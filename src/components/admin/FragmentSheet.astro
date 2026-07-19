@@ -1,0 +1,293 @@
+---
+/*
+  FragmentSheet — the quick-editor for quotes & songs (docs/admin.md §6–7),
+  as a native <dialog> drawer. Native gives focus-trapping, Escape, scroll-lock,
+  and focus restoration for free; we add the slide/fade animation via the
+  `.drawer-dialog` utility in app.css. Self-contained: its script wires the
+  list's New/Edit buttons, so the list page doesn't need to know about it.
+*/
+import { actions } from 'astro:actions';
+import TagInput from '../TagInput.astro';
+
+interface Props {
+  subjects: string[];
+}
+const { subjects } = Astro.props;
+const thisYear = new Date().getUTCFullYear();
+---
+
+<dialog id="sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="sheet-title">
+  <div class="flex h-full flex-col overflow-y-auto">
+    <header class="flex items-center justify-between border-b border-base-300 px-6 py-4">
+      <h2 id="sheet-title" class="font-display text-xl">New quote</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <p id="sheet-error" hidden class="mx-6 mt-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>
+
+    {/* QUOTE */}
+    <form id="quote-form" method="POST" action={actions.fragments.saveQuote} class="flex flex-col gap-4 p-6 font-sans">
+      <input type="hidden" name="id" />
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Quote</span>
+        <textarea name="body" rows="4" required class="textarea textarea-bordered font-serif text-base" placeholder="The words themselves…"></textarea>
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Attribution</span>
+        <input name="attribution" class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
+      </label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Source title</span>
+          <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Source author</span>
+          <input name="source_author" class="input input-sm input-bordered" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Work year</span>
+          <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Page</span>
+          <input name="page" type="number" class="input input-sm input-bordered" />
+        </label>
+      </div>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Source link</span>
+        <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
+      </label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Added (year)</span>
+          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Status</span>
+          <select name="status" class="select select-sm select-bordered">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </label>
+      </div>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Subjects</span>
+        <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="stoicism, acceptance" />
+      </label>
+      <div class="mt-2 flex items-center gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
+        <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+      </div>
+    </form>
+
+    {/* SONG */}
+    <form id="song-form" method="POST" action={actions.fragments.saveSong} hidden class="flex flex-col gap-4 p-6 font-sans">
+      <input type="hidden" name="id" />
+      <input type="hidden" name="spotify_id" />
+      <input type="hidden" name="thumbnail_url" />
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Spotify link</span>
+        <input name="spotify_url" type="url" required class="input input-sm input-bordered" placeholder="https://open.spotify.com/track/…" />
+        <span id="song-lookup" class="text-xs text-base-content/55" role="status"></span>
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Title <span class="text-base-content/40">(auto-filled)</span></span>
+        <input name="title" required class="input input-sm input-bordered" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Artist</span>
+        <input name="attribution" required class="input input-sm input-bordered" placeholder="Miles Davis" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Album</span>
+        <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
+      </label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Added (year)</span>
+          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Status</span>
+          <select name="status" class="select select-sm select-bordered">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </label>
+      </div>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Subjects</span>
+        <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="jazz, longing" />
+      </label>
+      <div class="mt-2 flex items-center gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
+        <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  import { actions } from 'astro:actions';
+  import { formatActionError } from '../../scripts/action-error';
+  import { confirmDialog } from '../../scripts/confirm-dialog';
+
+  const sheet = document.getElementById('sheet') as HTMLDialogElement;
+  const sheetTitle = document.getElementById('sheet-title')!;
+  const sheetError = document.getElementById('sheet-error') as HTMLParagraphElement;
+  const quoteForm = document.getElementById('quote-form') as HTMLFormElement;
+  const songForm = document.getElementById('song-form') as HTMLFormElement;
+
+  const showError = (msg: string) => {
+    sheetError.textContent = msg;
+    sheetError.hidden = false;
+  };
+  const clearError = () => {
+    sheetError.hidden = true;
+    sheetError.textContent = '';
+  };
+
+  function openSheet(type: 'quote' | 'song') {
+    clearError();
+    quoteForm.hidden = type !== 'quote';
+    songForm.hidden = type !== 'song';
+    sheet.showModal(); // native: focus-trap + Escape + focus restore on close
+  }
+  document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => sheet.close()));
+  // click on the backdrop (outside the drawer) closes
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) sheet.close();
+  });
+
+  function setField(form: HTMLFormElement, name: string, value: string) {
+    const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+    if (el) el.value = value;
+  }
+  function setSubjects(form: HTMLFormElement, value: string) {
+    (form.querySelector('tag-input') as HTMLElement & { setTags?: (v: string) => void })?.setTags?.(value);
+  }
+  function toggleDelete(form: HTMLFormElement, show: boolean) {
+    (form.querySelector('[data-delete]') as HTMLElement).hidden = !show;
+  }
+
+  // --- New quote / New song (buttons live in the list page) ---
+  document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.new as 'quote' | 'song';
+      const form = type === 'quote' ? quoteForm : songForm;
+      form.reset();
+      setField(form, 'id', '');
+      setSubjects(form, '');
+      toggleDelete(form, false);
+      if (type === 'song') document.getElementById('song-lookup')!.textContent = '';
+      sheetTitle.textContent = type === 'quote' ? 'New quote' : 'New song';
+      openSheet(type);
+    });
+  });
+
+  // --- Edit existing quote / song (delegated, so it survives list swaps) ---
+  document.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.edit-btn') as HTMLElement | null;
+    if (!btn) return;
+    {
+      let d: any;
+      try {
+        d = JSON.parse(btn.dataset.fragment!);
+      } catch {
+        return showError('Could not read that fragment.');
+      }
+      const type = d.type as 'quote' | 'song';
+      const form = type === 'quote' ? quoteForm : songForm;
+      form.reset();
+      setField(form, 'id', d.id);
+      setField(form, 'attribution', d.attribution);
+      setField(form, 'status', d.status);
+      setField(form, 'year', String(d.year));
+      setSubjects(form, d.subjects);
+      if (type === 'quote') {
+        setField(form, 'body', d.body);
+        setField(form, 'source_url', d.source_url);
+        setField(form, 'source_title', d.details.source_title ?? '');
+        setField(form, 'source_author', d.details.source_author ?? '');
+        setField(form, 'work_year', d.details.work_year != null ? String(d.details.work_year) : '');
+        setField(form, 'page', d.details.page != null ? String(d.details.page) : '');
+      } else {
+        setField(form, 'title', d.title);
+        setField(form, 'spotify_url', d.source_url);
+        setField(form, 'spotify_id', d.details.spotify_id ?? '');
+        setField(form, 'thumbnail_url', d.details.thumbnail_url ?? '');
+        setField(form, 'album', d.details.album ?? '');
+        document.getElementById('song-lookup')!.textContent = '';
+      }
+      toggleDelete(form, true);
+      sheetTitle.textContent = type === 'quote' ? 'Edit quote' : 'Edit song';
+      openSheet(type);
+    }
+  });
+
+  // --- Spotify lookup on paste/change ---
+  const urlField = songForm.elements.namedItem('spotify_url') as HTMLInputElement;
+  const lookupNote = document.getElementById('song-lookup')!;
+  async function runLookup() {
+    const url = urlField.value.trim();
+    if (!url) return;
+    lookupNote.textContent = 'Looking up…';
+    const { data, error } = await actions.songs.lookup({ url });
+    if (error || !data) {
+      lookupNote.textContent = 'Couldn’t read that link — fill the fields manually.';
+      return;
+    }
+    if (!(songForm.elements.namedItem('title') as HTMLInputElement).value) setField(songForm, 'title', data.title);
+    setField(songForm, 'spotify_id', data.spotifyId);
+    if (data.thumbnailUrl) setField(songForm, 'thumbnail_url', data.thumbnailUrl);
+    lookupNote.textContent = `✓ ${data.title}`;
+  }
+  urlField.addEventListener('change', runLookup);
+  urlField.addEventListener('paste', () => setTimeout(runLookup, 50));
+
+  // --- submit via the action ---
+  for (const [form, action] of [
+    [quoteForm, actions.fragments.saveQuote],
+    [songForm, actions.fragments.saveSong],
+  ] as const) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+      const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+      submitBtn.disabled = true;
+      const { error } = await action(new FormData(form));
+      submitBtn.disabled = false;
+      if (!error) {
+        window.location.href = '/admin';
+        return;
+      }
+      showError(formatActionError(error));
+    });
+  }
+
+  // --- delete from within the editor ---
+  document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const form = btn.closest('form') as HTMLFormElement;
+      const id = (form.elements.namedItem('id') as HTMLInputElement).value;
+      if (!id) return;
+      const ok = await confirmDialog({
+        title: 'Delete fragment',
+        message: 'Delete this fragment? This cannot be undone.',
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      btn.disabled = true;
+      const fd = new FormData();
+      fd.set('id', id);
+      const { error } = await actions.fragments.remove(fd);
+      if (error) {
+        btn.disabled = false;
+        return showError(error.message);
+      }
+      window.location.href = '/admin';
+    });
+  });
+</script>

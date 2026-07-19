@@ -1,0 +1,74 @@
+---
+/*
+  PublishDialog — the composer's pre-publish / post-details dialog (docs/admin.md
+  §5). It collects the last-mile metadata (slug, excerpt, subjects, an optional
+  backdated date) and confirms publish/unpublish.
+
+  IMPORTANT: this <dialog> is a sibling of <form id="writing-form">, so every
+  control here carries `form="writing-form"` — otherwise the form's FormData
+  would never include these fields. TagInput's hidden input is associated the
+  same way via its `form` prop.
+*/
+import TagInput from '../TagInput.astro';
+
+interface Props {
+  isNew: boolean;
+  slug: string;
+  excerpt: string;
+  subjectsValue: string;
+  subjectNames: string[];
+}
+const { isNew, slug, excerpt, subjectsValue, subjectNames } = Astro.props;
+const FORM = 'writing-form';
+---
+
+<dialog id="publish-dialog" class="modal-dialog w-full max-w-md" aria-labelledby="dialog-title">
+  <div class="flex flex-col gap-5 p-6 font-sans">
+    <div>
+      <h2 id="dialog-title" class="font-display text-2xl">Publish this piece</h2>
+      <p id="dialog-sub" class="mt-1 text-sm text-base-content/60">A few last details, then it goes live.</p>
+    </div>
+
+    {/* Posted date — automatic unless you deliberately backdate */}
+    <div class="flex flex-col gap-2 text-sm">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" id="date-toggle" class="checkbox checkbox-xs" checked={!isNew} />
+        <span class="text-base-content/80">Set a custom posted date</span>
+        <span class="text-base-content/40">— for backdating older posts</span>
+      </label>
+      <input
+        type="datetime-local"
+        name="occurred_at"
+        id="occurred-field"
+        form={FORM}
+        disabled={isNew}
+        class="input input-sm input-bordered w-full disabled:opacity-40"
+      />
+      <p id="date-auto-note" class="text-xs text-base-content/55" hidden={!isNew}>
+        Otherwise the posted date is set automatically when you publish.
+      </p>
+    </div>
+
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="text-base-content/80">Slug <span class="text-base-content/40">— the URL</span></span>
+      <input name="slug" id="slug-field" form={FORM} value={slug} class="input input-sm input-bordered" placeholder="auto-from-title" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="text-base-content/80">Excerpt <span class="text-base-content/40">— the card blurb (optional)</span></span>
+      <textarea name="excerpt" form={FORM} rows="2" class="textarea textarea-bordered font-serif text-base">{excerpt}</textarea>
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="text-base-content/80">Subjects</span>
+      <TagInput name="subjects" label="Subjects" value={subjectsValue} suggestions={subjectNames} form={FORM} placeholder="Add a subject…" />
+    </label>
+
+    <p id="dialog-error" hidden class="rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>
+
+    <div class="mt-1 flex items-center justify-end gap-2">
+      <button type="button" id="dialog-cancel" class="btn btn-ghost btn-sm normal-case">Cancel</button>
+      <button type="button" id="dialog-confirm" class="btn btn-primary btn-sm normal-case">Publish now</button>
+    </div>
+  </div>
+</dialog>

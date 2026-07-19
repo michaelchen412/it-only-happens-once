@@ -1,0 +1,78 @@
+---
+/*
+  AdminLayout — chrome for the third room (docs/admin.md §1).
+
+  A private workshop, not a public surface: same dusk tokens, Atkinson chrome,
+  but tuned for speed and density over poetry. Every /admin route is auth-gated
+  by middleware and renders on demand (never cached, never public).
+*/
+import Base from './Base.astro';
+import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
+
+interface Props {
+  title?: string;
+  /** Which top-nav item is active. */
+  active?: 'fragments';
+}
+const { title = 'Workshop', active = 'fragments' } = Astro.props;
+const user = Astro.locals.user;
+
+const nav = [{ key: 'fragments', label: 'Fragments', href: '/admin' }] as const;
+---
+
+<Base title={`${title} — Workshop`}>
+  <div class="min-h-screen bg-base-100 font-sans">
+    <header
+      class="sticky top-0 z-30 flex h-14 items-center gap-6 border-b border-base-300 bg-base-100/90 px-6 backdrop-blur"
+    >
+      <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
+        <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
+        <span class="font-display text-lg leading-none">Workshop</span>
+      </a>
+
+      <nav class="flex items-center gap-1 text-sm">
+        {
+          nav.map((item) => (
+            <a
+              href={item.href}
+              class:list={[
+                'rounded-field px-3 py-1.5 transition-colors',
+                active === item.key
+                  ? 'bg-base-200 text-base-content'
+                  : 'text-base-content/50 hover:text-base-content',
+              ]}
+            >
+              {item.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <div class="ml-auto flex items-center gap-3 text-xs text-base-content/40">
+        <span class="hidden sm:inline">{user?.email}</span>
+        <a href="/" class="hover:text-base-content" title="View the site">Site ↗</a>
+        <button id="admin-signout" class="rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content">
+          Sign out
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+  </div>
+
+  <ConfirmDialog />
+
+  <script>
+    import { createBrowserClient } from '@supabase/ssr';
+    const supabase = createBrowserClient(
+      import.meta.env.PUBLIC_SUPABASE_URL,
+      import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    );
+    document.getElementById('admin-signout')?.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    });
+  </script>
+</Base>

@@ -1,0 +1,150 @@
+---
+/*
+  /admin/writing/[id] — the writing composer (docs/admin.md §5). A focused,
+  near-full-screen surface: one sticky bar (command row + fixed formatting
+  toolbar), then the document (title + body). TipTap stores Markdown (ADR-0006);
+  the client logic lives in src/scripts/composer.ts, the metadata form in
+  PublishDialog. `[id]` is 'new' or a fragment UUID.
+*/
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PublishDialog from '../../../components/admin/PublishDialog.astro';
+import type { Database } from '../../../lib/database.types';
+
+const supabase = Astro.locals.supabase;
+const { id } = Astro.params;
+const isNew = id === 'new';
+
+type FragmentRow = Database['public']['Tables']['fragments']['Row'];
+let fragment: FragmentRow | null = null;
+if (!isNew) {
+  const { data, error } = await supabase.from('fragments').select('*').eq('id', id!).eq('type', 'writing').single();
+  if (error || !data) return Astro.redirect('/admin');
+  fragment = data;
+}
+
+let subjectsValue = '';
+if (fragment) {
+  const { data: fs } = await supabase.from('fragment_subjects').select('subjects(name)').eq('fragment_id', fragment.id);
+  subjectsValue = (fs ?? []).map((l) => (l.subjects as { name: string } | null)?.name).filter(Boolean).join(', ');
+}
+const { data: allSubjects } = await supabase.from('subjects').select('name').order('name');
+const subjectNames = (allSubjects ?? []).map((s) => s.name);
+
+// composer-init: read by the client script. occurredIso is formatted to LOCAL
+// time client-side (avoids the datetime-local UTC round-trip drift).
+const composerInit = {
+  body: fragment?.body ?? '',
+  status: fragment?.status ?? 'draft',
+  occurredIso: fragment?.occurred_at ?? '',
+};
+
+// Fixed toolbar spec — `cmd` maps to a TipTap chain in composer.ts.
+const TOOLS = [
+  { group: [{ cmd: 'undo', label: '↶', aria: 'Undo' }, { cmd: 'redo', label: '↷', aria: 'Redo' }] },
+  { group: [{ cmd: 'h2', label: 'H2', aria: 'Heading', toggle: true }, { cmd: 'h3', label: 'H3', aria: 'Subheading', toggle: true }] },
+  { group: [
+      { cmd: 'bold', label: 'B', aria: 'Bold', klass: 'font-bold', toggle: true },
+      { cmd: 'italic', label: 'I', aria: 'Italic', klass: 'italic', toggle: true },
+      { cmd: 'strike', label: 'S', aria: 'Strikethrough', klass: 'line-through', toggle: true },
+    ] },
+  { group: [
+      { cmd: 'blockquote', label: '“', aria: 'Quote', toggle: true },
+      { cmd: 'bulletList', label: '•', aria: 'Bulleted list', toggle: true },
+      { cmd: 'orderedList', label: '1.', aria: 'Numbered list', toggle: true },
+    ] },
+  { group: [{ cmd: 'link', label: '🔗', aria: 'Add link' }, { cmd: 'hr', label: '—', aria: 'Divider' }] },
+] as const;
+---
+
+<AdminLayout title={isNew ? 'New writing' : 'Edit writing'} active="fragments">
+  <form id="writing-form" class="flex min-h-[calc(100vh-3.5rem)] flex-col">
+    <input type="hidden" name="id" value={fragment?.id ?? ''} />
+    <input type="hidden" name="body" id="body-field" />
+
+    {/* One sticky bar: command row + formatting toolbar (single offset = header height) */}
+    <div class="sticky top-14 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur">
+      <div class="flex items-center gap-3 px-6 py-2">
+        <a href="/admin" class="font-sans text-sm text-base-content/55 hover:text-base-content">← Fragments</a>
+
+        <div id="status-indicator" class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55" aria-live="polite">
+          <span id="spinner" hidden class="loading loading-spinner loading-xs"></span>
+          <span id="status-text">Autosaves as you write</span>
+        </div>
+
+        <div id="actions-draft" class="flex items-center gap-2">
+          <button type="button" id="open-publish" class="btn btn-primary btn-sm normal-case">Publish…</button>
+        </div>
+        <div id="actions-published" hidden class="flex items-center gap-2">
+          {fragment?.slug && <a id="view-link" href={`/blog/${fragment.slug}`} class="btn btn-ghost btn-sm normal-case">View ↗</a>}
+          <button type="button" id="open-details" class="btn btn-ghost btn-sm normal-case">Details…</button>
+          <button type="button" id="unpublish" class="btn btn-outline btn-sm normal-case">Unpublish</button>
+        </div>
+
+        {!isNew && <button type="button" id="delete" class="font-sans text-sm text-base-content/55 hover:text-error">Delete</button>}
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1 border-t border-base-300/60 px-6 py-1.5" role="toolbar" aria-label="Formatting">
+        {
+          TOOLS.map((section, i) => (
+            <>
+              {i > 0 && <span class="mx-1 h-5 w-px bg-base-300"></span>}
+              {section.group.map((t) => (
+                <button
+                  type="button"
+                  data-cmd={t.cmd}
+                  title={t.aria}
+                  aria-label={t.aria}
+                  aria-pressed={(t as { toggle?: boolean }).toggle ? 'false' : undefined}
+                  class:list={['tt-btn', (t as { klass?: string }).klass]}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </>
+          ))
+        }
+      </div>
+    </div>
+
+    {/* Document */}
+    <div class="mx-auto w-full max-w-2xl flex-1 px-6 pt-10 pb-24">
+      <input
+        name="title"
+        value={fragment?.title ?? ''}
+        placeholder="Title"
+        aria-label="Title"
+        class="w-full border-none bg-transparent font-display text-4xl font-light outline-none placeholder:text-base-content/25"
+      />
+      <p id="js-error" hidden class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error"></p>
+      <div id="editor" class="reading mt-6"></div>
+    </div>
+  </form>
+
+  <PublishDialog
+    isNew={isNew}
+    slug={fragment?.slug ?? ''}
+    excerpt={fragment?.excerpt ?? ''}
+    subjectsValue={subjectsValue}
+    subjectNames={subjectNames}
+  />
+
+  {/* Link editor (replaces prompt()) */}
+  <dialog id="link-dialog" class="modal-dialog w-full max-w-sm" aria-labelledby="link-title">
+    <div class="flex flex-col gap-4 p-6 font-sans">
+      <h2 id="link-title" class="font-display text-xl">Link</h2>
+      <input id="link-url" type="url" placeholder="https://…" class="input input-sm input-bordered" aria-label="Link URL" />
+      <div class="flex items-center justify-between">
+        <button type="button" id="link-remove" hidden class="btn btn-ghost btn-sm text-error normal-case">Remove</button>
+        <div class="ml-auto flex gap-2">
+          <button type="button" id="link-cancel" class="btn btn-ghost btn-sm normal-case">Cancel</button>
+          <button type="button" id="link-apply" class="btn btn-primary btn-sm normal-case">Apply</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="application/json" id="composer-init" is:inline set:html={JSON.stringify(composerInit)}></script>
+  <script>
+    import '../../../scripts/composer';
+  </script>
+</AdminLayout>

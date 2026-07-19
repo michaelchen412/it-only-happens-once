@@ -1,0 +1,56 @@
+---
+/*
+  One row in the admin fragment list. Writing links out to its composer page;
+  quote/song carry a JSON blob the FragmentSheet reads to open the editor.
+*/
+import type { Database } from '../../lib/database.types';
+import { TYPE_META, displayDate, rowTitle, type FragmentType } from '../../lib/fragments-display';
+
+type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
+interface Props {
+  fragment: FragmentRowT;
+  subjects: string[];
+}
+const { fragment: r, subjects } = Astro.props;
+const meta = TYPE_META[r.type as FragmentType];
+
+// Blob for the slide-over editor (quote/song only).
+const editorData = JSON.stringify({
+  id: r.id,
+  type: r.type,
+  title: r.title ?? '',
+  body: r.body ?? '',
+  attribution: r.attribution ?? '',
+  source_url: r.source_url ?? '',
+  status: r.status,
+  year: new Date(r.occurred_at).getUTCFullYear(),
+  subjects: subjects.join(', '),
+  details: (r.details ?? {}) as Record<string, unknown>,
+});
+---
+
+<li class="group flex items-center gap-3 px-4 py-3 hover:bg-base-200/40">
+  <input type="checkbox" class="row-check checkbox checkbox-xs" value={r.id} aria-label={`Select ${rowTitle(r)}`} />
+  <span class:list={['w-4 text-center', meta.tone]} aria-hidden="true">{meta.glyph}</span>
+
+  <div class="min-w-0 flex-1">
+    <span class:list={['block truncate', r.type === 'quote' ? 'italic' : '']}>{rowTitle(r)}</span>
+    {r.attribution && <p class="truncate font-sans text-xs text-base-content/55">{r.attribution}</p>}
+  </div>
+
+  <span class="hidden shrink-0 font-sans text-xs text-base-content/55 sm:inline">
+    {displayDate(r.occurred_at, r.date_precision)}
+  </span>
+
+  {
+    r.type === 'writing' ? (
+      <a href={`/admin/writing/${r.id}`} class="row-edit shrink-0 font-sans text-xs text-base-content/50 hover:text-primary">
+        Edit
+      </a>
+    ) : (
+      <button class="edit-btn row-edit shrink-0 font-sans text-xs text-base-content/50 hover:text-primary" data-fragment={editorData}>
+        Edit
+      </button>
+    )
+  }
+</li>

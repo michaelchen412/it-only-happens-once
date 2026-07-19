@@ -1,0 +1,182 @@
+---
+/*
+  /admin — the fragment list (docs/admin.md §2). The workshop's home base:
+  filter · search · sort · select-many for bulk actions, over ALL fragments
+  (draft + published; admin sees everything via RLS). Rows come from FragmentRow;
+  quotes/songs edit in the FragmentSheet drawer; writing links to its composer.
+*/
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import FragmentRow from '../../components/admin/FragmentRow.astro';
+import FragmentSheet from '../../components/admin/FragmentSheet.astro';
+import { actions } from 'astro:actions';
+
+const supabase = Astro.locals.supabase;
+
+// No-JS fallback: if a quote/song form posted here, redirect on success.
+let actionError: string | null = null;
+for (const a of [actions.fragments.saveQuote, actions.fragments.saveSong, actions.fragments.remove]) {
+  const r = Astro.getActionResult(a);
+  if (r) {
+    if (!r.error) return Astro.redirect('/admin');
+    actionError = r.error.message;
+  }
+}
+
+// --- filters from the URL ---
+const url = Astro.url;
+const TYPES = ['writing', 'quote', 'song'] as const;
+const STATUSES = ['draft', 'published'] as const;
+const typeParam = TYPES.find((t) => t === url.searchParams.get('type')) ?? null;
+const statusParam = STATUSES.find((s) => s === url.searchParams.get('status')) ?? null;
+const subjectParam = url.searchParams.get('subject') || null;
+const q = (url.searchParams.get('q') ?? '').trim();
+const sort = url.searchParams.get('sort') ?? 'recent';
+
+// --- subject filter → fragment ids ---
+let subjectFilterIds: string[] | null = null;
+if (subjectParam) {
+  const { data: subj } = await supabase.from('subjects').select('id').eq('slug', subjectParam).single();
+  if (subj) {
+    const { data: links } = await supabase.from('fragment_subjects').select('fragment_id').eq('subject_id', subj.id);
+    subjectFilterIds = (links ?? []).map((l) => l.fragment_id);
+  } else {
+    subjectFilterIds = [];
+  }
+}
+
+// --- main query ---
+let query = supabase.from('fragments').select('*');
+if (typeParam) query = query.eq('type', typeParam);
+if (statusParam) query = query.eq('status', statusParam);
+if (subjectFilterIds) query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
+if (q) {
+  const safe = q.replace(/[(),]/g, ' ');
+  query = query.or(`title.ilike.%${safe}%,body.ilike.%${safe}%,attribution.ilike.%${safe}%,excerpt.ilike.%${safe}%`);
+}
+if (sort === 'oldest') query = query.order('occurred_at', { ascending: true });
+else if (sort === 'title') query = query.order('title', { ascending: true, nullsFirst: false });
+else if (sort === 'updated') query = query.order('updated_at', { ascending: false });
+else query = query.order('occurred_at', { ascending: false });
+
+const { data: fragments, error: listError } = await query;
+const rows = fragments ?? [];
+if (listError) actionError ??= listError.message;
+
+// In-progress work sits on top.
+const sections = [
+  { key: 'draft', title: 'Drafts', items: rows.filter((r) => r.status === 'draft') },
+  { key: 'published', title: 'Published', items: rows.filter((r) => r.status === 'published') },
+] as const;
+
+// Subject names per fragment (for the editor prefill) + all subjects (filter + sheet).
+const ids = rows.map((r) => r.id);
+const subjectsByFragment: Record<string, string[]> = {};
+if (ids.length) {
+  const { data: fs } = await supabase.from('fragment_subjects').select('fragment_id, subjects(name)').in('fragment_id', ids);
+  for (const link of fs ?? []) {
+    const name = (link.subjects as { name: string } | null)?.name;
+    if (name) (subjectsByFragment[link.fragment_id] ??= []).push(name);
+  }
+}
+const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
+const subjectNames = (allSubjects ?? []).map((s) => s.name);
+
+const filtered = typeParam || statusParam || subjectParam || q;
+---
+
+<AdminLayout title="Fragments" active="fragments">
+  <div class="mx-auto max-w-5xl px-6 py-8">
+    <div class="flex items-baseline justify-between gap-4">
+      <div>
+        <h1 class="font-display text-3xl font-light">Fragments</h1>
+        <p class="mt-1 text-sm text-base-content/50">
+          <span id="fragment-count">{rows.length} {rows.length === 1 ? 'fragment' : 'fragments'}{filtered ? ' matching' : ' in all'}</span>
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="/admin/writing/new" class="btn btn-primary btn-sm font-sans normal-case"><span aria-hidden="true">▤</span> Writing</a>
+        <button data-new="quote" class="btn btn-outline btn-sm font-sans normal-case"><span aria-hidden="true">”</span> Quote</button>
+        <button data-new="song" class="btn btn-outline btn-sm font-sans normal-case"><span aria-hidden="true">♪</span> Song</button>
+      </div>
+    </div>
+
+    {actionError && <p class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error">{actionError}</p>}
+
+    {/* Filters (GET form, auto-submits on change) */}
+    <form method="GET" id="filters" class="mt-6 flex flex-wrap items-center gap-2 text-sm">
+      <input type="search" name="q" value={q} placeholder="Search…" class="input input-sm input-bordered w-48 font-sans" aria-label="Search fragments" />
+      <select name="type" class="select select-sm select-bordered font-sans" aria-label="Type">
+        <option value="">All types</option>
+        {TYPES.map((t) => <option value={t} selected={typeParam === t}>{t}</option>)}
+      </select>
+      <select name="status" class="select select-sm select-bordered font-sans" aria-label="Status">
+        <option value="">Any status</option>
+        {STATUSES.map((s) => <option value={s} selected={statusParam === s}>{s}</option>)}
+      </select>
+      <select name="subject" class="select select-sm select-bordered font-sans" aria-label="Subject">
+        <option value="">Any subject</option>
+        {(allSubjects ?? []).map((s) => <option value={s.slug} selected={subjectParam === s.slug}>{s.name}</option>)}
+      </select>
+      <select name="sort" class="select select-sm select-bordered font-sans" aria-label="Sort">
+        <option value="recent" selected={sort === 'recent'}>Newest</option>
+        <option value="oldest" selected={sort === 'oldest'}>Oldest</option>
+        <option value="title" selected={sort === 'title'}>Title</option>
+        <option value="updated" selected={sort === 'updated'}>Recently edited</option>
+      </select>
+      <noscript><button class="btn btn-sm btn-neutral font-sans normal-case">Apply</button></noscript>
+      {(filtered || sort !== 'recent') && <a href="/admin" class="text-base-content/55 underline hover:text-base-content">clear</a>}
+    </form>
+
+    {/* The list — grouped into Drafts / Published sections. This region is
+        swapped in place by client-side filtering (src/scripts/admin-list.ts). */}
+    <div id="fragment-list" class="mt-2">
+      {
+        rows.length === 0 ? (
+          <div class="mt-8 rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
+            <p class="font-display text-xl text-base-content/60">Nothing here yet.</p>
+            <p class="mt-2 text-sm text-base-content/50">Start with a piece of writing, a quote, or a song — the buttons up top.</p>
+          </div>
+        ) : (
+          <>
+            <label class="mt-3 flex items-center gap-2 px-1 font-sans text-xs text-base-content/55">
+              <input type="checkbox" id="selectall" class="checkbox checkbox-xs" />
+              Select all
+            </label>
+            {sections
+              .filter((s) => s.items.length > 0)
+              .map((section) => (
+                <section class="mt-4">
+                  <h2 class="mb-2 flex items-center gap-2 px-1 font-sans text-xs tracking-wide text-base-content/55 uppercase">
+                    {section.title}
+                    <span class="rounded-selector bg-base-200 px-1.5 py-0.5 normal-case">{section.items.length}</span>
+                  </h2>
+                  <ul class="divide-y divide-base-300 rounded-box border border-base-300">
+                    {section.items.map((r) => (
+                      <FragmentRow fragment={r} subjects={subjectsByFragment[r.id] ?? []} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+          </>
+        )
+      }
+    </div>
+  </div>
+
+  {/* Floating bulk-action bar (slides up when rows are selected) */}
+  <div id="bulkbar" class="bulkbar font-sans text-sm">
+    <span id="bulkcount" class="text-base-content/70">0 selected</span>
+    <div class="flex gap-1">
+      <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
+      <button data-bulk="unpublish" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
+      <button data-bulk="delete" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
+    </div>
+  </div>
+  <p id="bulk-error" hidden class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
+
+  <FragmentSheet subjects={subjectNames} />
+
+  <script>
+    import '../../scripts/admin-list';
+  </script>
+</AdminLayout>
