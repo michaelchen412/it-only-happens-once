@@ -1,0 +1,123 @@
+---
+import Base from '../layouts/Base.astro';
+import Timestamp from '../components/Timestamp.astro';
+
+// Sample content — a plausible essay, so we can judge Newsreader at real length.
+const lenses = ['conditions, not character', 'the invisible graveyard'];
+---
+
+<Base title="Forgiveness — It Only Happens Once">
+  <main class="px-6 py-16 sm:py-24">
+    <article class="prose-measure mx-auto">
+      <!-- which lenses this piece lives in -->
+      <div
+        class="flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-xs tracking-widest text-base-content/45 uppercase"
+      >
+        {
+          lenses.map((l) => (
+            <span class="inline-flex items-center gap-1.5">
+              <span class="text-primary">✦</span>
+              {l}
+            </span>
+          ))
+        }
+      </div>
+
+      <h1 class="mt-6 font-display text-4xl leading-[1.1] font-light sm:text-6xl">
+        Forgiveness
+      </h1>
+
+      <div class="mt-6 flex items-center gap-3 text-sm text-base-content/40">
+        <Timestamp date="2023-05-31" />
+        <span class="font-sans">·</span>
+        <span class="font-sans">6 min read</span>
+      </div>
+
+      <div class="reading mt-14">
+        <p class="reading-lead">
+          For most of my life I believed forgiveness was a decision — a door
+          you chose to open, a generosity you extended by force of will. I don't
+          believe that anymore.
+        </p>
+
+        <p>
+          What changed wasn't my heart. It was my model of people. Somewhere
+          along the way I started tracing behavior back to its causes — really
+          tracing it, past the point where blame is comfortable — and I kept
+          arriving at the same place: <em>conditions</em>. The person who hurt
+          me was, in almost every case, doing the only thing their history had
+          equipped them to do. Not excused. Explained.
+        </p>
+
+        <p>
+          And explanation, it turns out, does something that willpower never
+          could. When you follow the full causal chain behind an action, the
+          <em>agent</em> you wanted to blame quietly dissolves. There is no one
+          standing at the center of it who could have done otherwise. What's
+          left isn't anger. It's a kind of tired tenderness.
+        </p>
+
+        <blockquote>The best revenge is not to be like your enemy.</blockquote>
+
+        <h2>What understanding does</h2>
+
+        <p>
+          I used to think this made me soft — that refusing to hold a grudge was
+          a failure of self-respect. I've come to think the opposite.
+          Resentment assumes a free agent who <strong>chose</strong> to wrong
+          you. Remove the assumption and resentment has nothing to hold onto; it
+          isn't suppressed, it's <em>unfounded</em>. That's not weakness. It's
+          just accuracy.
+        </p>
+
+        <p>
+          There is a cost to seeing this way, and I won't pretend there isn't.
+          If no one is finally to blame, then some part of you has to carry the
+          grief without the relief of having someone to hand it to. The pain was
+          real. It simply didn't have an author.
+        </p>
+
+        <h2>The part I keep having to relearn</h2>
+
+        <p>
+          The strange thing is how hard it is to extend the same mercy inward. I
+          can forgive almost anyone their conditions — except the younger
+          version of myself, who by the exact same logic could not have done
+          otherwise either. The framework that sets everyone else free keeps
+          making an exception for me. I'm still
+          <a href="#">working on that</a>.
+        </p>
+
+        <p>
+          But that is the direction, at least. Forgiveness stopped being
+          something I <em>do</em> and became something I <em>see</em> — and once
+          you see it, you can't quite unsee it. It only happens once, this life,
+          and most of the people in it are trying about as hard as their
+          conditions allow.
+        </p>
+      </div>
+
+      <!-- where it lives -->
+      <footer class="mt-20 border-t border-base-300 pt-8">
+        <p
+          class="font-sans text-xs tracking-widest text-base-content/40 uppercase"
+        >
+          This piece lives in
+        </p>
+        <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-xl">
+          {
+            lenses.map((l) => (
+              <a
+                href="#"
+                class="inline-flex items-center gap-2 font-light transition-colors hover:text-primary"
+              >
+                <span class="text-primary">✦</span>
+                {l}
+              </a>
+            ))
+          }
+        </div>
+      </footer>
+    </article>
+  </main>
+</Base>

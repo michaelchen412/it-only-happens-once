@@ -1,0 +1,418 @@
+---
+import Base from '../layouts/Base.astro';
+import FragmentCard from '../components/FragmentCard.astro';
+import Timestamp from '../components/Timestamp.astro';
+
+// live sample dates so the relative labels actually demonstrate the range
+const now = new Date();
+const daysAgo = (n: number) => {
+  const d = new Date(now);
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+};
+
+// Illustrative content only — drawn from real things in about-michael.md so the
+// prototype feels like the actual site rather than lorem ipsum.
+const swatches = [
+  { name: 'base-100', cls: 'bg-base-100', note: 'the room' },
+  { name: 'base-200', cls: 'bg-base-200', note: 'raised' },
+  { name: 'base-300', cls: 'bg-base-300', note: 'edges' },
+  { name: 'primary', cls: 'bg-primary', note: 'lamplight' },
+  { name: 'secondary', cls: 'bg-secondary', note: 'dusk sky' },
+  { name: 'accent', cls: 'bg-accent', note: 'ember' },
+  { name: 'neutral', cls: 'bg-neutral', note: 'quiet' },
+  { name: 'info', cls: 'bg-info', note: '' },
+  { name: 'success', cls: 'bg-success', note: '' },
+  { name: 'warning', cls: 'bg-warning', note: '' },
+  { name: 'error', cls: 'bg-error', note: '' },
+];
+
+const constellations = [
+  { name: 'conditions, not character', weight: 'text-4xl sm:text-5xl' },
+  { name: 'it only happens once', weight: 'text-3xl sm:text-4xl' },
+  { name: 'the one who reaches first', weight: 'text-2xl sm:text-3xl' },
+  { name: 'not looking away', weight: 'text-xl sm:text-2xl' },
+  { name: 'the invisible graveyard', weight: 'text-lg sm:text-xl' },
+  { name: 'love stretched too thin', weight: 'text-base sm:text-lg' },
+  { name: 'built for depth', weight: 'text-base' },
+];
+---
+
+<Base title="Styleguide — It Only Happens Once">
+  <!-- ── theme switch ─────────────────────────────────────────────── -->
+  <div
+    class="sticky top-0 z-50 border-b border-base-300 bg-base-100/85 backdrop-blur"
+  >
+    <div
+      class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
+    >
+      <span class="font-sans text-xs tracking-widest text-base-content/50 uppercase"
+        >Styleguide</span
+      >
+      <button
+        id="theme-toggle"
+        class="btn btn-ghost btn-sm font-sans normal-case"
+      >
+        <span id="theme-label">dusk</span>
+      </button>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-5xl px-6 py-16">
+    <!-- ── masthead ───────────────────────────────────────────────── -->
+    <header class="mb-24">
+      <p
+        class="font-sans text-xs tracking-[0.2em] text-base-content/40 uppercase"
+      >
+        design prototype
+      </p>
+      <h1 class="mt-4 font-display text-5xl leading-[1.1] font-light sm:text-7xl">
+        It Only <em class="text-primary not-italic">Happens</em> Once
+      </h1>
+      <p class="prose-measure mt-6 text-lg text-base-content/70">
+        The night sky as intimacy, not as space. Warm ink, cream, lamplight —
+        a jazz club at eleven, a porch at dusk. Restraint is the warmth: a
+        good listener doesn't shout.
+      </p>
+    </header>
+
+    <!-- ── color ──────────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        Color
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        Every slot is <em>semantic</em> — a role, never a value. Nothing on this
+        site may name a color directly.
+      </p>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {
+          swatches.map((s) => (
+            <div>
+              <div
+                class={`h-16 rounded-box border border-base-300 ${s.cls}`}
+              />
+              <p class="mt-2 font-sans text-xs">{s.name}</p>
+              {s.note && (
+                <p class="font-sans text-xs text-base-content/40">{s.note}</p>
+              )}
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ── type ───────────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-8 font-sans text-sm tracking-widest uppercase opacity-50">
+        Type
+      </h2>
+      <div class="space-y-6">
+        <div>
+          <p class="text-6xl font-light">Newsreader — display</p>
+          <p class="mt-1 font-sans text-xs text-base-content/40">
+            serif · the voice · reading &amp; identity
+          </p>
+        </div>
+        <div>
+          <p class="text-3xl font-light">A constellation is a lens</p>
+        </div>
+        <div>
+          <p class="text-xl italic">and adjacency carries the meaning</p>
+        </div>
+        <div class="border-t border-base-300 pt-6">
+          <p class="font-sans text-lg">Atkinson Hyperlegible — interface</p>
+          <p class="mt-1 font-sans text-xs text-base-content/40">
+            sans · chrome, labels, metadata · designed by the Braille Institute
+            so that people who struggle to read still can
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── reading ────────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-8 font-sans text-sm tracking-widest uppercase opacity-50">
+        Reading
+      </h2>
+      <div class="prose-measure space-y-5 text-lg">
+        <p>
+          Vanity of vanities, saith the Preacher, vanity of vanities; all is
+          vanity. What profit hath a man of all his labour which he taketh
+          under the sun? One generation passeth away, and another generation
+          cometh: but the earth abideth for ever.
+        </p>
+        <p>
+          The thing that hath been, it is that which shall be; and that which
+          is done is that which shall be done: and there is no new thing under
+          the sun. Is there any thing whereof it may be said, See, this is new?
+          it hath been already of old time, which was before us.
+        </p>
+        <p class="font-sans text-sm text-base-content/40">
+          Ecclesiastes 1 — measure capped at 68ch, leading at 1.7
+        </p>
+      </div>
+    </section>
+
+    <!-- ── fragments ──────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        Fragments
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        The atom. Single-medium, standalone — a song, a quote, a piece of
+        writing. Provenance is shown quietly and never sorts anything.
+      </p>
+
+      <div class="grid items-stretch gap-4 sm:grid-cols-3">
+        <FragmentCard
+          type="song"
+          title="Auburn"
+          attribution="Ben Wendel · The Seasons"
+          date="2019-01-01"
+          precision="year"
+        />
+        <FragmentCard
+          type="quote"
+          body="You have power over your mind — not outside events. Realize this, and you will find strength."
+          attribution="Marcus Aurelius · Meditations"
+          date={daysAgo(3)}
+        />
+        <FragmentCard
+          type="writing"
+          title="Forgiveness"
+          body="If people are largely products of their conditions, there is no free agent left to blame — and understanding dissolves resentment."
+          date="2023-05-31"
+          meta="6 min"
+        />
+      </div>
+      <p class="mt-6 font-sans text-xs text-base-content/40">
+        Same frame, same width, footer on one baseline. The long quote now
+        clamps; the essay always shows an excerpt. (The Spotify embed and full
+        text live on each fragment's own page, not the card.)
+      </p>
+    </section>
+
+    <!-- ── dates ──────────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        Dates
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        Quiet on the surface — no verb, just the moment. Click any date for the
+        full timestamp (and any later edit). One component, used everywhere.
+      </p>
+      <div class="flex flex-wrap gap-x-10 gap-y-4 text-lg">
+        <Timestamp date={daysAgo(0)} />
+        <Timestamp date={daysAgo(1)} />
+        <Timestamp date={daysAgo(3)} />
+        <Timestamp date="2026-02-14" />
+        <Timestamp date="2023-05-31" />
+        <Timestamp date="2019-01-01" precision="year" kind="added" />
+        <Timestamp date="2023-05-31" updated={daysAgo(2)} />
+      </div>
+      <p class="mt-6 font-sans text-xs text-base-content/40">
+        Today · Yesterday · weekday · this-year · older · year-only · edited
+      </p>
+    </section>
+
+    <!-- ── constellation band ─────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        Constellation — the landing
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        You land <em>inside</em> a living lens, never on a menu. Fragments are
+        visible immediately. Scroll down crosses domains; swipe sideways moves
+        through the suite. The next constellation peeks — that's what teaches
+        the whole structure in one glance.
+      </p>
+
+      <div
+        class="overflow-hidden rounded-box border border-base-300 bg-base-100"
+      >
+        <div class="p-6 sm:p-10">
+          <div class="flex items-baseline gap-3">
+            <span class="text-primary">✦</span>
+            <h3 class="font-display text-3xl font-light sm:text-4xl">
+              conditions, not character
+            </h3>
+          </div>
+          <p class="prose-measure mt-3 text-base-content/50">
+            Outcomes are shaped by structural conditions far more than
+            individual willpower.
+          </p>
+
+          <div class="mt-8 flex items-stretch gap-4 overflow-x-auto pb-2">
+            <FragmentCard
+              class="w-72 shrink-0"
+              type="song"
+              title="Gaze"
+              attribution="Ben Wendel"
+              date="2019-01-01"
+              precision="year"
+            />
+            <FragmentCard
+              class="w-72 shrink-0"
+              type="quote"
+              body="One generation passeth away, and another generation cometh: but the earth abideth for ever."
+              attribution="Qohelet 1:4"
+              date="2021-06-01"
+              precision="year"
+            />
+            <FragmentCard
+              class="w-72 shrink-0"
+              type="writing"
+              title="Choice"
+              body="Why should I act as if I knew with any certainty whether a relationship would work?"
+              date="2023-05-03"
+              meta="5 min"
+            />
+            <FragmentCard
+              class="w-72 shrink-0"
+              type="writing"
+              title="Forgiveness"
+              body="If people are largely products of their conditions, there is no free agent left to blame."
+              date="2023-05-31"
+              meta="6 min"
+            />
+          </div>
+        </div>
+
+        <!-- the peek -->
+        <div class="border-t border-base-300 px-6 pt-6 pb-2 sm:px-10">
+          <div class="flex items-baseline gap-3 opacity-40">
+            <span class="text-primary">✦</span>
+            <h3 class="font-display text-2xl font-light">the one who reaches first</h3>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── sky ────────────────────────────────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        The whole sky — zoomed out
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        One gesture. Every lens at a glance, sized by how much of him it
+        occupies. Uneven on purpose — weight is signal, not noise. This is the
+        only index the sky gets: no pills, no dropdowns.
+      </p>
+
+      <div
+        class="rounded-box border border-base-300 bg-base-100 px-6 py-14 sm:px-16"
+      >
+        <div class="flex flex-col gap-5">
+          {
+            constellations.map((c, i) => (
+              <div
+                class={`flex items-baseline gap-3 ${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}
+              >
+                <span class="text-primary/60 text-xs">✦</span>
+                <span
+                  class={`${c.weight} font-display cursor-pointer font-light transition-colors hover:text-primary`}
+                >
+                  {c.name}
+                </span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ── controls (the Index register) ──────────────────────────── -->
+    <section class="mb-24">
+      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+        Controls — the Index register
+      </h2>
+      <p class="prose-measure mb-8 text-base-content/60">
+        None of this belongs in the sky. It lives in the Index, where finding a
+        specific thing is the whole job.
+      </p>
+
+      <div class="space-y-8">
+        <div class="flex flex-wrap items-center gap-3">
+          <button class="btn btn-primary font-sans normal-case">Primary</button>
+          <button class="btn btn-secondary font-sans normal-case">Secondary</button>
+          <button class="btn btn-accent font-sans normal-case">Accent</button>
+          <button class="btn btn-outline font-sans normal-case">Outline</button>
+          <button class="btn btn-ghost font-sans normal-case">Ghost</button>
+          <button class="btn btn-sm font-sans normal-case">Small</button>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+          <input
+            type="text"
+            placeholder="Search everything…"
+            class="input input-bordered w-full max-w-xs font-sans"
+          />
+          <select class="select select-bordered font-sans">
+            <option>All fragments</option>
+            <option>Music</option>
+            <option>Quotes</option>
+            <option>Writing</option>
+          </select>
+          <div class="dropdown">
+            <div
+              tabindex="0"
+              role="button"
+              class="btn btn-outline font-sans normal-case"
+            >
+              Subject ▾
+            </div>
+            <ul
+              tabindex="0"
+              class="dropdown-content menu z-10 w-52 rounded-box border border-base-300 bg-base-200 p-2 font-sans"
+            >
+              <li><a>leadership</a></li>
+              <li><a>faith</a></li>
+              <li><a>romance</a></li>
+              <li><a>music</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4 font-sans text-sm">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" checked class="checkbox checkbox-primary" />
+            music
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" class="checkbox checkbox-secondary" />
+            quotes
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" class="toggle toggle-primary" checked />
+            chronological
+          </label>
+        </div>
+
+        <div class="flex flex-wrap gap-2 font-sans">
+          <span class="badge badge-primary">conditions</span>
+          <span class="badge badge-secondary">impermanence</span>
+          <span class="badge badge-outline">leadership</span>
+          <span class="badge badge-ghost">2023</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="border-t border-base-300 pt-8 font-sans text-xs text-base-content/30">
+      Every value on this page comes from <code>src/styles/app.css</code>.
+      Nothing here names a color.
+    </footer>
+  </main>
+
+  <script>
+    // dusk / paper preview toggle
+    const root = document.documentElement;
+    const themeBtn = document.getElementById('theme-toggle');
+    const themeLabel = document.getElementById('theme-label');
+    themeBtn?.addEventListener('click', () => {
+      const next = root.dataset.theme === 'dusk' ? 'paper' : 'dusk';
+      root.dataset.theme = next;
+      if (themeLabel) themeLabel.textContent = next;
+    });
+  </script>
+</Base>

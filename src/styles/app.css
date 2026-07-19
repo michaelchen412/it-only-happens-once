@@ -1,0 +1,454 @@
+/* ============================================================================
+   app.css — THE SOURCE OF TRUTH
+   ----------------------------------------------------------------------------
+   Every color, radius, and typeface on this site is defined HERE and nowhere
+   else.
+
+   THE LAW (this is what prevents UI drift):
+     - Never write a raw color at a usage site. No `text-[#1a1a1a]`.
+     - Never use Tailwind's palette directly. No `text-gray-800`, no `bg-slate-900`.
+     - Always reference a SEMANTIC slot: `text-base-content`, `bg-base-200`,
+       `text-primary`. The slot describes the ROLE, not the value.
+     - Changing the site's entire mood = editing this file. Nothing else.
+
+   THEMES
+     "dusk"  (default, dark)  — the night sky as INTIMACY, not as space.
+                                Warm ink, cream text, lamplight amber.
+                                A jazz club at 11pm; a porch at dusk.
+     "paper" (light)          — warm paper and ink, for long-form reading.
+
+   Both share the same hues. Dusk and paper are the same room at different
+   hours — not two different houses.
+   ========================================================================= */
+
+@import "tailwindcss";
+@plugin "daisyui";
+
+/* ---------------------------------------------------------------------------
+   DUSK — default. Warm dark.
+   Hue ~62 (amber/ember) for surfaces; the one cool note is dusk-blue (~232),
+   the color of the sky as it lets go of the day.
+   ------------------------------------------------------------------------ */
+@plugin "daisyui/theme" {
+  name: "dusk";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  /* surfaces — warm near-black, never #000 (black is cold and stark) */
+  --color-base-100: oklch(20% 0.012 62);
+  --color-base-200: oklch(24% 0.014 62);
+  --color-base-300: oklch(29% 0.016 62);
+  --color-base-content: oklch(91% 0.018 78);   /* warm cream, not white */
+
+  /* lamplight */
+  --color-primary: oklch(76% 0.115 68);
+  --color-primary-content: oklch(22% 0.03 68);
+
+  /* the cooling sky */
+  --color-secondary: oklch(68% 0.075 232);
+  --color-secondary-content: oklch(96% 0.01 232);
+
+  /* ember / terracotta */
+  --color-accent: oklch(70% 0.09 22);
+  --color-accent-content: oklch(20% 0.03 22);
+
+  --color-neutral: oklch(34% 0.014 62);
+  --color-neutral-content: oklch(90% 0.015 62);
+
+  --color-info: oklch(72% 0.08 230);
+  --color-info-content: oklch(20% 0.02 230);
+  --color-success: oklch(70% 0.09 150);
+  --color-success-content: oklch(20% 0.02 150);
+  --color-warning: oklch(80% 0.11 80);
+  --color-warning-content: oklch(22% 0.03 80);
+  --color-error: oklch(64% 0.14 25);
+  --color-error-content: oklch(96% 0.01 25);
+
+  /* soft, never bubbly — friendly geometry reads as unguarded */
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+
+  /* flat. restraint IS the warmth — a good listener doesn't shout. */
+  --depth: 0;
+  --noise: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   PAPER — light. Same hues, different hour.
+   ------------------------------------------------------------------------ */
+@plugin "daisyui/theme" {
+  name: "paper";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(97.5% 0.008 82);     /* warm paper, not white */
+  --color-base-200: oklch(94.5% 0.011 82);
+  --color-base-300: oklch(90% 0.014 82);
+  --color-base-content: oklch(28% 0.02 58);    /* warm ink, not black */
+
+  --color-primary: oklch(56% 0.11 62);
+  --color-primary-content: oklch(98% 0.01 62);
+
+  --color-secondary: oklch(52% 0.08 232);
+  --color-secondary-content: oklch(98% 0.01 232);
+
+  --color-accent: oklch(56% 0.11 22);
+  --color-accent-content: oklch(98% 0.01 22);
+
+  --color-neutral: oklch(40% 0.014 62);
+  --color-neutral-content: oklch(96% 0.01 62);
+
+  --color-info: oklch(54% 0.09 230);
+  --color-info-content: oklch(98% 0.01 230);
+  --color-success: oklch(52% 0.09 150);
+  --color-success-content: oklch(98% 0.01 150);
+  --color-warning: oklch(64% 0.11 80);
+  --color-warning-content: oklch(98% 0.01 80);
+  --color-error: oklch(52% 0.14 25);
+  --color-error-content: oklch(98% 0.01 25);
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   TYPE
+     serif → Newsreader.  Reading and identity. The site's voice.
+     sans  → Atkinson Hyperlegible.  UI chrome, labels, metadata.
+             Designed by the Braille Institute so that people who struggle to
+             read still can. Legibility as an act of care.
+   ------------------------------------------------------------------------ */
+@theme {
+  --font-display: var(--font-newsreader), Georgia, Cambria, serif;
+  --font-serif: var(--font-newsreader), Georgia, Cambria, serif;
+  --font-sans: var(--font-atkinson), system-ui, -apple-system, sans-serif;
+}
+
+/* Type is LOCKED to the Editorial direction — Newsreader + Atkinson — defined
+   in @theme above. The three slots stay (display / serif=voice / sans=chrome)
+   so we can still pair a distinct display face with the reading face later
+   without touching a single usage site. */
+
+/* ---------------------------------------------------------------------------
+   BASE
+     The site reads first and interfaces second, so serif is the default and
+     sans is the exception (opt in with `font-sans`).
+   ------------------------------------------------------------------------ */
+@layer base {
+  html {
+    /* nothing snaps. the zoom between sky and constellation must feel like
+       breathing, and honoring reduced-motion is part of being unguarded. */
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    font-family: var(--font-serif);
+    /* optical sizing + slightly open leading: room to breathe = low pressure */
+    font-optical-sizing: auto;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* long-form measure. never let a line of prose run past this. */
+  .prose-measure {
+    max-width: 68ch;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Timestamp popover — native top-layer popover so it never clips inside a
+   scrolling rail. Anchored under its trigger where CSS anchor positioning is
+   supported; elsewhere it falls back to the browser default (centered) —
+   still fully usable, click-to-open, light-dismiss, Escape to close.
+   ------------------------------------------------------------------------ */
+[popover].ts-popover {
+  max-width: 20rem;
+}
+@supports (top: anchor(bottom)) {
+  [popover].ts-popover {
+    margin: 0;
+    position: fixed;
+    top: anchor(bottom);
+    left: anchor(left);
+    margin-top: 0.4rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reading — long-form article typography, the heart of the blog.
+   Scoped to `.reading` so authored / markdown content styles itself with no
+   per-element classes. Pair with `.prose-measure` to cap the line length.
+   ------------------------------------------------------------------------ */
+@layer base {
+  .reading {
+    font-size: 1.15rem;
+    line-height: 1.8;
+    color: color-mix(in oklab, var(--color-base-content) 92%, transparent);
+  }
+  .reading p {
+    margin-block: 1.4em;
+  }
+  /* the opening paragraph carries a little more presence */
+  .reading-lead {
+    font-size: 1.4rem;
+    line-height: 1.55;
+    color: var(--color-base-content);
+    margin-block: 1.2em;
+  }
+  .reading h2 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: 1.7rem;
+    line-height: 1.2;
+    margin-top: 2em;
+    margin-bottom: 0.5em;
+  }
+  .reading h3 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: 1.35rem;
+    margin-top: 1.6em;
+    margin-bottom: 0.4em;
+  }
+  .reading blockquote {
+    border-inline-start: 2px solid var(--color-primary);
+    padding-inline-start: 1.25rem;
+    margin-block: 1.7em;
+    font-style: italic;
+    font-size: 1.3rem;
+    line-height: 1.5;
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+  }
+  .reading a {
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-underline-offset: 3px;
+    transition: color 0.15s;
+  }
+  .reading a:hover {
+    color: var(--color-primary);
+  }
+  .reading strong {
+    font-weight: 600;
+  }
+  .reading em {
+    font-style: italic;
+  }
+  .reading ul {
+    list-style: disc;
+    padding-inline-start: 1.3em;
+    margin-block: 1.4em;
+  }
+  .reading ol {
+    list-style: decimal;
+    padding-inline-start: 1.3em;
+    margin-block: 1.4em;
+  }
+  .reading li {
+    margin-block: 0.35em;
+  }
+  .reading hr {
+    border: none;
+    border-top: 1px solid var(--color-base-300);
+    width: 3rem;
+    margin: 2.5em auto;
+  }
+}
+
+/* ===========================================================================
+   ADMIN (the workshop) — see docs/admin.md. Kept here so app.css stays the
+   single source of truth for tokens/motion; these all reference semantic slots.
+   Motion respects prefers-reduced-motion via the global rule above (durations
+   are zeroed), so the open/close animations self-disable for that preference.
+   ======================================================================== */
+
+/* Animated native <dialog>s. `transition-behavior: allow-discrete` on display +
+   overlay lets the EXIT animate too; @starting-style provides the enter-from. */
+.modal-dialog,
+.drawer-dialog {
+  padding: 0;
+  color: var(--color-base-content);
+  background: var(--color-base-100);
+}
+.modal-dialog::backdrop,
+.drawer-dialog::backdrop {
+  background: color-mix(in oklab, var(--color-base-100) 62%, transparent);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition:
+    opacity 0.25s ease,
+    overlay 0.25s ease allow-discrete,
+    display 0.25s ease allow-discrete;
+}
+.modal-dialog[open]::backdrop,
+.drawer-dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  .modal-dialog[open]::backdrop,
+  .drawer-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* Centered modal — fade + subtle scale. */
+.modal-dialog {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  opacity: 0;
+  scale: 0.97;
+  transition:
+    opacity 0.2s ease,
+    scale 0.2s ease,
+    overlay 0.2s ease allow-discrete,
+    display 0.2s ease allow-discrete;
+}
+.modal-dialog[open] {
+  opacity: 1;
+  scale: 1;
+}
+@starting-style {
+  .modal-dialog[open] {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+/* Right-hand drawer — slides in from the edge. */
+.drawer-dialog {
+  height: 100%;
+  max-height: 100%;
+  margin: 0 0 0 auto; /* pin to the right */
+  border-left: 1px solid var(--color-base-300);
+  box-shadow: -8px 0 30px -12px color-mix(in oklab, black 40%, transparent);
+  translate: 100% 0;
+  transition:
+    translate 0.28s ease,
+    overlay 0.28s ease allow-discrete,
+    display 0.28s ease allow-discrete;
+}
+.drawer-dialog[open] {
+  translate: 0 0;
+}
+@starting-style {
+  .drawer-dialog[open] {
+    translate: 100% 0;
+  }
+}
+
+/* Bulk-action bar — a floating pill that slides up from the bottom when rows
+   are selected. Always in the DOM (so it can transition); off-screen when idle. */
+.bulkbar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem 0.4rem 1.1rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+  background: var(--color-base-200);
+  box-shadow: 0 12px 34px -12px color-mix(in oklab, black 55%, transparent);
+  translate: -50% 160%;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate 0.22s ease,
+    opacity 0.22s ease;
+}
+.bulkbar.is-open {
+  translate: -50% 0;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The list region dims while a client-side filter fetch is in flight. */
+.list-loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* List-row edit affordance: revealed on hover/focus for pointer users, but
+   ALWAYS visible where there's no hover (touch), and on keyboard focus. */
+.row-edit {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.group:hover .row-edit,
+.group:focus-within .row-edit,
+.row-edit:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .row-edit {
+    opacity: 1;
+  }
+}
+
+/* Composer formatting toolbar buttons. */
+.tt-btn {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  border-radius: var(--radius-field);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.tt-btn:hover {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.tt-btn.is-active {
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+}
+
+/* TipTap document surface: placeholder + min height. (Content typography is
+   inherited from `.reading`, which the editor element also carries.) */
+.tiptap-doc {
+  min-height: 24rem;
+}
+.tiptap-doc p.is-editor-empty:first-child::before,
+.tiptap-doc .is-empty::before {
+  content: attr(data-placeholder);
+  color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

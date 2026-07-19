@@ -1,0 +1,85 @@
+---
+/*
+  Timestamp — one date component for the whole site.
+
+  Surface: a bare, quiet token. No verb. Just the moment.
+    today → Today · yesterday → Yesterday · within a week → Tuesday
+    this year → March 12 · older → March 12, 2023 · year-precision → 2019
+  Click: a popover with the full truth — weekday, date, time, and any later edit.
+  The verb ("Posted" / "Added") lives ONLY in the popover, chosen by `kind`,
+  honoring the two date meanings: writing is posted, a song/quote is added.
+
+  Renders a real <time datetime> so it stays machine-readable and accessible.
+*/
+interface Props {
+  date: string | Date;
+  updated?: string | Date;
+  kind?: 'posted' | 'added';
+  precision?: 'day' | 'year';
+  class?: string;
+}
+import { Icon } from 'astro-icon/components';
+const { date, updated, kind = 'posted', precision = 'day', class: className = '' } = Astro.props;
+
+const d = new Date(date);
+const u = updated ? new Date(updated) : null;
+const now = new Date();
+
+const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+const weekdayLong = d.toLocaleDateString('en-US', { weekday: 'long' });
+const monthDay = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+const monthDayYear = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+let label: string;
+if (precision === 'year') label = String(d.getFullYear());
+else if (diffDays === 0) label = 'Today';
+else if (diffDays === 1) label = 'Yesterday';
+else if (diffDays > 1 && diffDays < 7) label = weekdayLong;
+else if (d.getFullYear() === now.getFullYear()) label = monthDay;
+else label = monthDayYear;
+
+const verb = kind === 'added' ? 'Added' : 'Posted';
+const detail =
+  precision === 'year'
+    ? `${verb} in ${d.getFullYear()}`
+    : `${verb} on ${weekdayLong}, ${monthDayYear} at ${time}`;
+const updatedDetail = u
+  ? `Last updated on ${u.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })} at ${u.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  : null;
+
+// unique per instance (build-time)
+const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
+---
+
+<span class:list={['inline-flex items-baseline font-sans', className]}>
+  <button
+    type="button"
+    popovertarget={pid}
+    style={`anchor-name: --${pid}`}
+    class="inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-base-content/70"
+  >
+    <Icon name="ph:clock-light" class="size-3.5 opacity-70" />
+    <span class="underline decoration-dotted decoration-base-content/20 underline-offset-4">
+      <time datetime={d.toISOString()}>{label}</time>{
+        u && <span class="text-base-content/25"> · updated</span>
+      }
+    </span>
+  </button>
+  <div
+    id={pid}
+    popover
+    style={`position-anchor: --${pid}`}
+    class="ts-popover rounded-box border border-base-300 bg-base-200 p-4 text-sm shadow-lg"
+  >
+    <p class="text-base-content/80">{detail}</p>
+    {updatedDetail && <p class="mt-1 text-base-content/50">{updatedDetail}</p>}
+  </div>
+</span>

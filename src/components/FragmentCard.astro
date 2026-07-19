@@ -1,0 +1,97 @@
+---
+import Timestamp from './Timestamp.astro';
+
+/*
+  FragmentCard — the atom, standardized.
+
+  RULES (agreed):
+    - The card is a fixed FRAME; content truncates to fit, never the reverse.
+    - Flex column with the date footer pinned to the bottom (mt-auto via grow),
+      so the date sits on the same baseline across every card in a row.
+    - Titles clamp to 1 line; bodies / quotes / excerpts clamp to 2 lines.
+    - Writing ALWAYS shows an excerpt.
+    - Height is not hard-coded: cards stretch to match their row (flex/grid
+      `stretch`), so they align without dead space. Width is set by the caller
+      (rail passes `w-72 shrink-0`; a grid lets them fill the column).
+
+  Per type:
+    song    → title + artist,   provenance year   (Added)
+    quote   → the quote (2 ln) + attribution,      (Added)
+    writing → title + excerpt,  posted date + read (Posted)
+  The Spotify embed / full quote / full essay live on the fragment's own page,
+  not on the card — that's what keeps every card the same shape.
+*/
+interface Props {
+  type: 'song' | 'quote' | 'writing';
+  title?: string;
+  body?: string; // quote text, excerpt, or (song) optional album line
+  attribution?: string; // artist(+album) · quote author · source
+  date?: string | Date;
+  updated?: string | Date;
+  precision?: 'day' | 'year';
+  meta?: string; // e.g. read time
+  class?: string;
+}
+const {
+  type,
+  title,
+  body,
+  attribution,
+  date,
+  updated,
+  precision = 'day',
+  meta,
+  class: className = '',
+} = Astro.props;
+
+const cfg = {
+  song: { glyph: '♪', label: 'song', tone: 'text-primary', hover: 'hover:border-primary/40', kind: 'added' },
+  quote: { glyph: '”', label: 'quote', tone: 'text-secondary', hover: 'hover:border-secondary/40', kind: 'added' },
+  writing: { glyph: '▤', label: 'writing', tone: 'text-accent', hover: 'hover:border-accent/40', kind: 'posted' },
+}[type];
+---
+
+<article
+  class:list={[
+    'flex h-full flex-col rounded-box border border-base-300 bg-base-200 p-5 transition-colors',
+    cfg.hover,
+    className,
+  ]}
+>
+  <header class:list={['flex items-center gap-2', cfg.tone]}>
+    <span class="text-sm" aria-hidden="true">{cfg.glyph}</span>
+    <span class="font-sans text-xs tracking-widest uppercase">{cfg.label}</span>
+  </header>
+
+  <div class="mt-3 grow">
+    {
+      type === 'quote' ? (
+        <blockquote class="line-clamp-2 text-lg leading-relaxed italic">{body}</blockquote>
+      ) : (
+        <>
+          {title && <h3 class="line-clamp-1 text-xl leading-snug">{title}</h3>}
+          {body && <p class="mt-1 line-clamp-2 text-base-content/60">{body}</p>}
+        </>
+      )
+    }
+    {
+      attribution && (
+        <p class="mt-2 line-clamp-1 font-sans text-sm text-base-content/50">{attribution}</p>
+      )
+    }
+  </div>
+
+  <footer class="mt-4 flex items-center gap-1 font-sans text-xs text-base-content/30">
+    {
+      date && (
+        <Timestamp
+          date={date}
+          updated={updated}
+          kind={cfg.kind as 'posted' | 'added'}
+          precision={precision}
+        />
+      )
+    }
+    {meta && <span>· {meta}</span>}
+  </footer>
+</article>
