@@ -1,7 +1,12 @@
 # build output
 dist/
+.vercel/
 # generated types
 .astro/
+
+# local Squarespace export — personal content (journal + letters); kept out of
+# git history. The reflections import (scripts/) reads it locally, not from git.
+legacy/
 
 # dependencies
 node_modules/
@@ -13,9 +18,10 @@ yarn-error.log*
 pnpm-debug.log*
 
 
-# environment variables
+# environment variables — never commit secrets. .env.example is the tracked template.
 .env
-.env.production
+.env.*
+!.env.example
 
 # macOS-specific files
 .DS_Store

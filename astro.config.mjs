@@ -1,10 +1,41 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, fontProviders } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
+import icon from 'astro-icon';
+import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
+  // SSR + edge caching for DB-backed content; the admin renders on demand.
+  // See docs/adr/0001. Static pages opt back in with `export const prerender = true`.
+  output: 'server',
+  adapter: vercel(),
+  // Iconography: Phosphor (thin/light weights) for functional UI icons.
+  // Signature marks in the Sky (✦ ♪ ” ▤) stay as hand-chosen glyphs.
+  integrations: [icon({ include: { ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'arrow-up-right', 'funnel'] } })],
   vite: {
     plugins: [tailwindcss()],
   },
+  fonts: [
+    {
+      // Long-form reading + display. Warm, literary, optical sizing.
+      provider: fontProviders.google(),
+      name: 'Newsreader',
+      cssVariable: '--font-newsreader',
+      weights: [300, 400, 500, 600],
+      styles: ['normal', 'italic'],
+      subsets: ['latin'],
+      fallbacks: ['Georgia', 'serif'],
+    },
+    {
+      // UI chrome. Designed by the Braille Institute for maximum legibility.
+      provider: fontProviders.google(),
+      name: 'Atkinson Hyperlegible',
+      cssVariable: '--font-atkinson',
+      weights: [400, 700],
+      styles: ['normal', 'italic'],
+      subsets: ['latin'],
+      fallbacks: ['system-ui', 'sans-serif'],
+    },
+  ],
 });
