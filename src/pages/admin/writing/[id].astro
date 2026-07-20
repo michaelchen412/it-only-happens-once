@@ -75,6 +75,8 @@ const TOOLS = [
           <button type="button" id="open-publish" class="btn btn-primary btn-sm normal-case">Publish…</button>
         </div>
         <div id="actions-published" hidden class="flex items-center gap-2">
+          <button type="button" id="discard-changes" hidden class="btn btn-ghost btn-sm normal-case">Discard</button>
+          <button type="button" id="save-changes" class="btn btn-primary btn-sm normal-case" disabled>Save changes</button>
           {fragment?.slug && <a id="view-link" href={`/blog/${fragment.slug}`} class="btn btn-ghost btn-sm normal-case">View ↗</a>}
           <button type="button" id="open-details" class="btn btn-ghost btn-sm normal-case">Details…</button>
           <button type="button" id="unpublish" class="btn btn-outline btn-sm normal-case">Unpublish</button>
@@ -115,7 +117,7 @@ const TOOLS = [
         aria-label="Title"
         class="w-full border-none bg-transparent font-display text-4xl font-light outline-none placeholder:text-base-content/25"
       />
-      <p id="js-error" hidden class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error"></p>
+      <p id="js-error" hidden role="alert" class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error"></p>
       <div id="editor" class="reading mt-6"></div>
     </div>
   </form>

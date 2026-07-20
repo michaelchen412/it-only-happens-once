@@ -129,20 +129,44 @@ function setStatusError(msg: string) {
 // ---- publish-state bar toggle ----
 const draftActions = document.getElementById('actions-draft')!;
 const publishedActions = document.getElementById('actions-published')!;
+const saveChangesBtn = document.getElementById('save-changes') as HTMLButtonElement;
+const discardBtn = document.getElementById('discard-changes') as HTMLButtonElement;
 let savedStatus: string = init.status || 'draft';
+let dirty = false;
+const isPublished = () => savedStatus === 'published';
+
 function reflectStatus() {
-  const published = savedStatus === 'published';
-  draftActions.hidden = published;
-  publishedActions.hidden = !published;
+  draftActions.hidden = isPublished();
+  publishedActions.hidden = !isPublished();
+  updateDirtyUI();
+}
+
+/**
+ * Published posts DON'T autosave — edits accumulate and are pushed via an
+ * explicit "Save changes" (docs/admin.md §5). This reflects that dirty state.
+ */
+function updateDirtyUI() {
+  if (isPublished()) {
+    saveChangesBtn.disabled = !dirty;
+    discardBtn.hidden = !dirty;
+    if (dirty) {
+      spinner.hidden = true;
+      statusText.textContent = 'Unsaved changes';
+      statusText.classList.add('text-warning');
+      return;
+    }
+  }
+  statusText.classList.remove('text-warning');
 }
 reflectStatus();
+statusText.textContent = isPublished() ? 'Up to date' : 'Autosaves as you write';
 
 // ---- auto-slug from title until slug is touched ----
 let slugTouched = slugField.value.trim().length > 0;
 slugField.addEventListener('input', () => (slugTouched = true));
 titleField.addEventListener('input', () => {
   if (!slugTouched) slugField.value = slugify(titleField.value);
-  scheduleAutosave();
+  onEdit();
 });
 
 // ---- date override (local-time round-trip, not UTC) ----
@@ -162,18 +186,21 @@ dateToggle.addEventListener('change', () => {
   if (dateToggle.checked && !occurredField.value) occurredField.value = toLocalInput(new Date().toISOString());
 });
 
-// ---- autosave: debounced, serialized via a promise mutex ----
-let dirty = false;
+// ---- edits: drafts autosave; published posts wait for an explicit Save ----
 let timer: number | undefined;
 let lock: Promise<unknown> = Promise.resolve();
 
-function scheduleAutosave() {
+function onEdit() {
   dirty = true;
+  if (isPublished()) {
+    updateDirtyUI(); // no autosave — light up Save changes / Discard
+    return;
+  }
   clearTimeout(timer);
   timer = window.setTimeout(() => save(savedStatus, { silentEmpty: true }), 1200);
 }
-editor.on('update', scheduleAutosave);
-form.addEventListener('input', scheduleAutosave);
+editor.on('update', onEdit);
+form.addEventListener('input', onEdit);
 
 /** Serialize saves so a Publish click never races an in-flight autosave. */
 function save(status: string, opts: { silentEmpty?: boolean } = {}): Promise<boolean> {
@@ -285,12 +312,30 @@ unpublishBtn?.addEventListener('click', async () => {
   if (saved) setSaved('Moved to drafts ' + nowTime());
 });
 
+// ---- published: explicit Save changes / Discard (no autosave) ----
+saveChangesBtn.addEventListener('click', async () => {
+  saveChangesBtn.disabled = true;
+  const ok = await save('published');
+  if (!ok) saveChangesBtn.disabled = false; // still dirty
+});
+discardBtn.addEventListener('click', async () => {
+  const ok = await confirmDialog({
+    title: 'Discard changes',
+    message: 'Discard your unsaved edits to this published piece?',
+    confirmLabel: 'Discard',
+    danger: true,
+  });
+  if (!ok) return;
+  dirty = false; // bypass the unload guard, then reload the saved version
+  window.location.reload();
+});
+
 const deleteBtn = document.getElementById('delete') as HTMLButtonElement | null;
 deleteBtn?.addEventListener('click', async () => {
   if (!idField.value) return;
   const ok = await confirmDialog({
-    title: 'Delete piece',
-    message: 'Delete this piece? This cannot be undone.',
+    title: 'Move to trash',
+    message: 'Move this piece to trash? You can restore it later.',
     confirmLabel: 'Delete',
     danger: true,
   });
@@ -298,7 +343,7 @@ deleteBtn?.addEventListener('click', async () => {
   deleteBtn.disabled = true;
   const fd = new FormData();
   fd.set('id', idField.value);
-  const { error } = await actions.fragments.remove(fd);
+  const { error } = await actions.fragments.trash(fd);
   if (error) {
     deleteBtn.disabled = false;
     return setStatusError(error.message);
