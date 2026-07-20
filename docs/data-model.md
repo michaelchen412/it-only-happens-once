@@ -149,6 +149,7 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`slug`** — URL identity (`/blog/forgiveness`). Unique across all fragments.
 - **`occurred_at` + `date_precision`** — the *public* date, driving the `Timestamp` component. `writing` → the *posted* date (`day`); `song`/`quote` → *provenance* (often `year`). Verb ("Posted"/"Added") is presentation-only, chosen by type. For `writing` it is **set automatically to the publish moment on first publish**; the composer only exposes it as an optional override for backdating legacy posts (see [admin.md](admin.md) §5). It is distinct from the three **system-maintained audit timestamps**, which are never hand-edited: `created_at` (row created), `published_at` (first went live; stamped once, kept on unpublish), `updated_at` (last edit, via the `moddatetime` trigger).
 - **`status`** — `draft` fragments are visible only to the admin (enforced by RLS). Publishing sets `status='published'` and `published_at`.
+- **`deleted_at`** — soft delete (migration `..._soft_delete.sql`). "Delete" sets it and the fragment moves to the admin **Trash** (restorable); public reads exclude `deleted_at is not null`; the admin still sees trashed rows. A "purge" is a real `DELETE`. Keeps years of writing recoverable.
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
 - **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different lenses.
 
