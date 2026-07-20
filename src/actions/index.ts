@@ -261,37 +261,83 @@ export const server = {
       },
     }),
 
-    /** Delete one fragment (join rows cascade). */
-    remove: defineAction({
+    /** Soft-delete: move a fragment to Trash (recoverable). */
+    trash: defineAction({
       accept: 'form',
       input: z.object({ id: z.string().min(1) }),
       handler: async (input, ctx) => {
-        const { error } = await ctx.locals.supabase.from('fragments').delete().eq('id', input.id);
+        const { error } = await ctx.locals.supabase
+          .from('fragments')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', input.id);
         if (error) throw fail(error.message);
         return { ok: true };
       },
     }),
 
-    /** Bulk publish / unpublish / delete. `ids` is a comma-joined list. */
+    /** Restore a fragment from Trash. */
+    restore: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().min(1) }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase.from('fragments').update({ deleted_at: null }).eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+
+    /** Permanently delete (only from Trash; join rows cascade). */
+    purge: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().min(1) }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase
+          .from('fragments')
+          .delete()
+          .eq('id', input.id)
+          .not('deleted_at', 'is', null); // guard: never hard-delete a live fragment
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+
+    /** Permanently delete everything currently in Trash. */
+    emptyTrash: defineAction({
+      accept: 'form',
+      input: z.object({}),
+      handler: async (_input, ctx) => {
+        const { error } = await ctx.locals.supabase.from('fragments').delete().not('deleted_at', 'is', null);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+
+    /** Bulk actions over a comma-joined id list. */
     bulk: defineAction({
       accept: 'form',
       input: z.object({
         ids: z.string().min(1),
-        op: z.enum(['publish', 'unpublish', 'delete']),
+        op: z.enum(['publish', 'unpublish', 'trash', 'restore', 'purge']),
       }),
       handler: async (input, ctx) => {
         const sb = ctx.locals.supabase;
         const ids = input.ids.split(',').map((s) => s.trim()).filter(Boolean);
         if (!ids.length) return { ok: true, count: 0 };
+        const now = new Date().toISOString();
 
-        if (input.op === 'delete') {
-          const { error } = await sb.from('fragments').delete().in('id', ids);
+        if (input.op === 'trash') {
+          const { error } = await sb.from('fragments').update({ deleted_at: now }).in('id', ids);
+          if (error) throw fail(error.message);
+        } else if (input.op === 'restore') {
+          const { error } = await sb.from('fragments').update({ deleted_at: null }).in('id', ids);
+          if (error) throw fail(error.message);
+        } else if (input.op === 'purge') {
+          const { error } = await sb.from('fragments').delete().in('id', ids).not('deleted_at', 'is', null);
           if (error) throw fail(error.message);
         } else if (input.op === 'publish') {
-          // stamp published_at only where it isn't set yet, then flip status
           const { error: tsErr } = await sb
             .from('fragments')
-            .update({ published_at: new Date().toISOString() })
+            .update({ published_at: now })
             .in('id', ids)
             .is('published_at', null);
           if (tsErr) throw fail(tsErr.message);

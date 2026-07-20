@@ -116,6 +116,7 @@ export type Database = {
           body: string | null
           created_at: string
           date_precision: Database["public"]["Enums"]["date_precision"]
+          deleted_at: string | null
           details: Json
           excerpt: string | null
           id: string
@@ -133,6 +134,7 @@ export type Database = {
           body?: string | null
           created_at?: string
           date_precision?: Database["public"]["Enums"]["date_precision"]
+          deleted_at?: string | null
           details?: Json
           excerpt?: string | null
           id?: string
@@ -150,6 +152,7 @@ export type Database = {
           body?: string | null
           created_at?: string
           date_precision?: Database["public"]["Enums"]["date_precision"]
+          deleted_at?: string | null
           details?: Json
           excerpt?: string | null
           id?: string
