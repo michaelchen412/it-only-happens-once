@@ -23,7 +23,7 @@ const thisYear = new Date().getUTCFullYear();
       <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
     </header>
 
-    <p id="sheet-error" hidden class="mx-6 mt-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>
+    <p id="sheet-error" hidden role="alert" class="mx-6 mt-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>
 
     {/* QUOTE */}
     <form id="quote-form" method="POST" action={actions.fragments.saveQuote} class="flex flex-col gap-4 p-6 font-sans">
@@ -186,14 +186,12 @@ const thisYear = new Date().getUTCFullYear();
     });
   });
 
-  // --- Edit existing quote / song (delegated, so it survives list swaps) ---
-  document.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest('.edit-btn') as HTMLElement | null;
-    if (!btn) return;
+  // --- Edit existing quote / song (opened by a row click in the manager) ---
+  document.addEventListener('fragment:edit', (e) => {
     {
       let d: any;
       try {
-        d = JSON.parse(btn.dataset.fragment!);
+        d = JSON.parse((e as CustomEvent).detail);
       } catch {
         return showError('Could not read that fragment.');
       }
@@ -259,7 +257,7 @@ const thisYear = new Date().getUTCFullYear();
       const { error } = await action(new FormData(form));
       submitBtn.disabled = false;
       if (!error) {
-        window.location.href = '/admin';
+        window.location.reload();
         return;
       }
       showError(formatActionError(error));
@@ -273,8 +271,8 @@ const thisYear = new Date().getUTCFullYear();
       const id = (form.elements.namedItem('id') as HTMLInputElement).value;
       if (!id) return;
       const ok = await confirmDialog({
-        title: 'Delete fragment',
-        message: 'Delete this fragment? This cannot be undone.',
+        title: 'Move to trash',
+        message: 'Move this fragment to trash? You can restore it later.',
         confirmLabel: 'Delete',
         danger: true,
       });
@@ -282,12 +280,12 @@ const thisYear = new Date().getUTCFullYear();
       btn.disabled = true;
       const fd = new FormData();
       fd.set('id', id);
-      const { error } = await actions.fragments.remove(fd);
+      const { error } = await actions.fragments.trash(fd);
       if (error) {
         btn.disabled = false;
         return showError(error.message);
       }
-      window.location.href = '/admin';
+      window.location.reload();
     });
   });
 </script>

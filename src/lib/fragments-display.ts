@@ -16,6 +16,12 @@ export function displayDate(iso: string, precision: 'day' | 'year'): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
+/** Compact absolute date ("Apr 19, 2023") or an em-dash for null. UTC-stable. */
+export function shortDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
 /** The primary line for a list row: title for writing/song, the text for a quote. */
 export function rowTitle(r: { type: string; title: string | null; body: string | null }): string {
   if (r.type === 'quote') return r.body || '(empty quote)';

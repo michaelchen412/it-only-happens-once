@@ -6,6 +6,7 @@
   but tuned for speed and density over poetry. Every /admin route is auth-gated
   by middleware and renders on demand (never cached, never public).
 */
+import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 
@@ -50,6 +51,15 @@ const nav = [{ key: 'fragments', label: 'Fragments', href: '/admin' }] as const;
 
       <div class="ml-auto flex items-center gap-3 text-xs text-base-content/40">
         <span class="hidden sm:inline">{user?.email}</span>
+        <button
+          id="theme-toggle"
+          class="theme-toggle rounded-field p-1.5 hover:bg-base-200 hover:text-base-content"
+          aria-label="Toggle light and dark theme"
+          title="Toggle theme"
+        >
+          <Icon name="ph:sun" class="theme-icon-sun text-base" />
+          <Icon name="ph:moon" class="theme-icon-moon text-base" />
+        </button>
         <a href="/" class="hover:text-base-content" title="View the site">Site ↗</a>
         <button id="admin-signout" class="rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content">
           Sign out
@@ -73,6 +83,25 @@ const nav = [{ key: 'fragments', label: 'Fragments', href: '/admin' }] as const;
     document.getElementById('admin-signout')?.addEventListener('click', async () => {
       await supabase.auth.signOut();
       window.location.href = '/';
+    });
+
+    const themeBtn = document.getElementById('theme-toggle');
+    const syncThemeBtn = () => themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));
+    syncThemeBtn();
+    themeBtn?.addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
+      document.documentElement.dataset.theme = next;
+      try {
+        localStorage.setItem('theme', next);
+      } catch (e) {}
+      syncThemeBtn();
+    });
+    // keep other open tabs in sync
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'theme' && e.newValue) {
+        document.documentElement.dataset.theme = e.newValue;
+        syncThemeBtn();
+      }
     });
   </script>
 </Base>

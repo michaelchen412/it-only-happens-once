@@ -1,74 +1,75 @@
 ---
 /*
-  /admin — the fragment list (docs/admin.md §2). The workshop's home base:
-  filter · search · sort · select-many for bulk actions, over ALL fragments
-  (draft + published; admin sees everything via RLS). Rows come from FragmentRow;
-  quotes/songs edit in the FragmentSheet drawer; writing links to its composer.
+  /admin — the Fragment Manager (docs/admin.md §2). A flat, sortable table over
+  ALL fragments (admin sees everything via RLS). Type-badge filters, status +
+  subject filters, search, sortable date columns, bulk actions, and a Trash view
+  (?view=trash) for soft-deleted fragments. Filtering/sorting swap the table in
+  place (src/scripts/admin-list.ts) — no full reload.
 */
+import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import FragmentRow from '../../components/admin/FragmentRow.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
-import { actions } from 'astro:actions';
+import SubjectFilter from '../../components/admin/SubjectFilter.astro';
 
 const supabase = Astro.locals.supabase;
-
-// No-JS fallback: if a quote/song form posted here, redirect on success.
-let actionError: string | null = null;
-for (const a of [actions.fragments.saveQuote, actions.fragments.saveSong, actions.fragments.remove]) {
-  const r = Astro.getActionResult(a);
-  if (r) {
-    if (!r.error) return Astro.redirect('/admin');
-    actionError = r.error.message;
-  }
-}
-
-// --- filters from the URL ---
 const url = Astro.url;
-const TYPES = ['writing', 'quote', 'song'] as const;
-const STATUSES = ['draft', 'published'] as const;
-const typeParam = TYPES.find((t) => t === url.searchParams.get('type')) ?? null;
-const statusParam = STATUSES.find((s) => s === url.searchParams.get('status')) ?? null;
-const subjectParam = url.searchParams.get('subject') || null;
-const q = (url.searchParams.get('q') ?? '').trim();
-const sort = url.searchParams.get('sort') ?? 'recent';
 
-// --- subject filter → fragment ids ---
+const view = url.searchParams.get('view') === 'trash' ? 'trash' : 'list';
+const TYPES = ['writing', 'quote', 'song'] as const;
+const typeParam = TYPES.find((t) => t === url.searchParams.get('type')) ?? null;
+const subjectSlugs = (url.searchParams.get('subject') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const q = (url.searchParams.get('q') ?? '').trim();
+
+// sort = "<field>_<dir>". Drafts are always pinned to the top (secondary sort).
+const SORT_COL: Record<string, string> = { title: 'title', posted: 'occurred_at', edited: 'updated_at' };
+const sortMatch = (url.searchParams.get('sort') ?? 'edited_desc').match(/^(title|posted|edited)_(asc|desc)$/);
+const sortField = sortMatch ? sortMatch[1] : 'edited';
+const sortDir = sortMatch ? sortMatch[2] : 'desc';
+
+// subject filter → fragment ids matching ALL selected subjects (AND semantics)
 let subjectFilterIds: string[] | null = null;
-if (subjectParam) {
-  const { data: subj } = await supabase.from('subjects').select('id').eq('slug', subjectParam).single();
-  if (subj) {
-    const { data: links } = await supabase.from('fragment_subjects').select('fragment_id').eq('subject_id', subj.id);
-    subjectFilterIds = (links ?? []).map((l) => l.fragment_id);
-  } else {
+if (subjectSlugs.length) {
+  const { data: subs } = await supabase.from('subjects').select('id, slug').in('slug', subjectSlugs);
+  const subIds = (subs ?? []).map((s) => s.id);
+  if (!subIds.length) {
     subjectFilterIds = [];
+  } else {
+    const { data: links } = await supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', subIds);
+    const bySet: Record<string, Set<string>> = {};
+    for (const l of links ?? []) (bySet[l.fragment_id] ??= new Set()).add(l.subject_id);
+    subjectFilterIds = Object.entries(bySet)
+      .filter(([, s]) => s.size === subIds.length)
+      .map(([fid]) => fid);
   }
 }
 
-// --- main query ---
-let query = supabase.from('fragments').select('*');
+// deleted-state scope shared by the list query and the per-type counts
+const scoped = <T extends { not: any; is: any }>(qb: T) =>
+  (view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null)) as T;
+
+// main query — drafts first (status asc: draft < published), then the chosen sort
+let query = scoped(supabase.from('fragments').select('*'));
 if (typeParam) query = query.eq('type', typeParam);
-if (statusParam) query = query.eq('status', statusParam);
 if (subjectFilterIds) query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
 if (q) {
   const safe = q.replace(/[(),]/g, ' ');
   query = query.or(`title.ilike.%${safe}%,body.ilike.%${safe}%,attribution.ilike.%${safe}%,excerpt.ilike.%${safe}%`);
 }
-if (sort === 'oldest') query = query.order('occurred_at', { ascending: true });
-else if (sort === 'title') query = query.order('title', { ascending: true, nullsFirst: false });
-else if (sort === 'updated') query = query.order('updated_at', { ascending: false });
-else query = query.order('occurred_at', { ascending: false });
+query = query
+  .order('status', { ascending: true }) // drafts pinned to top
+  .order(SORT_COL[sortField], { ascending: sortDir === 'asc', nullsFirst: false });
 
-const { data: fragments, error: listError } = await query;
+const { data: fragments } = await query;
 const rows = fragments ?? [];
-if (listError) actionError ??= listError.message;
 
-// In-progress work sits on top.
-const sections = [
-  { key: 'draft', title: 'Drafts', items: rows.filter((r) => r.status === 'draft') },
-  { key: 'published', title: 'Published', items: rows.filter((r) => r.status === 'published') },
-] as const;
+// per-type counts (the badge numbers) for the current view, independent of filters
+const { data: typeRows } = await scoped(supabase.from('fragments').select('type'));
+const typeCounts = { writing: 0, quote: 0, song: 0 } as Record<string, number>;
+for (const r of typeRows ?? []) typeCounts[r.type]++;
+const totalCount = (typeRows ?? []).length;
 
-// Subject names per fragment (for the editor prefill) + all subjects (filter + sheet).
+// subjects per fragment (editor prefill) + all subjects + trash count
 const ids = rows.map((r) => r.id);
 const subjectsByFragment: Record<string, string[]> = {};
 if (ids.length) {
@@ -80,99 +81,155 @@ if (ids.length) {
 }
 const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
 const subjectNames = (allSubjects ?? []).map((s) => s.name);
+const { count: trashCount } = await supabase.from('fragments').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null);
 
-const filtered = typeParam || statusParam || subjectParam || q;
+const filtered = typeParam || subjectSlugs.length > 0 || q;
+const COLUMNS = [
+  { field: 'title', label: 'Fragment', align: 'left', cls: '', sortable: true },
+  { field: 'status', label: 'Status', align: 'left', cls: 'hidden sm:table-cell', sortable: false },
+  { field: 'posted', label: 'Posted', align: 'right', cls: 'hidden md:table-cell', sortable: true },
+  { field: 'edited', label: 'Edited', align: 'right', cls: '', sortable: true },
+] as const;
 ---
 
-<AdminLayout title="Fragments" active="fragments">
+<AdminLayout title={view === 'trash' ? 'Trash' : 'Fragments'} active="fragments">
   <div class="mx-auto max-w-5xl px-6 py-8">
     <div class="flex items-baseline justify-between gap-4">
-      <div>
-        <h1 class="font-display text-3xl font-light">Fragments</h1>
-        <p class="mt-1 text-sm text-base-content/50">
-          <span id="fragment-count">{rows.length} {rows.length === 1 ? 'fragment' : 'fragments'}{filtered ? ' matching' : ' in all'}</span>
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <a href="/admin/writing/new" class="btn btn-primary btn-sm font-sans normal-case"><span aria-hidden="true">▤</span> Writing</a>
-        <button data-new="quote" class="btn btn-outline btn-sm font-sans normal-case"><span aria-hidden="true">”</span> Quote</button>
-        <button data-new="song" class="btn btn-outline btn-sm font-sans normal-case"><span aria-hidden="true">♪</span> Song</button>
+      <h1 class="font-display text-3xl font-light">{view === 'trash' ? 'Trash' : 'Fragments'}</h1>
+      <div class="flex items-center gap-2">
+        {
+          view === 'trash' ? (
+            <>
+              <a href="/admin" class="btn btn-ghost btn-sm gap-1.5 font-sans">← Fragments</a>
+              <button id="empty-trash" class="btn btn-outline btn-sm gap-1.5 font-sans text-error" disabled={rows.length === 0}>
+                <Icon name="ph:trash" class="text-base" /> Empty trash
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/admin?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
+                <Icon name="ph:trash" />
+                Trash
+                <span id="trash-count" class="rounded-full bg-base-300 px-1.5 text-xs text-base-content/70 empty:hidden">{trashCount || ''}</span>
+              </a>
+              <div class="relative">
+                <button id="add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
+                  <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
+                </button>
+                <div id="add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
+                  <a href="/admin/writing/new" role="menuitem" class="add-item block px-3 py-2 text-sm"><span class="text-accent" aria-hidden="true">▤</span> Writing</a>
+                  <button data-new="quote" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-secondary" aria-hidden="true">”</span> Quote</button>
+                  <button data-new="song" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-primary" aria-hidden="true">♪</span> Song</button>
+                </div>
+              </div>
+            </>
+          )
+        }
       </div>
     </div>
 
-    {actionError && <p class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error">{actionError}</p>}
+    {/* Toolbar */}
+    <form method="GET" id="filters" class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+      <input type="hidden" name="sort" id="sort-input" value={`${sortField}_${sortDir}`} />
+      <input type="hidden" name="type" id="type-input" value={typeParam ?? ''} />
+      <input type="hidden" name="view" value={view === 'trash' ? 'trash' : ''} />
 
-    {/* Filters (GET form, auto-submits on change) */}
-    <form method="GET" id="filters" class="mt-6 flex flex-wrap items-center gap-2 text-sm">
-      <input type="search" name="q" value={q} placeholder="Search…" class="input input-sm input-bordered w-48 font-sans" aria-label="Search fragments" />
-      <select name="type" class="select select-sm select-bordered font-sans" aria-label="Type">
-        <option value="">All types</option>
-        {TYPES.map((t) => <option value={t} selected={typeParam === t}>{t}</option>)}
-      </select>
-      <select name="status" class="select select-sm select-bordered font-sans" aria-label="Status">
-        <option value="">Any status</option>
-        {STATUSES.map((s) => <option value={s} selected={statusParam === s}>{s}</option>)}
-      </select>
-      <select name="subject" class="select select-sm select-bordered font-sans" aria-label="Subject">
-        <option value="">Any subject</option>
-        {(allSubjects ?? []).map((s) => <option value={s.slug} selected={subjectParam === s.slug}>{s.name}</option>)}
-      </select>
-      <select name="sort" class="select select-sm select-bordered font-sans" aria-label="Sort">
-        <option value="recent" selected={sort === 'recent'}>Newest</option>
-        <option value="oldest" selected={sort === 'oldest'}>Oldest</option>
-        <option value="title" selected={sort === 'title'}>Title</option>
-        <option value="updated" selected={sort === 'updated'}>Recently edited</option>
-      </select>
-      <noscript><button class="btn btn-sm btn-neutral font-sans normal-case">Apply</button></noscript>
-      {(filtered || sort !== 'recent') && <a href="/admin" class="text-base-content/55 underline hover:text-base-content">clear</a>}
+      {/* type filter = segmented control (single-select), with counts */}
+      <div class="seg" role="radiogroup" aria-label="Filter by type">
+        <button type="button" role="radio" aria-checked={!typeParam} class:list={['type-badge', !typeParam && 'is-active']} data-type-filter="">
+          All <span class="type-badge__n">{totalCount}</span>
+        </button>
+        {TYPES.map((t) => (
+          <button type="button" role="radio" aria-checked={typeParam === t} class:list={['type-badge', typeParam === t && 'is-active']} data-type-filter={t}>
+            {t} <span class="type-badge__n">{typeCounts[t]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* search — icon lives inside the field (daisyUI pattern; no overlay) */}
+      <label class="input input-sm input-bordered flex min-w-[12rem] flex-1 items-center gap-2 font-sans md:max-w-xs">
+        <Icon name="ph:magnifying-glass" class="shrink-0 text-base-content/50" />
+        <input type="search" name="q" value={q} placeholder="Search fragments…" class="grow" aria-label="Search fragments" />
+      </label>
+
+      <SubjectFilter subjects={allSubjects ?? []} value={subjectSlugs} />
+      {filtered && <a href={view === 'trash' ? '/admin?view=trash' : '/admin'} class="text-base-content/60 underline hover:text-base-content">clear</a>}
     </form>
 
-    {/* The list — grouped into Drafts / Published sections. This region is
-        swapped in place by client-side filtering (src/scripts/admin-list.ts). */}
-    <div id="fragment-list" class="mt-2">
+    {/* The table (swapped in place on filter/sort) */}
+    <div id="fragment-list" class="mt-4" data-view={view}>
       {
         rows.length === 0 ? (
-          <div class="mt-8 rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
-            <p class="font-display text-xl text-base-content/60">Nothing here yet.</p>
-            <p class="mt-2 text-sm text-base-content/50">Start with a piece of writing, a quote, or a song — the buttons up top.</p>
+          <div class="mt-6 rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
+            <p class="font-display text-xl text-base-content/60">
+              {view === 'trash' ? 'Trash is empty.' : filtered ? 'Nothing matches.' : 'Nothing here yet.'}
+            </p>
+            {view !== 'trash' && !filtered && (
+              <p class="mt-2 text-sm text-base-content/50">Add a piece of writing, a quote, or a song to begin.</p>
+            )}
           </div>
         ) : (
-          <>
-            <label class="mt-3 flex items-center gap-2 px-1 font-sans text-xs text-base-content/55">
-              <input type="checkbox" id="selectall" class="checkbox checkbox-xs" />
-              Select all
-            </label>
-            {sections
-              .filter((s) => s.items.length > 0)
-              .map((section) => (
-                <section class="mt-4">
-                  <h2 class="mb-2 flex items-center gap-2 px-1 font-sans text-xs tracking-wide text-base-content/55 uppercase">
-                    {section.title}
-                    <span class="rounded-selector bg-base-200 px-1.5 py-0.5 normal-case">{section.items.length}</span>
-                  </h2>
-                  <ul class="divide-y divide-base-300 rounded-box border border-base-300">
-                    {section.items.map((r) => (
-                      <FragmentRow fragment={r} subjects={subjectsByFragment[r.id] ?? []} />
-                    ))}
-                  </ul>
-                </section>
-              ))}
-          </>
+          <div class="overflow-x-auto rounded-box border border-base-300">
+            <table class="w-full text-sm">
+              <caption class="sr-only">{view === 'trash' ? 'Trashed fragments' : 'Fragments'}</caption>
+              <thead>
+                <tr class="border-b border-base-300 bg-base-200/50">
+                  <th scope="col" class="w-8 px-3 py-2">
+                    <input type="checkbox" id="selectall" class="checkbox checkbox-xs" aria-label="Select all" />
+                  </th>
+                  <th scope="col" class="w-6"><span class="sr-only">Type</span></th>
+                  {COLUMNS.map((c) => (
+                    <th
+                      scope="col"
+                      class:list={[c.cls, 'px-3 py-2.5 font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase', c.align === 'right' ? 'text-right' : 'text-left']}
+                      aria-sort={c.sortable && sortField === c.field ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    >
+                      {c.sortable ? (
+                        <button type="button" class:list={['sort-header inline-flex items-center gap-1 hover:text-base-content', sortField === c.field && 'text-base-content']} data-field={c.field}>
+                          {c.label}
+                          <span class:list={['text-[0.6rem]', sortField !== c.field && 'opacity-30']} aria-hidden="true">
+                            {sortField === c.field ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                          </span>
+                        </button>
+                      ) : (
+                        c.label
+                      )}
+                    </th>
+                  ))}
+                  {view === 'trash' && <th scope="col" class="px-3 py-2 text-right font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => <FragmentRow fragment={r} subjects={subjectsByFragment[r.id] ?? []} view={view} />)}
+              </tbody>
+            </table>
+          </div>
         )
       }
     </div>
   </div>
 
-  {/* Floating bulk-action bar (slides up when rows are selected) */}
-  <div id="bulkbar" class="bulkbar font-sans text-sm">
+  {/* Floating bulk-action bar (buttons rendered per view) */}
+  <div id="bulkbar" class="bulkbar font-sans text-sm" data-view={view}>
     <span id="bulkcount" class="text-base-content/70">0 selected</span>
     <div class="flex gap-1">
-      <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
-      <button data-bulk="unpublish" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
-      <button data-bulk="delete" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
+      {
+        view === 'trash' ? (
+          <>
+            <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">Restore</button>
+            <button data-bulk="purge" class="btn btn-xs btn-ghost normal-case text-error">Delete forever</button>
+          </>
+        ) : (
+          <>
+            <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
+            <button data-bulk="unpublish" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
+            <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
+          </>
+        )
+      }
     </div>
   </div>
-  <p id="bulk-error" hidden class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
+  <p id="bulk-error" hidden role="alert" class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
 
   <FragmentSheet subjects={subjectNames} />
 
