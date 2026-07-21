@@ -15,6 +15,7 @@
     "@anthropic-ai/sdk": "^0.112.4",
     "@astrojs/vercel": "^11.0.3",
     "@iconify-json/ph": "^1.2.2",
+    "@iconify-json/simple-icons": "^1.2.91",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4.3.3",

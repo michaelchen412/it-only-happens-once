@@ -2,16 +2,17 @@
 /*
   SiteLayout — chrome for the PUBLIC site (the reader-facing rooms).
 
-  Distinct from AdminLayout (the private workshop). This is the editorial
-  register from design.md §8: a quiet top bar with a plain wordmark, generous
-  space, no ornament. Wraps Base.astro (which owns <head>, fonts, the no-flash
-  theme script). Pages opt into an `active` nav item.
-
-  Note: the brand links home (`/`), which now carries the public chrome. The
-  Sky itself (landing in a constellation, the zoom) is a later design pass.
+  A quiet top bar with a plain wordmark (design.md §8). On desktop the nav, the
+  theme toggle, and the colophon sit inline at the right; on mobile they collapse
+  into a hamburger menu (a single set of controls that reflows — no duplicated
+  ids). No footer: the colophon lives in the bar now. Wraps Base.astro (which
+  owns <head>, fonts, the no-flash theme script, and opts this layout into view
+  transitions). Pages set an `active` nav item.
 */
 import { Icon } from 'astro-icon/components';
+import { fade } from 'astro:transitions';
 import Base from './Base.astro';
+import Colophon from '../components/Colophon.astro';
 
 interface Props {
   title?: string;
@@ -27,78 +28,123 @@ const nav = [
 ] as const;
 ---
 
-<Base title={pageTitle}>
+<Base title={pageTitle} transitions>
   <div class="flex min-h-screen flex-col">
     {/* Top bar — the site's primary navigation. */}
     <header
-      class="sticky top-0 z-20 flex h-14 items-center gap-4 border-b border-base-300 bg-base-100/90 px-5 backdrop-blur"
+      class="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-base-300 bg-base-100/90 px-5 backdrop-blur"
     >
       <a
         href="/"
-        class="font-display text-base leading-none whitespace-nowrap sm:text-lg"
+        class="mr-auto font-display text-base leading-none whitespace-nowrap sm:text-lg"
         aria-label="It Only Happens Once — home"
       >
         It Only Happens Once
       </a>
 
-      <nav class="ml-auto flex items-center gap-4 sm:gap-5" aria-label="Primary">
+      {/* Hamburger — mobile only. */}
+      <button
+        id="menu-toggle"
+        type="button"
+        class="rounded-field p-1.5 text-base-content/60 hover:bg-base-200 hover:text-base-content sm:hidden"
+        aria-label="Menu"
+        aria-controls="site-menu"
+        aria-expanded="false"
+      >
+        <Icon name="ph:list" class="text-lg" />
+      </button>
+
+      {/* Nav — inline row on desktop, dropdown panel on mobile. */}
+      <nav
+        id="site-menu"
+        aria-label="Primary"
+        class:list={[
+          'site-menu items-center',
+          'absolute top-full right-4 mt-2 hidden w-44 flex-col gap-1 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg',
+          'sm:static sm:right-auto sm:mt-0 sm:flex sm:w-auto sm:flex-row sm:gap-5 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none',
+        ]}
+      >
         {
           nav.map((item) => (
             <a
               href={item.href}
               aria-current={active === item.key ? 'page' : undefined}
               class:list={[
-                'font-sans text-sm transition-colors',
+                'w-full rounded-field px-2 py-1.5 font-sans text-sm transition-colors sm:w-auto sm:rounded-none sm:p-0',
                 active === item.key
-                  ? 'border-b border-primary pb-0.5 text-base-content'
-                  : 'text-base-content/60 hover:text-base-content',
+                  ? 'text-base-content sm:border-b sm:border-primary sm:pb-0.5'
+                  : 'text-base-content/60 hover:bg-base-200 hover:text-base-content sm:hover:bg-transparent',
               ]}
             >
               {item.label}
             </a>
           ))
         }
-        <button
-          id="theme-toggle"
-          class="theme-toggle rounded-field p-1.5 text-base-content/55 hover:bg-base-200 hover:text-base-content"
-          aria-label="Toggle light and dark theme"
-          title="Toggle theme"
+
+        {/* Utilities: theme toggle + colophon (a divider above them on mobile). */}
+        <div
+          class="mt-1 flex w-full items-center gap-1 border-t border-base-300 px-1 pt-2 sm:mt-0 sm:w-auto sm:border-0 sm:p-0"
         >
-          <Icon name="ph:sun" class="theme-icon-sun text-base" />
-          <Icon name="ph:moon" class="theme-icon-moon text-base" />
-        </button>
+          <button
+            id="theme-toggle"
+            class="theme-toggle rounded-field p-1.5 text-base-content/55 hover:bg-base-200 hover:text-base-content"
+            aria-label="Toggle light and dark theme"
+            title="Toggle theme"
+          >
+            <Icon name="ph:sun" class="theme-icon-sun text-base" />
+            <Icon name="ph:moon" class="theme-icon-moon text-base" />
+          </button>
+          <Colophon />
+        </div>
       </nav>
     </header>
 
-    <main class="min-w-0 flex-1">
+    <main
+      class="min-w-0 flex-1"
+      transition:name="content"
+      transition:animate={fade({ duration: '0.22s' })}
+    >
       <slot />
     </main>
-
-    <footer class="border-t border-base-300 px-5 py-6">
-      <div class="mx-auto max-w-3xl font-sans text-xs text-base-content/40">It Only Happens Once</div>
-    </footer>
   </div>
 
   <script>
-    // Theme toggle — dusk ⇄ paper, persisted (mirrors AdminLayout).
-    const themeBtn = document.getElementById('theme-toggle');
-    const syncThemeBtn = () =>
-      themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));
-    syncThemeBtn();
-    themeBtn?.addEventListener('click', () => {
+    // ---- Theme toggle — dusk ⇄ paper, persisted. Delegated on document so it
+    // survives view-transition navigation without re-binding. ----
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as Element)?.closest?.('#theme-toggle');
+      if (!btn) return;
       const next = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
       document.documentElement.dataset.theme = next;
       try {
         localStorage.setItem('theme', next);
-      } catch (e) {}
-      syncThemeBtn();
+      } catch (err) {}
+      btn.setAttribute('aria-pressed', String(next === 'paper'));
     });
-    // keep other open tabs in sync
     window.addEventListener('storage', (e) => {
-      if (e.key === 'theme' && e.newValue) {
-        document.documentElement.dataset.theme = e.newValue;
-        syncThemeBtn();
-      }
+      if (e.key === 'theme' && e.newValue) document.documentElement.dataset.theme = e.newValue;
     });
+
+    // ---- Mobile menu (delegated) ----
+    const closeMenu = () => {
+      document.getElementById('site-menu')?.classList.remove('is-open');
+      document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'false');
+    };
+    document.addEventListener('click', (e) => {
+      const target = e.target as Element;
+      const menu = document.getElementById('site-menu');
+      if (!menu) return;
+      if (target?.closest?.('#menu-toggle')) {
+        const open = menu.classList.toggle('is-open');
+        document.getElementById('menu-toggle')?.setAttribute('aria-expanded', String(open));
+        return;
+      }
+      if (target?.closest?.('#site-menu a')) return closeMenu(); // nav link tapped
+      if (menu.classList.contains('is-open') && !menu.contains(target)) closeMenu(); // outside click
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMenu();
+    });
+    document.addEventListener('astro:page-load', closeMenu); // each page starts closed
   </script>
 </Base>

@@ -1,0 +1,109 @@
+---
+/*
+  Colophon — the "how this was made" note, editorial-style. See design.md §3.
+
+  A quiet GitHub mark in the top bar opens a native top-layer popover: the
+  typefaces (and *why* Atkinson), the stack as monochrome marks, and a link to
+  the source. Not a "powered by" badge strip.
+
+  Positioned with a small script relative to its trigger (just below it, since it
+  lives in the top bar) — more reliable across browsers than CSS anchor
+  positioning, and it works whether the trigger is inline (desktop) or inside the
+  mobile menu. The listeners are delegated on `document`, so they survive view-
+  transition navigations without re-binding.
+*/
+import { Icon } from 'astro-icon/components';
+
+const repo = 'https://github.com/michaelchen412/it-only-happens-once';
+const stack = [
+  { icon: 'simple-icons:astro', label: 'Astro' },
+  { icon: 'simple-icons:supabase', label: 'Supabase' },
+  { icon: 'simple-icons:tailwindcss', label: 'Tailwind CSS' },
+  { icon: 'simple-icons:daisyui', label: 'daisyUI' },
+  { icon: 'simple-icons:typescript', label: 'TypeScript' },
+  { icon: 'simple-icons:vercel', label: 'Vercel' },
+];
+---
+
+<button
+  type="button"
+  popovertarget="site-colophon"
+  aria-label="How this site was built"
+  class="inline-flex rounded-field p-1.5 text-base-content/55 transition-colors hover:bg-base-200 hover:text-base-content"
+>
+  <Icon name="simple-icons:github" class="size-4" />
+</button>
+
+<div
+  id="site-colophon"
+  popover
+  class="colophon-popover rounded-box border border-base-300 bg-base-200 p-5 text-left shadow-lg"
+>
+  <p class="font-serif text-sm leading-relaxed text-base-content/75">
+    Typeset in Newsreader and <span class="font-sans">Atkinson&nbsp;Hyperlegible</span> — the
+    latter drawn by the Braille Institute so that people who struggle to read still can.
+  </p>
+
+  <p class="mt-4 font-sans text-xs tracking-wide text-base-content/40">Built with</p>
+  <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-sans text-sm text-base-content/60">
+    {
+      stack.map((s) => (
+        <li class="inline-flex items-center gap-1.5">
+          <Icon name={s.icon} class="size-4" />
+          {s.label}
+        </li>
+      ))
+    }
+  </ul>
+
+  <p class="mt-4 border-t border-base-300 pt-4 font-sans text-xs leading-relaxed text-base-content/50">
+    There is no AI-generated content on this blog; all content is authored, edited, and compiled by
+    me. Claude Code was only used to streamline the development process of the site itself.
+  </p>
+
+  <a
+    href={repo}
+    target="_blank"
+    rel="noopener noreferrer"
+    class="mt-5 inline-flex items-center gap-1.5 font-sans text-sm text-primary hover:underline"
+  >
+    <Icon name="simple-icons:github" class="size-4" />
+    View on GitHub
+    <Icon name="ph:arrow-up-right" class="size-3" />
+  </a>
+</div>
+
+<script>
+  function positionColophon() {
+    const pop = document.getElementById('site-colophon');
+    const btn = document.querySelector('button[popovertarget="site-colophon"]') as HTMLElement | null;
+    if (!pop || !btn) return;
+    const r = btn.getBoundingClientRect();
+    const pad = 8;
+    const pw = pop.offsetWidth;
+    const ph = pop.offsetHeight;
+    const left = Math.max(pad, Math.min(r.right - pw, window.innerWidth - pw - pad));
+    let top = r.bottom + pad; // open downward — the trigger sits in the top bar
+    if (top + ph > window.innerHeight - pad) {
+      const above = r.top - ph - pad;
+      if (above >= pad) top = above; // flip up only if it actually fits
+    }
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    pop.style.right = 'auto';
+    pop.style.bottom = 'auto';
+  }
+
+  // Delegated on document, so it survives view-transition navigation.
+  document.addEventListener('click', (e) => {
+    if (!(e.target as Element)?.closest?.('button[popovertarget="site-colophon"]')) return;
+    requestAnimationFrame(() => {
+      const pop = document.getElementById('site-colophon');
+      if (pop && pop.matches(':popover-open')) positionColophon();
+    });
+  });
+  window.addEventListener('resize', () => {
+    const pop = document.getElementById('site-colophon');
+    if (pop && pop.matches(':popover-open')) positionColophon();
+  });
+</script>

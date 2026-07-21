@@ -1,23 +1,28 @@
 ---
 import { Font } from 'astro:assets';
+import { ClientRouter } from 'astro:transitions';
 import '../styles/app.css';
 
 interface Props {
   title?: string;
+  /** Opt into animated view transitions (the public reader pages do). */
+  transitions?: boolean;
 }
 
-const { title = 'It Only Happens Once' } = Astro.props;
+const { title = 'It Only Happens Once', transitions = false } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en" data-theme="dusk">
+<html lang="en" data-theme="dusk" transition:name="root" transition:animate="none">
   <head>
     <meta charset="utf-8" />
-    {/* Apply the saved theme before paint (no flash). Default stays dusk. */}
+    {/* Pick the theme before paint (no flash): a saved choice wins; otherwise
+        follow the system preference; otherwise default to dusk (dark). */}
     <script is:inline>
       try {
         const t = localStorage.getItem('theme');
-        if (t) document.documentElement.dataset.theme = t;
+        document.documentElement.dataset.theme =
+          t || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'paper' : 'dusk');
       } catch (e) {}
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -26,8 +31,22 @@ const { title = 'It Only Happens Once' } = Astro.props;
     <title>{title}</title>
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />
+    {transitions && <ClientRouter />}
   </head>
   <body class="bg-base-100 text-base-content">
     <slot />
+    <script>
+      // After each view-transition swap, re-apply the theme before paint so it
+      // never flashes back to the default on client-side navigation. Same rule as
+      // the initial pick: saved choice → system preference → dusk. Inert unless a
+      // page opted into transitions (the event never fires otherwise).
+      document.addEventListener('astro:after-swap', () => {
+        try {
+          const t = localStorage.getItem('theme');
+          document.documentElement.dataset.theme =
+            t || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'paper' : 'dusk');
+        } catch (e) {}
+      });
+    </script>
   </body>
 </html>

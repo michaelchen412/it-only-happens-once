@@ -204,6 +204,26 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Colophon popover — the "how this site was built" note, triggered from the top
+   bar. Native top-layer (so it never clips); a script in Colophon.astro
+   positions it just under its trigger on open. This fixed default (top-right,
+   under the bar) is only what shows for the one frame before the script runs.
+   ------------------------------------------------------------------------ */
+[popover].colophon-popover {
+  max-width: 22rem;
+  position: fixed;
+  margin: 0;
+  top: 3.5rem;
+  right: 1rem;
+}
+
+/* Mobile nav dropdown — revealed when the hamburger toggles it open (§8 chrome).
+   Base is `hidden sm:flex`; this compound selector out-specifies `hidden`. */
+.site-menu.is-open {
+  display: flex;
+}
+
+/* ---------------------------------------------------------------------------
    Reading — long-form article typography, the heart of the blog.
    Scoped to `.reading` so authored / markdown content styles itself with no
    per-element classes. Pair with `.prose-measure` to cap the line length.

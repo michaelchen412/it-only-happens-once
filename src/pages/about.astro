@@ -1,13 +1,12 @@
 ---
 /*
-  /about — the public About page. Two movements from the `about` singleton:
-  I · WHO I AM (me), then II · ABOUT THE BLOG (site), with an optional contact.
+  /about — the public About page. Two sections from the `about` singleton:
+  Who I am (me), then About the Blog (site), with an optional contact.
   Edited at /admin/about. SSR + edge cache.
 
-  Editorial treatment (not SaaS): quiet serif small-caps labels + serif movement
-  numerals (a true I/II sequence — the "movements" of a composed suite), no accent
+  Editorial treatment (not SaaS): quiet serif small-caps section labels, no accent
   eyebrows, and a floated portrait the prose wraps around. Heading outline: a
-  visually-hidden h1 names the page; each movement is a <section> headed by an h2.
+  visually-hidden h1 names the page; each section is a <section> headed by an h2.
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
@@ -45,11 +44,6 @@ const hasMe = !!(me.headline || meBodyHtml || portraitUrl || interests.length);
 const hasSite = !!(site.thesis || siteBodyHtml || blurbHtml || embedSrc);
 const hasContact = !!(contact.href && contact.label);
 
-// Quiet serif labels (no accent color, no star marks). Small-caps via inline style.
-// On lg+, the movement numeral hangs out in the left margin (manuscript style).
-const numCls =
-  'font-display text-3xl leading-none text-base-content/25 lg:absolute lg:top-0 lg:right-full lg:mr-6 lg:text-4xl';
-
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 ---
 
@@ -63,11 +57,10 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
         </div>
       ) : (
         <>
-          {/* ─────────  I · WHO I AM  ───────── */}
+          {/* ─────────  WHO I AM  ───────── */}
           {hasMe && (
             <section aria-labelledby="mv-me">
-              <h2 id="mv-me" class="relative flex items-baseline gap-3">
-                <span class={numCls}>I</span>
+              <h2 id="mv-me">
                 <Label as="span">Who I am</Label>
               </h2>
 
@@ -109,11 +102,10 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 
           {hasMe && hasSite && <hr class="my-20 border-base-300" />}
 
-          {/* ─────────  II · ABOUT THE BLOG  ───────── */}
+          {/* ─────────  ABOUT THE BLOG  ───────── */}
           {hasSite && (
             <section aria-labelledby="mv-site" class="max-w-lg">
-              <h2 id="mv-site" class="relative flex items-baseline gap-3">
-                <span class={numCls}>II</span>
+              <h2 id="mv-site">
                 <Label as="span">About the Blog</Label>
               </h2>
 
@@ -153,6 +145,15 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
               <a href={contact.href} class="font-sans text-sm text-primary hover:underline">{contact.label} →</a>
             </div>
           )}
+
+          {/* Authorship attestation — hardcoded so it is always present. */}
+          <div class="mt-16 border-t border-base-300 pt-6">
+            <p class="font-serif text-sm leading-relaxed text-base-content/55 italic">
+              There is no AI-generated content on this blog; all content is authored, edited, and
+              compiled by me. Claude Code was only used to streamline the development process of the
+              site itself.
+            </p>
+          </div>
         </>
       )
     }
