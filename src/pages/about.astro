@@ -1,0 +1,160 @@
+---
+/*
+  /about — the public About page. Two movements from the `about` singleton:
+  I · WHO I AM (me), then II · ABOUT THE BLOG (site), with an optional contact.
+  Edited at /admin/about. SSR + edge cache.
+
+  Editorial treatment (not SaaS): quiet serif small-caps labels + serif movement
+  numerals (a true I/II sequence — the "movements" of a composed suite), no accent
+  eyebrows, and a floated portrait the prose wraps around. Heading outline: a
+  visually-hidden h1 names the page; each movement is a <section> headed by an h2.
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Label from '../components/Label.astro';
+import { renderMarkdown } from '../lib/markdown';
+import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+
+const supabase = Astro.locals.supabase;
+const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
+
+type Interest = { term: string; gloss: string };
+const c = (page?.content ?? {}) as {
+  me?: { headline?: string; portrait?: string | null; portrait_caption?: string; body?: string; interests?: Interest[] };
+  site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
+  contact?: { label?: string; href?: string };
+};
+const me = c.me ?? {};
+const site = c.site ?? {};
+const siteName = site.name ?? {};
+const contact = c.contact ?? {};
+const interests: Interest[] = (Array.isArray(me.interests) ? me.interests : []).filter((it) => it.term || it.gloss);
+
+const meBodyHtml = renderMarkdown(me.body);
+const siteBodyHtml = renderMarkdown(site.body);
+const blurbHtml = renderMarkdown(siteName.blurb);
+
+const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
+const cacheBust = page?.updated_at ? new Date(page.updated_at).getTime() : 0;
+const portraitUrl = me.portrait ? `${SUPABASE_URL}/storage/v1/object/public/site/${me.portrait}?v=${cacheBust}` : '';
+
+const embed = siteName.spotify_url ? parseSpotifyEmbed(siteName.spotify_url) : null;
+const embedSrc = embed ? spotifyEmbedSrc(embed) : '';
+const embedHeight = embed && embed.kind === 'track' ? 152 : 352;
+
+const hasMe = !!(me.headline || meBodyHtml || portraitUrl || interests.length);
+const hasSite = !!(site.thesis || siteBodyHtml || blurbHtml || embedSrc);
+const hasContact = !!(contact.href && contact.label);
+
+// Quiet serif labels (no accent color, no star marks). Small-caps via inline style.
+// On lg+, the movement numeral hangs out in the left margin (manuscript style).
+const numCls =
+  'font-display text-3xl leading-none text-base-content/25 lg:absolute lg:top-0 lg:right-full lg:mr-6 lg:text-4xl';
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+---
+
+<SiteLayout title="About" active="about">
+  <article class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
+    <h1 class="sr-only">About</h1>
+    {
+      !hasMe && !hasSite ? (
+        <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+          <p class="font-serif text-lg text-base-content/55">This page is being composed.</p>
+        </div>
+      ) : (
+        <>
+          {/* ─────────  I · WHO I AM  ───────── */}
+          {hasMe && (
+            <section aria-labelledby="mv-me">
+              <h2 id="mv-me" class="relative flex items-baseline gap-3">
+                <span class={numCls}>I</span>
+                <Label as="span">Who I am</Label>
+              </h2>
+
+              <div class="mt-8 flow-root">
+                {portraitUrl && (
+                  <figure class="mb-5 sm:float-right sm:mb-2 sm:ml-10 sm:w-56">
+                    <img
+                      src={portraitUrl}
+                      alt={me.headline ? `Portrait of ${me.headline}` : 'Portrait of the author'}
+                      class="w-44 rounded-box border border-base-300 object-cover sm:w-full"
+                      style="aspect-ratio: 4 / 5"
+                    />
+                    {me.portrait_caption && (
+                      <figcaption class="mt-2 font-serif text-sm text-base-content/40 italic">{me.portrait_caption}</figcaption>
+                    )}
+                  </figure>
+                )}
+                {me.headline && (
+                  <p class="mb-2 font-display text-4xl leading-[1.08] font-light sm:text-5xl">{me.headline}</p>
+                )}
+                {meBodyHtml && <div class="reading" set:html={meBodyHtml} />}
+              </div>
+
+              {interests.length > 0 && (
+                <div class="mt-12">
+                  <Label as="h3">My Interests</Label>
+                  <dl class="mt-5 grid gap-x-10 gap-y-5 sm:grid-cols-2">
+                    {interests.map((it) => (
+                      <div>
+                        <dt class="font-serif text-xl">{it.term}</dt>
+                        {it.gloss && <dd class="mt-0.5 ml-0 font-sans text-sm leading-relaxed text-base-content/55">{it.gloss}</dd>}
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+            </section>
+          )}
+
+          {hasMe && hasSite && <hr class="my-20 border-base-300" />}
+
+          {/* ─────────  II · ABOUT THE BLOG  ───────── */}
+          {hasSite && (
+            <section aria-labelledby="mv-site" class="max-w-lg">
+              <h2 id="mv-site" class="relative flex items-baseline gap-3">
+                <span class={numCls}>II</span>
+                <Label as="span">About the Blog</Label>
+              </h2>
+
+              {site.thesis && (
+                <blockquote class="mt-8 border-l-2 border-base-300 pl-6 font-serif text-xl leading-relaxed text-base-content/80 italic">
+                  {site.thesis}
+                </blockquote>
+              )}
+              {siteBodyHtml && <div class="reading mt-8" set:html={siteBodyHtml} />}
+
+              {(blurbHtml || embedSrc) && (
+                <div class="mt-12">
+                  <Label as="h3">About the Name</Label>
+                  <div class="mt-4 rounded-box border border-base-300 bg-base-200 p-6">
+                    {blurbHtml && <div class="reading" set:html={blurbHtml} />}
+                    {embedSrc && (
+                      <iframe
+                        src={embedSrc}
+                        title="Spotify player"
+                        width="100%"
+                        height={embedHeight}
+                        style="border-radius:12px;border:0"
+                        class:list={[blurbHtml && 'mt-5']}
+                        loading="lazy"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        allowfullscreen
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {hasContact && (
+            <div class="mt-20 border-t border-base-300 pt-8">
+              <a href={contact.href} class="font-sans text-sm text-primary hover:underline">{contact.label} →</a>
+            </div>
+          )}
+        </>
+      )
+    }
+  </article>
+</SiteLayout>

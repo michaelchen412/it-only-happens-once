@@ -1,0 +1,50 @@
+---
+/*
+  EditorToolbar — the fixed, Google-Docs-style formatting toolbar shared by the
+  writing composer and the About builder. Buttons carry `data-cmd`; the commands
+  are wired in src/scripts/rich-editor.ts (mountRichEditor). Caller supplies
+  border/padding via `class`.
+*/
+const TOOLS = [
+  { group: [{ cmd: 'undo', label: '↶', aria: 'Undo' }, { cmd: 'redo', label: '↷', aria: 'Redo' }] },
+  { group: [{ cmd: 'h2', label: 'H2', aria: 'Heading', toggle: true }, { cmd: 'h3', label: 'H3', aria: 'Subheading', toggle: true }] },
+  { group: [
+      { cmd: 'bold', label: 'B', aria: 'Bold', klass: 'font-bold', toggle: true },
+      { cmd: 'italic', label: 'I', aria: 'Italic', klass: 'italic', toggle: true },
+      { cmd: 'strike', label: 'S', aria: 'Strikethrough', klass: 'line-through', toggle: true },
+    ] },
+  { group: [
+      { cmd: 'blockquote', label: '“', aria: 'Quote', toggle: true },
+      { cmd: 'bulletList', label: '•', aria: 'Bulleted list', toggle: true },
+      { cmd: 'orderedList', label: '1.', aria: 'Numbered list', toggle: true },
+    ] },
+  { group: [{ cmd: 'link', label: '🔗', aria: 'Add link' }, { cmd: 'hr', label: '—', aria: 'Divider' }] },
+] as const;
+
+interface Props {
+  class?: string;
+}
+const { class: className = '' } = Astro.props;
+---
+
+<div class:list={['flex flex-wrap items-center gap-1', className]} role="toolbar" aria-label="Formatting">
+  {
+    TOOLS.map((section, i) => (
+      <>
+        {i > 0 && <span class="mx-1 h-5 w-px bg-base-300" />}
+        {section.group.map((t) => (
+          <button
+            type="button"
+            data-cmd={t.cmd}
+            title={t.aria}
+            aria-label={t.aria}
+            aria-pressed={(t as { toggle?: boolean }).toggle ? 'false' : undefined}
+            class:list={['tt-btn', (t as { klass?: string }).klass]}
+          >
+            {t.label}
+          </button>
+        ))}
+      </>
+    ))
+  }
+</div>

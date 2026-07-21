@@ -1,0 +1,85 @@
+---
+/*
+  /blog — the reading/retrieval room (vision.md §4, "the Index").
+
+  SHELL ONLY for now: this pass builds the navigable chrome — the view
+  switcher, the search field, and the subject-filter rail — but not the
+  content. The writing stream, quotes view, and working search/filter land in
+  the next pass. Music is deferred to its own facet-design pass.
+*/
+import { Icon } from 'astro-icon/components';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import Label from '../../components/Label.astro';
+
+const views = [
+  { key: 'writing', label: 'Writing', active: true },
+  { key: 'quotes', label: 'Quotes', active: false },
+] as const;
+
+// A few real subjects, shown inert, just to render the filter chrome.
+const sampleSubjects = ['faith', 'love', 'suffering', 'free will', 'meaning', 'work'];
+---
+
+<SiteLayout title="Blog" active="blog">
+  <div class="mx-auto w-full max-w-5xl px-5 py-8 sm:py-10">
+    {/* View switcher + search */}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <nav class="flex items-center gap-1" aria-label="Blog views">
+        {
+          views.map((v) => (
+            <span
+              aria-current={v.active ? 'page' : undefined}
+              class:list={[
+                'rounded-field px-3 py-1.5 font-sans text-sm transition-colors',
+                v.active ? 'bg-base-200 text-base-content' : 'text-base-content/55',
+              ]}
+            >
+              {v.label}
+            </span>
+          ))
+        }
+        <span class="px-3 py-1.5 font-sans text-sm text-base-content/30">Music · later</span>
+      </nav>
+
+      <div class="relative w-full sm:w-64">
+        <Icon
+          name="ph:magnifying-glass"
+          class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base text-base-content/35"
+        />
+        <input
+          type="search"
+          disabled
+          placeholder="Search writing…"
+          aria-label="Search (coming soon)"
+          class="w-full rounded-field border border-base-300 bg-base-100 py-2 pr-3 pl-9 font-sans text-sm placeholder:text-base-content/35"
+        />
+      </div>
+    </div>
+
+    {/* Rail + content */}
+    <div class="mt-8 grid gap-8 md:grid-cols-[10rem_1fr]">
+      {/* Subject-filter rail ("the sidebar as needed for the blog") */}
+      <aside class="hidden md:block">
+        <Label variant="chrome">Subjects</Label>
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          {
+            sampleSubjects.map((s) => (
+              <span class="rounded-full border border-base-300 px-2.5 py-0.5 font-sans text-xs text-base-content/50">
+                {s}
+              </span>
+            ))
+          }
+          <span class="px-1 py-0.5 font-sans text-xs text-base-content/30">+15 more</span>
+        </div>
+      </aside>
+
+      {/* Empty state */}
+      <section class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+        <p class="max-w-sm font-serif text-lg text-base-content/55">The writing stream lands here next.</p>
+        <p class="mt-2 max-w-sm font-sans text-sm text-base-content/40">
+          This pass built the room; the posts, quotes, search, and filters come in the next one.
+        </p>
+      </section>
+    </div>
+  </div>
+</SiteLayout>

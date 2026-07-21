@@ -8,6 +8,8 @@
 */
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PublishDialog from '../../../components/admin/PublishDialog.astro';
+import EditorToolbar from '../../../components/admin/EditorToolbar.astro';
+import LinkDialog from '../../../components/admin/LinkDialog.astro';
 import type { Database } from '../../../lib/database.types';
 
 const supabase = Astro.locals.supabase;
@@ -37,23 +39,6 @@ const composerInit = {
   status: fragment?.status ?? 'draft',
   occurredIso: fragment?.occurred_at ?? '',
 };
-
-// Fixed toolbar spec — `cmd` maps to a TipTap chain in composer.ts.
-const TOOLS = [
-  { group: [{ cmd: 'undo', label: '↶', aria: 'Undo' }, { cmd: 'redo', label: '↷', aria: 'Redo' }] },
-  { group: [{ cmd: 'h2', label: 'H2', aria: 'Heading', toggle: true }, { cmd: 'h3', label: 'H3', aria: 'Subheading', toggle: true }] },
-  { group: [
-      { cmd: 'bold', label: 'B', aria: 'Bold', klass: 'font-bold', toggle: true },
-      { cmd: 'italic', label: 'I', aria: 'Italic', klass: 'italic', toggle: true },
-      { cmd: 'strike', label: 'S', aria: 'Strikethrough', klass: 'line-through', toggle: true },
-    ] },
-  { group: [
-      { cmd: 'blockquote', label: '“', aria: 'Quote', toggle: true },
-      { cmd: 'bulletList', label: '•', aria: 'Bulleted list', toggle: true },
-      { cmd: 'orderedList', label: '1.', aria: 'Numbered list', toggle: true },
-    ] },
-  { group: [{ cmd: 'link', label: '🔗', aria: 'Add link' }, { cmd: 'hr', label: '—', aria: 'Divider' }] },
-] as const;
 ---
 
 <AdminLayout title={isNew ? 'New writing' : 'Edit writing'} active="fragments">
@@ -85,27 +70,7 @@ const TOOLS = [
         {!isNew && <button type="button" id="delete" class="font-sans text-sm text-base-content/55 hover:text-error">Delete</button>}
       </div>
 
-      <div class="flex flex-wrap items-center gap-1 border-t border-base-300/60 px-6 py-1.5" role="toolbar" aria-label="Formatting">
-        {
-          TOOLS.map((section, i) => (
-            <>
-              {i > 0 && <span class="mx-1 h-5 w-px bg-base-300"></span>}
-              {section.group.map((t) => (
-                <button
-                  type="button"
-                  data-cmd={t.cmd}
-                  title={t.aria}
-                  aria-label={t.aria}
-                  aria-pressed={(t as { toggle?: boolean }).toggle ? 'false' : undefined}
-                  class:list={['tt-btn', (t as { klass?: string }).klass]}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </>
-          ))
-        }
-      </div>
+      <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" />
     </div>
 
     {/* Document */}
@@ -131,19 +96,7 @@ const TOOLS = [
   />
 
   {/* Link editor (replaces prompt()) */}
-  <dialog id="link-dialog" class="modal-dialog w-full max-w-sm" aria-labelledby="link-title">
-    <div class="flex flex-col gap-4 p-6 font-sans">
-      <h2 id="link-title" class="font-display text-xl">Link</h2>
-      <input id="link-url" type="url" placeholder="https://…" class="input input-sm input-bordered" aria-label="Link URL" />
-      <div class="flex items-center justify-between">
-        <button type="button" id="link-remove" hidden class="btn btn-ghost btn-sm text-error normal-case">Remove</button>
-        <div class="ml-auto flex gap-2">
-          <button type="button" id="link-cancel" class="btn btn-ghost btn-sm normal-case">Cancel</button>
-          <button type="button" id="link-apply" class="btn btn-primary btn-sm normal-case">Apply</button>
-        </div>
-      </div>
-    </div>
-  </dialog>
+  <LinkDialog />
 
   <script type="application/json" id="composer-init" is:inline set:html={JSON.stringify(composerInit)}></script>
   <script>

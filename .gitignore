@@ -8,6 +8,12 @@ dist/
 # git history. The reflections import (scripts/) reads it locally, not from git.
 legacy/
 
+# local-only docs — internal strategy + a personal portrait. They live on disk
+# and inform the work, but are deliberately kept out of the public repo.
+about-michael.md
+vision.md
+design.md
+
 # dependencies
 node_modules/
 

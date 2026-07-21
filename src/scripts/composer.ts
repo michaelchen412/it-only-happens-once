@@ -1,10 +1,7 @@
 // Client logic for the writing composer (src/pages/admin/writing/[id].astro).
 // TipTap (WYSIWYG → Markdown, ADR-0006) + a fixed toolbar, continuous autosave,
 // and the publish/details dialog. Kept out of the .astro file so it stays lean.
-import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import { Markdown } from 'tiptap-markdown';
+import { mountRichEditor } from './rich-editor';
 import { actions } from 'astro:actions';
 import { slugify } from '../lib/slug';
 import { formatActionError, nowTime } from './action-error';
@@ -23,90 +20,14 @@ const statusText = document.getElementById('status-text') as HTMLElement;
 
 form.addEventListener('submit', (e) => e.preventDefault()); // no implicit submit
 
-// ---- TipTap editor (WYSIWYG that serializes to Markdown) ----
-const editor = new Editor({
-  element: document.getElementById('editor')!,
-  extensions: [
-    StarterKit,
-    Markdown.configure({ transformPastedText: true, transformCopiedText: true }),
-    Placeholder.configure({ placeholder: 'Start writing…' }),
-  ],
+// ---- TipTap editor (WYSIWYG → Markdown) + toolbar + link dialog ----
+const { editor, getMarkdown } = mountRichEditor({
+  editorEl: document.getElementById('editor')!,
+  toolbarRoot: document.querySelector('[role="toolbar"]') as HTMLElement,
+  linkDialog: document.querySelector('.link-dialog') as HTMLDialogElement,
+  placeholder: 'Start writing…',
   content: init.body || '',
-  editorProps: { attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': 'Article body' } },
-});
-const getMarkdown = () => (editor.storage.markdown as { getMarkdown: () => string }).getMarkdown();
-
-// ---- toolbar ----
-const cmds: Record<string, () => void> = {
-  undo: () => editor.chain().focus().undo().run(),
-  redo: () => editor.chain().focus().redo().run(),
-  h2: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-  h3: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-  bold: () => editor.chain().focus().toggleBold().run(),
-  italic: () => editor.chain().focus().toggleItalic().run(),
-  strike: () => editor.chain().focus().toggleStrike().run(),
-  blockquote: () => editor.chain().focus().toggleBlockquote().run(),
-  bulletList: () => editor.chain().focus().toggleBulletList().run(),
-  orderedList: () => editor.chain().focus().toggleOrderedList().run(),
-  hr: () => editor.chain().focus().setHorizontalRule().run(),
-  link: () => openLinkDialog(),
-};
-const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.tt-btn'));
-btns.forEach((b) => b.addEventListener('click', () => cmds[b.dataset.cmd!]?.()));
-
-function syncToolbar() {
-  const active: Record<string, boolean> = {
-    bold: editor.isActive('bold'),
-    italic: editor.isActive('italic'),
-    strike: editor.isActive('strike'),
-    blockquote: editor.isActive('blockquote'),
-    bulletList: editor.isActive('bulletList'),
-    orderedList: editor.isActive('orderedList'),
-    link: editor.isActive('link'),
-    h2: editor.isActive('heading', { level: 2 }),
-    h3: editor.isActive('heading', { level: 3 }),
-  };
-  btns.forEach((b) => {
-    const on = !!active[b.dataset.cmd!];
-    b.classList.toggle('is-active', on);
-    if (b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', String(on)); // toggles only
-  });
-}
-editor.on('selectionUpdate', syncToolbar);
-editor.on('transaction', syncToolbar);
-
-// ---- link dialog (replaces prompt) ----
-const linkDialog = document.getElementById('link-dialog') as HTMLDialogElement;
-const linkUrl = document.getElementById('link-url') as HTMLInputElement;
-const linkRemove = document.getElementById('link-remove') as HTMLButtonElement;
-
-function openLinkDialog() {
-  const prev = (editor.getAttributes('link').href as string | undefined) ?? '';
-  linkUrl.value = prev;
-  linkRemove.hidden = !prev;
-  linkDialog.showModal();
-  linkUrl.focus();
-  linkUrl.select();
-}
-function applyLink() {
-  const url = linkUrl.value.trim();
-  linkDialog.close();
-  if (url) editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-}
-document.getElementById('link-apply')!.addEventListener('click', applyLink);
-document.getElementById('link-cancel')!.addEventListener('click', () => linkDialog.close());
-linkRemove.addEventListener('click', () => {
-  linkDialog.close();
-  editor.chain().focus().unsetLink().run();
-});
-linkDialog.addEventListener('click', (e) => {
-  if (e.target === linkDialog) linkDialog.close();
-});
-linkUrl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    applyLink();
-  }
+  ariaLabel: 'Article body',
 });
 
 // ---- status indicator ----

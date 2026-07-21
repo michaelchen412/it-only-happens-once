@@ -541,4 +541,54 @@ export const server = {
       },
     }),
   },
+
+  // --- editable singleton pages (docs/admin.md): About, and future pages ------
+  pages: {
+    /** Save a page's structured content (a validated shape) to its `pages` row. */
+    save: defineAction({
+      input: z.object({
+        slug: z.string().min(1),
+        // The About page is two co-equal movements: `me` (who I am) and `site`
+        // (what this place is), plus an optional contact line. See docs/admin.md.
+        content: z.object({
+          me: z
+            .object({
+              headline: z.string().default(''),
+              portrait: z.string().nullable().default(null),
+              portrait_caption: z.string().default(''),
+              body: z.string().default(''),
+              interests: z
+                .array(z.object({ term: z.string().default(''), gloss: z.string().default('') }))
+                .default([]),
+            })
+            .default({}),
+          site: z
+            .object({
+              thesis: z.string().default(''),
+              body: z.string().default(''),
+              name: z
+                .object({
+                  blurb: z.string().default(''),
+                  spotify_url: z.string().default(''),
+                })
+                .default({}),
+            })
+            .default({}),
+          contact: z
+            .object({
+              label: z.string().default(''),
+              href: z.string().default(''),
+            })
+            .default({}),
+        }),
+      }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase
+          .from('pages')
+          .upsert({ slug: input.slug, content: input.content as unknown as Json }, { onConflict: 'slug' });
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+  },
 };

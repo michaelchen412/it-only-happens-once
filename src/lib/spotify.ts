@@ -21,6 +21,38 @@ export function parseSpotifyTrackId(url: string): string | null {
   return null;
 }
 
+/** The Spotify entity kinds we can embed. */
+export type SpotifyEmbedKind = 'track' | 'album' | 'playlist' | 'episode' | 'show' | 'artist';
+
+export interface SpotifyEmbed {
+  kind: SpotifyEmbedKind;
+  id: string;
+}
+
+/**
+ * Parse ANY Spotify URL/URI into `{ kind, id }` for embedding — track, album,
+ * playlist, etc. Used by the About builder (the name-origin album) and anywhere
+ * we accept a pasted Spotify link. We store just kind+id, never raw iframe HTML.
+ */
+export function parseSpotifyEmbed(url: string): SpotifyEmbed | null {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return null;
+  // spotify:album:ID
+  const uri = trimmed.match(/^spotify:(track|album|playlist|episode|show|artist):([A-Za-z0-9]+)$/);
+  if (uri) return { kind: uri[1] as SpotifyEmbedKind, id: uri[2] };
+  // https://open.spotify.com/[intl-xx/]album/ID?...
+  const web = trimmed.match(
+    /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/,
+  );
+  if (web) return { kind: web[1] as SpotifyEmbedKind, id: web[2] };
+  return null;
+}
+
+/** Canonical embed iframe `src` for a parsed ref. `theme=0` follows the dark UI. */
+export function spotifyEmbedSrc(ref: SpotifyEmbed): string {
+  return `https://open.spotify.com/embed/${ref.kind}/${ref.id}?theme=0`;
+}
+
 export interface SpotifyLookup {
   spotifyId: string;
   title: string;

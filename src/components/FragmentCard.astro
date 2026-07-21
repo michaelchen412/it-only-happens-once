@@ -1,5 +1,6 @@
 ---
 import Timestamp from './Timestamp.astro';
+import Label from './Label.astro';
 
 /*
   FragmentCard — the atom, standardized.
@@ -58,9 +59,9 @@ const cfg = {
     className,
   ]}
 >
-  <header class:list={['flex items-center gap-2', cfg.tone]}>
-    <span class="text-sm" aria-hidden="true">{cfg.glyph}</span>
-    <span class="font-sans text-xs tracking-widest uppercase">{cfg.label}</span>
+  <header class="flex items-center gap-2">
+    <span class:list={['text-sm', cfg.tone]} aria-hidden="true">{cfg.glyph}</span>
+    <Label variant="chrome" as="span">{cfg.label}</Label>
   </header>
 
   <div class="mt-3 grow">

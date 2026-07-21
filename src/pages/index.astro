@@ -1,17 +1,23 @@
 ---
+/*
+  / — Home, the Sky's front door.
 
+  CHROME ONLY for now: this wires the public shell so `/` is a real room instead
+  of the Astro scaffold. The Sky itself — landing inside a living constellation,
+  and the zoom out to the whole sky (vision.md §4) — is the next design pass and
+  lands here later. Kept deliberately quiet and honest in the meantime, in the
+  same calibrated-placeholder voice as the other unbuilt rooms.
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<SiteLayout>
+  <section
+    class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 py-24 text-center"
+  >
+    <p class="font-serif text-lg text-base-content/55">The sky is being composed.</p>
+    <p class="mt-2 max-w-sm font-sans text-sm text-base-content/40">
+      The front door — landing inside a living constellation — lands here in a later pass.
+    </p>
+  </section>
+</SiteLayout>

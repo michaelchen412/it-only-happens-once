@@ -1,0 +1,179 @@
+---
+/*
+  /admin/about — the About page builder (docs/admin.md). A dedicated, per-section
+  editor for the `about` singleton in the `pages` table. The page is two co-equal
+  movements: WHO I AM (me) and WHAT THIS IS (site), plus an optional contact line.
+  Each movement has its own rich-text body (the shared TipTap editor supports
+  multiple instances). Always live; saved deliberately (no autosave).
+*/
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import EditorToolbar from '../../components/admin/EditorToolbar.astro';
+import LinkDialog from '../../components/admin/LinkDialog.astro';
+import InterestRow from '../../components/admin/InterestRow.astro';
+import { Icon } from 'astro-icon/components';
+
+const supabase = Astro.locals.supabase;
+const { data: page } = await supabase.from('pages').select('content').eq('slug', 'about').single();
+
+type Interest = { term: string; gloss: string };
+const c = (page?.content ?? {}) as {
+  me?: { headline?: string; portrait?: string | null; portrait_caption?: string; body?: string; interests?: Interest[] };
+  site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
+  contact?: { label?: string; href?: string };
+};
+const me = c.me ?? {};
+const site = c.site ?? {};
+const siteName = site.name ?? {};
+const contact = c.contact ?? {};
+const interests: Interest[] = Array.isArray(me.interests) ? me.interests : [];
+
+const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
+const portraitPath = me.portrait ?? '';
+const portraitUrl = portraitPath ? `${SUPABASE_URL}/storage/v1/object/public/site/${portraitPath}` : '';
+
+const aboutInit = { meBody: me.body ?? '', siteBody: site.body ?? '' };
+
+const input =
+  'w-full rounded-field border border-base-300 bg-base-100 px-3 py-2 font-sans text-sm outline-none focus:border-primary/60';
+const fieldLabel = 'font-sans text-sm text-base-content/70';
+const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
+---
+
+<AdminLayout title="About" active="about">
+  <div class="flex min-h-[calc(100vh-3.5rem)] flex-col">
+    {/* Command bar */}
+    <div class="sticky top-14 z-10 border-b border-base-300 bg-base-100/95 px-6 py-2 backdrop-blur md:top-0">
+      <div class="mx-auto flex max-w-2xl items-center gap-3">
+        <span class="font-display text-lg">About page</span>
+        <div
+          id="about-status"
+          class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55"
+          aria-live="polite"
+        >
+          <span id="about-spinner" hidden class="loading loading-spinner loading-xs"></span>
+          <span id="about-status-text">Edit and save</span>
+        </div>
+        <a href="/about" target="_blank" class="btn btn-ghost btn-sm normal-case">View ↗</a>
+        <button type="button" id="save-about" class="btn btn-primary btn-sm normal-case" disabled>Save</button>
+      </div>
+    </div>
+
+    <form id="about-form" class="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
+      <p id="about-error" hidden role="alert" class="mb-8 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error"></p>
+
+      {/* ─────────────  MOVEMENT I — WHO I AM  ───────────── */}
+      <section class="space-y-6">
+        <div>
+          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> Who I am</p>
+          <p class="mt-1 font-sans text-xs text-base-content/45">The person. Weave your heritage and origin into the prose — no facts row.</p>
+        </div>
+
+        <div class="space-y-1">
+          <label for="f-me-headline" class={fieldLabel}>Headline — a short opening line (optional; e.g. your name)</label>
+          <input id="f-me-headline" type="text" class={input} value={me.headline ?? ''} />
+        </div>
+
+        <div class="space-y-2">
+          <span class={fieldLabel}>Portrait — one photo (optional)</span>
+          <div class="flex items-center gap-4">
+            <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-box border border-base-300 bg-base-200">
+              <img id="portrait-preview" src={portraitUrl} alt="" class:list={['h-full w-full object-cover', portraitUrl ? '' : 'hidden']} />
+              <Icon id="portrait-placeholder" name="ph:image" class:list={['text-2xl text-base-content/30', portraitUrl ? 'hidden' : '']} />
+            </div>
+            <div class="flex flex-col gap-2 font-sans text-sm">
+              <label class="btn btn-outline btn-sm w-fit normal-case">
+                Upload…
+                <input id="portrait-input" type="file" accept="image/*" class="hidden" />
+              </label>
+              <button type="button" id="portrait-remove" class:list={['w-fit text-left text-xs text-base-content/50 hover:text-error', portraitUrl ? '' : 'hidden']}>Remove photo</button>
+            </div>
+          </div>
+          <input type="hidden" id="portrait-path" value={portraitPath} />
+        </div>
+
+        <div class="space-y-1">
+          <label for="f-portrait-caption" class={fieldLabel}>Photo caption (optional — a place, a date, a moment)</label>
+          <input id="f-portrait-caption" type="text" placeholder="New York City · 2024" class={input} value={me.portrait_caption ?? ''} />
+        </div>
+
+        <div class="space-y-1">
+          <label class={fieldLabel}>Your story (the main identity prose)</label>
+          <div class="rounded-box border border-base-300" data-editor="me">
+            <EditorToolbar class="border-b border-base-300 px-3 py-1.5" />
+            <div id="me-editor" class="reading px-4 py-4"></div>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class={fieldLabel}>What I'm into</span>
+            <button type="button" id="interest-add" class="btn btn-ghost btn-xs normal-case">+ Add</button>
+          </div>
+          <div id="interests-list" class="space-y-3">
+            {interests.map((it) => <InterestRow term={it.term} gloss={it.gloss} />)}
+          </div>
+        </div>
+      </section>
+
+      <hr class="my-12 border-base-300" />
+
+      {/* ─────────────  MOVEMENT II — WHAT THIS IS  ───────────── */}
+      <section class="space-y-6">
+        <div>
+          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> What this is</p>
+          <p class="mt-1 font-sans text-xs text-base-content/45">The site and its ethos — why you write, and where the name came from.</p>
+        </div>
+
+        <div class="space-y-1">
+          <label for="f-site-thesis" class={fieldLabel}>Thesis — the large opening statement</label>
+          <textarea id="f-site-thesis" rows="3" class={input}>{site.thesis ?? ''}</textarea>
+        </div>
+
+        <div class="space-y-1">
+          <label class={fieldLabel}>Why I write here (the ethos prose)</label>
+          <div class="rounded-box border border-base-300" data-editor="site">
+            <EditorToolbar class="border-b border-base-300 px-3 py-1.5" />
+            <div id="site-editor" class="reading px-4 py-4"></div>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label for="f-blurb" class={fieldLabel}>Where the name came from (Markdown — *italics* for the album title)</label>
+          <textarea id="f-blurb" rows="4" class={input}>{siteName.blurb ?? ''}</textarea>
+        </div>
+        <div class="space-y-1">
+          <label for="f-spotify" class={fieldLabel}>Spotify link (album or track — we render the embed)</label>
+          <input id="f-spotify" type="url" placeholder="https://open.spotify.com/album/…" class={input} value={siteName.spotify_url ?? ''} />
+        </div>
+      </section>
+
+      <hr class="my-12 border-base-300" />
+
+      {/* ─────────────  CONTACT (optional)  ───────────── */}
+      <section class="space-y-4">
+        <p class="font-sans text-xs tracking-widest text-base-content/45 uppercase">Contact (optional)</p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-1">
+            <label for="f-contact-label" class={fieldLabel}>Link label</label>
+            <input id="f-contact-label" type="text" placeholder="Say hello" class={input} value={contact.label ?? ''} />
+          </div>
+          <div class="space-y-1">
+            <label for="f-contact-href" class={fieldLabel}>Link URL</label>
+            <input id="f-contact-href" type="text" placeholder="mailto:… or https://…" class={input} value={contact.href ?? ''} />
+          </div>
+        </div>
+      </section>
+    </form>
+  </div>
+
+  {/* one interest row, cloned by the client for "+ Add" (same source as the list) */}
+  <template id="interest-template"><InterestRow /></template>
+
+  <LinkDialog id="me-link" />
+  <LinkDialog id="site-link" />
+
+  <script type="application/json" id="about-init" is:inline set:html={JSON.stringify(aboutInit)}></script>
+  <script>
+    import '../../scripts/about-builder';
+  </script>
+</AdminLayout>

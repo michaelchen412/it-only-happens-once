@@ -217,6 +217,24 @@ export type Database = {
           },
         ]
       }
+      pages: {
+        Row: {
+          content: Json
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subjects: {
         Row: {
           created_at: string

@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Timestamp from '../components/Timestamp.astro';
+import Label from '../components/Label.astro';
 
 // Sample content — a plausible essay, so we can judge Newsreader at real length.
 const constellations = ['conditions, not character', 'the invisible graveyard'];
@@ -11,7 +12,7 @@ const constellations = ['conditions, not character', 'the invisible graveyard'];
     <article class="prose-measure mx-auto">
       <!-- which constellations this piece lives in -->
       <div
-        class="flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-xs tracking-widest text-base-content/45 uppercase"
+        class="flex flex-wrap items-center gap-x-5 gap-y-1 font-serif text-sm text-base-content/45"
       >
         {
           constellations.map((l) => (
@@ -99,11 +100,7 @@ const constellations = ['conditions, not character', 'the invisible graveyard'];
 
       <!-- where it lives -->
       <footer class="mt-20 border-t border-base-300 pt-8">
-        <p
-          class="font-sans text-xs tracking-widest text-base-content/40 uppercase"
-        >
-          This piece lives in
-        </p>
+        <Label variant="voice">This piece lives in</Label>
         <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-xl">
           {
             constellations.map((l) => (

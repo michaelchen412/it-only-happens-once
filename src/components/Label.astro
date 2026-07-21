@@ -1,0 +1,31 @@
+---
+/*
+  Label — the section eyebrow, wrapped. See design.md §7.
+
+  One primitive, two registers (the split of §4):
+    - voice  (default): serif, all-small-caps, muted ink. Evocative surfaces —
+             the Sky, About, reading headers.
+    - chrome (variant="chrome"): Atkinson sans, uppercase, tracked, muted.
+             Machinery rooms only — the Index rail, controls, admin.
+
+  Hard rule, both registers: an eyebrow is NEVER accent-colored (§5). Accent is
+  for content — links, the ✦, a rule — not for labels.
+
+  Renders <p> by default; pass `as="h2" | "h3" | "span"` when the label heads a
+  section so it takes part in the heading outline.
+*/
+interface Props {
+  variant?: 'voice' | 'chrome';
+  as?: string;
+  class?: string;
+}
+const { variant = 'voice', as: tag = 'p', class: className = '' } = Astro.props;
+const Tag = tag as any;
+
+const register = {
+  voice: 'font-serif tracking-[0.09em] text-base-content/50 [font-variant:all-small-caps]',
+  chrome: 'font-sans text-xs uppercase tracking-widest text-base-content/40',
+};
+---
+
+<Tag class:list={[register[variant], className]}><slot /></Tag>

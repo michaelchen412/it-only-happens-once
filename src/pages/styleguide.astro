@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import FragmentCard from '../components/FragmentCard.astro';
 import Timestamp from '../components/Timestamp.astro';
+import Label from '../components/Label.astro';
 
 // live sample dates so the relative labels actually demonstrate the range
 const now = new Date();
@@ -46,9 +47,7 @@ const constellations = [
     <div
       class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3"
     >
-      <span class="font-sans text-xs tracking-widest text-base-content/50 uppercase"
-        >Styleguide</span
-      >
+      <Label variant="chrome" as="span">Styleguide</Label>
       <button
         id="theme-toggle"
         class="btn btn-ghost btn-sm font-sans normal-case"
@@ -61,11 +60,9 @@ const constellations = [
   <main class="mx-auto max-w-5xl px-6 py-16">
     <!-- ── masthead ───────────────────────────────────────────────── -->
     <header class="mb-24">
-      <p
-        class="font-sans text-xs tracking-[0.2em] text-base-content/40 uppercase"
-      >
+      <Label variant="voice">
         design prototype
-      </p>
+      </Label>
       <h1 class="mt-4 font-display text-5xl leading-[1.1] font-light sm:text-7xl">
         It Only <em class="text-primary not-italic">Happens</em> Once
       </h1>
@@ -78,9 +75,9 @@ const constellations = [
 
     <!-- ── color ──────────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         Color
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         Every slot is <em>semantic</em> — a role, never a value. Nothing on this
         site may name a color directly.
@@ -104,9 +101,9 @@ const constellations = [
 
     <!-- ── type ───────────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-8 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-8">
         Type
-      </h2>
+      </Label>
       <div class="space-y-6">
         <div>
           <p class="text-6xl font-light">Newsreader — display</p>
@@ -132,9 +129,9 @@ const constellations = [
 
     <!-- ── reading ────────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-8 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-8">
         Reading
-      </h2>
+      </Label>
       <div class="prose-measure space-y-5 text-lg">
         <p>
           Vanity of vanities, saith the Preacher, vanity of vanities; all is
@@ -156,9 +153,9 @@ const constellations = [
 
     <!-- ── fragments ──────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         Fragments
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         The atom. Single-medium, standalone — a song, a quote, a piece of
         writing. Provenance is shown quietly and never sorts anything.
@@ -195,9 +192,9 @@ const constellations = [
 
     <!-- ── dates ──────────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         Dates
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         Quiet on the surface — no verb, just the moment. Click any date for the
         full timestamp (and any later edit). One component, used everywhere.
@@ -218,9 +215,9 @@ const constellations = [
 
     <!-- ── constellation band ─────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         Constellation — the landing
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         You land <em>inside</em> a living constellation, never on a menu. Fragments are
         visible immediately. Scroll down crosses domains; swipe sideways moves
@@ -291,9 +288,9 @@ const constellations = [
 
     <!-- ── sky ────────────────────────────────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         The whole sky — zoomed out
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         One gesture. Every constellation at a glance, sized by how much of him it
         occupies. Uneven on purpose — weight is signal, not noise. This is the
@@ -324,9 +321,9 @@ const constellations = [
 
     <!-- ── controls (the Index register) ──────────────────────────── -->
     <section class="mb-24">
-      <h2 class="mb-2 font-sans text-sm tracking-widest uppercase opacity-50">
+      <Label as="h2" variant="voice" class="mb-2">
         Controls — the Index register
-      </h2>
+      </Label>
       <p class="prose-measure mb-8 text-base-content/60">
         None of this belongs in the sky. It lives in the Index, where finding a
         specific thing is the whole job.
