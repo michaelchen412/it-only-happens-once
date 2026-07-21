@@ -56,7 +56,7 @@ as $$ select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false
 
 The RLS **policies are unchanged** — they already call `public.is_admin()`. Only the helper's body changes (from the earlier Clerk `user_role` claim to Supabase's `app_metadata.role`), applied via a follow-up migration. Recap:
 
-- Public (`anon`) may `select` only `status = 'published'` fragments; lens/subject labels are readable.
+- Public (`anon`) may `select` only `status = 'published'` fragments; constellation/subject labels are readable.
 - All writes (`insert`/`update`/`delete`) require `is_admin()`.
 - Checks are wrapped in `(select …)` for per-statement caching; every policy targets an explicit role.
 

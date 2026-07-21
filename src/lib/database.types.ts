@@ -12,11 +12,40 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      authors: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          note: string | null
+          slug: string
+          sort_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          note?: string | null
+          slug: string
+          sort_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string | null
+          slug?: string
+          sort_name?: string | null
+        }
+        Relationships: []
+      }
       constellations: {
         Row: {
           created_at: string
@@ -113,6 +142,7 @@ export type Database = {
       fragments: {
         Row: {
           attribution: string | null
+          author_id: string | null
           body: string | null
           created_at: string
           date_precision: Database["public"]["Enums"]["date_precision"]
@@ -128,9 +158,11 @@ export type Database = {
           title: string | null
           type: Database["public"]["Enums"]["fragment_type"]
           updated_at: string
+          work_id: string | null
         }
         Insert: {
           attribution?: string | null
+          author_id?: string | null
           body?: string | null
           created_at?: string
           date_precision?: Database["public"]["Enums"]["date_precision"]
@@ -146,9 +178,11 @@ export type Database = {
           title?: string | null
           type: Database["public"]["Enums"]["fragment_type"]
           updated_at?: string
+          work_id?: string | null
         }
         Update: {
           attribution?: string | null
+          author_id?: string | null
           body?: string | null
           created_at?: string
           date_precision?: Database["public"]["Enums"]["date_precision"]
@@ -164,29 +198,86 @@ export type Database = {
           title?: string | null
           type?: Database["public"]["Enums"]["fragment_type"]
           updated_at?: string
+          work_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fragments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fragments_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subjects: {
         Row: {
           created_at: string
+          definition: string | null
           id: string
           name: string
           slug: string
         }
         Insert: {
           created_at?: string
+          definition?: string | null
           id?: string
           name: string
           slug: string
         }
         Update: {
           created_at?: string
+          definition?: string | null
           id?: string
           name?: string
           slug?: string
         }
         Relationships: []
+      }
+      works: {
+        Row: {
+          author_id: string | null
+          created_at: string
+          id: string
+          kind: string | null
+          slug: string
+          title: string
+          year: number | null
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          slug: string
+          title: string
+          year?: number | null
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          slug?: string
+          title?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "works_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

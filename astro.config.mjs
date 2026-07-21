@@ -12,7 +12,7 @@ export default defineConfig({
   adapter: vercel(),
   // Iconography: Phosphor (thin/light weights) for functional UI icons.
   // Signature marks in the Sky (✦ ♪ ” ▤) stay as hand-chosen glyphs.
-  integrations: [icon({ include: { ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'arrow-up-right', 'funnel', 'trash', 'plus', 'sun', 'moon'] } })],
+  integrations: [icon({ include: { ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'arrow-up-right', 'funnel', 'trash', 'plus', 'sun', 'moon', 'list', 'stack', 'books'] } })],
   vite: {
     plugins: [tailwindcss()],
   },

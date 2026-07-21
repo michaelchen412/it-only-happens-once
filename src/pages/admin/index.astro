@@ -11,6 +11,7 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import FragmentRow from '../../components/admin/FragmentRow.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
 import SubjectFilter from '../../components/admin/SubjectFilter.astro';
+import { MIN_SEARCH } from '../../lib/search-highlight';
 
 const supabase = Astro.locals.supabase;
 const url = Astro.url;
@@ -20,6 +21,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
 const typeParam = TYPES.find((t) => t === url.searchParams.get('type')) ?? null;
 const subjectSlugs = (url.searchParams.get('subject') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const q = (url.searchParams.get('q') ?? '').trim();
+const searching = q.length >= MIN_SEARCH; // ignore 1-char terms (match nearly everything)
 
 // sort = "<field>_<dir>". Drafts are always pinned to the top (secondary sort).
 const SORT_COL: Record<string, string> = { title: 'title', posted: 'occurred_at', edited: 'updated_at' };
@@ -44,6 +46,16 @@ if (subjectSlugs.length) {
   }
 }
 
+// provenance facets: authors & works (for the datalists, filters, and editor prefill)
+const { data: allAuthors } = await supabase.from('authors').select('id, name, slug').order('name');
+const { data: allWorks } = await supabase.from('works').select('id, title, slug').order('title');
+const authorNameById = Object.fromEntries((allAuthors ?? []).map((a) => [a.id, a.name]));
+const workTitleById = Object.fromEntries((allWorks ?? []).map((w) => [w.id, w.title]));
+const authorSlug = (url.searchParams.get('author') || '').trim();
+const workSlug = (url.searchParams.get('work') || '').trim();
+const authorFilterId = authorSlug ? (allAuthors ?? []).find((a) => a.slug === authorSlug)?.id ?? '—' : null;
+const workFilterId = workSlug ? (allWorks ?? []).find((w) => w.slug === workSlug)?.id ?? '—' : null;
+
 // deleted-state scope shared by the list query and the per-type counts
 const scoped = <T extends { not: any; is: any }>(qb: T) =>
   (view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null)) as T;
@@ -51,8 +63,10 @@ const scoped = <T extends { not: any; is: any }>(qb: T) =>
 // main query — drafts first (status asc: draft < published), then the chosen sort
 let query = scoped(supabase.from('fragments').select('*'));
 if (typeParam) query = query.eq('type', typeParam);
+if (authorFilterId) query = query.eq('author_id', authorFilterId);
+if (workFilterId) query = query.eq('work_id', workFilterId);
 if (subjectFilterIds) query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
-if (q) {
+if (searching) {
   const safe = q.replace(/[(),]/g, ' ');
   query = query.or(`title.ilike.%${safe}%,body.ilike.%${safe}%,attribution.ilike.%${safe}%,excerpt.ilike.%${safe}%`);
 }
@@ -83,9 +97,9 @@ const { data: allSubjects } = await supabase.from('subjects').select('name, slug
 const subjectNames = (allSubjects ?? []).map((s) => s.name);
 const { count: trashCount } = await supabase.from('fragments').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null);
 
-const filtered = typeParam || subjectSlugs.length > 0 || q;
+const filtered = typeParam || subjectSlugs.length > 0 || searching || !!authorSlug || !!workSlug;
 const COLUMNS = [
-  { field: 'title', label: 'Fragment', align: 'left', cls: '', sortable: true },
+  { field: 'title', label: 'Fragment', align: 'left', cls: 'w-full', sortable: true },
   { field: 'status', label: 'Status', align: 'left', cls: 'hidden sm:table-cell', sortable: false },
   { field: 'posted', label: 'Posted', align: 'right', cls: 'hidden md:table-cell', sortable: true },
   { field: 'edited', label: 'Edited', align: 'right', cls: '', sortable: true },
@@ -153,6 +167,18 @@ const COLUMNS = [
       </label>
 
       <SubjectFilter subjects={allSubjects ?? []} value={subjectSlugs} />
+      <select name="author" aria-label="Filter by author" class="select select-sm select-bordered max-w-[10rem] font-sans">
+        <option value="">All authors</option>
+        {(allAuthors ?? []).map((a) => (
+          <option value={a.slug} selected={a.slug === authorSlug}>{a.name}</option>
+        ))}
+      </select>
+      <select name="work" aria-label="Filter by work" class="select select-sm select-bordered max-w-[10rem] font-sans">
+        <option value="">All works</option>
+        {(allWorks ?? []).map((w) => (
+          <option value={w.slug} selected={w.slug === workSlug}>{w.title}</option>
+        ))}
+      </select>
       {filtered && <a href={view === 'trash' ? '/admin?view=trash' : '/admin'} class="text-base-content/60 underline hover:text-base-content">clear</a>}
     </form>
 
@@ -200,7 +226,16 @@ const COLUMNS = [
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => <FragmentRow fragment={r} subjects={subjectsByFragment[r.id] ?? []} view={view} />)}
+                {rows.map((r) => (
+                  <FragmentRow
+                    fragment={r}
+                    subjects={subjectsByFragment[r.id] ?? []}
+                    authorName={r.author_id ? authorNameById[r.author_id] : undefined}
+                    workName={r.work_id ? workTitleById[r.work_id] : undefined}
+                    view={view}
+                    searchTerm={searching ? q : ''}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
@@ -231,7 +266,7 @@ const COLUMNS = [
   </div>
   <p id="bulk-error" hidden role="alert" class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
 
-  <FragmentSheet subjects={subjectNames} />
+  <FragmentSheet subjects={subjectNames} authors={(allAuthors ?? []).map((a) => a.name)} works={(allWorks ?? []).map((w) => w.title)} />
 
   <script>
     import '../../scripts/admin-list';

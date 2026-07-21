@@ -5,14 +5,22 @@
   and focus restoration for free; we add the slide/fade animation via the
   `.drawer-dialog` utility in app.css. Self-contained: its script wires the
   list's New/Edit buttons, so the list page doesn't need to know about it.
+
+  The quote body is a TipTap editor (WYSIWYG → Markdown, same engine as the
+  writing composer; ADR-0006) with `breaks: true` so poetry line breaks survive.
+  Required fields (Quote, Attribution) are marked and gate the Save button.
+  Dates follow the composer convention: automatic (now) unless a legacy date is
+  set explicitly.
 */
 import { actions } from 'astro:actions';
 import TagInput from '../TagInput.astro';
 
 interface Props {
   subjects: string[];
+  authors?: string[];
+  works?: string[];
 }
-const { subjects } = Astro.props;
+const { subjects, authors = [], works = [] } = Astro.props;
 const thisYear = new Date().getUTCFullYear();
 ---
 
@@ -28,55 +36,108 @@ const thisYear = new Date().getUTCFullYear();
     {/* QUOTE */}
     <form id="quote-form" method="POST" action={actions.fragments.saveQuote} class="flex flex-col gap-4 p-6 font-sans">
       <input type="hidden" name="id" />
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Quote</span>
-        <textarea name="body" rows="4" required class="textarea textarea-bordered font-serif text-base" placeholder="The words themselves…"></textarea>
-      </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Attribution</span>
-        <input name="attribution" class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
-      </label>
-      <div class="grid grid-cols-2 gap-3">
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Source title</span>
-          <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Source author</span>
-          <input name="source_author" class="input input-sm input-bordered" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Work year</span>
-          <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Page</span>
-          <input name="page" type="number" class="input input-sm input-bordered" />
-        </label>
+      <input type="hidden" name="body" id="quote-body" />
+
+      {/* — required — */}
+      <div class="flex flex-col gap-1 text-sm">
+        <span class="flex items-center gap-1 text-base-content/70">Quote <span class="text-error" title="required" aria-hidden="true">*</span></span>
+        <div id="quote-editor-wrap" class="rounded-field border border-base-300 focus-within:border-primary">
+          <div class="flex items-center gap-0.5 border-b border-base-300/60 px-1.5 py-1" role="toolbar" aria-label="Formatting">
+            <button type="button" class="tt-btn" data-qcmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
+            <button type="button" class="tt-btn" data-qcmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+          </div>
+          <div id="quote-editor" class="max-h-[45vh] min-h-[10rem] overflow-y-auto px-3 py-2"></div>
+        </div>
       </div>
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Source link</span>
-        <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
+        <span class="flex items-center gap-1 text-base-content/70">Attribution <span class="text-error" title="required" aria-hidden="true">*</span></span>
+        <input name="attribution" required class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
       </label>
-      <div class="grid grid-cols-2 gap-3">
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Added (year)</span>
-          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Status</span>
-          <select name="status" class="select select-sm select-bordered">
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </label>
-      </div>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Subjects</span>
+
+      {/* — optional source metadata — */}
+      <details class="rounded-field border border-base-300/70 px-3 py-2">
+        <summary class="cursor-pointer text-xs font-medium tracking-wide text-base-content/55 uppercase">
+          Source &amp; citation <span class="font-normal text-base-content/40 normal-case">— optional</span>
+        </summary>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <p class="col-span-2 text-xs text-base-content/45">
+            <span class="text-base-content/60">Author</span> &amp; <span class="text-base-content/60">Work</span> power search &amp; grouping (e.g. every Bible verse).
+            <span class="text-base-content/60">Attribution</span> &amp; <span class="text-base-content/60">Source title</span> are what’s shown.
+          </p>
+          <label class="col-span-2 flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Author <span class="text-base-content/40">— group / search by</span></span>
+            <input name="author_name" list="authors-list" autocomplete="off" class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
+          </label>
+          <label class="col-span-2 flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Source title <span class="text-base-content/40">— shown after the attribution</span></span>
+            <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
+          </label>
+          <label class="col-span-2 flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Work <span class="text-base-content/40">— group / search by</span></span>
+            <input name="work_name" list="works-list" autocomplete="off" class="input input-sm input-bordered" placeholder="Meditations · The Bible" />
+          </label>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Work year</span>
+            <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
+          </label>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Page</span>
+            <input name="page" type="number" class="input input-sm input-bordered" />
+          </label>
+          <label class="col-span-2 flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Citation <span class="text-base-content/40">(chapter / verse / letter)</span></span>
+            <input name="citation" class="input input-sm input-bordered" placeholder="Book 2:2" />
+          </label>
+          <label class="col-span-2 flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70">Source link</span>
+            <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
+          </label>
+        </div>
+      </details>
+
+      <datalist id="authors-list">{authors.map((a) => <option value={a} />)}</datalist>
+      <datalist id="works-list">{works.map((w) => <option value={w} />)}</datalist>
+
+      <div class="flex flex-col gap-1 text-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-base-content/70">Subjects</span>
+          <button
+            type="button"
+            id="quote-suggest"
+            class="flex items-center gap-1 text-xs text-primary hover:underline disabled:no-underline disabled:opacity-40"
+          >
+            <span id="quote-suggest-label">✦ Suggest with AI</span>
+          </button>
+        </div>
         <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="stoicism, acceptance" />
-      </label>
+        <div
+          id="quote-proposed"
+          hidden
+          class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-field border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs"
+        >
+          <span class="text-base-content/60">New subject:</span>
+          <span id="quote-proposed-name" class="font-medium text-base-content"></span>
+          <span id="quote-proposed-def" class="w-full text-base-content/55"></span>
+          <button type="button" id="quote-proposed-add" class="rounded bg-primary/15 px-2 py-0.5 font-medium text-primary hover:bg-primary/25">Add it</button>
+          <button type="button" id="quote-proposed-dismiss" class="text-base-content/40 hover:text-base-content" aria-label="Dismiss">✕</button>
+        </div>
+      </div>
+
+      {/* — date: automatic unless backdating a legacy quote — */}
+      <div class="flex flex-col gap-2 text-sm">
+        <label class="flex cursor-pointer items-center gap-2">
+          <input type="checkbox" id="quote-date-toggle" class="checkbox checkbox-xs" />
+          <span class="text-base-content/70">Set a specific date</span>
+        </label>
+        <p id="quote-date-note" class="text-xs text-base-content/45">Dated today automatically — enable only to backdate a legacy quote.</p>
+        <input type="datetime-local" name="occurred_at" id="quote-occurred" disabled class="input input-sm input-bordered" />
+      </div>
+
+      {/* Quotes publish on save — no draft lifecycle (docs/admin.md). Unpublish via the list. */}
+      <input type="hidden" name="status" value="published" />
+
       <div class="mt-2 flex items-center gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
+        <button type="submit" id="quote-save" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
         <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
       </div>
     </form>
@@ -103,19 +164,12 @@ const thisYear = new Date().getUTCFullYear();
         <span class="text-base-content/70">Album</span>
         <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
       </label>
-      <div class="grid grid-cols-2 gap-3">
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Added (year)</span>
-          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Status</span>
-          <select name="status" class="select select-sm select-bordered">
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </label>
-      </div>
+      {/* Songs publish on save — no draft lifecycle. Unpublish via the list. */}
+      <input type="hidden" name="status" value="published" />
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Added (year)</span>
+        <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
+      </label>
       <label class="flex flex-col gap-1 text-sm">
         <span class="text-base-content/70">Subjects</span>
         <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="jazz, longing" />
@@ -129,6 +183,10 @@ const thisYear = new Date().getUTCFullYear();
 </dialog>
 
 <script>
+  import { Editor } from '@tiptap/core';
+  import StarterKit from '@tiptap/starter-kit';
+  import Placeholder from '@tiptap/extension-placeholder';
+  import { Markdown } from 'tiptap-markdown';
   import { actions } from 'astro:actions';
   import { formatActionError } from '../../scripts/action-error';
   import { confirmDialog } from '../../scripts/confirm-dialog';
@@ -138,6 +196,123 @@ const thisYear = new Date().getUTCFullYear();
   const sheetError = document.getElementById('sheet-error') as HTMLParagraphElement;
   const quoteForm = document.getElementById('quote-form') as HTMLFormElement;
   const songForm = document.getElementById('song-form') as HTMLFormElement;
+
+  // --- quote body: a minimal TipTap editor (bold/italic only; breaks preserved) ---
+  const quoteBody = document.getElementById('quote-body') as HTMLInputElement;
+  const quoteSave = document.getElementById('quote-save') as HTMLButtonElement;
+  const quoteAttr = quoteForm.elements.namedItem('attribution') as HTMLInputElement;
+  const quoteEditor = new Editor({
+    element: document.getElementById('quote-editor')!,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+      }),
+      Markdown.configure({ breaks: true, transformPastedText: true }),
+      Placeholder.configure({ placeholder: 'The words themselves…' }),
+    ],
+    content: '',
+    editorProps: { attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': 'Quote text' } },
+  });
+  const quoteMarkdown = () => (quoteEditor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+
+  const qBtns = Array.from(quoteForm.querySelectorAll<HTMLButtonElement>('.tt-btn'));
+  const qCmds: Record<string, () => void> = {
+    bold: () => quoteEditor.chain().focus().toggleBold().run(),
+    italic: () => quoteEditor.chain().focus().toggleItalic().run(),
+  };
+  qBtns.forEach((b) => b.addEventListener('click', () => qCmds[b.dataset.qcmd!]?.()));
+  function syncQuoteToolbar() {
+    qBtns.forEach((b) => {
+      const on = quoteEditor.isActive(b.dataset.qcmd!);
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  quoteEditor.on('selectionUpdate', syncQuoteToolbar);
+  quoteEditor.on('transaction', syncQuoteToolbar);
+
+  // required-field gate: Quote + Attribution must be non-empty to save
+  function refreshQuoteValid() {
+    quoteSave.disabled = quoteEditor.isEmpty || !quoteAttr.value.trim();
+  }
+  quoteEditor.on('update', refreshQuoteValid);
+  quoteAttr.addEventListener('input', refreshQuoteValid);
+
+  // --- provenance facets: Author/Work auto-follow the display fields (override for scripture) ---
+  const quoteAuthorName = quoteForm.elements.namedItem('author_name') as HTMLInputElement;
+  const quoteWorkName = quoteForm.elements.namedItem('work_name') as HTMLInputElement;
+  const quoteSourceTitle = quoteForm.elements.namedItem('source_title') as HTMLInputElement;
+  quoteAttr.addEventListener('change', () => {
+    const v = quoteAttr.value.trim();
+    // don't mirror scripture ("Matthew 5:43-48") into a bogus author
+    if (v && !quoteAuthorName.value.trim() && !/\d+\s*:\s*\d+/.test(v)) quoteAuthorName.value = v;
+  });
+  quoteSourceTitle.addEventListener('change', () => {
+    const v = quoteSourceTitle.value.trim();
+    if (v && !quoteWorkName.value.trim()) quoteWorkName.value = v;
+  });
+
+  // --- AI subject suggestions (Haiku) — pre-fill tags; new subject needs accept ---
+  const quoteSubjects = quoteForm.elements.namedItem('subjects') as HTMLInputElement;
+  const suggestBtn = document.getElementById('quote-suggest') as HTMLButtonElement;
+  const suggestLabel = document.getElementById('quote-suggest-label')!;
+  const proposedBox = document.getElementById('quote-proposed') as HTMLElement;
+  const proposedName = document.getElementById('quote-proposed-name')!;
+  const proposedDef = document.getElementById('quote-proposed-def')!;
+  const proposedAdd = document.getElementById('quote-proposed-add') as HTMLButtonElement;
+  const currentTags = () => quoteSubjects.value.split(',').map((s) => s.trim()).filter(Boolean);
+  const addTags = (extra: string[]) => setSubjects(quoteForm, Array.from(new Set([...currentTags(), ...extra])).join(', '));
+
+  suggestBtn.addEventListener('click', async () => {
+    const text = quoteEditor.getText().trim();
+    if (!text) return showError('Add the quote first, then suggest subjects.');
+    clearError();
+    proposedBox.hidden = true;
+    suggestBtn.disabled = true;
+    suggestLabel.textContent = 'Thinking…';
+    const { data, error } = await actions.fragments.suggestSubjects({ text, kind: 'quote' });
+    suggestBtn.disabled = false;
+    suggestLabel.textContent = '✦ Suggest with AI';
+    if (error || !data) return showError(error ? formatActionError(error) : 'No suggestions came back.');
+    addTags(data.existing);
+    if (data.proposed) {
+      proposedName.textContent = data.proposed.name;
+      proposedDef.textContent = data.proposed.definition;
+      proposedAdd.onclick = () => {
+        addTags([data.proposed!.name]);
+        proposedBox.hidden = true;
+      };
+      proposedBox.hidden = false;
+    }
+  });
+  document.getElementById('quote-proposed-dismiss')!.addEventListener('click', () => (proposedBox.hidden = true));
+
+  // date: automatic unless the toggle is on
+  const quoteDateToggle = document.getElementById('quote-date-toggle') as HTMLInputElement;
+  const quoteOccurred = document.getElementById('quote-occurred') as HTMLInputElement;
+  const quoteDateNote = document.getElementById('quote-date-note') as HTMLElement;
+  const toLocalInput = (iso: string) => {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  quoteDateToggle.addEventListener('change', () => {
+    quoteOccurred.disabled = !quoteDateToggle.checked;
+    quoteDateNote.hidden = quoteDateToggle.checked;
+    if (quoteDateToggle.checked && !quoteOccurred.value) quoteOccurred.value = toLocalInput(new Date().toISOString());
+  });
+  function resetQuoteDate(iso?: string, precision?: string) {
+    const legacy = !!iso && precision === 'day';
+    quoteDateToggle.checked = legacy;
+    quoteOccurred.disabled = !legacy;
+    quoteDateNote.hidden = legacy;
+    quoteOccurred.value = legacy ? toLocalInput(iso!) : '';
+  }
 
   const showError = (msg: string) => {
     sheetError.textContent = msg;
@@ -180,6 +355,12 @@ const thisYear = new Date().getUTCFullYear();
       setField(form, 'id', '');
       setSubjects(form, '');
       toggleDelete(form, false);
+      if (type === 'quote') {
+        quoteEditor.commands.setContent('');
+        resetQuoteDate();
+        refreshQuoteValid();
+        proposedBox.hidden = true;
+      }
       if (type === 'song') document.getElementById('song-lookup')!.textContent = '';
       sheetTitle.textContent = type === 'quote' ? 'New quote' : 'New song';
       openSheet(type);
@@ -201,16 +382,22 @@ const thisYear = new Date().getUTCFullYear();
       setField(form, 'id', d.id);
       setField(form, 'attribution', d.attribution);
       setField(form, 'status', d.status);
-      setField(form, 'year', String(d.year));
       setSubjects(form, d.subjects);
       if (type === 'quote') {
-        setField(form, 'body', d.body);
+        quoteEditor.commands.setContent(d.body || '');
         setField(form, 'source_url', d.source_url);
         setField(form, 'source_title', d.details.source_title ?? '');
         setField(form, 'source_author', d.details.source_author ?? '');
         setField(form, 'work_year', d.details.work_year != null ? String(d.details.work_year) : '');
         setField(form, 'page', d.details.page != null ? String(d.details.page) : '');
+        setField(form, 'citation', d.details.citation ?? '');
+        setField(form, 'author_name', d.authorName ?? '');
+        setField(form, 'work_name', d.workName ?? '');
+        resetQuoteDate(d.occurredIso, d.datePrecision);
+        refreshQuoteValid();
+        proposedBox.hidden = true;
       } else {
+        setField(form, 'year', String(d.year));
         setField(form, 'title', d.title);
         setField(form, 'spotify_url', d.source_url);
         setField(form, 'spotify_id', d.details.spotify_id ?? '');
@@ -252,9 +439,18 @@ const thisYear = new Date().getUTCFullYear();
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       clearError();
+      if (form === quoteForm) {
+        quoteBody.value = quoteMarkdown();
+        if (quoteEditor.isEmpty || !quoteAttr.value.trim()) {
+          showError('A quote needs both its words and an attribution.');
+          return;
+        }
+      }
+      const fd = new FormData(form);
+      if (form === quoteForm && !quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic
       const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
       submitBtn.disabled = true;
-      const { error } = await action(new FormData(form));
+      const { error } = await action(fd);
       submitBtn.disabled = false;
       if (!error) {
         window.location.reload();

@@ -13,63 +13,94 @@ import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'fragments';
+  active?: 'fragments' | 'library';
 }
 const { title = 'Workshop', active = 'fragments' } = Astro.props;
 const user = Astro.locals.user;
 
-const nav = [{ key: 'fragments', label: 'Fragments', href: '/admin' }] as const;
+const nav = [
+  { key: 'fragments', label: 'Fragments', href: '/admin', icon: 'ph:stack' },
+  { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books' },
+] as const;
 ---
 
 <Base title={`${title} — Workshop`}>
-  <div class="min-h-screen bg-base-100 font-sans">
-    <header
-      class="sticky top-0 z-30 flex h-14 items-center gap-6 border-b border-base-300 bg-base-100/90 px-6 backdrop-blur"
+  <div class="flex min-h-screen bg-base-100 font-sans">
+    {/* Off-canvas backdrop (mobile only) */}
+    <div
+      id="sb-backdrop"
+      class="pointer-events-none fixed inset-0 z-30 bg-black/50 opacity-0 transition-opacity duration-200 md:hidden"
     >
-      <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
-        <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
-        <span class="font-display text-lg leading-none">Workshop</span>
-      </a>
+    </div>
 
-      <nav class="flex items-center gap-1 text-sm">
+    {/* Sidebar — persistent on desktop, off-canvas drawer on mobile */}
+    <aside
+      id="sidebar"
+      class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-base-300 bg-base-100 transition-transform duration-200 md:static md:translate-x-0"
+    >
+      <div class="flex h-14 shrink-0 items-center gap-2 border-b border-base-300 px-4">
+        <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
+          <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
+          <span class="font-display text-lg leading-none">Workshop</span>
+        </a>
+        <button id="sb-close" class="ml-auto rounded-field p-1 text-base-content/50 hover:bg-base-200 hover:text-base-content md:hidden" aria-label="Close menu">
+          <Icon name="ph:x" class="text-lg" />
+        </button>
+      </div>
+
+      <nav class="flex-1 space-y-1 overflow-y-auto p-3">
         {
           nav.map((item) => (
             <a
               href={item.href}
+              aria-current={active === item.key ? 'page' : undefined}
               class:list={[
-                'rounded-field px-3 py-1.5 transition-colors',
+                'flex items-center gap-3 rounded-field px-3 py-2 text-sm transition-colors',
                 active === item.key
-                  ? 'bg-base-200 text-base-content'
-                  : 'text-base-content/50 hover:text-base-content',
+                  ? 'bg-base-200 font-medium text-base-content'
+                  : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content',
               ]}
             >
+              <Icon name={item.icon} class="text-lg" />
               {item.label}
             </a>
           ))
         }
       </nav>
 
-      <div class="ml-auto flex items-center gap-3 text-xs text-base-content/40">
-        <span class="hidden sm:inline">{user?.email}</span>
-        <button
-          id="theme-toggle"
-          class="theme-toggle rounded-field p-1.5 hover:bg-base-200 hover:text-base-content"
-          aria-label="Toggle light and dark theme"
-          title="Toggle theme"
-        >
-          <Icon name="ph:sun" class="theme-icon-sun text-base" />
-          <Icon name="ph:moon" class="theme-icon-moon text-base" />
-        </button>
-        <a href="/" class="hover:text-base-content" title="View the site">Site ↗</a>
-        <button id="admin-signout" class="rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content">
-          Sign out
-        </button>
+      <div class="shrink-0 space-y-2 border-t border-base-300 p-3">
+        <div class="truncate px-1 text-xs text-base-content/40" title={user?.email}>{user?.email}</div>
+        <div class="flex items-center gap-1 text-xs text-base-content/50">
+          <button
+            id="theme-toggle"
+            class="theme-toggle rounded-field p-1.5 hover:bg-base-200 hover:text-base-content"
+            aria-label="Toggle light and dark theme"
+            title="Toggle theme"
+          >
+            <Icon name="ph:sun" class="theme-icon-sun text-base" />
+            <Icon name="ph:moon" class="theme-icon-moon text-base" />
+          </button>
+          <a href="/" class="rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content" title="View the site">Site ↗</a>
+          <button id="admin-signout" class="ml-auto rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content">Sign out</button>
+        </div>
       </div>
-    </header>
+    </aside>
 
-    <main>
-      <slot />
-    </main>
+    {/* Main column */}
+    <div class="flex min-w-0 flex-1 flex-col">
+      {/* Slim top bar — mobile only (desktop uses the full height for content) */}
+      <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur md:hidden">
+        <button id="sb-open" class="-ml-1 rounded-field p-1.5 text-base-content/70 hover:bg-base-200 hover:text-base-content" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+          <Icon name="ph:list" class="text-xl" />
+        </button>
+        <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
+        <span class="font-display text-base leading-none">{title}</span>
+      </header>
+
+      <main class="min-w-0 flex-1">
+        <slot />
+      </main>
+    </div>
   </div>
 
   <ConfirmDialog />
@@ -84,6 +115,25 @@ const nav = [{ key: 'fragments', label: 'Fragments', href: '/admin' }] as const;
       await supabase.auth.signOut();
       window.location.href = '/';
     });
+
+    // --- mobile off-canvas sidebar ---
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sb-backdrop');
+    const openBtn = document.getElementById('sb-open');
+    const openSidebar = () => {
+      sidebar?.classList.remove('-translate-x-full');
+      backdrop?.classList.remove('opacity-0', 'pointer-events-none');
+      openBtn?.setAttribute('aria-expanded', 'true');
+    };
+    const closeSidebar = () => {
+      sidebar?.classList.add('-translate-x-full');
+      backdrop?.classList.add('opacity-0', 'pointer-events-none');
+      openBtn?.setAttribute('aria-expanded', 'false');
+    };
+    openBtn?.addEventListener('click', openSidebar);
+    document.getElementById('sb-close')?.addEventListener('click', closeSidebar);
+    backdrop?.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && closeSidebar());
 
     const themeBtn = document.getElementById('theme-toggle');
     const syncThemeBtn = () => themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));

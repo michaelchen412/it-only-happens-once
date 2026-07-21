@@ -5,6 +5,7 @@
 //    so handlers survive the table being swapped out.
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
+import { MIN_SEARCH } from '../lib/search-highlight';
 
 const filters = document.getElementById('filters') as HTMLFormElement;
 const sortInput = document.getElementById('sort-input') as HTMLInputElement;
@@ -36,6 +37,7 @@ async function applyFilters() {
   const params = new URLSearchParams();
   for (const [k, v] of new FormData(filters) as unknown as Iterable<[string, string]>) if (v) params.set(k, v);
   if (params.get('sort') === 'edited_desc') params.delete('sort'); // keep the default URL clean
+  if ((params.get('q')?.trim().length ?? 0) < MIN_SEARCH) params.delete('q'); // ignore too-short terms
   const target = '/admin' + (params.toString() ? `?${params}` : '');
   // remember a focused sort header so keyboard focus survives the swap
   const focusField = (document.activeElement as HTMLElement)?.closest?.('.sort-header')?.getAttribute('data-field');
@@ -67,10 +69,18 @@ async function applyFilters() {
 filters.addEventListener('submit', (e) => e.preventDefault());
 filters.querySelectorAll('select').forEach((s) => s.addEventListener('change', applyFilters));
 filters.addEventListener('filter:change', applyFilters); // subject combobox
+const qInput = filters.elements.namedItem('q') as HTMLInputElement;
+let lastSearch = qInput.value.trim().length >= MIN_SEARCH ? qInput.value.trim() : '';
 let searchTimer: number;
-(filters.elements.namedItem('q') as HTMLInputElement).addEventListener('input', () => {
+qInput.addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(applyFilters, 300);
+  searchTimer = window.setTimeout(() => {
+    const raw = qInput.value.trim();
+    const eff = raw.length >= MIN_SEARCH ? raw : '';
+    if (eff === lastSearch) return; // effective query unchanged → skip the fetch
+    lastSearch = eff;
+    applyFilters();
+  }, 300);
 });
 
 // --- type badges = filters --------------------------------------------------

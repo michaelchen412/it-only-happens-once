@@ -10,7 +10,8 @@ Durable records of what this site is and how it's built — so that neither a hu
 4. **[`architecture.md`](architecture.md)** — system architecture: rendering, hosting, data flow, public vs. admin, the incremental admin roadmap.
 5. **[`data-model.md`](data-model.md)** — database schema, ERD, and how the domain maps to tables.
 6. **[`auth.md`](auth.md)** — authentication (Supabase Auth), Row Level Security, admin protection, secrets.
-7. **[`adr/`](adr/)** — Architecture Decision Records: the reasoning, alternatives, and consequences behind each major choice.
+7. **[`search.md`](search.md)** — search & match-highlighting: the engine, the XSS boundary, the perf traps, and the checklist for reusing it on the public frontend.
+8. **[`adr/`](adr/)** — Architecture Decision Records: the reasoning, alternatives, and consequences behind each major choice.
 
 ## Decisions locked so far
 
@@ -23,6 +24,9 @@ Durable records of what this site is and how it's built — so that neither a hu
 | Content store | **Supabase** is the single source of truth; **no** content collections | [0004](adr/0004-supabase-over-content-collections.md) |
 | Type direction | **Editorial** — Newsreader + Atkinson Hyperlegible | `design.md` |
 | Themes | **dusk** (dark) / **paper** (light), OKLCH, semantic tokens only | `design.md` |
+| Composer editor | **TipTap** (ProseMirror), fixed toolbar, stores Markdown | [0006](adr/0006-composer-editor-tiptap.md) |
+| AI subject tagging | **Claude Haiku 4.5**, structured output, human-in-loop | [0007](adr/0007-ai-subject-tagging.md) |
+| Provenance | **authors/works** as query facets, decoupled from display | [0008](adr/0008-provenance-and-facets.md) |
 
 ## Status
 

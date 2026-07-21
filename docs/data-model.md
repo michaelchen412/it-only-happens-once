@@ -11,7 +11,7 @@
 - **The blog** = chronological / filtered *views* over fragments (writing by date; songs; quotes).
 - **The Sky** = constellation-grouped views over the fragments that have been *placed*.
 - **"Elevation into the Sky" is not a flag** — it is simply *having a row in `fragment_constellations`*. An unplaced fragment lives in the blog forever. (This is the "no placement debt" rule, expressed in the schema.)
-- **Links between constellations are emergent** — two lenses are related whenever a fragment belongs to both. There is deliberately **no** fragment-to-fragment link table.
+- **Links between constellations are emergent** — two constellations are related whenever a fragment belongs to both. There is deliberately **no** fragment-to-fragment link table.
 
 ## 2. Entities
 
@@ -94,7 +94,7 @@ create table fragments (
 create index fragments_feed_idx      on fragments (type, status, occurred_at desc);
 create index fragments_published_idx on fragments (status, published_at desc);
 
--- A lens. NOT a topic. See vision.md for the distinction.
+-- A constellation: a way of seeing, NOT a topic. See vision.md for the distinction.
 create table constellations (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,          -- e.g. "conditions, not character"
@@ -115,11 +115,14 @@ create table fragment_constellations (
 create index fragment_constellations_order_idx
   on fragment_constellations (constellation_id, position);
 
--- What a fragment is ABOUT (leadership, faith, …). The orthogonal axis to lenses.
+-- What a fragment is ABOUT (leadership, faith, …). The orthogonal axis to constellations.
+-- `definition` (added 0003) is the taxonomy's meaning — the DB is now the single
+-- source of truth the AI subject-suggester reads.
 create table subjects (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
   slug       text not null unique,
+  definition text,
   created_at timestamptz not null default now()
 );
 
@@ -128,7 +131,26 @@ create table fragment_subjects (
   subject_id  uuid not null references subjects(id)  on delete cascade,
   primary key (fragment_id, subject_id)
 );
+
+-- PROVENANCE (added 0003): where a fragment comes from. The orthogonal axis to
+-- subjects (what it's ABOUT). Both optional; essays have neither.
+create table authors (
+  id uuid primary key default gen_random_uuid(),
+  name text not null, slug text not null unique,
+  sort_name text, note text, created_at timestamptz not null default now()
+);
+create table works (
+  id uuid primary key default gen_random_uuid(),
+  title text not null, slug text not null unique,
+  author_id uuid references authors(id) on delete set null,  -- a work belongs to an author
+  year int, kind text, created_at timestamptz not null default now()
+);
+-- Fragments carry author_id/work_id as QUERY FACETS only (on delete set null):
+--   alter table fragments add column author_id uuid references authors(id) on delete set null;
+--   alter table fragments add column work_id   uuid references works(id)   on delete set null;
 ```
+
+**Display vs. query — the Bible rule.** `author_id` / `work_id` are *facets for grouping and search*, kept separate from what's **shown** (`attribution` / `details.source_title`). So a scripture verse **displays** "Matthew 5:43-48" (from `attribution`) while **grouping** under the work "The Bible" (`work_id`) — the collection name never leaks into the presented text. "All Bible verses" = `where work_id = <the-bible>`; "everything by Ocean Vuong" = `where author_id = <vuong>`. Managed at [`/admin/library`](admin.md).
 
 `updated_at` is maintained by a standard `moddatetime` trigger on `fragments`.
 
@@ -151,7 +173,7 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`status`** — `draft` fragments are visible only to the admin (enforced by RLS). Publishing sets `status='published'` and `published_at`.
 - **`deleted_at`** — soft delete (migration `..._soft_delete.sql`). "Delete" sets it and the fragment moves to the admin **Trash** (restorable); public reads exclude `deleted_at is not null`; the admin still sees trashed rows. A "purge" is a real `DELETE`. Keeps years of writing recoverable.
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
-- **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different lenses.
+- **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different constellations.
 
 ## 7. Derived data (not stored)
 
@@ -165,11 +187,12 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 | Fragment (atom) | `fragments` row |
 | Song / Quote / Writing | `fragments.type` |
 | Provenance date | `occurred_at` + `date_precision` |
-| Constellation (lens) | `constellations` row |
+| Constellation | `constellations` row |
 | Composed suite / adjacency | `fragment_constellations.position` |
 | Placement / elevation | existence of a `fragment_constellations` row |
 | Subject (tag) | `subjects` + `fragment_subjects` |
-| Emergent links between lenses | shared membership (no table) |
+| Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` (facets; display stays in `attribution` / `details`) |
+| Emergent links between constellations | shared membership (no table) |
 | The blog / index | queries over `fragments` by `type` + `occurred_at` |
 
 ## 9. Deferred (not in v1)

@@ -5,19 +5,38 @@
   (quote/song → sheet). A click anywhere else on the row is a mouse-only
   convenience that triggers the same thing (src/scripts/admin-list.ts). In trash
   view the row isn't an edit target and shows Restore / Delete-forever actions.
+
+  When a search term is active, the title/attribution highlight matches and a
+  `writing` fragment shows an excerpt line per match window (search-highlight.ts).
 */
 import type { Database } from '../../lib/database.types';
 import { TYPE_META, shortDate, rowTitle, type FragmentType } from '../../lib/fragments-display';
+import { excerpts, toPlain } from '../../lib/search-highlight';
+import Highlighted from './Highlighted.astro';
 
 type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
 interface Props {
   fragment: FragmentRowT;
   subjects: string[];
+  authorName?: string;
+  workName?: string;
   view?: 'list' | 'trash';
+  searchTerm?: string;
 }
-const { fragment: r, subjects, view = 'list' } = Astro.props;
+const { fragment: r, subjects, authorName, workName, view = 'list', searchTerm = '' } = Astro.props;
 const meta = TYPE_META[r.type as FragmentType];
 const trash = view === 'trash';
+const term = searchTerm.trim();
+
+// Excerpt the essay body (writing only — for quotes the body IS the shown title).
+const { windows: bodyWindows, more: moreMatches } =
+  term && r.type === 'writing' && r.body ? excerpts(toPlain(r.body), term) : { windows: [], more: 0 };
+
+// A quote's fuller identity for the citation line: "— Author, Work".
+const quoteWork = r.type === 'quote' ? String((r.details as Record<string, unknown> | null)?.source_title ?? '').trim() : '';
+
+// The primary line. A quote's body is Markdown → strip it to plain text for the row.
+const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
 
 const editorData =
   r.type === 'writing'
@@ -31,6 +50,10 @@ const editorData =
         source_url: r.source_url ?? '',
         status: r.status,
         year: new Date(r.occurred_at).getUTCFullYear(),
+        occurredIso: r.occurred_at,
+        datePrecision: r.date_precision,
+        authorName: authorName ?? '',
+        workName: workName ?? '',
         subjects: subjects.join(', '),
         details: (r.details ?? {}) as Record<string, unknown>,
       });
@@ -43,30 +66,54 @@ const editorData =
   data-href={r.type === 'writing' ? `/admin/writing/${r.id}` : undefined}
   data-fragment={editorData || undefined}
 >
-  <td class="w-8 px-3 py-2.5 align-middle" data-noedit>
-    <input type="checkbox" class="row-check checkbox checkbox-xs" value={r.id} aria-label={`Select ${rowTitle(r)}`} />
+  <td class="w-8 px-3 py-2.5 align-top" data-noedit>
+    <input type="checkbox" class="row-check checkbox checkbox-xs" value={r.id} aria-label={`Select ${primaryText}`} />
   </td>
-  <td class:list={['w-6 text-center align-middle', meta.tone]}>
+  <td class:list={['w-6 pt-2.5 text-center align-top', meta.tone]}>
     <span aria-hidden="true">{meta.glyph}</span>
     <span class="sr-only">{meta.label}</span>
   </td>
-  <td class="max-w-0 py-2.5 pr-3 align-middle">
+  <td class="w-full max-w-0 py-2.5 pr-3 align-top">
     {
       trash ? (
-        <div class="truncate">
-          <span class:list={r.type === 'quote' ? 'italic' : ''}>{rowTitle(r)}</span>
+        <div class:list={r.type === 'quote' ? 'line-clamp-3 italic' : 'truncate'}>
+          <Highlighted text={primaryText} term={term} />
         </div>
       ) : r.type === 'writing' ? (
-        <a href={`/admin/writing/${r.id}`} class="row-open block truncate">{rowTitle(r)}</a>
+        <a href={`/admin/writing/${r.id}`} class="row-open block truncate"><Highlighted text={primaryText} term={term} /></a>
+      ) : r.type === 'quote' ? (
+        <button type="button" class="row-open line-clamp-3 max-w-full text-left italic">
+          <Highlighted text={primaryText} term={term} />
+        </button>
       ) : (
-        <button type="button" class:list={['row-open block max-w-full truncate text-left', r.type === 'quote' && 'italic']}>
-          {rowTitle(r)}
+        <button type="button" class="row-open block max-w-full truncate text-left">
+          <Highlighted text={primaryText} term={term} />
         </button>
       )
     }
-    {r.attribution && <div class="truncate font-sans text-xs text-base-content/60">{r.attribution}</div>}
+    {r.attribution && (
+      <div class="truncate font-sans text-xs text-base-content/60">
+        {r.type === 'quote' && '— '}<Highlighted text={r.attribution} term={term} />{quoteWork && (<>, <span class="italic">{quoteWork}</span></>)}
+      </div>
+    )}
+    {
+      bodyWindows.length > 0 && (
+        <div class="mt-1 space-y-0.5 font-sans text-xs leading-relaxed text-base-content/60">
+          {bodyWindows.map((ex) => (
+            <p>
+              {ex.lead && '… '}
+              <Highlighted segs={ex.segs} />
+              {ex.trail && ' …'}
+            </p>
+          ))}
+          {moreMatches > 0 && (
+            <p class="text-base-content/45">+{moreMatches} more match{moreMatches === 1 ? '' : 'es'}</p>
+          )}
+        </div>
+      )
+    }
   </td>
-  <td class="hidden px-3 align-middle sm:table-cell">
+  <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
     <span
       class:list={[
         'rounded-selector px-1.5 py-0.5 font-sans text-[0.65rem] tracking-wide uppercase',
@@ -76,15 +123,15 @@ const editorData =
       {r.status}
     </span>
   </td>
-  <td class="hidden px-3 text-right align-middle font-sans text-xs text-base-content/65 md:table-cell whitespace-nowrap">
+  <td class="hidden px-3 pt-2.5 text-right align-top font-sans text-xs text-base-content/65 md:table-cell whitespace-nowrap">
     {shortDate(r.occurred_at)}
   </td>
-  <td class="px-3 text-right align-middle font-sans text-xs text-base-content/65 whitespace-nowrap">
+  <td class="px-3 pt-2.5 text-right align-top font-sans text-xs text-base-content/65 whitespace-nowrap">
     {shortDate(r.updated_at)}
   </td>
   {
     trash && (
-      <td class="px-3 text-right align-middle whitespace-nowrap" data-noedit>
+      <td class="px-3 pt-2.5 text-right align-top whitespace-nowrap" data-noedit>
         <button class="restore-btn font-sans text-xs text-base-content/70 hover:text-primary" data-id={r.id}>Restore</button>
         <button class="purge-btn ml-3 font-sans text-xs text-base-content/70 hover:text-error" data-id={r.id}>Delete</button>
       </td>

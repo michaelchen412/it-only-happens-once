@@ -1,0 +1,18 @@
+---
+/*
+  Renders text with the search term wrapped in <mark>. Either pass pre-computed
+  `segs`, or `text` + `term`. Rendering segments as separate children means Astro
+  escapes every text slice — only the <mark> element is real markup.
+*/
+import { highlight, type Seg } from '../../lib/search-highlight';
+
+interface Props {
+  text?: string;
+  term?: string;
+  segs?: Seg[];
+}
+const { text = '', term = '', segs } = Astro.props;
+const parts: Seg[] = segs ?? (term ? highlight(text, term) : [{ text, hit: false }]);
+---
+
+{parts.map((p) => (p.hit ? <mark class="hl">{p.text}</mark> : p.text))}

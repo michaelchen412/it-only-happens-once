@@ -3,18 +3,18 @@ import Base from '../layouts/Base.astro';
 import Timestamp from '../components/Timestamp.astro';
 
 // Sample content — a plausible essay, so we can judge Newsreader at real length.
-const lenses = ['conditions, not character', 'the invisible graveyard'];
+const constellations = ['conditions, not character', 'the invisible graveyard'];
 ---
 
 <Base title="Forgiveness — It Only Happens Once">
   <main class="px-6 py-16 sm:py-24">
     <article class="prose-measure mx-auto">
-      <!-- which lenses this piece lives in -->
+      <!-- which constellations this piece lives in -->
       <div
         class="flex flex-wrap items-center gap-x-5 gap-y-1 font-sans text-xs tracking-widest text-base-content/45 uppercase"
       >
         {
-          lenses.map((l) => (
+          constellations.map((l) => (
             <span class="inline-flex items-center gap-1.5">
               <span class="text-primary">✦</span>
               {l}
@@ -106,7 +106,7 @@ const lenses = ['conditions, not character', 'the invisible graveyard'];
         </p>
         <div class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-xl">
           {
-            lenses.map((l) => (
+            constellations.map((l) => (
               <a
                 href="#"
                 class="inline-flex items-center gap-2 font-light transition-colors hover:text-primary"

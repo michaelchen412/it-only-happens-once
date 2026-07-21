@@ -1,0 +1,226 @@
+---
+/*
+  /admin/library — the vocabulary manager (docs/admin.md §8). Grooms the
+  cross-cutting reference entities that editors create on the fly: SUBJECTS
+  (with definitions — the taxonomy the AI classifier reads), AUTHORS, and WORKS.
+  Each row: edit in place, merge into another (reassigns links, deletes the
+  loser), or delete (FK-safe: fragments are never orphaned). Counts show usage.
+*/
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const supabase = Astro.locals.supabase;
+
+const [{ data: subjects }, { data: authors }, { data: works }] = await Promise.all([
+  supabase.from('subjects').select('id, name, definition').order('name'),
+  supabase.from('authors').select('id, name, note').order('name'),
+  supabase.from('works').select('id, title, author_id, year, kind').order('title'),
+]);
+
+// usage counts
+const { data: fs } = await supabase.from('fragment_subjects').select('subject_id');
+const { data: frs } = await supabase.from('fragments').select('author_id, work_id').is('deleted_at', null);
+const tally = (rows: any[] | null, key: string) => {
+  const m: Record<string, number> = {};
+  for (const r of rows ?? []) if (r[key]) m[r[key]] = (m[r[key]] || 0) + 1;
+  return m;
+};
+const subjCount = tally(fs, 'subject_id');
+const authorCount = tally(frs, 'author_id');
+const workCount = tally(frs, 'work_id');
+const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name]));
+---
+
+<AdminLayout title="Library" active="library">
+  <div class="mx-auto max-w-5xl px-6 py-8">
+    <h1 class="font-display text-2xl">Library</h1>
+    <p class="mt-1 mb-8 max-w-2xl font-sans text-sm text-base-content/55">
+      The vocabulary the workshop shares. <b>Subjects</b> (what a piece is about — definitions feed the AI suggester),
+      <b>Authors</b> and <b>Works</b> (where it comes from). Edit in place, merge duplicates, or delete.
+    </p>
+    <p id="lib-error" hidden role="alert" class="mb-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 font-sans text-sm text-error"></p>
+
+    {/* SUBJECTS */}
+    <section class="mb-12">
+      <h2 class="mb-3 font-display text-lg">Subjects <span class="text-base-content/40 text-sm">({(subjects ?? []).length})</span></h2>
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="w-full font-sans text-sm">
+          <thead>
+            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+              <th class="px-3 py-2 font-normal">Name</th>
+              <th class="px-3 py-2 font-normal">Definition</th>
+              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(subjects ?? []).map((s) => (
+              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="subject" data-id={s.id}>
+                <td class="px-3 py-2"><input data-field="name" value={s.name} class="input input-xs input-bordered w-36" /></td>
+                <td class="px-3 py-2"><input data-field="definition" value={s.definition ?? ''} placeholder="one-line meaning…" class="input input-xs input-bordered w-full" /></td>
+                <td class="px-3 py-2 text-right text-base-content/60">{subjCount[s.id] ?? 0}</td>
+                <td class="px-3 py-2">
+                  <div class="flex items-center gap-2">
+                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                      <option value="">Merge into…</option>
+                      {(subjects ?? []).filter((o) => o.id !== s.id).map((o) => <option value={o.id}>{o.name}</option>)}
+                    </select>
+                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {/* AUTHORS */}
+    <section class="mb-12">
+      <h2 class="mb-3 font-display text-lg">Authors <span class="text-base-content/40 text-sm">({(authors ?? []).length})</span></h2>
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="w-full font-sans text-sm">
+          <thead>
+            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+              <th class="px-3 py-2 font-normal">Name</th>
+              <th class="px-3 py-2 font-normal">Note</th>
+              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(authors ?? []).map((a) => (
+              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="author" data-id={a.id}>
+                <td class="px-3 py-2"><input data-field="name" value={a.name} class="input input-xs input-bordered w-44" /></td>
+                <td class="px-3 py-2"><input data-field="note" value={a.note ?? ''} placeholder="dates, a line…" class="input input-xs input-bordered w-full" /></td>
+                <td class="px-3 py-2 text-right text-base-content/60">{authorCount[a.id] ?? 0}</td>
+                <td class="px-3 py-2">
+                  <div class="flex items-center gap-2">
+                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                      <option value="">Merge into…</option>
+                      {(authors ?? []).filter((o) => o.id !== a.id).map((o) => <option value={o.id}>{o.name}</option>)}
+                    </select>
+                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {/* WORKS */}
+    <section class="mb-12">
+      <h2 class="mb-3 font-display text-lg">Works <span class="text-base-content/40 text-sm">({(works ?? []).length})</span></h2>
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="w-full font-sans text-sm">
+          <thead>
+            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+              <th class="px-3 py-2 font-normal">Title</th>
+              <th class="px-3 py-2 font-normal">Author</th>
+              <th class="w-16 px-3 py-2 font-normal">Year</th>
+              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(works ?? []).map((w) => (
+              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="work" data-id={w.id}>
+                <td class="px-3 py-2"><input data-field="title" value={w.title} class="input input-xs input-bordered w-44" /></td>
+                <td class="px-3 py-2">
+                  <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
+                    <option value="">— none —</option>
+                    {(authors ?? []).map((a) => <option value={a.id} selected={a.id === w.author_id}>{a.name}</option>)}
+                  </select>
+                </td>
+                <td class="px-3 py-2"><input data-field="year" type="number" value={w.year ?? ''} class="input input-xs input-bordered w-16" /></td>
+                <td class="px-3 py-2 text-right text-base-content/60">{workCount[w.id] ?? 0}</td>
+                <td class="px-3 py-2">
+                  <input data-field="kind" type="hidden" value={w.kind ?? ''} />
+                  <div class="flex items-center gap-2">
+                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                      <option value="">Merge into…</option>
+                      {(works ?? []).filter((o) => o.id !== w.id).map((o) => <option value={o.id}>{o.title}</option>)}
+                    </select>
+                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { actions } from 'astro:actions';
+    import { confirmDialog } from '../../scripts/confirm-dialog';
+
+    const A: Record<string, any> = { subject: actions.subjects, author: actions.authors, work: actions.works };
+    const err = document.getElementById('lib-error') as HTMLParagraphElement;
+    const showErr = (m: string) => {
+      err.textContent = m;
+      err.hidden = false;
+      err.scrollIntoView({ block: 'nearest' });
+    };
+
+    document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
+      const entity = row.dataset.entity!;
+      const id = row.dataset.id!;
+      const api = A[entity];
+
+      row.querySelector('.lib-save')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget as HTMLButtonElement;
+        const fd = new FormData();
+        fd.set('id', id);
+        row.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach((el) => fd.set(el.dataset.field!, el.value));
+        btn.disabled = true;
+        const { error } = await api.update(fd);
+        btn.disabled = false;
+        if (error) showErr(error.message);
+        else location.reload();
+      });
+
+      row.querySelector('.lib-delete')?.addEventListener('click', async () => {
+        const ok = await confirmDialog({
+          title: 'Delete',
+          message: 'Delete this? Fragments themselves stay — only this label and its links are removed.',
+          confirmLabel: 'Delete',
+          danger: true,
+        });
+        if (!ok) return;
+        const fd = new FormData();
+        fd.set('id', id);
+        const { error } = await api.remove(fd);
+        if (error) showErr(error.message);
+        else location.reload();
+      });
+
+      const merge = row.querySelector<HTMLSelectElement>('.lib-merge');
+      merge?.addEventListener('change', async () => {
+        const into = merge.value;
+        if (!into) return;
+        const ok = await confirmDialog({
+          title: 'Merge',
+          message: 'Move everything onto the target and delete this one? This can’t be undone.',
+          confirmLabel: 'Merge',
+          danger: true,
+        });
+        if (!ok) {
+          merge.value = '';
+          return;
+        }
+        const fd = new FormData();
+        fd.set('from', id);
+        fd.set('into', into);
+        const { error } = await api.merge(fd);
+        if (error) showErr(error.message);
+        else location.reload();
+      });
+    });
+  </script>
+</AdminLayout>

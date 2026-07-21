@@ -54,6 +54,28 @@ async function uniqueSlug(sb: DB, base: string, excludeId?: string): Promise<str
   throw fail('Could not generate a unique slug');
 }
 
+/** Upsert an author by name; return its id (or null for blank). Idempotent by slug. */
+async function resolveAuthor(sb: DB, name?: string): Promise<string | null> {
+  const n = name?.trim();
+  if (!n) return null;
+  const slug = slugify(n);
+  const { error } = await sb.from('authors').upsert({ name: n, slug }, { onConflict: 'slug', ignoreDuplicates: true });
+  if (error) throw fail(error.message);
+  const { data } = await sb.from('authors').select('id').eq('slug', slug).single();
+  return data?.id ?? null;
+}
+
+/** Upsert a work by title (optionally linked to an author); return its id. */
+async function resolveWork(sb: DB, title?: string, authorId?: string | null): Promise<string | null> {
+  const t = title?.trim();
+  if (!t) return null;
+  const slug = slugify(t);
+  const { error } = await sb.from('works').upsert({ title: t, slug, author_id: authorId ?? null }, { onConflict: 'slug', ignoreDuplicates: true });
+  if (error) throw fail(error.message);
+  const { data } = await sb.from('works').select('id').eq('slug', slug).single();
+  return data?.id ?? null;
+}
+
 /** Replace a fragment's subject links, creating any new subjects on the fly. */
 async function syncSubjects(sb: DB, fragmentId: string, raw?: string): Promise<void> {
   const names = (raw ?? '')
@@ -192,8 +214,11 @@ export const server = {
         source_author: optText,
         work_year: optInt,
         page: optInt,
+        citation: optText,
         source_url: optUrl,
-        year: z.coerce.number().int(),
+        author_name: optText, // provenance facet (grouping/search); display stays in attribution
+        work_name: optText, //   provenance facet; display stays in details.source_title
+        occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
         status,
         subjects: optText,
         slug: optText,
@@ -207,6 +232,9 @@ export const server = {
         if (input.source_author) details.source_author = input.source_author;
         if (input.work_year !== undefined) details.work_year = input.work_year;
         if (input.page !== undefined) details.page = input.page;
+        if (input.citation) details.citation = input.citation;
+        const author_id = await resolveAuthor(sb, input.author_name);
+        const work_id = await resolveWork(sb, input.work_name, author_id);
         const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
           type: 'quote',
           title: null,
@@ -214,10 +242,14 @@ export const server = {
           attribution: input.attribution ?? null,
           source_url: input.source_url ?? null,
           details,
+          author_id,
+          work_id,
           status: input.status,
-          occurred_at: yearToISO(input.year),
-          date_precision: 'year',
         };
+        if (input.occurred_at) {
+          row.occurred_at = new Date(input.occurred_at).toISOString();
+          row.date_precision = 'day';
+        }
         return persist(sb, input.id, row, input.subjects);
       },
     }),
@@ -246,6 +278,9 @@ export const server = {
         const details: Record<string, Json> = { spotify_id: spotifyId };
         if (input.album) details.album = input.album;
         if (input.thumbnail_url) details.thumbnail_url = input.thumbnail_url;
+        // provenance facets follow the shown fields: artist → author, album → work
+        const author_id = await resolveAuthor(sb, input.attribution);
+        const work_id = await resolveWork(sb, input.album, author_id);
         const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
           type: 'song',
           title: input.title,
@@ -253,11 +288,38 @@ export const server = {
           attribution: input.attribution,
           source_url: input.spotify_url,
           details,
+          author_id,
+          work_id,
           status: input.status,
           occurred_at: yearToISO(input.year),
           date_precision: 'year',
         };
         return persist(sb, input.id, row, input.subjects);
+      },
+    }),
+
+    /**
+     * AI subject suggestions for a fragment (read-only; no DB write). Returns
+     * existing subjects that apply + an optional proposed new one. The human
+     * accepts/edits in the editor; a proposed subject only becomes real if it's
+     * still in the `subjects` field at save time. Degrades cleanly when no key.
+     */
+    suggestSubjects: defineAction({
+      input: z.object({
+        text: z.string().min(1),
+        kind: z.enum(['quote', 'song', 'writing']),
+      }),
+      handler: async ({ text, kind }, ctx) => {
+        const apiKey = import.meta.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw fail('AI suggestions aren’t configured — add ANTHROPIC_API_KEY.', 'BAD_REQUEST');
+        const { data: taxonomy, error } = await ctx.locals.supabase.from('subjects').select('name, definition').order('name');
+        if (error) throw fail(error.message);
+        try {
+          const { suggestSubjects } = await import('../lib/suggest-subjects');
+          return await suggestSubjects(text, kind, apiKey, taxonomy ?? []);
+        } catch {
+          throw fail('Couldn’t reach the model — tag it manually.', 'INTERNAL_SERVER_ERROR');
+        }
       },
     }),
 
@@ -360,6 +422,122 @@ export const server = {
         const found = await lookupSpotifyTrack(input.url);
         if (!found) throw fail('Couldn’t read that Spotify link', 'BAD_REQUEST');
         return found;
+      },
+    }),
+  },
+
+  // --- vocabulary management (docs/admin.md §8): subjects, authors, works ------
+  // Delete is FK-safe: fragment_subjects cascades; fragments.author_id/work_id and
+  // works.author_id are ON DELETE SET NULL — a fragment is never orphaned.
+  subjects: {
+    update: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid(), name: z.string().min(1), definition: optText }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
+        const { error } = await sb.from('subjects').update({ name: input.name.trim(), slug, definition: input.definition ?? null }).eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    remove: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase.from('subjects').delete().eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    merge: defineAction({
+      accept: 'form',
+      input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        if (input.from === input.into) throw fail('Pick two different subjects', 'BAD_REQUEST');
+        const { data: links } = await sb.from('fragment_subjects').select('fragment_id').eq('subject_id', input.from);
+        for (const l of links ?? []) {
+          await sb.from('fragment_subjects').upsert({ fragment_id: l.fragment_id, subject_id: input.into }, { onConflict: 'fragment_id,subject_id', ignoreDuplicates: true });
+        }
+        await sb.from('fragment_subjects').delete().eq('subject_id', input.from);
+        const { error } = await sb.from('subjects').delete().eq('id', input.from);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+  },
+
+  authors: {
+    update: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid(), name: z.string().min(1), note: optText }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
+        const { error } = await sb.from('authors').update({ name: input.name.trim(), slug, note: input.note ?? null }).eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    remove: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase.from('authors').delete().eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    merge: defineAction({
+      accept: 'form',
+      input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        if (input.from === input.into) throw fail('Pick two different authors', 'BAD_REQUEST');
+        await sb.from('fragments').update({ author_id: input.into }).eq('author_id', input.from);
+        await sb.from('works').update({ author_id: input.into }).eq('author_id', input.from);
+        const { error } = await sb.from('authors').delete().eq('id', input.from);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+  },
+
+  works: {
+    update: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid(), title: z.string().min(1), author_id: optText, year: optInt, kind: optText }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const slug = await uniqueSlug(sb, slugify(input.title), input.id).catch(() => slugify(input.title));
+        const { error } = await sb
+          .from('works')
+          .update({ title: input.title.trim(), slug, author_id: input.author_id ?? null, year: input.year ?? null, kind: input.kind ?? null })
+          .eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    remove: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase.from('works').delete().eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    merge: defineAction({
+      accept: 'form',
+      input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        if (input.from === input.into) throw fail('Pick two different works', 'BAD_REQUEST');
+        await sb.from('fragments').update({ work_id: input.into }).eq('work_id', input.from);
+        const { error } = await sb.from('works').delete().eq('id', input.from);
+        if (error) throw fail(error.message);
+        return { ok: true };
       },
     }),
   },
