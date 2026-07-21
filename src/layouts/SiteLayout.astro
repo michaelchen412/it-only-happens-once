@@ -16,10 +16,12 @@ import Colophon from '../components/Colophon.astro';
 
 interface Props {
   title?: string;
+  /** Optional meta description, passed through to <head>. */
+  description?: string;
   /** Which top-nav item is highlighted. */
   active?: 'blog' | 'about';
 }
-const { title, active } = Astro.props;
+const { title, description, active } = Astro.props;
 const pageTitle = title ? `${title} — It Only Happens Once` : 'It Only Happens Once';
 
 const nav = [
@@ -28,7 +30,7 @@ const nav = [
 ] as const;
 ---
 
-<Base title={pageTitle} transitions>
+<Base title={pageTitle} description={description} transitions>
   <div class="flex min-h-screen flex-col">
     {/* Top bar — the site's primary navigation. */}
     <header

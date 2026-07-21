@@ -393,6 +393,77 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Reader — the PUBLIC in-context reading surface (components/Reader.astro).
+   Reuses .drawer-dialog above for the right-edge slide + backdrop: a full-height
+   sheet on desktop (a comfortable reading width), a full-screen sheet on phones.
+   Reused by the blog now and the constellation views later.
+   ------------------------------------------------------------------------- */
+html.reader-open {
+  overflow: hidden; /* freeze the feed behind the reader */
+  /* Pad by the now-hidden scrollbar's width (measured in Reader.astro) so the
+     page doesn't jump sideways. The strip sits under the backdrop, so unseen. */
+  padding-right: var(--reader-sbw, 0px);
+}
+.reader {
+  width: min(44rem, 100vw);
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  /* height, right-pin, and the slide-in come from .drawer-dialog */
+}
+.reader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.reader-inner {
+  padding: 3.5rem 1.75rem 4rem;
+}
+.reader-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  display: inline-flex;
+  padding: 0.4rem;
+  border-radius: var(--radius-field);
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  background: color-mix(in oklab, var(--color-base-100) 70%, transparent);
+  backdrop-filter: blur(4px);
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.reader-close:hover {
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+}
+@media (max-width: 640px) {
+  /* Full-screen sheet on phones (the platform-correct pattern). */
+  .reader {
+    width: 100vw;
+    border-left: 0;
+  }
+  .reader-inner {
+    padding: 3.25rem 1.25rem 3rem;
+  }
+}
+
+/* Blog feed — infinite-scroll sentinel (scripts/blog-feed.ts). The manual
+   "Load older" link is the no-JS fallback; while the next page is fetched it
+   swaps to a quiet loading state. */
+.feed-spin {
+  display: none;
+}
+.feed-sentinel.is-loading .feed-more {
+  display: none;
+}
+.feed-sentinel.is-loading .feed-spin {
+  display: inline-flex;
+}
+
 /* Bulk-action bar — a floating pill that slides up from the bottom when rows
    are selected. Always in the DOM (so it can transition); off-screen when idle. */
 .bulkbar {

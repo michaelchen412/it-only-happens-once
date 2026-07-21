@@ -1,0 +1,56 @@
+---
+/*
+  QuoteCard — one quote in the blog feed. Quotes are short, so they render whole
+  (no reader). When a search term is active, matches in the quote and its
+  attribution highlight inline (search-highlight.ts — same engine as the essays;
+  short fields use highlight(), not windowed excerpts, per docs/search.md).
+
+  Layout notes (deliberate):
+    · The quote is NOT italicized — a full italic block at this size reads as
+      strained; upright serif is easier on the eyes.
+    · The caption reads: attribution on the left, then subjects, then the date
+      pinned to the far RIGHT. The date is intentionally last, after the tags,
+      and labelled "Added …": a quote's date is provenance (when it entered
+      Michael's life), NOT when it was said — putting a bare date next to the
+      attribution wrongly implies the latter.
+*/
+import Timestamp from './Timestamp.astro';
+import Highlighted from './admin/Highlighted.astro';
+import { MIN_SEARCH } from '../lib/search-highlight';
+import type { QuoteItem } from '../lib/blog';
+
+interface Props {
+  item: QuoteItem;
+  term?: string;
+}
+const { item, term = '' } = Astro.props;
+const searching = term.trim().length >= MIN_SEARCH;
+---
+
+<figure class="py-9 first:pt-0">
+  <blockquote class="font-serif text-xl leading-relaxed text-base-content/85">
+    {searching ? <Highlighted text={item.body} term={term} /> : item.body}
+  </blockquote>
+  <figcaption class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm text-base-content/45">
+    {
+      item.attribution && (
+        <span>— {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}</span>
+      )
+    }
+    {/* Subjects then the "Added" date, pinned right (provenance, not when-said). */}
+    <div class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+      {item.subjects.length > 0 && (
+        <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/40">
+          {item.subjects.map((s) => (
+            <li>
+              <a href={`/blog?view=quotes&subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
+                {s.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Timestamp date={item.occurredAt} kind="added" precision={item.precision} prefix="Added" />
+    </div>
+  </figcaption>
+</figure>

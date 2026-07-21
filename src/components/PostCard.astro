@@ -1,0 +1,102 @@
+---
+/*
+  PostCard — one essay in the blog feed (design.md §4, the Index).
+
+  Default: the title (a permalink), date + read time, an auto-excerpt clamped to
+  a few lines, and — when there's more than the excerpt shows — a "Read more" that
+  opens the in-context Reader (never a navigation). Subjects sit quietly at the
+  foot as filter links (chrome register, never an accent eyebrow, §7).
+
+  When a search term is active it switches to the occurrence view: the title
+  highlights its matches, and the body becomes bounded, windowed excerpts around
+  each match (search-highlight.ts — same engine + rules as the admin, see
+  docs/search.md). The reader <template> always carries the full, un-highlighted
+  essay so "Read more" opens the real thing.
+*/
+import { Icon } from 'astro-icon/components';
+import Timestamp from './Timestamp.astro';
+import PostArticle from './PostArticle.astro';
+import Highlighted from './admin/Highlighted.astro';
+import { highlight, excerpts, toPlain, MIN_SEARCH } from '../lib/search-highlight';
+import type { WritingItem } from '../lib/blog';
+
+interface Props {
+  item: WritingItem;
+  /** The active search term, when searching — drives match highlighting. */
+  term?: string;
+}
+const { item, term = '' } = Astro.props;
+
+const searching = term.trim().length >= MIN_SEARCH;
+const titleSegs = searching ? highlight(item.title, term) : null;
+const { windows, more } = searching ? excerpts(toPlain(item.bodyMarkdown), term) : { windows: [], more: 0 };
+const showWindows = searching && windows.length > 0;
+---
+
+<article class="post-card py-9 first:pt-0">
+  <h2 class="font-display text-2xl leading-snug font-light sm:text-3xl">
+    <a href={`/blog/${item.slug}`} class="transition-colors hover:text-primary">
+      {titleSegs ? <Highlighted segs={titleSegs} /> : item.title}
+    </a>
+  </h2>
+
+  <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-base-content/40">
+    <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
+    <span class="font-sans">·</span>
+    <span class="font-sans">{item.readMinutes} min read</span>
+  </div>
+
+  {
+    showWindows ? (
+      <div class="mt-4 space-y-1.5 font-serif leading-relaxed text-base-content/70">
+        {windows.map((w) => (
+          <p>
+            {w.lead && '… '}
+            <Highlighted segs={w.segs} />
+            {w.trail && ' …'}
+          </p>
+        ))}
+        {more > 0 && (
+          <p class="font-sans text-xs text-base-content/40">
+            +{more} more {more === 1 ? 'match' : 'matches'}
+          </p>
+        )}
+      </div>
+    ) : (
+      <p class="mt-4 line-clamp-5 font-serif leading-relaxed text-base-content/70">{item.excerpt}</p>
+    )
+  }
+
+  <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+    {
+      (item.hasMore || searching) && (
+        <button
+          type="button"
+          data-read={item.slug}
+          class="inline-flex items-center gap-1 font-sans text-sm text-base-content/60 transition-colors hover:text-primary"
+        >
+          Read more
+          <Icon name="ph:arrow-right" class="size-3.5" />
+        </button>
+      )
+    }
+    {
+      item.subjects.length > 0 && (
+        <ul class="ml-auto flex flex-wrap gap-x-3 gap-y-1 font-sans text-xs text-base-content/40">
+          {item.subjects.map((s) => (
+            <li>
+              <a href={`/blog?subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
+                {s.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+
+  {/* Full essay, cloned into the Reader on demand. Inert until then. */}
+  <template data-reader-content={item.slug}>
+    <PostArticle item={item} linkTitle />
+  </template>
+</article>

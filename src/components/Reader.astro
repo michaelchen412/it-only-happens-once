@@ -1,0 +1,140 @@
+---
+/*
+  Reader — a reusable, in-context reading surface (a native top-layer <dialog>).
+
+  Drop <Reader /> once on a page. Anything with `data-read="<slug>"` opens it,
+  filled from the matching `<template data-reader-content="<slug>">` on the page.
+  The feed underneath never moves, so closing drops the reader back exactly where
+  the reader was scrolling — the whole point of not navigating away.
+
+  Open state is mirrored to the URL hash (`#read=<slug>`) so the browser Back
+  button and Escape both close it, and it reconciles on client-side navigation.
+  Built to be reused by the constellation views later — nothing here is
+  blog-specific.
+
+  Desktop: a right-side sheet at full height (a comfortable reading width).
+  Mobile: a full-screen sheet (styles in app.css). Motion self-disables under
+  prefers-reduced-motion (global rule).
+*/
+import { Icon } from 'astro-icon/components';
+---
+
+<dialog id="site-reader" class="reader drawer-dialog" aria-label="Reading view">
+  <button type="button" class="reader-close" data-reader-close aria-label="Close reading view">
+    <Icon name="ph:x" class="text-lg" />
+  </button>
+  <div class="reader-scroll">
+    <div class="reader-inner prose-measure mx-auto"></div>
+  </div>
+</dialog>
+
+<script>
+  const PREFIX = 'read=';
+
+  const reader = () => document.getElementById('site-reader') as HTMLDialogElement | null;
+  const readSlug = () => {
+    const h = location.hash.slice(1);
+    return h.startsWith(PREFIX) ? decodeURIComponent(h.slice(PREFIX.length)) : null;
+  };
+
+  // True when the reader was opened by a click (so there's a history entry to pop
+  // on close); false when we arrived already pointing at it (deep link / refresh).
+  let openedViaTrigger = false;
+
+  // Lock page scroll without shifting the layout: measure the scrollbar we're
+  // about to hide and pad the page by exactly that width. (scrollbar-gutter was
+  // unreliable across browsers, so we compensate explicitly.)
+  function lockScroll() {
+    const sbw = window.innerWidth - document.documentElement.clientWidth;
+    document.documentElement.style.setProperty('--reader-sbw', `${sbw}px`);
+    document.documentElement.classList.add('reader-open');
+  }
+  function unlockScroll() {
+    document.documentElement.classList.remove('reader-open');
+    document.documentElement.style.removeProperty('--reader-sbw');
+  }
+
+  function open(slug: string): boolean {
+    const d = reader();
+    if (!d) return false;
+    const tpl = document.querySelector(
+      `template[data-reader-content="${CSS.escape(slug)}"]`
+    ) as HTMLTemplateElement | null;
+    const inner = d.querySelector('.reader-inner');
+    if (!tpl || !inner) return false; // content isn't on this page
+    inner.replaceChildren(tpl.content.cloneNode(true));
+    if (!d.open) d.showModal();
+    const scroll = d.querySelector('.reader-scroll');
+    if (scroll) scroll.scrollTop = 0;
+    lockScroll();
+    return true;
+  }
+
+  function close() {
+    const d = reader();
+    if (d && d.open) d.close();
+    unlockScroll();
+  }
+
+  // The URL hash is the single source of truth; reconcile the DOM to it.
+  function sync() {
+    const slug = readSlug();
+    if (!slug) return close();
+    if (!open(slug)) {
+      // Deep-linked to a post that isn't in this page's feed → send them to the
+      // canonical permalink, which always exists.
+      location.replace(`/blog/${slug}`);
+    }
+  }
+
+  // Every close intent collapses to "leave the reader hash". Prefer history.back()
+  // so the pushed entry is popped; if we arrived on it, strip the hash in place.
+  function dismiss() {
+    if (!readSlug()) return close();
+    if (openedViaTrigger) {
+      openedViaTrigger = false;
+      history.back();
+    } else {
+      history.replaceState(null, '', location.pathname + location.search);
+      close();
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as Element;
+    const trigger = target?.closest?.('[data-read]');
+    if (trigger) {
+      e.preventDefault();
+      const slug = trigger.getAttribute('data-read');
+      if (slug) {
+        openedViaTrigger = true;
+        location.hash = PREFIX + encodeURIComponent(slug); // → hashchange → sync()
+      }
+      return;
+    }
+    if (target?.closest?.('[data-reader-close]')) {
+      e.preventDefault();
+      return dismiss();
+    }
+    const d = reader();
+    if (d && d.open && target === d) dismiss(); // click on the backdrop
+  });
+
+  // Escape: the native <dialog> closes visually; we still sync the hash.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && reader()?.open) {
+      e.preventDefault();
+      dismiss();
+    }
+  });
+
+  window.addEventListener('hashchange', sync);
+  // Deep links + view-transition navigation: reconcile on arrival.
+  document.addEventListener('astro:page-load', () => {
+    openedViaTrigger = false;
+    sync();
+  });
+  // <html> persists across view transitions — never leak the scroll lock.
+  document.addEventListener('astro:before-swap', unlockScroll);
+  sync(); // first load
+</script>

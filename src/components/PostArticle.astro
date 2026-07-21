@@ -1,0 +1,63 @@
+---
+/*
+  PostArticle — the one canonical rendering of a full essay (design.md §10).
+
+  Deliberately shared by three surfaces so they stay pixel-identical:
+    • the in-context Reader (cloned from a <template>),
+    • the card's reader <template> in the feed,
+    • the /blog/[slug] permalink page.
+
+  Header: the subjects the piece touches (quiet serif links — NOT ✦, which is
+  reserved for constellations, §3), the display title, the Timestamp, and read
+  time. Body is authored Markdown scoped to `.reading`. The caller supplies the
+  measure (`.prose-measure`) and padding.
+*/
+import Timestamp from './Timestamp.astro';
+import { renderMarkdown } from '../lib/markdown';
+import type { WritingItem } from '../lib/blog';
+
+interface Props {
+  item: WritingItem;
+  /** Link the title to its permalink (feed/reader) vs. plain h1 (the page itself). */
+  linkTitle?: boolean;
+}
+const { item, linkTitle = false } = Astro.props;
+const bodyHtml = renderMarkdown(item.bodyMarkdown);
+---
+
+<article class="post-article">
+  <h1 class="font-display text-3xl leading-[1.12] font-light sm:text-5xl">
+    {
+      linkTitle ? (
+        <a href={`/blog/${item.slug}`} class="transition-colors hover:text-primary">
+          {item.title}
+        </a>
+      ) : (
+        item.title
+      )
+    }
+  </h1>
+
+  <div class="mt-5 flex flex-wrap items-center gap-3 text-sm text-base-content/40">
+    <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
+    <span class="font-sans">·</span>
+    <span class="font-sans">{item.readMinutes} min read</span>
+  </div>
+
+  {
+    item.subjects.length > 0 && (
+      <p class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-serif text-sm text-base-content/45 italic">
+        {item.subjects.map((s, i) => (
+          <>
+            {i > 0 && <span class="text-base-content/20 not-italic">·</span>}
+            <a href={`/blog?subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
+              {s.name}
+            </a>
+          </>
+        ))}
+      </p>
+    )
+  }
+
+  {bodyHtml && <div class="reading mt-10" set:html={bodyHtml} />}
+</article>

@@ -17,9 +17,13 @@ interface Props {
   kind?: 'posted' | 'added';
   precision?: 'day' | 'year';
   class?: string;
+  /** Optional visible verb before the date (e.g. "Added"). Off by default —
+      the surface is normally a bare token — for contexts where the meaning
+      would otherwise be ambiguous (a quote's date is provenance, not when-said). */
+  prefix?: string;
 }
 import { Icon } from 'astro-icon/components';
-const { date, updated, kind = 'posted', precision = 'day', class: className = '' } = Astro.props;
+const { date, updated, kind = 'posted', precision = 'day', class: className = '', prefix } = Astro.props;
 
 const d = new Date(date);
 const u = updated ? new Date(updated) : null;
@@ -67,10 +71,9 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     class="inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-base-content/70"
   >
     <Icon name="ph:clock-light" class="size-3.5 opacity-70" />
+    {prefix && <span>{prefix}</span>}
     <span class="underline decoration-dotted decoration-base-content/20 underline-offset-4">
-      <time datetime={d.toISOString()}>{label}</time>{
-        u && <span class="text-base-content/25"> · updated</span>
-      }
+      <time datetime={d.toISOString()}>{label}</time>
     </span>
   </button>
   <div

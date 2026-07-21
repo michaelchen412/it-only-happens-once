@@ -1,85 +1,227 @@
 ---
 /*
-  /blog — the reading/retrieval room (vision.md §4, "the Index").
+  /blog — the Index (design.md §4): a retrieval room, machinery register.
 
-  SHELL ONLY for now: this pass builds the navigable chrome — the view
-  switcher, the search field, and the subject-filter rail — but not the
-  content. The writing stream, quotes view, and working search/filter land in
-  the next pass. Music is deferred to its own facet-design pass.
+  A prominent content-type switch (Writing · Quotes · Music) — the primary axis —
+  sits above a sticky left rail (search · subject filters) and the scrolling feed.
+  The rail is the SAME for every view: quotes and songs share the one subject
+  taxonomy, so each view filters and searches within its own type. Writing renders
+  as excerpt cards that open the full essay in an in-context Reader; quotes, being
+  short, render whole. Everything is URL-driven — `?view`, `?subject`, `?q`,
+  `?page` — so any state is shareable.
+
+  Search mirrors the admin (docs/search.md): a debounced fetch-and-swap of
+  #blog-feed (see scripts/blog-feed.ts) with match highlighting, gated at
+  MIN_SEARCH on both server and client. That same script runs the infinite
+  scroll — an IntersectionObserver that appends #feed-list pages via the
+  #feed-sentinel's data-next-url.
 */
-import { Icon } from 'astro-icon/components';
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import Label from '../../components/Label.astro';
+import PostCard from '../../components/PostCard.astro';
+import QuoteCard from '../../components/QuoteCard.astro';
+import Reader from '../../components/Reader.astro';
+import { Icon } from 'astro-icon/components';
+import { listWriting, listQuotes, listSubjects } from '../../lib/blog';
+import { MIN_SEARCH } from '../../lib/search-highlight';
 
-const views = [
-  { key: 'writing', label: 'Writing', active: true },
-  { key: 'quotes', label: 'Quotes', active: false },
+const supabase = Astro.locals.supabase;
+const params = Astro.url.searchParams;
+const view = params.get('view') === 'quotes' ? 'quotes' : 'writing';
+const type = view === 'quotes' ? 'quote' : 'writing';
+const subject = params.get('subject');
+const rawQ = (params.get('q') ?? '').trim();
+const searching = rawQ.length >= MIN_SEARCH; // a 1-char term matches ~everything (docs/search.md §3)
+const q = searching ? rawQ : '';
+// `page` is internal to infinite scroll: only client fetches (X-Requested-With)
+// ask for a specific page; a real browser navigation always starts at page 1, so
+// a stray ?page=N in the address bar can never show a partial feed.
+const isPartial = Astro.request.headers.get('X-Requested-With') === 'fetch';
+const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1) : 1;
+
+const subjects = await listSubjects(supabase, type);
+const activeSubject = subject ? subjects.find((s) => s.slug === subject) : null;
+
+const writing = view === 'writing' ? await listWriting(supabase, { page, subject, q: q || null }) : null;
+const quotes = view === 'quotes' ? await listQuotes(supabase, { page, subject, q: q || null }) : null;
+const feed = writing ?? quotes!;
+
+const noun = view === 'quotes' ? 'quote' : 'essay';
+const nounPlural = view === 'quotes' ? 'quotes' : 'essays';
+// The search field names the medium ("writing"/"quotes"), not the unit ("essays").
+const searchNoun = view === 'quotes' ? 'quotes' : 'writing';
+
+/** Build a /blog URL, keeping current view/subject/q and overriding some params. */
+function href(over: Record<string, string | number | null | undefined>): string {
+  const p = new URLSearchParams();
+  const base: Record<string, string | number | null | undefined> = { view: view === 'quotes' ? 'quotes' : null, subject, q: q || null, ...over };
+  for (const [k, v] of Object.entries(base)) if (v !== null && v !== undefined && v !== '') p.set(k, String(v));
+  const s = p.toString();
+  return s ? `/blog?${s}` : '/blog';
+}
+
+const tabs = [
+  { key: 'writing', label: 'Writing', href: '/blog', active: view === 'writing' },
+  { key: 'quotes', label: 'Quotes', href: '/blog?view=quotes', active: view === 'quotes' },
 ] as const;
 
-// A few real subjects, shown inert, just to render the filter chrome.
-const sampleSubjects = ['faith', 'love', 'suffering', 'free will', 'meaning', 'work'];
+// Infinite scroll: the next page's URL, or null at the end. The client fetches it
+// (X-Requested-With) and appends the items; the manual link is the no-JS fallback.
+const nextUrl = feed.page < feed.pageCount ? href({ page: feed.page + 1 }) : null;
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+// The rendered page depends on X-Requested-With (partial page fetches honour
+// ?page; browser navigations always start at page 1), so cache it per-variant.
+Astro.response.headers.set('Vary', 'X-Requested-With');
 ---
 
 <SiteLayout title="Blog" active="blog">
-  <div class="mx-auto w-full max-w-5xl px-5 py-8 sm:py-10">
-    {/* View switcher + search */}
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <nav class="flex items-center gap-1" aria-label="Blog views">
+  <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
+    {/* ─────────  PRIMARY AXIS: content-type switch  ───────── */}
+    <nav class="mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b border-base-300" aria-label="Content">
+      {
+        tabs.map((t) => (
+          <a
+            href={t.href}
+            aria-current={t.active ? 'page' : undefined}
+            class:list={[
+              '-mb-px border-b-2 pb-3 font-display text-2xl leading-none font-light transition-colors sm:text-3xl',
+              t.active ? 'border-primary text-base-content' : 'border-transparent text-base-content/35 hover:text-base-content/70',
+            ]}
+          >
+            {t.label}
+          </a>
+        ))
+      }
+      <span class="-mb-px border-b-2 border-transparent pb-3 font-display text-2xl leading-none font-light text-base-content/20 sm:text-3xl">
+        Music <span class="align-middle font-sans text-xs tracking-wide">soon</span>
+      </span>
+    </nav>
+
+    <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
+      {/* ─────────  THE RAIL: search + subjects (same for every view)  ───────── */}
+      <aside class="md:sticky md:top-20 md:self-start">
+        <form method="get" action="/blog" role="search" id="blog-filters" class="relative">
+          <Icon
+            name="ph:magnifying-glass"
+            class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base text-base-content/35"
+          />
+          <input
+            type="search"
+            name="q"
+            value={rawQ}
+            placeholder={`Search ${searchNoun}…`}
+            aria-label={`Search ${searchNoun}`}
+            autocomplete="off"
+            class="w-full rounded-field border border-base-300 bg-base-100 py-2 pr-3 pl-9 font-sans text-sm placeholder:text-base-content/35 focus:border-base-content/30 focus:outline-none"
+          />
+          {subject && <input type="hidden" name="subject" value={subject} />}
+          {view === 'quotes' && <input type="hidden" name="view" value="quotes" />}
+        </form>
+
         {
-          views.map((v) => (
-            <span
-              aria-current={v.active ? 'page' : undefined}
-              class:list={[
-                'rounded-field px-3 py-1.5 font-sans text-sm transition-colors',
-                v.active ? 'bg-base-200 text-base-content' : 'text-base-content/55',
-              ]}
-            >
-              {v.label}
-            </span>
-          ))
+          subjects.length > 0 && (
+            <div class="mt-7">
+              <div class="flex items-baseline justify-between">
+                <Label variant="chrome">Subjects</Label>
+                {(activeSubject || q) && (
+                  <a href={view === 'quotes' ? '/blog?view=quotes' : '/blog'} class="font-sans text-xs text-base-content/40 hover:text-base-content/70">
+                    Clear
+                  </a>
+                )}
+              </div>
+              <ul class="mt-3 flex flex-wrap gap-1.5 md:flex-col md:gap-0.5">
+                {subjects.map((s) => (
+                  <li>
+                    <a
+                      href={href({ subject: s.slug, page: null, q: null })}
+                      aria-current={activeSubject?.slug === s.slug ? 'true' : undefined}
+                      class:list={[
+                        'inline-flex items-baseline gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors md:rounded-field',
+                        activeSubject?.slug === s.slug
+                          ? 'border-base-content/30 bg-base-200 text-base-content'
+                          : 'border-base-300 text-base-content/55 hover:border-base-content/25 hover:text-base-content',
+                      ]}
+                    >
+                      {s.name}
+                      <span class="text-base-content/30">{s.count}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
         }
-        <span class="px-3 py-1.5 font-sans text-sm text-base-content/30">Music · later</span>
-      </nav>
-
-      <div class="relative w-full sm:w-64">
-        <Icon
-          name="ph:magnifying-glass"
-          class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base text-base-content/35"
-        />
-        <input
-          type="search"
-          disabled
-          placeholder="Search writing…"
-          aria-label="Search (coming soon)"
-          class="w-full rounded-field border border-base-300 bg-base-100 py-2 pr-3 pl-9 font-sans text-sm placeholder:text-base-content/35"
-        />
-      </div>
-    </div>
-
-    {/* Rail + content */}
-    <div class="mt-8 grid gap-8 md:grid-cols-[10rem_1fr]">
-      {/* Subject-filter rail ("the sidebar as needed for the blog") */}
-      <aside class="hidden md:block">
-        <Label variant="chrome">Subjects</Label>
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          {
-            sampleSubjects.map((s) => (
-              <span class="rounded-full border border-base-300 px-2.5 py-0.5 font-sans text-xs text-base-content/50">
-                {s}
-              </span>
-            ))
-          }
-          <span class="px-1 py-0.5 font-sans text-xs text-base-content/30">+15 more</span>
-        </div>
       </aside>
 
-      {/* Empty state */}
-      <section class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-        <p class="max-w-sm font-serif text-lg text-base-content/55">The writing stream lands here next.</p>
-        <p class="mt-2 max-w-sm font-sans text-sm text-base-content/40">
-          This pass built the room; the posts, quotes, search, and filters come in the next one.
-        </p>
+      {/* ─────────  THE FEED  ───────── */}
+      <section class="min-w-0">
+        <div id="blog-feed">
+          {
+            (activeSubject || q) && (
+              <p class="mb-8 font-serif text-base-content/55 italic">
+                {feed.total} {feed.total === 1 ? noun : nounPlural}
+                {activeSubject && (
+                  <>
+                    {' '}on <span class="text-base-content/80 not-italic">{activeSubject.name}</span>
+                  </>
+                )}
+                {q && (
+                  <>
+                    {' '}matching <span class="text-base-content/80 not-italic">“{q}”</span>
+                  </>
+                )}
+              </p>
+            )
+          }
+
+          {
+            feed.items.length === 0 ? (
+              <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+                <p class="max-w-sm font-serif text-lg text-base-content/55">Nothing here yet.</p>
+                <p class="mt-2 max-w-sm font-sans text-sm text-base-content/40">
+                  {activeSubject || q ? `No ${nounPlural} match this filter.` : `The ${nounPlural} will collect here.`}
+                </p>
+              </div>
+            ) : view === 'writing' ? (
+              <div id="feed-list" class="divide-y divide-base-300">
+                {writing!.items.map((item) => (
+                  <PostCard item={item} term={q} />
+                ))}
+              </div>
+            ) : (
+              <div id="feed-list" class="divide-y divide-base-300">
+                {quotes!.items.map((item) => (
+                  <QuoteCard item={item} term={q} />
+                ))}
+              </div>
+            )
+          }
+
+          {
+            nextUrl && (
+              <div id="feed-sentinel" data-next-url={nextUrl} class="feed-sentinel flex justify-center pt-10">
+                <a
+                  href={nextUrl}
+                  data-feed-more
+                  class="feed-more inline-flex items-center gap-1 font-sans text-sm text-base-content/55 transition-colors hover:text-base-content"
+                >
+                  Load older {nounPlural}
+                  <Icon name="ph:caret-down" class="size-3.5" />
+                </a>
+                <span class="feed-spin font-sans text-sm text-base-content/40">Loading…</span>
+              </div>
+            )
+          }
+        </div>
       </section>
     </div>
   </div>
+
+  {/* The in-context reader (writing view only). */}
+  {view === 'writing' && <Reader />}
 </SiteLayout>
+
+<script>
+  import '../../scripts/blog-feed';
+</script>

@@ -5,11 +5,13 @@ import '../styles/app.css';
 
 interface Props {
   title?: string;
+  /** Optional meta description (permalink pages set it for search/sharing). */
+  description?: string;
   /** Opt into animated view transitions (the public reader pages do). */
   transitions?: boolean;
 }
 
-const { title = 'It Only Happens Once', transitions = false } = Astro.props;
+const { title = 'It Only Happens Once', description, transitions = false } = Astro.props;
 ---
 
 <!doctype html>
@@ -28,6 +30,7 @@ const { title = 'It Only Happens Once', transitions = false } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
+    {description && <meta name="description" content={description} />}
     <title>{title}</title>
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />

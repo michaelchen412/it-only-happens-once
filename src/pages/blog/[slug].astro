@@ -1,0 +1,55 @@
+---
+/*
+  /blog/[slug] — the canonical page for a single essay (design.md §10).
+
+  The same PostArticle the in-context Reader shows, but on its own URL: shareable,
+  crawlable, and a no-JS fallback. The footer offers a way back into the Index,
+  filtered to the subjects the piece touches. (Constellations, once they exist,
+  will join this footer — the "this piece lives in" pattern.)
+*/
+import { Icon } from 'astro-icon/components';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import PostArticle from '../../components/PostArticle.astro';
+import { getWritingBySlug } from '../../lib/blog';
+import { toPlainText } from '../../lib/markdown';
+
+const { slug } = Astro.params;
+const item = slug ? await getWritingBySlug(Astro.locals.supabase, slug) : null;
+
+if (!item) {
+  Astro.response.status = 404;
+} else {
+  Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+}
+
+const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
+---
+
+<SiteLayout title={item ? item.title : 'Not found'} active="blog" description={description}>
+  {
+    !item ? (
+      <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
+        <p class="font-serif text-2xl text-base-content/70">This piece isn’t here.</p>
+        <p class="mt-2 font-sans text-sm text-base-content/45">
+          It may have been unpublished, or the link is off by a letter.
+        </p>
+        <a href="/blog" class="mt-6 inline-flex items-center gap-1 font-sans text-sm text-primary hover:underline">
+          <Icon name="ph:caret-left" class="size-3.5" /> Back to the blog
+        </a>
+      </div>
+    ) : (
+      <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
+        <a
+          href="/blog"
+          class="inline-flex items-center gap-1 font-sans text-sm text-base-content/45 transition-colors hover:text-base-content"
+        >
+          <Icon name="ph:caret-left" class="size-3.5" /> The blog
+        </a>
+
+        <div class="prose-measure mt-8">
+          <PostArticle item={item} />
+        </div>
+      </div>
+    )
+  }
+</SiteLayout>

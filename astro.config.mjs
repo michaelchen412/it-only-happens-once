@@ -17,7 +17,7 @@ export default defineConfig({
   integrations: [
     icon({
       include: {
-        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'arrow-up-right', 'funnel', 'trash', 'plus', 'sun', 'moon', 'list', 'stack', 'books', 'user-circle', 'image'],
+        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up-right', 'funnel', 'trash', 'plus', 'sun', 'moon', 'list', 'stack', 'books', 'user-circle', 'image'],
         'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel'],
       },
     }),
