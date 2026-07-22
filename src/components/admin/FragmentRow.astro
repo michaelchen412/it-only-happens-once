@@ -24,6 +24,9 @@ interface Props {
   searchTerm?: string;
 }
 const { fragment: r, subjects, authorName, workName, view = 'list', searchTerm = '' } = Astro.props;
+// The combo prefill needs ids (to select the existing entity), not just names.
+const authorId = r.author_id ?? '';
+const workId = r.work_id ?? '';
 const meta = TYPE_META[r.type as FragmentType];
 const trash = view === 'trash';
 const term = searchTerm.trim();
@@ -52,7 +55,9 @@ const editorData =
         year: new Date(r.occurred_at).getUTCFullYear(),
         occurredIso: r.occurred_at,
         datePrecision: r.date_precision,
+        authorId,
         authorName: authorName ?? '',
+        workId,
         workName: workName ?? '',
         subjects: subjects.join(', '),
         details: (r.details ?? {}) as Record<string, unknown>,

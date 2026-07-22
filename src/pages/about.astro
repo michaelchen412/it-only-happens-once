@@ -10,27 +10,31 @@
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
+import ContactForm from '../components/ContactForm.astro';
 import { renderMarkdown } from '../lib/markdown';
 import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
 
-type Interest = { term: string; gloss: string };
+type Interest = { term: string; note?: string };
 const c = (page?.content ?? {}) as {
   me?: { headline?: string; portrait?: string | null; portrait_caption?: string; body?: string; interests?: Interest[] };
   site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
-  contact?: { label?: string; href?: string };
+  contact?: { intro?: string };
 };
 const me = c.me ?? {};
 const site = c.site ?? {};
 const siteName = site.name ?? {};
 const contact = c.contact ?? {};
-const interests: Interest[] = (Array.isArray(me.interests) ? me.interests : []).filter((it) => it.term || it.gloss);
+const interests = (Array.isArray(me.interests) ? me.interests : [])
+  .filter((it) => it.term || it.note)
+  .map((it) => ({ ...it, noteHtml: renderMarkdown(it.note) }));
 
 const meBodyHtml = renderMarkdown(me.body);
 const siteBodyHtml = renderMarkdown(site.body);
 const blurbHtml = renderMarkdown(siteName.blurb);
+const contactIntroHtml = renderMarkdown(contact.intro);
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const cacheBust = page?.updated_at ? new Date(page.updated_at).getTime() : 0;
@@ -42,7 +46,6 @@ const embedHeight = embed && embed.kind === 'track' ? 152 : 352;
 
 const hasMe = !!(me.headline || meBodyHtml || portraitUrl || interests.length);
 const hasSite = !!(site.thesis || siteBodyHtml || blurbHtml || embedSrc);
-const hasContact = !!(contact.href && contact.label);
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 ---
@@ -85,16 +88,21 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
               </div>
 
               {interests.length > 0 && (
-                <div class="mt-12">
+                <div class="mt-14">
                   <Label as="h3">My Interests</Label>
-                  <dl class="mt-5 grid gap-x-10 gap-y-5 sm:grid-cols-2">
+                  <div class="mt-6 space-y-9">
                     {interests.map((it) => (
                       <div>
-                        <dt class="font-serif text-xl">{it.term}</dt>
-                        {it.gloss && <dd class="mt-0.5 ml-0 font-sans text-sm leading-relaxed text-base-content/55">{it.gloss}</dd>}
+                        <h4 class="font-serif text-2xl">{it.term}</h4>
+                        {it.noteHtml && (
+                          <div
+                            class="mt-1.5 max-w-xl space-y-2 font-sans text-sm leading-relaxed text-base-content/55 [&_ul]:list-disc [&_ul]:pl-5"
+                            set:html={it.noteHtml}
+                          />
+                        )}
                       </div>
                     ))}
-                  </dl>
+                  </div>
                 </div>
               )}
             </section>
@@ -140,11 +148,20 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
             </section>
           )}
 
-          {hasContact && (
-            <div class="mt-20 border-t border-base-300 pt-8">
-              <a href={contact.href} class="font-sans text-sm text-primary hover:underline">{contact.label} →</a>
-            </div>
-          )}
+          {/* ─────────  SAY HELLO  ───────── */}
+          <section aria-labelledby="mv-hello" class="mt-20 border-t border-base-300 pt-10">
+            <h2 id="mv-hello">
+              <Label as="span">Say hello</Label>
+            </h2>
+            {contactIntroHtml ? (
+              <div class="reading mt-6 max-w-lg" set:html={contactIntroHtml} />
+            ) : (
+              <p class="mt-6 max-w-lg font-serif text-lg leading-relaxed text-base-content/70">
+                Have a thought, a question, or a hello? I read everything.
+              </p>
+            )}
+            <ContactForm />
+          </section>
 
           {/* Authorship attestation — hardcoded so it is always present. */}
           <div class="mt-16 border-t border-base-300 pt-6">

@@ -10,8 +10,10 @@
 // JWT predates the admin-role grant — sign out and back in (see docs/auth.md).
 // ============================================================================
 import { defineAction, ActionError } from 'astro:actions';
+import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
 import { slugify } from '../lib/slug';
 import { lookupSpotifyTrack, parseSpotifyTrackId } from '../lib/spotify';
 import type { Database, Json } from '../lib/database.types';
@@ -24,12 +26,42 @@ const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
 const optText = z.preprocess(blankToUndef, z.string().optional());
 const optUrl = z.preprocess(blankToUndef, z.string().url('That doesn’t look like a URL').optional());
 const optInt = z.preprocess(blankToUndef, z.coerce.number().int().optional());
+const optUuid = z.preprocess(blankToUndef, z.string().uuid().optional());
 const status = z.enum(['draft', 'published']).default('draft');
 
 // --- shared internals --------------------------------------------------------
 
-const fail = (message: string, code: Parameters<typeof ActionError>[0]['code'] = 'INTERNAL_SERVER_ERROR') =>
+const fail = (message: string, code: ConstructorParameters<typeof ActionError>[0]['code'] = 'INTERNAL_SERVER_ERROR') =>
   new ActionError({ code, message });
+
+/**
+ * Guard an action to the authenticated admin. Most actions are protected
+ * implicitly by RLS (they run as the caller's session and is_admin() rejects
+ * non-admins). Actions that DON'T touch RLS-protected tables — the AI subject
+ * suggester and the Spotify lookup, which reach paid/third-party APIs — must
+ * gate here, or they're callable by anyone. `role` lives in app_metadata, which
+ * is server-controlled (a user can't grant it to themselves).
+ */
+function requireAdmin(ctx: { locals: App.Locals }): void {
+  if (ctx.locals.user?.app_metadata?.role !== 'admin') {
+    throw fail('Not authorized.', 'FORBIDDEN');
+  }
+}
+
+/** Verify a Cloudflare Turnstile token server-side. Returns false on any failure. */
+async function verifyTurnstile(secret: string, token: string, ip?: string): Promise<boolean> {
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret, response: token, remoteip: ip }),
+    });
+    const outcome = (await res.json()) as { success?: boolean };
+    return outcome.success === true;
+  } catch {
+    return false;
+  }
+}
 
 function firstWords(text: string, n = 7): string {
   return text.trim().split(/\s+/).slice(0, n).join(' ');
@@ -133,7 +165,7 @@ async function persist(
 
   const published_at = publishing ? existing?.published_at ?? now : existing?.published_at ?? null;
 
-  const payload: Record<string, unknown> = { ...row, published_at };
+  const payload: FragmentInsert = { ...row, published_at };
   if (row.occurred_at === undefined) {
     // No explicit date: snap to now only on a writing's first publish; else leave alone.
     if (publishing && !existing?.published_at) payload.occurred_at = now;
@@ -146,7 +178,7 @@ async function persist(
     if (error) throw fail(error.message);
     saved = data;
   } else {
-    const { data, error } = await sb.from('fragments').insert(payload as FragmentInsert).select('id, slug').single();
+    const { data, error } = await sb.from('fragments').insert(payload).select('id, slug').single();
     if (error) throw fail(error.message);
     saved = data;
   }
@@ -216,8 +248,12 @@ export const server = {
         page: optInt,
         citation: optText,
         source_url: optUrl,
-        author_name: optText, // provenance facet (grouping/search); display stays in attribution
-        work_name: optText, //   provenance facet; display stays in details.source_title
+        // provenance facets. The combo submits an id when an existing entity was
+        // chosen; the *_name is only used to create-by-name when the id is absent.
+        author_id: optUuid,
+        work_id: optUuid,
+        author_name: optText, // display stays in attribution
+        work_name: optText, //   display stays in details.source_title
         occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
         status,
         subjects: optText,
@@ -233,11 +269,22 @@ export const server = {
         if (input.work_year !== undefined) details.work_year = input.work_year;
         if (input.page !== undefined) details.page = input.page;
         if (input.citation) details.citation = input.citation;
-        const author_id = await resolveAuthor(sb, input.author_name);
-        const work_id = await resolveWork(sb, input.work_name, author_id);
+        // Prefer the chosen entity's id; fall back to creating one by name.
+        let author_id = input.author_id ?? (await resolveAuthor(sb, input.author_name));
+        const work_id = input.work_id ?? (await resolveWork(sb, input.work_name, author_id));
+        // Integrity: a work belongs to one author, so the work's canonical author is
+        // authoritative — this keeps fragment.author_id and work.author_id from ever
+        // disagreeing (e.g. "Letters from a Stoic" can't be filed under Ocean Vuong),
+        // even if the client sent a mismatched pair. Authorless works (The Bible)
+        // leave the chosen author untouched.
+        if (work_id) {
+          const { data: w } = await sb.from('works').select('author_id').eq('id', work_id).single();
+          if (w?.author_id) author_id = w.author_id;
+        }
         const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
           type: 'quote',
           title: null,
+          slug,
           body: input.body,
           attribution: input.attribution ?? null,
           source_url: input.source_url ?? null,
@@ -284,6 +331,7 @@ export const server = {
         const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
           type: 'song',
           title: input.title,
+          slug,
           body: null,
           attribution: input.attribution,
           source_url: input.spotify_url,
@@ -306,11 +354,12 @@ export const server = {
      */
     suggestSubjects: defineAction({
       input: z.object({
-        text: z.string().min(1),
+        text: z.string().min(1).max(20_000),
         kind: z.enum(['quote', 'song', 'writing']),
       }),
       handler: async ({ text, kind }, ctx) => {
-        const apiKey = import.meta.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+        requireAdmin(ctx);
+        const apiKey = getSecret('ANTHROPIC_API_KEY');
         if (!apiKey) throw fail('AI suggestions aren’t configured — add ANTHROPIC_API_KEY.', 'BAD_REQUEST');
         const { data: taxonomy, error } = await ctx.locals.supabase.from('subjects').select('name, definition').order('name');
         if (error) throw fail(error.message);
@@ -417,8 +466,9 @@ export const server = {
   songs: {
     /** Resolve a pasted Spotify link to { spotifyId, title, thumbnailUrl }. */
     lookup: defineAction({
-      input: z.object({ url: z.string().min(1) }),
-      handler: async (input) => {
+      input: z.object({ url: z.string().min(1).max(500) }),
+      handler: async (input, ctx) => {
+        requireAdmin(ctx);
         const found = await lookupSpotifyTrack(input.url);
         if (!found) throw fail('Couldn’t read that Spotify link', 'BAD_REQUEST');
         return found;
@@ -558,10 +608,16 @@ export const server = {
               portrait_caption: z.string().default(''),
               body: z.string().default(''),
               interests: z
-                .array(z.object({ term: z.string().default(''), gloss: z.string().default('') }))
+                .array(
+                  z.object({
+                    term: z.string().default(''),
+                    // A few sentences (Markdown) on why this is part of who I am.
+                    note: z.string().default(''),
+                  }),
+                )
                 .default([]),
             })
-            .default({}),
+            .prefault({}),
           site: z
             .object({
               thesis: z.string().default(''),
@@ -571,15 +627,15 @@ export const server = {
                   blurb: z.string().default(''),
                   spotify_url: z.string().default(''),
                 })
-                .default({}),
+                .prefault({}),
             })
-            .default({}),
+            .prefault({}),
           contact: z
             .object({
-              label: z.string().default(''),
-              href: z.string().default(''),
+              // Optional copy shown above the public contact form.
+              intro: z.string().default(''),
             })
-            .default({}),
+            .prefault({}),
         }),
       }),
       handler: async (input, ctx) => {
@@ -587,6 +643,61 @@ export const server = {
           .from('pages')
           .upsert({ slug: input.slug, content: input.content as unknown as Json }, { onConflict: 'slug' });
         if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+  },
+
+  // --- public contact form (unauthenticated: called from /about) --------------
+  // Not a DB write, so it needs no session/RLS. Spam is filtered by a honeypot
+  // field + a Cloudflare Turnstile token (verified below); delivery is Resend.
+  contact: {
+    send: defineAction({
+      input: z.object({
+        name: z.string().trim().min(1, 'Please add your name').max(120),
+        email: z.string().trim().email('Please use a valid email').max(200),
+        message: z.string().trim().min(1, 'Please write a message').max(5000),
+        // Honeypot: a hidden field real people never fill in.
+        company: z.string().optional(),
+        // Cloudflare Turnstile token from the widget.
+        token: z.string().optional(),
+      }),
+      handler: async (input, ctx) => {
+        // Bots that trip the honeypot get a silent "success" — never a signal.
+        if (input.company && input.company.trim()) return { ok: true };
+
+        const ip =
+          ctx.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+          ctx.request.headers.get('x-real-ip') ||
+          undefined;
+
+        // Secrets via getSecret (astro:env/server): reads the server env in prod
+        // AND .env files in dev — unlike import.meta.env, which since Astro v6
+        // no longer exposes non-PUBLIC vars. See docs/environment-variables.
+        // Turnstile: enforced when configured; skipped in local dev without a key.
+        const turnstileSecret = getSecret('TURNSTILE_SECRET_KEY');
+        if (turnstileSecret) {
+          if (!input.token) throw fail('Please complete the “I’m human” check.', 'BAD_REQUEST');
+          const ok = await verifyTurnstile(turnstileSecret, input.token, ip);
+          if (!ok) throw fail('That verification didn’t go through — please try again.', 'BAD_REQUEST');
+        }
+
+        const resendKey = getSecret('RESEND_API_KEY');
+        const to = getSecret('CONTACT_TO_EMAIL');
+        if (!resendKey || !to) {
+          throw fail('The contact form isn’t configured yet. Please try again later.', 'INTERNAL_SERVER_ERROR');
+        }
+        const from = getSecret('CONTACT_FROM_EMAIL') || 'It Only Happens Once <onboarding@resend.dev>';
+
+        const resend = new Resend(resendKey);
+        const { error } = await resend.emails.send({
+          from,
+          to,
+          replyTo: input.email,
+          subject: `New message from ${input.name}`,
+          text: `From: ${input.name} <${input.email}>${ip ? `\nIP: ${ip}` : ''}\n\n${input.message}`,
+        });
+        if (error) throw fail('Sorry — the message didn’t send. Please try again.', 'INTERNAL_SERVER_ERROR');
         return { ok: true };
       },
     }),

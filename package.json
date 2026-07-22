@@ -26,10 +26,18 @@
     "astro-icon": "^1.1.5",
     "daisyui": "^5.6.18",
     "marked": "^18.0.7",
+    "resend": "^6.18.0",
+    "sanitize-html": "^2.17.6",
     "tailwindcss": "^4.3.3",
     "tiptap-markdown": "^0.9.0"
   },
   "devDependencies": {
-    "turndown": "^7.2.4"
+    "@astrojs/check": "^0.9.9",
+    "@types/sanitize-html": "^2.16.1",
+    "turndown": "^7.2.4",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "path-to-regexp": "6.3.0"
   }
 }

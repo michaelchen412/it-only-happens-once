@@ -1,0 +1,361 @@
+---
+/*
+  EntityCombo — a searchable single-select combobox with an explicit "create"
+  affordance, for provenance facets (Author, Work). Unlike a native <datalist>,
+  it CONSTRAINS: you either pick an existing entity (commits its id) or you
+  explicitly choose "＋ Add «text»" to create one on save (id blank, name carries
+  the text). It submits two hidden fields — `<idName>` (the entity id, blank when
+  creating) and `<name>` (the display text) — so the save action prefers the id
+  and only creates-by-name when the id is absent.
+
+  Options are `{ id, name, authorId? }`. The component doesn't couple Author→Work
+  itself; the parent scopes the Work list with setOptions() and reads a pick's
+  authorId from the `combo:change` event to keep the two fields coherent (see
+  FragmentSheet). `combo:change` fires only on USER edits — the programmatic
+  setters (setValue/clear/setOptions) stay silent, so parent wiring can't loop.
+
+  Public API: setValue(id, name), clear(), getId(), getName(), getOption(),
+  setOptions(list). Modelled on TagInput's custom-element pattern.
+*/
+interface Option {
+  id: string;
+  name: string;
+  authorId?: string | null;
+}
+interface Props {
+  name: string;
+  idName: string;
+  noun: string;
+  label?: string;
+  options?: Option[];
+  placeholder?: string;
+  id?: string;
+  class?: string;
+}
+const { name, idName, noun, label, options = [], placeholder = '', id, class: className = '' } = Astro.props;
+---
+
+<entity-combo
+  id={id}
+  class:list={['entity-combo', className]}
+  data-name={name}
+  data-id-name={idName}
+  data-noun={noun}
+  data-label={label ?? noun}
+  data-placeholder={placeholder}
+  data-options={JSON.stringify(options)}
+></entity-combo>
+
+<script>
+  if (!customElements.get('entity-combo')) {
+    let uid = 0;
+    interface Opt {
+      id: string;
+      name: string;
+      authorId?: string | null;
+    }
+    type Row = { create?: boolean; opt?: Opt; name: string };
+
+    class EntityCombo extends HTMLElement {
+      options: Opt[] = [];
+      selected: Opt | null = null;
+      rows: Row[] = [];
+      activeIndex = -1;
+      open = false;
+      noun = 'item';
+      baseId = '';
+      field!: HTMLInputElement;
+      idInput!: HTMLInputElement;
+      nameInput!: HTMLInputElement;
+      menu!: HTMLUListElement;
+      clearBtn!: HTMLButtonElement;
+
+      connectedCallback() {
+        const name = this.dataset.name || 'entity';
+        const idName = this.dataset.idName || 'entity_id';
+        this.noun = this.dataset.noun || 'item';
+        this.options = JSON.parse(this.dataset.options || '[]');
+        this.baseId = `combo-${++uid}`;
+        this.innerHTML = '';
+
+        this.field = document.createElement('input');
+        this.field.type = 'text';
+        this.field.className = 'entity-combo__field input input-sm input-bordered w-full';
+        this.field.placeholder = this.dataset.placeholder || '';
+        this.field.autocomplete = 'off';
+        this.field.setAttribute('role', 'combobox');
+        this.field.setAttribute('aria-autocomplete', 'list');
+        this.field.setAttribute('aria-expanded', 'false');
+        this.field.setAttribute('aria-controls', `${this.baseId}-menu`);
+        this.field.setAttribute('aria-label', this.dataset.label || this.noun);
+
+        this.clearBtn = document.createElement('button');
+        this.clearBtn.type = 'button';
+        this.clearBtn.className = 'entity-combo__clear';
+        this.clearBtn.textContent = '✕';
+        this.clearBtn.tabIndex = -1;
+        this.clearBtn.hidden = true;
+        this.clearBtn.setAttribute('aria-label', `Clear ${this.noun}`);
+
+        this.menu = document.createElement('ul');
+        this.menu.className = 'entity-combo__menu';
+        this.menu.id = `${this.baseId}-menu`;
+        this.menu.setAttribute('role', 'listbox');
+        this.menu.hidden = true;
+
+        this.idInput = document.createElement('input');
+        this.idInput.type = 'hidden';
+        this.idInput.name = idName;
+        this.nameInput = document.createElement('input');
+        this.nameInput.type = 'hidden';
+        this.nameInput.name = name;
+
+        this.append(this.field, this.clearBtn, this.menu, this.idInput, this.nameInput);
+
+        this.field.addEventListener('input', () => this.onInput());
+        this.field.addEventListener('focus', () => this.openMenu());
+        this.field.addEventListener('keydown', (e) => this.onKeydown(e));
+        this.field.addEventListener('blur', () => this.onBlur());
+        this.clearBtn.addEventListener('click', () => {
+          this.clear();
+          this.emit();
+          this.field.focus();
+        });
+        // Keep focus on the field when a row is clicked, so blur doesn't fire first.
+        this.menu.addEventListener('mousedown', (e) => e.preventDefault());
+      }
+
+      // --- menu rendering ---
+      private filterOptions(text: string): Opt[] {
+        const q = text.trim().toLowerCase();
+        const list = q ? this.options.filter((o) => o.name.toLowerCase().includes(q)) : this.options;
+        return list.slice(0, 50);
+      }
+      private renderMenu() {
+        const text = this.field.value;
+        const q = text.trim();
+        const exact = !!q && this.options.some((o) => o.name.toLowerCase() === q.toLowerCase());
+        this.rows = this.filterOptions(text).map((o) => ({ opt: o, name: o.name }));
+        if (q && !exact) this.rows.push({ create: true, name: q });
+
+        this.menu.innerHTML = '';
+        if (!this.rows.length) {
+          this.menu.hidden = true;
+          this.field.setAttribute('aria-expanded', 'false');
+          this.field.removeAttribute('aria-activedescendant');
+          return;
+        }
+        this.activeIndex = Math.max(0, Math.min(this.activeIndex, this.rows.length - 1));
+        this.rows.forEach((row, i) => {
+          const li = document.createElement('li');
+          li.id = `${this.baseId}-opt-${i}`;
+          li.className = 'entity-combo__opt';
+          li.setAttribute('role', 'option');
+          li.setAttribute('aria-selected', String(i === this.activeIndex));
+          if (i === this.activeIndex) li.classList.add('is-active');
+          if (row.create) {
+            li.classList.add('entity-combo__opt--create');
+            const plus = document.createElement('span');
+            plus.className = 'entity-combo__plus';
+            plus.textContent = '＋';
+            const b = document.createElement('b');
+            b.textContent = row.name;
+            li.append(plus, document.createTextNode(` Add ${this.noun} “`), b, document.createTextNode('”'));
+          } else {
+            li.textContent = row.name;
+          }
+          li.addEventListener('click', () => this.pick(i));
+          this.menu.appendChild(li);
+        });
+        this.menu.hidden = false;
+        this.field.setAttribute('aria-expanded', 'true');
+        this.field.setAttribute('aria-activedescendant', `${this.baseId}-opt-${this.activeIndex}`);
+      }
+      private openMenu() {
+        this.open = true;
+        this.activeIndex = 0;
+        this.renderMenu();
+      }
+      private closeMenu() {
+        this.open = false;
+        this.menu.hidden = true;
+        this.field.setAttribute('aria-expanded', 'false');
+        this.field.removeAttribute('aria-activedescendant');
+      }
+
+      // --- user interaction ---
+      private onInput() {
+        // Typing breaks any existing id link; the tentative value is a create-by-name.
+        this.idInput.value = '';
+        this.nameInput.value = this.field.value.trim();
+        this.selected = null;
+        this.updateClear();
+        this.activeIndex = 0;
+        this.openMenu();
+      }
+      private onKeydown(e: KeyboardEvent) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!this.open) this.openMenu();
+          else {
+            this.activeIndex = Math.min(this.activeIndex + 1, this.rows.length - 1);
+            this.renderMenu();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          this.activeIndex = Math.max(this.activeIndex - 1, 0);
+          this.renderMenu();
+        } else if (e.key === 'Enter') {
+          e.preventDefault(); // never let it submit the form implicitly
+          if (this.open && this.activeIndex >= 0 && this.rows.length) this.pick(this.activeIndex);
+          else this.commitFromText();
+          this.closeMenu();
+        } else if (e.key === 'Escape') {
+          if (this.open) {
+            e.preventDefault();
+            this.closeMenu();
+          }
+        }
+      }
+      private onBlur() {
+        this.commitFromText();
+        this.closeMenu();
+      }
+      private pick(i: number) {
+        const row = this.rows[i];
+        if (!row) return;
+        if (row.create) this.commit('', row.name, null);
+        else this.commit(row.opt!.id, row.opt!.name, row.opt!);
+        this.closeMenu();
+        this.emit();
+      }
+      private commitFromText() {
+        const text = this.field.value.trim();
+        const before = `${this.idInput.value} ${this.nameInput.value}`;
+        if (!text) {
+          this.commit('', '', null);
+        } else {
+          const match = this.options.find((o) => o.name.toLowerCase() === text.toLowerCase());
+          if (match) this.commit(match.id, match.name, match);
+          else this.commit('', text, null);
+        }
+        if (`${this.idInput.value} ${this.nameInput.value}` !== before) this.emit();
+      }
+      private commit(id: string, name: string, opt: Opt | null) {
+        this.idInput.value = id;
+        this.nameInput.value = name;
+        this.field.value = name;
+        this.selected = opt;
+        this.updateClear();
+      }
+      private updateClear() {
+        this.clearBtn.hidden = !this.field.value;
+      }
+
+      // --- public API (programmatic; never emits `combo:change`) ---
+      setValue(id?: string | null, name?: string | null) {
+        const n = (name ?? '').trim();
+        if (id) {
+          const opt = this.options.find((o) => o.id === id) ?? { id, name: n };
+          this.commit(id, opt.name || n, opt);
+        } else if (n) {
+          const match = this.options.find((o) => o.name.toLowerCase() === n.toLowerCase());
+          if (match) this.commit(match.id, match.name, match);
+          else this.commit('', n, null);
+        } else {
+          this.commit('', '', null);
+        }
+      }
+      clear() {
+        this.commit('', '', null);
+      }
+      getId() {
+        return this.idInput.value;
+      }
+      getName() {
+        return this.nameInput.value;
+      }
+      getOption(): Opt | null {
+        return this.selected;
+      }
+      setOptions(list: Opt[]) {
+        this.options = Array.isArray(list) ? list : [];
+        if (this.open) this.renderMenu();
+      }
+
+      private emit() {
+        this.dispatchEvent(
+          new CustomEvent('combo:change', {
+            detail: { id: this.getId(), name: this.getName(), option: this.selected },
+            bubbles: true,
+          }),
+        );
+      }
+    }
+    customElements.define('entity-combo', EntityCombo);
+  }
+</script>
+
+<style is:global>
+  .entity-combo {
+    display: block;
+    position: relative;
+  }
+  .entity-combo__field {
+    padding-right: 1.75rem;
+  }
+  .entity-combo__clear {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 1.75rem;
+    font-size: 0.7rem;
+    color: var(--color-base-content);
+    opacity: 0.4;
+  }
+  .entity-combo__clear:hover {
+    opacity: 1;
+    color: var(--color-error);
+  }
+  .entity-combo__menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    max-height: 14rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    box-shadow: 0 8px 24px -8px color-mix(in oklab, var(--color-base-content) 25%, transparent);
+  }
+  .entity-combo__opt {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    color: var(--color-base-content);
+    border-radius: var(--radius-field);
+    cursor: pointer;
+  }
+  .entity-combo__opt.is-active,
+  .entity-combo__opt:hover {
+    background: var(--color-base-200);
+  }
+  .entity-combo__opt--create {
+    color: color-mix(in oklab, var(--color-primary) 85%, var(--color-base-content));
+  }
+  .entity-combo__opt--create b {
+    font-weight: 600;
+  }
+  .entity-combo__plus {
+    margin-right: 0.15rem;
+  }
+</style>

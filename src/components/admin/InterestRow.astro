@@ -1,27 +1,49 @@
 ---
 /*
-  InterestRow — one editable {term, gloss} row in the About builder's interests
-  repeater. Rendered both in the server-side list AND inside the clone <template>
-  (with empty values), so the two can never drift. The up/down/remove controls
-  are wired by event delegation in about-builder.ts.
+  InterestRow — one editable interest in the About builder's repeater.
+
+  A card, not a plain row: the header holds the {term}; below it a slim TipTap
+  editor for `note` — a few sentences on why this is part of who I am (rendered on
+  /about). Open by default; collapsible. Used both in the server-side list AND the
+  clone <template> (with empty values), so the two can never drift. The editor is
+  mounted client-side per row in about-builder.ts (the note's initial Markdown
+  rides along in the hidden `.interest-note-src` textarea). The toggle / up / down
+  / remove controls are wired by event delegation there too.
 */
 interface Props {
   term?: string;
-  gloss?: string;
+  note?: string;
 }
-const { term = '', gloss = '' } = Astro.props;
+const { term = '', note = '' } = Astro.props;
 const field =
   'rounded-field border border-base-300 bg-base-100 px-3 py-2 font-sans text-sm outline-none focus:border-primary/60';
+const ctrl = 'rounded-field px-1.5 hover:bg-base-200 hover:text-base-content';
+// Interests open by default — the description is the point, not an afterthought.
+const expanded = true;
 ---
 
-<div class="interest-row flex items-start gap-2">
-  <div class="grid flex-1 gap-2 sm:grid-cols-[10rem_1fr]">
-    <input class:list={['interest-term', field]} placeholder="Jazz" value={term} />
-    <input class:list={['interest-gloss', field]} placeholder="A short gloss" value={gloss} />
+<div class="interest-row rounded-box border border-base-300 bg-base-100">
+  <div class="flex items-start gap-2 p-3">
+    <input class:list={['interest-term flex-1', field]} placeholder="Jazz" value={term} />
+    <div class="flex shrink-0 items-center gap-1 pt-1 font-sans text-base-content/45">
+      <button type="button" class:list={['interest-toggle', ctrl]} aria-label="Why it matters" aria-expanded={expanded ? 'true' : 'false'}>
+        <span class:list={['interest-caret inline-block transition-transform', expanded && 'rotate-180']}>▾</span>
+      </button>
+      <button type="button" class:list={['interest-up', ctrl]} aria-label="Move up">↑</button>
+      <button type="button" class:list={['interest-down', ctrl]} aria-label="Move down">↓</button>
+      <button type="button" class:list={['interest-remove', 'rounded-field px-1.5 hover:bg-base-200 hover:text-error']} aria-label="Remove">✕</button>
+    </div>
   </div>
-  <div class="flex shrink-0 items-center gap-1 pt-1 font-sans text-base-content/45">
-    <button type="button" class="interest-up rounded-field px-1.5 hover:bg-base-200 hover:text-base-content" aria-label="Move up">↑</button>
-    <button type="button" class="interest-down rounded-field px-1.5 hover:bg-base-200 hover:text-base-content" aria-label="Move down">↓</button>
-    <button type="button" class="interest-remove rounded-field px-1.5 hover:bg-base-200 hover:text-error" aria-label="Remove">✕</button>
+
+  {/* “Why it’s part of who I am” — a slim, link-free rich editor. */}
+  <div class="interest-note-wrap border-t border-base-300" hidden={!expanded}>
+    <div class="interest-toolbar flex flex-wrap items-center gap-1 border-b border-base-300 px-3 py-1.5" role="toolbar" aria-label="Formatting">
+      <button type="button" data-cmd="bold" title="Bold" aria-label="Bold" aria-pressed="false" class="tt-btn font-bold">B</button>
+      <button type="button" data-cmd="italic" title="Italic" aria-label="Italic" aria-pressed="false" class="tt-btn italic">I</button>
+      <span class="mx-1 h-5 w-px bg-base-300"></span>
+      <button type="button" data-cmd="bulletList" title="Bulleted list" aria-label="Bulleted list" aria-pressed="false" class="tt-btn">•</button>
+    </div>
+    <div class="interest-note-editor reading px-4 py-3"></div>
+    <textarea class="interest-note-src" hidden>{note}</textarea>
   </div>
 </div>

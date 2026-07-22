@@ -1,0 +1,123 @@
+---
+/*
+  ContactForm — the public "Say hello" form on /about. Posts to the `contact.send`
+  action (email via Resend), guarded by a honeypot + Cloudflare Turnstile. The
+  Turnstile widget renders only when PUBLIC_TURNSTILE_SITE_KEY is set; without it
+  (e.g. local dev before setup) the form still submits and the server skips the
+  human check. The widget is (re)rendered on `astro:page-load` so it survives the
+  site's view transitions.
+*/
+const sitekey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
+const field =
+  'w-full rounded-field border border-base-300 bg-base-100 px-3 py-2 font-sans text-sm outline-none transition-colors focus:border-primary/60';
+const labelCls = 'font-sans text-xs tracking-wide text-base-content/55';
+---
+
+<form id="contact-form" class="mt-6 max-w-lg space-y-4" novalidate>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="space-y-1">
+      <label for="cf-name" class={labelCls}>Name</label>
+      <input id="cf-name" name="name" type="text" autocomplete="name" maxlength="120" required class={field} />
+    </div>
+    <div class="space-y-1">
+      <label for="cf-email" class={labelCls}>Email</label>
+      <input id="cf-email" name="email" type="email" autocomplete="email" maxlength="200" required class={field} />
+    </div>
+  </div>
+  <div class="space-y-1">
+    <label for="cf-message" class={labelCls}>Message</label>
+    <textarea id="cf-message" name="message" rows="5" maxlength="5000" required class={field}></textarea>
+  </div>
+
+  {/* Honeypot — visually hidden (not display:none), off the a11y tree. Bots fill it; people don't. */}
+  <div aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;">
+    <label>Company<input name="company" type="text" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  {sitekey && <div id="contact-turnstile" data-sitekey={sitekey} class="min-h-[65px]"></div>}
+
+  <div class="flex flex-wrap items-center gap-4">
+    <button type="submit" class="btn btn-primary btn-sm normal-case">Send message</button>
+    <p id="contact-status" role="status" aria-live="polite" class="font-sans text-sm"></p>
+  </div>
+</form>
+
+<script>
+  import { actions } from 'astro:actions';
+  import { formatActionError } from '../scripts/action-error';
+
+  interface TurnstileApi {
+    render(el: HTMLElement, opts: Record<string, unknown>): string;
+    getResponse(id?: string): string | undefined;
+    reset(id?: string): void;
+  }
+  const ts = () => (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+
+  function loadTurnstile(): Promise<TurnstileApi | undefined> {
+    return new Promise((resolve) => {
+      if (ts()) return resolve(ts());
+      const src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      let el = document.querySelector<HTMLScriptElement>('script[data-turnstile]');
+      if (!el) {
+        el = document.createElement('script');
+        el.src = src;
+        el.async = true;
+        el.defer = true;
+        el.dataset.turnstile = '';
+        document.head.appendChild(el);
+      }
+      el.addEventListener('load', () => resolve(ts()), { once: true });
+    });
+  }
+
+  async function initContactForm() {
+    const form = document.getElementById('contact-form') as HTMLFormElement | null;
+    if (!form || form.dataset.ready) return;
+    form.dataset.ready = '1';
+
+    const statusEl = document.getElementById('contact-status')!;
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    const turnstileEl = document.getElementById('contact-turnstile');
+    const sitekey = turnstileEl?.dataset.sitekey;
+    let widgetId: string | undefined;
+
+    const setStatus = (msg: string, tone: 'muted' | 'ok' | 'error') => {
+      statusEl.textContent = msg;
+      statusEl.className =
+        'font-sans text-sm ' +
+        (tone === 'ok' ? 'text-primary' : tone === 'error' ? 'text-error' : 'text-base-content/55');
+    };
+
+    if (sitekey && turnstileEl) {
+      const api = await loadTurnstile();
+      if (api) widgetId = api.render(turnstileEl, { sitekey, theme: 'auto' });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      submitBtn.disabled = true;
+      setStatus('Sending…', 'muted');
+
+      const { error } = await actions.contact.send({
+        name: String(data.get('name') || ''),
+        email: String(data.get('email') || ''),
+        message: String(data.get('message') || ''),
+        company: String(data.get('company') || ''), // honeypot
+        token: widgetId !== undefined ? ts()?.getResponse(widgetId) : undefined,
+      });
+
+      submitBtn.disabled = false;
+      if (widgetId !== undefined) ts()?.reset(widgetId);
+
+      if (error) {
+        setStatus(formatActionError(error), 'error');
+        return;
+      }
+      form.reset();
+      setStatus('Thank you — your message is on its way. I’ll be in touch.', 'ok');
+    });
+  }
+
+  document.addEventListener('astro:page-load', initContactForm);
+</script>

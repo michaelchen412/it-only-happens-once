@@ -7,7 +7,7 @@
 // browser session (RLS enforces is_admin()). No autosave — About is always live.
 import { createBrowserClient } from '@supabase/ssr';
 import { actions } from 'astro:actions';
-import { mountRichEditor } from './rich-editor';
+import { mountRichEditor, type RichEditorHandle } from './rich-editor';
 import { formatActionError, nowTime } from './action-error';
 
 const init = JSON.parse(document.getElementById('about-init')!.textContent || '{}');
@@ -107,9 +107,37 @@ portraitRemove.addEventListener('click', () => {
 const list = $('interests-list');
 const template = $('interest-template') as HTMLTemplateElement;
 
+// Each row owns a slim, link-free rich editor for its note. Keyed by the row so
+// we can harvest it at save time and tear it down on remove. The note's initial
+// Markdown rides in the row's hidden `.interest-note-src` textarea.
+const interestEditors = new WeakMap<Element, RichEditorHandle>();
+
+function mountInterestRow(row: Element) {
+  if (interestEditors.has(row)) return;
+  const editorEl = row.querySelector<HTMLElement>('.interest-note-editor');
+  const toolbar = row.querySelector<HTMLElement>('.interest-toolbar');
+  const src = row.querySelector<HTMLTextAreaElement>('.interest-note-src');
+  if (!editorEl || !toolbar) return;
+  interestEditors.set(
+    row,
+    mountRichEditor({
+      editorEl,
+      toolbarRoot: toolbar,
+      placeholder: 'Why this is part of who I am…',
+      content: src?.value ?? '',
+      ariaLabel: 'Why this matters',
+      onChange: markDirty,
+    }),
+  );
+}
+
+// Mount the server-rendered rows up front (so their notes save even if never expanded).
+list.querySelectorAll('.interest-row').forEach(mountInterestRow);
+
 $('interest-add').addEventListener('click', () => {
   const row = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
   list.appendChild(row);
+  mountInterestRow(row);
   row.querySelector<HTMLInputElement>('.interest-term')?.focus();
   markDirty();
 });
@@ -119,8 +147,18 @@ list.addEventListener('click', (e) => {
   const row = btn.closest('.interest-row');
   if (!row) return;
   if (btn.classList.contains('interest-remove')) {
+    interestEditors.get(row)?.editor.destroy();
+    interestEditors.delete(row);
     row.remove();
     markDirty();
+  } else if (btn.classList.contains('interest-toggle')) {
+    const wrap = row.querySelector<HTMLElement>('.interest-note-wrap');
+    if (!wrap) return;
+    const opening = wrap.hasAttribute('hidden');
+    wrap.toggleAttribute('hidden', !opening);
+    btn.setAttribute('aria-expanded', String(opening));
+    row.querySelector('.interest-caret')?.classList.toggle('rotate-180', opening);
+    if (opening) interestEditors.get(row)?.editor.commands.focus();
   } else if (btn.classList.contains('interest-up') && row.previousElementSibling) {
     row.parentElement!.insertBefore(row, row.previousElementSibling);
     markDirty();
@@ -134,9 +172,9 @@ function readInterests() {
   return Array.from(list.querySelectorAll('.interest-row'))
     .map((row) => ({
       term: (row.querySelector('.interest-term') as HTMLInputElement)?.value.trim() ?? '',
-      gloss: (row.querySelector('.interest-gloss') as HTMLInputElement)?.value.trim() ?? '',
+      note: interestEditors.get(row)?.getMarkdown().trim() ?? '',
     }))
-    .filter((it) => it.term || it.gloss);
+    .filter((it) => it.term || it.note);
 }
 
 // ---- save ----
@@ -173,8 +211,7 @@ saveBtn.addEventListener('click', async () => {
       },
     },
     contact: {
-      label: val('f-contact-label'),
-      href: val('f-contact-href'),
+      intro: val('f-contact-intro'),
     },
   };
 

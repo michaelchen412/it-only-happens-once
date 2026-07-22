@@ -14,18 +14,21 @@
 */
 import { actions } from 'astro:actions';
 import TagInput from '../TagInput.astro';
+import EntityCombo from './EntityCombo.astro';
 
 interface Props {
   subjects: string[];
-  authors?: string[];
-  works?: string[];
+  authors?: { id: string; name: string }[];
+  works?: { id: string; title: string; authorId: string | null }[];
 }
 const { subjects, authors = [], works = [] } = Astro.props;
+const authorOptions = authors.map((a) => ({ id: a.id, name: a.name }));
+const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
 const thisYear = new Date().getUTCFullYear();
 ---
 
 <dialog id="sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="sheet-title">
-  <div class="flex h-full flex-col overflow-y-auto">
+  <div class="flex h-full flex-col overflow-y-auto overscroll-contain">
     <header class="flex items-center justify-between border-b border-base-300 px-6 py-4">
       <h2 id="sheet-title" class="font-display text-xl">New quote</h2>
       <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
@@ -54,27 +57,30 @@ const thisYear = new Date().getUTCFullYear();
         <input name="attribution" required class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
       </label>
 
-      {/* — optional source metadata — */}
+      {/* — provenance facets: Author → Work (structured; a work belongs to its author) — */}
+      <div class="flex flex-col gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Author <span class="text-base-content/40">— group / search by</span></span>
+          <EntityCombo id="quote-author" name="author_name" idName="author_id" noun="author" label="Author" placeholder="Marcus Aurelius" options={authorOptions} />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Work <span class="text-base-content/40">— scoped to the author</span></span>
+          <EntityCombo id="quote-work" name="work_name" idName="work_id" noun="work" label="Work" placeholder="Meditations · The Bible" options={workOptions} />
+        </label>
+      </div>
+
+      {/* — optional display + citation details — */}
       <details class="rounded-field border border-base-300/70 px-3 py-2">
         <summary class="cursor-pointer text-xs font-medium tracking-wide text-base-content/55 uppercase">
           Source &amp; citation <span class="font-normal text-base-content/40 normal-case">— optional</span>
         </summary>
         <div class="mt-3 grid grid-cols-2 gap-3">
           <p class="col-span-2 text-xs text-base-content/45">
-            <span class="text-base-content/60">Author</span> &amp; <span class="text-base-content/60">Work</span> power search &amp; grouping (e.g. every Bible verse).
-            <span class="text-base-content/60">Attribution</span> &amp; <span class="text-base-content/60">Source title</span> are what’s shown.
+            <span class="text-base-content/60">Attribution</span> &amp; <span class="text-base-content/60">Source title</span> are what’s shown — they default to the Author &amp; Work above, but you can override them (e.g. show “Matthew 5:43–48” while grouping under “The Bible”).
           </p>
-          <label class="col-span-2 flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Author <span class="text-base-content/40">— group / search by</span></span>
-            <input name="author_name" list="authors-list" autocomplete="off" class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
-          </label>
           <label class="col-span-2 flex flex-col gap-1 text-sm">
             <span class="text-base-content/70">Source title <span class="text-base-content/40">— shown after the attribution</span></span>
             <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
-          </label>
-          <label class="col-span-2 flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Work <span class="text-base-content/40">— group / search by</span></span>
-            <input name="work_name" list="works-list" autocomplete="off" class="input input-sm input-bordered" placeholder="Meditations · The Bible" />
           </label>
           <label class="flex flex-col gap-1 text-sm">
             <span class="text-base-content/70">Work year</span>
@@ -94,9 +100,6 @@ const thisYear = new Date().getUTCFullYear();
           </label>
         </div>
       </details>
-
-      <datalist id="authors-list">{authors.map((a) => <option value={a} />)}</datalist>
-      <datalist id="works-list">{works.map((w) => <option value={w} />)}</datalist>
 
       <div class="flex flex-col gap-1 text-sm">
         <div class="flex items-center justify-between">
@@ -243,18 +246,76 @@ const thisYear = new Date().getUTCFullYear();
   quoteEditor.on('update', refreshQuoteValid);
   quoteAttr.addEventListener('input', refreshQuoteValid);
 
-  // --- provenance facets: Author/Work auto-follow the display fields (override for scripture) ---
-  const quoteAuthorName = quoteForm.elements.namedItem('author_name') as HTMLInputElement;
-  const quoteWorkName = quoteForm.elements.namedItem('work_name') as HTMLInputElement;
+  // --- provenance facets: structured Author → Work combos (integrity by construction) ---
+  type Combo = HTMLElement & {
+    getId(): string;
+    getName(): string;
+    getOption(): { id: string; name: string; authorId?: string | null } | null;
+    setValue(id?: string | null, name?: string | null): void;
+    clear(): void;
+    setOptions(list: { id: string; name: string; authorId?: string | null }[]): void;
+  };
+  const authorCombo = document.getElementById('quote-author') as Combo;
+  const workCombo = document.getElementById('quote-work') as Combo;
   const quoteSourceTitle = quoteForm.elements.namedItem('source_title') as HTMLInputElement;
+  const scriptureRe = /\d+\s*:\s*\d+/; // "Matthew 5:43-48" — a citation, not an author name
+
+  // The full lists (rendered into the combos) — used to re-scope the Work list.
+  const allAuthors: { id: string; name: string }[] = JSON.parse(authorCombo.dataset.options || '[]');
+  const allWorks: { id: string; name: string; authorId: string | null }[] = JSON.parse(workCombo.dataset.options || '[]');
+  const authorNameById = new Map(allAuthors.map((a) => [a.id, a.name]));
+
+  // The Work list only ever offers the chosen author's works (or all of them,
+  // when no author is set yet) — you can't pair an author with someone else's book.
+  function scopedWorks() {
+    const aid = authorCombo.getId();
+    const aname = authorCombo.getName().trim();
+    if (aid) return allWorks.filter((w) => w.authorId === aid);
+    if (aname) return []; // a not-yet-created author owns no existing works
+    return allWorks;
+  }
+  function recomputeWorkScope() {
+    const subset = scopedWorks();
+    workCombo.setOptions(subset);
+    const wid = workCombo.getId();
+    if (wid && !subset.some((w) => w.id === wid)) workCombo.clear(); // drop a now-orphaned work
+  }
+  // Author fills the shown attribution when it's still blank (no double-entry).
+  function fillAttrFromAuthor() {
+    const n = authorCombo.getName().trim();
+    if (n && !quoteAttr.value.trim()) {
+      quoteAttr.value = n;
+      refreshQuoteValid();
+    }
+  }
+
+  authorCombo.addEventListener('combo:change', () => {
+    fillAttrFromAuthor();
+    recomputeWorkScope();
+  });
+  workCombo.addEventListener('combo:change', () => {
+    const opt = workCombo.getOption();
+    // Picking an existing work asserts its author — snap Author to match (work wins).
+    if (opt && opt.authorId) {
+      authorCombo.setValue(opt.authorId, authorNameById.get(opt.authorId) ?? '');
+      recomputeWorkScope();
+      fillAttrFromAuthor();
+    }
+    const wname = workCombo.getName().trim();
+    if (wname && !quoteSourceTitle.value.trim()) quoteSourceTitle.value = wname;
+  });
+
+  // Typing a plain attribution seeds the Author facet (unless it's scripture).
   quoteAttr.addEventListener('change', () => {
     const v = quoteAttr.value.trim();
-    // don't mirror scripture ("Matthew 5:43-48") into a bogus author
-    if (v && !quoteAuthorName.value.trim() && !/\d+\s*:\s*\d+/.test(v)) quoteAuthorName.value = v;
+    if (v && !authorCombo.getName().trim() && !scriptureRe.test(v)) {
+      authorCombo.setValue('', v);
+      recomputeWorkScope();
+    }
   });
   quoteSourceTitle.addEventListener('change', () => {
     const v = quoteSourceTitle.value.trim();
-    if (v && !quoteWorkName.value.trim()) quoteWorkName.value = v;
+    if (v && !workCombo.getName().trim()) workCombo.setValue('', v);
   });
 
   // --- AI subject suggestions (Haiku) — pre-fill tags; new subject needs accept ---
@@ -323,16 +384,49 @@ const thisYear = new Date().getUTCFullYear();
     sheetError.textContent = '';
   };
 
+  // --- unsaved-work guard: an accidental dismiss must never delete edits ---
+  let dirty = false;
+  const markDirty = () => (dirty = true);
+  sheet.addEventListener('input', markDirty); // typing in any field, incl. the editor
+  sheet.addEventListener('change', markDirty); // toggles, selects, the date field
+  quoteEditor.on('update', markDirty);
+
   function openSheet(type: 'quote' | 'song') {
     clearError();
     quoteForm.hidden = type !== 'quote';
     songForm.hidden = type !== 'song';
     sheet.showModal(); // native: focus-trap + Escape + focus restore on close
+    dirty = false; // the fields we just populated don't count as user edits
   }
-  document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => sheet.close()));
-  // click on the backdrop (outside the drawer) closes
+
+  // Every exit funnels through here so unsaved edits can't silently vanish.
+  async function requestClose() {
+    if (dirty) {
+      const ok = await confirmDialog({
+        title: 'Discard changes?',
+        message: 'This fragment has unsaved edits. Close without saving?',
+        confirmLabel: 'Discard',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    dirty = false;
+    sheet.close();
+  }
+
+  document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => requestClose()));
+  // Escape → route through the guard instead of the native instant-close.
+  sheet.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    requestClose();
+  });
+  // Backdrop dismiss, but ONLY when the press both STARTED and ENDED on the
+  // backdrop. A right-to-left text selection that begins inside the sheet and
+  // releases on the backdrop must not close it (that was losing work mid-edit).
+  let pressedOnBackdrop = false;
+  sheet.addEventListener('pointerdown', (e) => (pressedOnBackdrop = e.target === sheet));
   sheet.addEventListener('click', (e) => {
-    if (e.target === sheet) sheet.close();
+    if (e.target === sheet && pressedOnBackdrop) requestClose();
   });
 
   function setField(form: HTMLFormElement, name: string, value: string) {
@@ -357,6 +451,9 @@ const thisYear = new Date().getUTCFullYear();
       toggleDelete(form, false);
       if (type === 'quote') {
         quoteEditor.commands.setContent('');
+        authorCombo.clear();
+        workCombo.clear();
+        recomputeWorkScope();
         resetQuoteDate();
         refreshQuoteValid();
         proposedBox.hidden = true;
@@ -391,8 +488,9 @@ const thisYear = new Date().getUTCFullYear();
         setField(form, 'work_year', d.details.work_year != null ? String(d.details.work_year) : '');
         setField(form, 'page', d.details.page != null ? String(d.details.page) : '');
         setField(form, 'citation', d.details.citation ?? '');
-        setField(form, 'author_name', d.authorName ?? '');
-        setField(form, 'work_name', d.workName ?? '');
+        authorCombo.setValue(d.authorId ?? '', d.authorName ?? '');
+        recomputeWorkScope(); // scope the Work list to this author before selecting
+        workCombo.setValue(d.workId ?? '', d.workName ?? '');
         resetQuoteDate(d.occurredIso, d.datePrecision);
         refreshQuoteValid();
         proposedBox.hidden = true;
@@ -453,6 +551,7 @@ const thisYear = new Date().getUTCFullYear();
       const { error } = await action(fd);
       submitBtn.disabled = false;
       if (!error) {
+        dirty = false; // saved — don't prompt on the reload
         window.location.reload();
         return;
       }

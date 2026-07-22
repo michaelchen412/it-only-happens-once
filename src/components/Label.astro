@@ -28,4 +28,4 @@ const register = {
 };
 ---
 
-<Tag class:list={[register[variant], className]}><slot /></Tag>
+<Tag class:list={[register[variant as keyof typeof register], className]}><slot /></Tag>

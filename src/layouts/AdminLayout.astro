@@ -34,10 +34,11 @@ const nav = [
     >
     </div>
 
-    {/* Sidebar — persistent on desktop, off-canvas drawer on mobile */}
+    {/* Sidebar — fixed to the viewport on desktop (its own scroll + a pinned
+        bottom block); an off-canvas drawer on mobile. */}
     <aside
       id="sidebar"
-      class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-base-300 bg-base-100 transition-transform duration-200 md:static md:translate-x-0"
+      class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-base-300 bg-base-100 transition-transform duration-200 md:translate-x-0"
     >
       <div class="flex h-14 shrink-0 items-center gap-2 border-b border-base-300 px-4">
         <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
@@ -49,7 +50,7 @@ const nav = [
         </button>
       </div>
 
-      <nav class="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav class="flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
         {
           nav.map((item) => (
             <a
@@ -87,8 +88,8 @@ const nav = [
       </div>
     </aside>
 
-    {/* Main column */}
-    <div class="flex min-w-0 flex-1 flex-col">
+    {/* Main column — padded left of the fixed sidebar on desktop. */}
+    <div class="flex min-w-0 flex-1 flex-col md:pl-60">
       {/* Slim top bar — mobile only (desktop uses the full height for content) */}
       <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur md:hidden">
         <button id="sb-open" class="-ml-1 rounded-field p-1.5 text-base-content/70 hover:bg-base-200 hover:text-base-content" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">

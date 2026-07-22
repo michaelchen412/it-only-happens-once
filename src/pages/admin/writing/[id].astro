@@ -11,6 +11,7 @@ import PublishDialog from '../../../components/admin/PublishDialog.astro';
 import EditorToolbar from '../../../components/admin/EditorToolbar.astro';
 import LinkDialog from '../../../components/admin/LinkDialog.astro';
 import type { Database } from '../../../lib/database.types';
+import { jsonForScript } from '../../../lib/serialize';
 
 const supabase = Astro.locals.supabase;
 const { id } = Astro.params;
@@ -98,7 +99,7 @@ const composerInit = {
   {/* Link editor (replaces prompt()) */}
   <LinkDialog />
 
-  <script type="application/json" id="composer-init" is:inline set:html={JSON.stringify(composerInit)}></script>
+  <script type="application/json" id="composer-init" is:inline set:html={jsonForScript(composerInit)}></script>
   <script>
     import '../../../scripts/composer';
   </script>

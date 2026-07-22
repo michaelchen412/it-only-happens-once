@@ -11,15 +11,16 @@ import EditorToolbar from '../../components/admin/EditorToolbar.astro';
 import LinkDialog from '../../components/admin/LinkDialog.astro';
 import InterestRow from '../../components/admin/InterestRow.astro';
 import { Icon } from 'astro-icon/components';
+import { jsonForScript } from '../../lib/serialize';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content').eq('slug', 'about').single();
 
-type Interest = { term: string; gloss: string };
+type Interest = { term: string; note?: string };
 const c = (page?.content ?? {}) as {
   me?: { headline?: string; portrait?: string | null; portrait_caption?: string; body?: string; interests?: Interest[] };
   site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
-  contact?: { label?: string; href?: string };
+  contact?: { intro?: string };
 };
 const me = c.me ?? {};
 const site = c.site ?? {};
@@ -39,7 +40,7 @@ const fieldLabel = 'font-sans text-sm text-base-content/70';
 const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
 ---
 
-<AdminLayout title="About" active="about">
+<AdminLayout title="About page" active="about">
   <div class="flex min-h-[calc(100vh-3.5rem)] flex-col">
     {/* Command bar */}
     <div class="sticky top-14 z-10 border-b border-base-300 bg-base-100/95 px-6 py-2 backdrop-blur md:top-0">
@@ -106,11 +107,12 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
 
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <span class={fieldLabel}>What I'm into</span>
+            <span class={fieldLabel}>My Interests</span>
             <button type="button" id="interest-add" class="btn btn-ghost btn-xs normal-case">+ Add</button>
           </div>
+          <p class="font-sans text-xs text-base-content/45">Each is a name and a few sentences on why it’s part of who you are.</p>
           <div id="interests-list" class="space-y-3">
-            {interests.map((it) => <InterestRow term={it.term} gloss={it.gloss} />)}
+            {interests.map((it) => <InterestRow term={it.term} note={it.note} />)}
           </div>
         </div>
       </section>
@@ -120,7 +122,7 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
       {/* ─────────────  MOVEMENT II — WHAT THIS IS  ───────────── */}
       <section class="space-y-6">
         <div>
-          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> What this is</p>
+          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> About the Blog</p>
           <p class="mt-1 font-sans text-xs text-base-content/45">The site and its ethos — why you write, and where the name came from.</p>
         </div>
 
@@ -137,6 +139,7 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           </div>
         </div>
 
+        <p class="pt-2 font-sans text-xs tracking-widest text-base-content/45 uppercase">About the Name</p>
         <div class="space-y-1">
           <label for="f-blurb" class={fieldLabel}>Where the name came from (Markdown — *italics* for the album title)</label>
           <textarea id="f-blurb" rows="4" class={input}>{siteName.blurb ?? ''}</textarea>
@@ -149,18 +152,18 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
 
       <hr class="my-12 border-base-300" />
 
-      {/* ─────────────  CONTACT (optional)  ───────────── */}
+      {/* ─────────────  SAY HELLO  ───────────── */}
       <section class="space-y-4">
-        <p class="font-sans text-xs tracking-widest text-base-content/45 uppercase">Contact (optional)</p>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="space-y-1">
-            <label for="f-contact-label" class={fieldLabel}>Link label</label>
-            <input id="f-contact-label" type="text" placeholder="Say hello" class={input} value={contact.label ?? ''} />
-          </div>
-          <div class="space-y-1">
-            <label for="f-contact-href" class={fieldLabel}>Link URL</label>
-            <input id="f-contact-href" type="text" placeholder="mailto:… or https://…" class={input} value={contact.href ?? ''} />
-          </div>
+        <div>
+          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> Say hello</p>
+          <p class="mt-1 font-sans text-xs text-base-content/45">
+            The public About page closes with a contact form (name · email · message), guarded against
+            spam. Set an optional line of copy to sit above it.
+          </p>
+        </div>
+        <div class="space-y-1">
+          <label for="f-contact-intro" class={fieldLabel}>Intro line (optional — shown above the form)</label>
+          <textarea id="f-contact-intro" rows="2" placeholder="Have a thought, a question, or a hello? I read everything." class={input}>{contact.intro ?? ''}</textarea>
         </div>
       </section>
     </form>
@@ -172,7 +175,7 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
   <LinkDialog id="me-link" />
   <LinkDialog id="site-link" />
 
-  <script type="application/json" id="about-init" is:inline set:html={JSON.stringify(aboutInit)}></script>
+  <script type="application/json" id="about-init" is:inline set:html={jsonForScript(aboutInit)}></script>
   <script>
     import '../../scripts/about-builder';
   </script>

@@ -20,8 +20,12 @@ export interface RichEditorOptions {
   editorEl: HTMLElement;
   /** Container holding the `.tt-btn` toolbar buttons (see EditorToolbar.astro). */
   toolbarRoot: HTMLElement;
-  /** The `<dialog>` from LinkDialog.astro (inner controls are class-scoped). */
-  linkDialog: HTMLDialogElement;
+  /**
+   * The `<dialog>` from LinkDialog.astro (inner controls are class-scoped).
+   * Optional: omit it for a slim, link-free toolbar (e.g. the interest notes) —
+   * the link command becomes a no-op and no dialog is required.
+   */
+  linkDialog?: HTMLDialogElement | null;
   placeholder?: string;
   content?: string;
   ariaLabel?: string;
@@ -42,9 +46,11 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
       attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Body' },
     },
   });
-  const getMarkdown = () => (editor.storage.markdown as { getMarkdown: () => string }).getMarkdown();
+  const getMarkdown = () => (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
 
   // ---- toolbar ----
+  // Reassigned below when a link dialog is supplied; a no-op otherwise.
+  let openLinkDialog = () => {};
   const cmds: Record<string, () => void> = {
     undo: () => editor.chain().focus().undo().run(),
     redo: () => editor.chain().focus().redo().run(),
@@ -84,41 +90,43 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
   editor.on('transaction', syncToolbar);
   if (opts.onChange) editor.on('update', opts.onChange);
 
-  // ---- link dialog (class-scoped within the passed dialog element) ----
-  const linkDialog = opts.linkDialog;
-  const linkUrl = linkDialog.querySelector('.link-url') as HTMLInputElement;
-  const linkRemove = linkDialog.querySelector('.link-remove') as HTMLButtonElement;
-  const linkApply = linkDialog.querySelector('.link-apply') as HTMLButtonElement;
-  const linkCancel = linkDialog.querySelector('.link-cancel') as HTMLButtonElement;
+  // ---- link dialog (optional; class-scoped within the passed dialog element) ----
+  if (opts.linkDialog) {
+    const linkDialog = opts.linkDialog;
+    const linkUrl = linkDialog.querySelector('.link-url') as HTMLInputElement;
+    const linkRemove = linkDialog.querySelector('.link-remove') as HTMLButtonElement;
+    const linkApply = linkDialog.querySelector('.link-apply') as HTMLButtonElement;
+    const linkCancel = linkDialog.querySelector('.link-cancel') as HTMLButtonElement;
 
-  function openLinkDialog() {
-    const prev = (editor.getAttributes('link').href as string | undefined) ?? '';
-    linkUrl.value = prev;
-    linkRemove.hidden = !prev;
-    linkDialog.showModal();
-    linkUrl.focus();
-    linkUrl.select();
+    openLinkDialog = () => {
+      const prev = (editor.getAttributes('link').href as string | undefined) ?? '';
+      linkUrl.value = prev;
+      linkRemove.hidden = !prev;
+      linkDialog.showModal();
+      linkUrl.focus();
+      linkUrl.select();
+    };
+    const applyLink = () => {
+      const url = linkUrl.value.trim();
+      linkDialog.close();
+      if (url) editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    };
+    linkApply.addEventListener('click', applyLink);
+    linkCancel.addEventListener('click', () => linkDialog.close());
+    linkRemove.addEventListener('click', () => {
+      linkDialog.close();
+      editor.chain().focus().unsetLink().run();
+    });
+    linkDialog.addEventListener('click', (e) => {
+      if (e.target === linkDialog) linkDialog.close();
+    });
+    linkUrl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyLink();
+      }
+    });
   }
-  function applyLink() {
-    const url = linkUrl.value.trim();
-    linkDialog.close();
-    if (url) editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  }
-  linkApply.addEventListener('click', applyLink);
-  linkCancel.addEventListener('click', () => linkDialog.close());
-  linkRemove.addEventListener('click', () => {
-    linkDialog.close();
-    editor.chain().focus().unsetLink().run();
-  });
-  linkDialog.addEventListener('click', (e) => {
-    if (e.target === linkDialog) linkDialog.close();
-  });
-  linkUrl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      applyLink();
-    }
-  });
 
   return { editor, getMarkdown };
 }
