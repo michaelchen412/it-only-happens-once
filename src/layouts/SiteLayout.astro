@@ -13,6 +13,7 @@ import { Icon } from 'astro-icon/components';
 import { fade } from 'astro:transitions';
 import Base from './Base.astro';
 import Colophon from '../components/Colophon.astro';
+import BackToTop from '../components/BackToTop.astro';
 
 interface Props {
   title?: string;
@@ -109,6 +110,8 @@ const nav = [
       <slot />
     </main>
   </div>
+
+  <BackToTop />
 
   <script>
     // ---- Theme toggle — dusk ⇄ paper, persisted. Delegated on document so it

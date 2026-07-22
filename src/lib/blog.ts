@@ -59,12 +59,17 @@ function sanitizeQuery(q: string): string {
   return q.replace(/[%,()\\]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Flatten the embedded `fragment_subjects(subjects(...))` shape, sorted by name. */
-function subjectsOf(row: { fragment_subjects?: { subjects: SubjectRef | null }[] | null }): SubjectRef[] {
-  return (row.fragment_subjects ?? [])
-    .map((fs) => fs.subjects)
-    .filter((s): s is SubjectRef => !!s)
-    .sort((a, b) => a.name.localeCompare(b.name));
+/** Flatten the embedded `fragment_subjects(subjects(...))` shape. With a `rank`
+ *  map (slug → global count) subjects come out busiest-first — so a capped card
+ *  keeps the most-used tags — with name as the tiebreak; without it, by name. */
+function subjectsOf(
+  row: { fragment_subjects?: { subjects: SubjectRef | null }[] | null },
+  rank?: Map<string, number>
+): SubjectRef[] {
+  const subs = (row.fragment_subjects ?? []).map((fs) => fs.subjects).filter((s): s is SubjectRef => !!s);
+  return rank
+    ? subs.sort((a, b) => (rank.get(b.slug) ?? 0) - (rank.get(a.slug) ?? 0) || a.name.localeCompare(b.name))
+    : subs.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Resolve a subject slug to the ids of the fragments tagged with it (any type;
@@ -79,7 +84,7 @@ async function fragmentIdsForSubject(supabase: DB, subjectSlug: string): Promise
 /** One page of published writing, newest first, optionally filtered by subject and/or search. */
 export async function listWriting(
   supabase: DB,
-  opts: { page?: number; subject?: string | null; q?: string | null } = {}
+  opts: { page?: number; subject?: string | null; q?: string | null; subjectRank?: Map<string, number> } = {}
 ): Promise<Page<WritingItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const q = opts.q ? sanitizeQuery(opts.q) : '';
@@ -124,7 +129,7 @@ export async function listWriting(
       updatedAt: r.updated_at ?? null,
       precision: r.date_precision,
       readMinutes: readingMinutes(r.body),
-      subjects: subjectsOf(r),
+      subjects: subjectsOf(r, opts.subjectRank),
     };
   });
 
@@ -135,7 +140,7 @@ export async function listWriting(
 /** One page of published quotes, newest first, optionally filtered by subject and/or search. */
 export async function listQuotes(
   supabase: DB,
-  opts: { page?: number; subject?: string | null; q?: string | null } = {}
+  opts: { page?: number; subject?: string | null; q?: string | null; subjectRank?: Map<string, number> } = {}
 ): Promise<Page<QuoteItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const searchTerm = opts.q ? sanitizeQuery(opts.q) : '';
@@ -172,7 +177,7 @@ export async function listQuotes(
     sourceUrl: r.source_url ?? null,
     occurredAt: r.occurred_at,
     precision: r.date_precision,
-    subjects: subjectsOf(r),
+    subjects: subjectsOf(r, opts.subjectRank),
   }));
 
   const total = count ?? items.length;

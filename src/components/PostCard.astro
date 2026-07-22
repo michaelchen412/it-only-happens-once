@@ -31,6 +31,12 @@ const searching = term.trim().length >= MIN_SEARCH;
 const titleSegs = searching ? highlight(item.title, term) : null;
 const { windows, more } = searching ? excerpts(toPlain(item.bodyMarkdown), term) : { windows: [], more: 0 };
 const showWindows = searching && windows.length > 0;
+
+// Subjects arrive busiest-first (lib/blog.ts). Show a few; the rest fold into a
+// quiet "+N" so a heavily-tagged essay never overruns the footer.
+const SUBJECT_CAP = 3;
+const shownSubjects = item.subjects.slice(0, SUBJECT_CAP);
+const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
 <article class="post-card py-9 first:pt-0">
@@ -67,7 +73,9 @@ const showWindows = searching && windows.length > 0;
     )
   }
 
-  <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+  {/* Footer: stacks on mobile (tags left-aligned under "Read more"); on desktop
+      it's one row with the tags pinned to the right margin. */}
+  <div class="mt-4 flex flex-col items-start gap-y-2 sm:flex-row sm:items-center sm:gap-x-4">
     {
       (item.hasMore || searching) && (
         <button
@@ -82,14 +90,15 @@ const showWindows = searching && windows.length > 0;
     }
     {
       item.subjects.length > 0 && (
-        <ul class="ml-auto flex flex-wrap gap-x-3 gap-y-1 font-sans text-xs text-base-content/40">
-          {item.subjects.map((s) => (
+        <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-base-content/40 sm:ml-auto">
+          {shownSubjects.map((s) => (
             <li>
               <a href={`/blog?subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
                 {s.name}
               </a>
             </li>
           ))}
+          {extraSubjects > 0 && <li class="text-base-content/30">+{extraSubjects}</li>}
         </ul>
       )
     }

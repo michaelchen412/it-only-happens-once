@@ -25,6 +25,11 @@ interface Props {
 }
 const { item, term = '' } = Astro.props;
 const searching = term.trim().length >= MIN_SEARCH;
+
+// Subjects arrive busiest-first (lib/blog.ts); cap to a few, fold the rest into
+// a quiet "+N" so the caption stays on a tidy line or two.
+const shownSubjects = item.subjects.slice(0, 3);
+const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
 <figure class="py-9 first:pt-0">
@@ -40,14 +45,15 @@ const searching = term.trim().length >= MIN_SEARCH;
     {/* Subjects then the "Added" date, pinned right (provenance, not when-said). */}
     <div class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
       {item.subjects.length > 0 && (
-        <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/40">
-          {item.subjects.map((s) => (
+        <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/40">
+          {shownSubjects.map((s) => (
             <li>
               <a href={`/blog?view=quotes&subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
                 {s.name}
               </a>
             </li>
           ))}
+          {extraSubjects > 0 && <li class="text-base-content/30">+{extraSubjects}</li>}
         </ul>
       )}
       <Timestamp date={item.occurredAt} kind="added" precision={item.precision} prefix="Added" />

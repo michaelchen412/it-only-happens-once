@@ -1,0 +1,47 @@
+---
+/*
+  BackToTop — a quiet floating control that appears once you've scrolled a screen
+  or so down, and returns you to the top. Global chrome (mounted once in
+  SiteLayout), so it's available on any long page; it stays hidden until earned
+  and tucks itself away again near the top. It sits under the Reader's top layer
+  and is explicitly suppressed while the reader is open (html.reader-open, see
+  app.css). Motion self-disables under prefers-reduced-motion.
+*/
+import { Icon } from 'astro-icon/components';
+---
+
+<button type="button" id="back-to-top" class="back-to-top" aria-label="Back to top">
+  <Icon name="ph:arrow-up" class="text-lg" />
+</button>
+
+<script>
+  const THRESHOLD = 600; // px scrolled before it earns its place
+
+  const btn = () => document.getElementById('back-to-top');
+
+  function update() {
+    btn()?.classList.toggle('is-visible', window.scrollY > THRESHOLD);
+  }
+
+  // Toggle at most once per frame — cheap on the scroll hot path.
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      update();
+      ticking = false;
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!(e.target as Element)?.closest?.('#back-to-top')) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  });
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  // Re-evaluate after a view-transition navigation lands on a new page.
+  document.addEventListener('astro:page-load', update);
+  update();
+</script>

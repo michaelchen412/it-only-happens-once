@@ -41,15 +41,20 @@ import { Icon } from 'astro-icon/components';
   // on close); false when we arrived already pointing at it (deep link / refresh).
   let openedViaTrigger = false;
 
+  // Pending scroll-unlock, deferred until the slide-out finishes (see close()).
+  let unlockTimer = 0;
+
   // Lock page scroll without shifting the layout: measure the scrollbar we're
   // about to hide and pad the page by exactly that width. (scrollbar-gutter was
   // unreliable across browsers, so we compensate explicitly.)
   function lockScroll() {
+    if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = 0; } // reopened mid-close
     const sbw = window.innerWidth - document.documentElement.clientWidth;
     document.documentElement.style.setProperty('--reader-sbw', `${sbw}px`);
     document.documentElement.classList.add('reader-open');
   }
   function unlockScroll() {
+    if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = 0; }
     document.documentElement.classList.remove('reader-open');
     document.documentElement.style.removeProperty('--reader-sbw');
   }
@@ -72,8 +77,14 @@ import { Icon } from 'astro-icon/components';
 
   function close() {
     const d = reader();
-    if (d && d.open) d.close();
-    unlockScroll();
+    if (!d || !d.open) return unlockScroll();
+    d.close(); // begins the slide-out (translate + backdrop fade)
+    // Hold the scroll-lock until the slide-out finishes. Drop it now and the
+    // frozen feed regains its scrollbar and reflows sideways *behind* the
+    // still-animating drawer — the close-jank. Reopening cancels this (lockScroll
+    // clears the timer). Reduced motion zeroes the duration → unlock at once.
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    unlockTimer = window.setTimeout(unlockScroll, reduce ? 0 : 320); // ≥ the 0.28s slide
   }
 
   // The URL hash is the single source of truth; reconcile the DOM to it.

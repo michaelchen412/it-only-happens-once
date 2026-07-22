@@ -145,6 +145,18 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Subjects rail (mobile): reveal the long tail behind "Show all" / "Show fewer".
+// The rail lives outside #blog-feed, so this is delegated on document (survives
+// search swaps and view-transition navigation) rather than bound per-render.
+document.addEventListener('click', (e) => {
+  const btn = (e.target as Element)?.closest?.('[data-subjects-toggle]') as HTMLElement | null;
+  const wrap = btn?.closest('[data-subjects]');
+  if (!btn || !wrap) return;
+  const expanded = wrap.classList.toggle('is-expanded');
+  btn.textContent = expanded ? 'Show fewer' : btn.dataset.labelCollapsed || 'Show all';
+  btn.setAttribute('aria-expanded', String(expanded));
+});
+
 // The form + feed are swapped on view-transition navigation, so (re)bind against
 // the fresh DOM each time. Fires on first load too.
 document.addEventListener('astro:page-load', () => {

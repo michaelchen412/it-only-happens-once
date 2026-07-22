@@ -41,9 +41,17 @@ const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 
 
 const subjects = await listSubjects(supabase, type);
 const activeSubject = subject ? subjects.find((s) => s.slug === subject) : null;
+// slug → global count, so the feed's per-card subjects sort busiest-first too
+// (they carry no count of their own). Same ordering as the rail below.
+const subjectRank = new Map(subjects.map((s) => [s.slug, s.count]));
 
-const writing = view === 'writing' ? await listWriting(supabase, { page, subject, q: q || null }) : null;
-const quotes = view === 'quotes' ? await listQuotes(supabase, { page, subject, q: q || null }) : null;
+// The rail shows the whole taxonomy on desktop, but a long list crowds the top
+// of the mobile page — so we cap it there and reveal the tail behind "Show all".
+const SUBJECT_CAP = 8;
+const subjectOverflow = Math.max(0, subjects.length - SUBJECT_CAP);
+
+const writing = view === 'writing' ? await listWriting(supabase, { page, subject, q: q || null, subjectRank }) : null;
+const quotes = view === 'quotes' ? await listQuotes(supabase, { page, subject, q: q || null, subjectRank }) : null;
 const feed = writing ?? quotes!;
 
 const noun = view === 'quotes' ? 'quote' : 'essay';
@@ -121,7 +129,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 
         {
           subjects.length > 0 && (
-            <div class="mt-7">
+            <div class="mt-7" data-subjects>
               <div class="flex items-baseline justify-between">
                 <Label variant="chrome">Subjects</Label>
                 {(activeSubject || q) && (
@@ -131,8 +139,8 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                 )}
               </div>
               <ul class="mt-3 flex flex-wrap gap-1.5 md:flex-col md:gap-0.5">
-                {subjects.map((s) => (
-                  <li>
+                {subjects.map((s, i) => (
+                  <li class:list={[i >= SUBJECT_CAP && 'subject-extra']}>
                     <a
                       href={href({ subject: s.slug, page: null, q: null })}
                       aria-current={activeSubject?.slug === s.slug ? 'true' : undefined}
@@ -149,6 +157,17 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                   </li>
                 ))}
               </ul>
+              {subjectOverflow > 0 && (
+                <button
+                  type="button"
+                  data-subjects-toggle
+                  data-label-collapsed={`Show all (${subjects.length})`}
+                  aria-expanded="false"
+                  class="mt-2 font-sans text-xs text-base-content/45 transition-colors hover:text-base-content/80 md:hidden"
+                >
+                  Show all ({subjects.length})
+                </button>
+              )}
             </div>
           )
         }
