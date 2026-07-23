@@ -1,0 +1,297 @@
+---
+/*
+  /admin/constellations/[id] — the Composer (design.md §13; the composing room).
+
+  Dense utilitarian rows over the composed suite (speed over poetry — the
+  REAL preview is the public page itself, which renders drafts for the admin).
+  Adding goes through ONE door: the Add button opens the FragmentBrowser, a
+  mini Fragment Manager (same table/filters as /admin) where already-placed
+  rows render dimmed; its own Add ▾ creates new fragments that auto-place here
+  via body[data-place-in]. Every fragment edits in an overlay (quote/song →
+  FragmentSheet, writing → WritingSheet) so you never leave the composition.
+  Remove unplaces, never deletes.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import FragmentSheet from '../../../components/admin/FragmentSheet.astro';
+import WritingSheet from '../../../components/admin/WritingSheet.astro';
+import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
+
+const sb = Astro.locals.supabase;
+const { id = '' } = Astro.params;
+
+const { data: c } = await sb
+  .from('constellations')
+  .select('id, name, slug, description, status, score_url')
+  .eq('id', id)
+  .maybeSingle();
+if (!c) return Astro.redirect('/admin/constellations');
+
+const [{ data: placements }, { data: allLinks }, { data: subjectRows }, { data: authors }, { data: works }] =
+  await Promise.all([
+    sb
+      .from('fragment_constellations')
+      .select(
+        'position, fragments!inner(id, type, slug, title, body, attribution, source_url, status, occurred_at, date_precision, details, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name)))'
+      )
+      .eq('constellation_id', c.id)
+      .is('fragments.deleted_at', null)
+      .order('position'),
+    sb.from('fragment_constellations').select('fragment_id, constellation_id'),
+    sb.from('subjects').select('name').order('name'),
+    sb.from('authors').select('id, name').order('name'),
+    sb.from('works').select('id, title, author_id').order('title'),
+  ]);
+
+const snip = (s: string | null | undefined, max = 110) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const glyph = { song: '♪', quote: '”', writing: '▤' } as const;
+
+// how many OTHER constellations each fragment lives in (the ✦×n hint)
+const elsewhere = new Map<string, number>();
+for (const l of allLinks ?? []) {
+  if (l.constellation_id === c.id) continue;
+  elsewhere.set(l.fragment_id, (elsewhere.get(l.fragment_id) ?? 0) + 1);
+}
+
+const suite = (placements ?? []).map((p) => {
+  const f = p.fragments as unknown as {
+    id: string; type: 'song' | 'quote' | 'writing'; slug: string; title: string | null; body: string | null;
+    attribution: string | null; source_url: string | null; status: string; occurred_at: string;
+    date_precision: string; details: Record<string, unknown> | null; author_id: string | null; work_id: string | null;
+    authors: { name: string } | null; works: { title: string } | null;
+    fragment_subjects: { subjects: { name: string } | null }[] | null;
+  };
+  const subjects = (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean).join(', ');
+  // the FragmentSheet edit payload (same shape FragmentRow emits)
+  const editorData =
+    f.type === 'writing'
+      ? null
+      : JSON.stringify({
+          id: f.id, type: f.type, title: f.title, body: f.body, attribution: f.attribution,
+          source_url: f.source_url, status: f.status,
+          year: (f.details as { year?: number } | null)?.year ?? null,
+          occurredIso: f.occurred_at, datePrecision: f.date_precision,
+          authorId: f.author_id, authorName: f.authors?.name ?? '',
+          workId: f.work_id, workName: f.works?.title ?? '',
+          subjects, details: f.details ?? {},
+        });
+  return {
+    id: f.id, type: f.type, status: f.status, editorData,
+    summary: f.type === 'quote' ? snip(f.body) : f.type === 'song' ? `${f.title ?? ''} — ${f.attribution ?? ''}` : (f.title ?? '(untitled)'),
+    subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
+    others: elsewhere.get(f.id) ?? 0,
+  };
+});
+
+// gauges: the three tests as instruments, never police
+const placedCount = suite.length;
+const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
+const mix = { quote: 0, writing: 0, song: 0 } as Record<string, number>;
+for (const s of suite) mix[s.type]++;
+
+const subjectNames = (subjectRows ?? []).map((s) => s.name);
+---
+
+<AdminLayout title={c.name} active="constellations">
+  <div id="ccomposer" class="mx-auto max-w-4xl px-6 py-8" data-id={c.id} data-slug={c.slug}>
+    <p class="mb-3 font-sans text-xs text-base-content/45">
+      <a href="/admin/constellations" class="hover:underline">Constellations</a> / {c.name}
+    </p>
+
+    <p id="cc-error" hidden role="alert" class="mb-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 font-sans text-sm text-error"></p>
+
+    {/* ── header: the constellation itself ─────────────────────────── */}
+    <form id="cc-form" class="rounded-box border border-base-300 bg-base-200 p-4">
+      <input type="hidden" name="id" value={c.id} />
+      <div class="flex flex-wrap items-center gap-3">
+        <input name="name" required value={c.name} class="input input-bordered max-w-xs font-display text-lg" />
+        <input name="slug" value={c.slug} class="input input-bordered input-sm max-w-[14rem] font-mono text-xs" title="Slug" />
+        <select name="status" class="select select-bordered select-sm font-sans">
+          <option value="draft" selected={c.status === 'draft'}>draft</option>
+          <option value="published" selected={c.status === 'published'}>published</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm font-sans normal-case">Save</button>
+        <span id="cc-saved" hidden class="font-sans text-xs text-success">saved</span>
+        <span class="ml-auto flex items-center gap-2">
+          <a href={`/${c.slug}`} target="_blank" class="btn btn-ghost btn-sm font-sans normal-case" title="The public page — drafts render for you only">
+            Preview <Icon name="ph:arrow-up-right" />
+          </a>
+          <button type="button" id="cc-delete" class="btn btn-ghost btn-sm text-error" title="Delete constellation">
+            <Icon name="ph:trash" />
+          </button>
+        </span>
+      </div>
+      <textarea
+        name="description"
+        rows="2"
+        placeholder="Why this way of seeing exists — shown on the home overview and as the suite's epigraph."
+        class="textarea textarea-bordered mt-3 w-full font-serif">{c.description}</textarea>
+      <input
+        name="score_url"
+        value={c.score_url}
+        placeholder="Spotify playlist URL — the constellation's score (optional)"
+        class="input input-bordered input-sm mt-2 w-full max-w-lg font-sans text-xs"
+      />
+      {/* the three tests, as quiet dials */}
+      <p class="mt-3 font-sans text-xs text-base-content/45">
+        {placedCount} placed{placedCount < 5 ? ' · thin (healthy is ~5–15)' : placedCount > 15 ? ' · heavy — two constellations fused? (~5–15)' : ''}
+        · {subjectSpread} subjects{subjectSpread < 3 ? ' · narrow (a way of seeing crosses ≥3)' : ''}
+        · mix ” {mix.quote} ▤ {mix.writing} ♪ {mix.song}
+      </p>
+    </form>
+
+    {/* ── the suite: composed order ───────────────────────────────── */}
+    <section class="mt-6">
+      <div class="mb-2 flex items-center justify-between">
+        <h2 class="font-sans text-xs tracking-widest text-base-content/40 uppercase">The suite — drag or nudge to compose</h2>
+        <button type="button" data-browse class="btn btn-primary btn-sm gap-1 font-sans normal-case">
+          <Icon name="ph:plus" /> Add
+        </button>
+      </div>
+      <ol id="suite-rows" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200">
+        {
+          suite.map((s) => (
+            <li
+              class="group flex items-center gap-3 px-3 py-2.5"
+              draggable="true"
+              data-fid={s.id}
+              data-type={s.type}
+              data-fragment={s.editorData}
+              data-writing={s.type === 'writing' ? s.id : undefined}
+            >
+              <span class="cursor-grab text-base-content/30 select-none" title="Drag to reorder">⋮⋮</span>
+              <span class="w-4 text-center font-serif text-base-content/45" aria-hidden="true">{glyph[s.type]}</span>
+              <button type="button" class="row-open min-w-0 grow truncate text-left font-serif text-[0.95rem]" data-open>
+                {s.summary}
+              </button>
+              {s.status === 'draft' && (
+                <span class="rounded-field border border-warning/40 px-1.5 py-0.5 font-sans text-[0.65rem] tracking-wide text-warning uppercase">draft</span>
+              )}
+              {s.others > 0 && (
+                <span class="font-sans text-xs text-base-content/40" title={`Also lives in ${s.others} other constellation${s.others > 1 ? 's' : ''}`}>
+                  &#10022;&times;{s.others + 1}
+                </span>
+              )}
+              <button type="button" class="btn btn-ghost btn-xs" data-move="up" title="Move up"><Icon name="ph:arrow-up" /></button>
+              <button type="button" class="btn btn-ghost btn-xs" data-move="down" title="Move down"><Icon name="ph:arrow-down" /></button>
+              <button type="button" class="btn btn-ghost btn-xs text-error/70" data-unplace title="Remove from this constellation (never deletes)">
+                <Icon name="ph:x" />
+              </button>
+            </li>
+          ))
+        }
+      </ol>
+      {suite.length === 0 && (
+        <p class="mt-4 font-sans text-sm text-base-content/50">
+          Empty sky here — press Add to browse everything, or create something new inside it.
+        </p>
+      )}
+    </section>
+  </div>
+
+  <FragmentSheet subjects={subjectNames} authors={authors ?? []} works={(works ?? []).map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))} />
+  <WritingSheet subjects={subjectNames} />
+  <FragmentBrowser constellation={c.id} />
+</AdminLayout>
+
+<script>
+  import { actions } from 'astro:actions';
+  import { confirmDialog } from '../../../scripts/confirm-dialog';
+  import { formatActionError } from '../../../scripts/action-error';
+
+  const root = document.getElementById('ccomposer')!;
+  const cid = root.dataset.id!;
+  // anything the editor sheets save on this page joins this suite
+  document.body.dataset.placeIn = cid;
+
+  const errBox = document.getElementById('cc-error') as HTMLParagraphElement;
+  const show = (m: string) => ((errBox.textContent = m), (errBox.hidden = false));
+
+  // ── header save / delete ───────────────────────────────────────────
+  document.getElementById('cc-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { data, error } = await actions.constellations.save(new FormData(e.target as HTMLFormElement));
+    if (error) return show(formatActionError(error));
+    errBox.hidden = true;
+    if (data?.slug) {
+      root.dataset.slug = data.slug;
+      const prev = root.querySelector<HTMLAnchorElement>('a[target="_blank"]');
+      if (prev) prev.href = `/${data.slug}`;
+    }
+    const saved = document.getElementById('cc-saved')!;
+    saved.hidden = false;
+    setTimeout(() => (saved.hidden = true), 1600);
+  });
+
+  document.getElementById('cc-delete')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Delete constellation',
+      message: 'Delete this constellation? Its composition is lost; the fragments themselves are untouched.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set('id', cid);
+    const { error } = await actions.constellations.remove(fd);
+    if (error) return show(formatActionError(error));
+    location.href = '/admin/constellations';
+  });
+
+  // ── the suite: reorder / unplace / open ────────────────────────────
+  const rows = document.getElementById('suite-rows')!;
+
+  async function persistOrder() {
+    const ids = [...rows.querySelectorAll<HTMLElement>('li[data-fid]')].map((l) => l.dataset.fid).join(',');
+    if (!ids) return;
+    const fd = new FormData();
+    fd.set('constellation_id', cid);
+    fd.set('fragment_ids', ids);
+    const { error } = await actions.constellations.reorderPlacements(fd);
+    if (error) show(formatActionError(error));
+  }
+
+  rows.addEventListener('click', async (e) => {
+    const li = (e.target as Element).closest('li[data-fid]') as HTMLElement | null;
+    if (!li) return;
+    const btn = (e.target as Element).closest('button');
+
+    if (btn?.dataset.move) {
+      const sib = btn.dataset.move === 'up' ? li.previousElementSibling : li.nextElementSibling;
+      if (!sib) return;
+      btn.dataset.move === 'up' ? sib.before(li) : sib.after(li);
+      return persistOrder();
+    }
+    if (btn?.hasAttribute('data-unplace')) {
+      const fd = new FormData();
+      fd.set('constellation_id', cid);
+      fd.set('fragment_id', li.dataset.fid!);
+      const { error } = await actions.constellations.unplace(fd);
+      if (error) return show(formatActionError(error));
+      return location.reload();
+    }
+    if (btn?.hasAttribute('data-open')) {
+      if (li.dataset.writing) return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: li.dataset.writing }));
+      if (li.dataset.fragment) document.dispatchEvent(new CustomEvent('fragment:edit', { detail: li.dataset.fragment }));
+    }
+  });
+
+  // drag to reorder (buttons remain the touch/keyboard path)
+  let dragged: HTMLElement | null = null;
+  rows.addEventListener('dragstart', (e) => {
+    dragged = (e.target as Element).closest('li[data-fid]');
+    if (dragged) e.dataTransfer?.setData('text/plain', dragged.dataset.fid!);
+  });
+  rows.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const over = (e.target as Element).closest('li[data-fid]') as HTMLElement | null;
+    if (!over || !dragged || over === dragged) return;
+    const r = over.getBoundingClientRect();
+    e.clientY < r.top + r.height / 2 ? over.before(dragged) : over.after(dragged);
+  });
+  rows.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (dragged) persistOrder();
+    dragged = null;
+  });
+</script>

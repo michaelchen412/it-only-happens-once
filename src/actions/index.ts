@@ -347,6 +347,38 @@ export const server = {
     }),
 
     /**
+     * Load one fragment for the WritingSheet (drafts included — the session
+     * client sees them via RLS; anon sessions only ever get published rows).
+     * Fetched on demand so the manager table doesn't embed every essay body.
+     */
+    get: defineAction({
+      input: z.object({ id: z.string().uuid() }),
+      handler: async ({ id }, ctx) => {
+        requireAdmin(ctx);
+        const { data, error } = await ctx.locals.supabase
+          .from('fragments')
+          .select('id, type, title, slug, excerpt, body, status, occurred_at, fragment_subjects(subjects(name))')
+          .eq('id', id)
+          .single();
+        if (error || !data) throw fail('That fragment no longer exists', 'NOT_FOUND');
+        return {
+          id: data.id,
+          type: data.type,
+          title: data.title ?? '',
+          slug: data.slug ?? '',
+          excerpt: data.excerpt ?? '',
+          body: data.body ?? '',
+          status: data.status,
+          occurredIso: data.occurred_at ?? '',
+          subjects: (data.fragment_subjects ?? [])
+            .map((l) => (l.subjects as { name: string } | null)?.name)
+            .filter(Boolean)
+            .join(', '),
+        };
+      },
+    }),
+
+    /**
      * AI subject suggestions for a fragment (read-only; no DB write). Returns
      * existing subjects that apply + an optional proposed new one. The human
      * accepts/edits in the editor; a proposed subject only becomes real if it's
@@ -587,6 +619,144 @@ export const server = {
         await sb.from('fragments').update({ work_id: input.into }).eq('work_id', input.from);
         const { error } = await sb.from('works').delete().eq('id', input.from);
         if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+  },
+
+  // --- constellations: the composing room (design.md §13) ---------------------
+  // A "pile" is just a draft constellation; drafts are RLS-hidden from anon.
+  // Placement is composition: positions are authored order, rewritten 1..n.
+  constellations: {
+    save: defineAction({
+      accept: 'form',
+      input: z.object({
+        id: optUuid,
+        name: z.string().trim().min(1, 'A constellation needs a name'),
+        slug: optText,
+        // Plain optional (no blank→undefined): an ABSENT field means "leave
+        // as-is" (the index's status toggle), an EMPTY one means "clear"
+        // (the composer form always submits both).
+        description: z.string().optional(),
+        score_url: z.string().optional(),
+        status,
+      }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        // unique slug among constellations (small table; linear probe like fragments)
+        const base = slugify(input.slug || input.name) || 'constellation';
+        let slug = base;
+        for (let i = 1; i < 60; i++) {
+          let q = sb.from('constellations').select('id').eq('slug', slug).limit(1);
+          if (input.id) q = q.neq('id', input.id);
+          const { data, error } = await q;
+          if (error) throw fail(error.message);
+          if (!data || data.length === 0) break;
+          slug = `${base}-${i + 1}`;
+        }
+        const scoreUrl = input.score_url?.trim();
+        if (scoreUrl) {
+          try {
+            new URL(scoreUrl);
+          } catch {
+            throw fail('The score doesn’t look like a URL', 'BAD_REQUEST');
+          }
+        }
+        const row: Database['public']['Tables']['constellations']['Update'] = { name: input.name.trim(), slug, status: input.status };
+        if (input.description !== undefined) row.description = input.description.trim() || null;
+        if (input.score_url !== undefined) row.score_url = scoreUrl || null;
+        if (input.id) {
+          const { error } = await sb.from('constellations').update(row).eq('id', input.id);
+          if (error) throw fail(error.message);
+          return { id: input.id, slug };
+        }
+        const { data: last } = await sb.from('constellations').select('sort').order('sort', { ascending: false }).limit(1);
+        const { data, error } = await sb
+          .from('constellations')
+          .insert({ ...row, name: input.name.trim(), slug, sort: (last?.[0]?.sort ?? 0) + 1 })
+          .select('id')
+          .single();
+        if (error) throw fail(error.message);
+        return { id: data.id, slug };
+      },
+    }),
+    remove: defineAction({
+      accept: 'form',
+      input: z.object({ id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        // Placements cascade away; fragments are never touched.
+        const { error } = await ctx.locals.supabase.from('constellations').delete().eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    /** Authored order of the sky itself: sort = index in the given id list. */
+    reorder: defineAction({
+      accept: 'form',
+      input: z.object({ ids: z.string().min(1) }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const ids = input.ids.split(',').filter(Boolean);
+        for (let i = 0; i < ids.length; i++) {
+          const { error } = await sb.from('constellations').update({ sort: i + 1 }).eq('id', ids[i]);
+          if (error) throw fail(error.message);
+        }
+        return { ok: true };
+      },
+    }),
+    /** Append a fragment to a suite (idempotent — re-placing is a no-op). */
+    place: defineAction({
+      accept: 'form',
+      input: z.object({ constellation_id: z.string().uuid(), fragment_id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const { data: last } = await sb
+          .from('fragment_constellations')
+          .select('position')
+          .eq('constellation_id', input.constellation_id)
+          .order('position', { ascending: false })
+          .limit(1);
+        const { error } = await sb.from('fragment_constellations').upsert(
+          {
+            constellation_id: input.constellation_id,
+            fragment_id: input.fragment_id,
+            position: (last?.[0]?.position ?? 0) + 1,
+          },
+          { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
+        );
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    /** Remove from the suite — unplacing, never deleting the fragment. */
+    unplace: defineAction({
+      accept: 'form',
+      input: z.object({ constellation_id: z.string().uuid(), fragment_id: z.string().uuid() }),
+      handler: async (input, ctx) => {
+        const { error } = await ctx.locals.supabase
+          .from('fragment_constellations')
+          .delete()
+          .eq('constellation_id', input.constellation_id)
+          .eq('fragment_id', input.fragment_id);
+        if (error) throw fail(error.message);
+        return { ok: true };
+      },
+    }),
+    /** The composed order: positions rewritten 1..n from the given list. */
+    reorderPlacements: defineAction({
+      accept: 'form',
+      input: z.object({ constellation_id: z.string().uuid(), fragment_ids: z.string().min(1) }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const ids = input.fragment_ids.split(',').filter(Boolean);
+        for (let i = 0; i < ids.length; i++) {
+          const { error } = await sb
+            .from('fragment_constellations')
+            .update({ position: i + 1 })
+            .eq('constellation_id', input.constellation_id)
+            .eq('fragment_id', ids[i]);
+          if (error) throw fail(error.message);
+        }
         return { ok: true };
       },
     }),

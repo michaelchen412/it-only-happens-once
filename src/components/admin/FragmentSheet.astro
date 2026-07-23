@@ -548,9 +548,18 @@ const thisYear = new Date().getUTCFullYear();
       if (form === quoteForm && !quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic
       const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
       submitBtn.disabled = true;
-      const { error } = await action(fd);
+      const { data, error } = await action(fd);
       submitBtn.disabled = false;
       if (!error) {
+        // Composer context (body[data-place-in]): whatever was saved here also
+        // joins that constellation's suite. Idempotent — re-placing is a no-op.
+        const placeIn = document.body.dataset.placeIn;
+        if (placeIn && data?.id) {
+          const pf = new FormData();
+          pf.set('constellation_id', placeIn);
+          pf.set('fragment_id', data.id);
+          await actions.constellations.place(pf);
+        }
         dirty = false; // saved — don't prompt on the reload
         window.location.reload();
         return;

@@ -13,13 +13,14 @@ import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'fragments' | 'library' | 'about';
+  active?: 'fragments' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Workshop', active = 'fragments' } = Astro.props;
 const user = Astro.locals.user;
 
 const nav = [
   { key: 'fragments', label: 'Fragments', href: '/admin', icon: 'ph:stack' },
+  { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars' },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books' },
   { key: 'about', label: 'About page', href: '/admin/about', icon: 'ph:user-circle' },
 ] as const;

@@ -111,25 +111,35 @@ import { Icon } from 'astro-icon/components';
     }
   }
 
-  document.addEventListener('click', (e) => {
-    const target = e.target as Element;
-    const trigger = target?.closest?.('[data-read]');
-    if (trigger) {
-      e.preventDefault();
-      const slug = trigger.getAttribute('data-read');
-      if (slug) {
-        openedViaTrigger = true;
-        location.hash = PREFIX + encodeURIComponent(slug); // → hashchange → sync()
+  // Capture phase, deliberately: a trigger may be an <a href> (the suite's
+  // writing fragments link to their permalinks as the no-JS fallback), and the
+  // ClientRouter's own click listener would otherwise win the race and
+  // navigate. Capturing + stopPropagation lets the reader claim its triggers
+  // before the router sees them; everything else passes through untouched.
+  document.addEventListener(
+    'click',
+    (e) => {
+      const target = e.target as Element;
+      const trigger = target?.closest?.('[data-read]');
+      if (trigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        const slug = trigger.getAttribute('data-read');
+        if (slug) {
+          openedViaTrigger = true;
+          location.hash = PREFIX + encodeURIComponent(slug); // → hashchange → sync()
+        }
+        return;
       }
-      return;
-    }
-    if (target?.closest?.('[data-reader-close]')) {
-      e.preventDefault();
-      return dismiss();
-    }
-    const d = reader();
-    if (d && d.open && target === d) dismiss(); // click on the backdrop
-  });
+      if (target?.closest?.('[data-reader-close]')) {
+        e.preventDefault();
+        return dismiss();
+      }
+      const d = reader();
+      if (d && d.open && target === d) dismiss(); // click on the backdrop
+    },
+    true
+  );
 
   // Escape: the native <dialog> closes visually; we still sync the hash.
   document.addEventListener('keydown', (e) => {

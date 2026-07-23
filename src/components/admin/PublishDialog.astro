@@ -1,25 +1,22 @@
 ---
 /*
-  PublishDialog — the composer's pre-publish / post-details dialog (docs/admin.md
-  §5). It collects the last-mile metadata (slug, excerpt, subjects, an optional
-  backdated date) and confirms publish/unpublish.
+  PublishDialog — the WritingSheet's pre-publish / post-details dialog
+  (docs/admin.md §5). It collects the last-mile metadata (slug, excerpt,
+  subjects, an optional backdated date) and confirms publish/unpublish.
 
-  IMPORTANT: this <dialog> is a sibling of <form id="writing-form">, so every
-  control here carries `form="writing-form"` — otherwise the form's FormData
-  would never include these fields. TagInput's hidden input is associated the
-  same way via its `form` prop.
+  IMPORTANT: this <dialog> is a sibling of the writing form, so every control
+  here carries `form={formId}` — otherwise the form's FormData would never
+  include these fields. TagInput's hidden input is associated the same way via
+  its `form` prop. Per-fragment values (slug/excerpt/subjects/date) are
+  populated by the sheet's script on every open — the markup is a blank shell.
 */
 import TagInput from '../TagInput.astro';
 
 interface Props {
-  isNew: boolean;
-  slug: string;
-  excerpt: string;
-  subjectsValue: string;
+  formId: string;
   subjectNames: string[];
 }
-const { isNew, slug, excerpt, subjectsValue, subjectNames } = Astro.props;
-const FORM = 'writing-form';
+const { formId, subjectNames } = Astro.props;
 ---
 
 <dialog id="publish-dialog" class="modal-dialog w-full max-w-md" aria-labelledby="dialog-title">
@@ -32,7 +29,7 @@ const FORM = 'writing-form';
     {/* Posted date — automatic unless you deliberately backdate */}
     <div class="flex flex-col gap-2 text-sm">
       <label class="flex items-center gap-2">
-        <input type="checkbox" id="date-toggle" class="checkbox checkbox-xs" checked={!isNew} />
+        <input type="checkbox" id="date-toggle" class="checkbox checkbox-xs" />
         <span class="text-base-content/80">Set a custom posted date</span>
         <span class="text-base-content/40">— for backdating older posts</span>
       </label>
@@ -40,28 +37,28 @@ const FORM = 'writing-form';
         type="datetime-local"
         name="occurred_at"
         id="occurred-field"
-        form={FORM}
-        disabled={isNew}
+        form={formId}
+        disabled
         class="input input-sm input-bordered w-full disabled:opacity-40"
       />
-      <p id="date-auto-note" class="text-xs text-base-content/55" hidden={!isNew}>
+      <p id="date-auto-note" class="text-xs text-base-content/55">
         Otherwise the posted date is set automatically when you publish.
       </p>
     </div>
 
     <label class="flex flex-col gap-1 text-sm">
       <span class="text-base-content/80">Slug <span class="text-base-content/40">— the URL</span></span>
-      <input name="slug" id="slug-field" form={FORM} value={slug} class="input input-sm input-bordered" placeholder="auto-from-title" />
+      <input name="slug" id="slug-field" form={formId} class="input input-sm input-bordered" placeholder="auto-from-title" />
     </label>
 
     <label class="flex flex-col gap-1 text-sm">
       <span class="text-base-content/80">Excerpt <span class="text-base-content/40">— the card blurb (optional)</span></span>
-      <textarea name="excerpt" form={FORM} rows="2" class="textarea textarea-bordered font-serif text-base">{excerpt}</textarea>
+      <textarea name="excerpt" id="excerpt-field" form={formId} rows="2" class="textarea textarea-bordered font-serif text-base"></textarea>
     </label>
 
     <label class="flex flex-col gap-1 text-sm">
       <span class="text-base-content/80">Subjects</span>
-      <TagInput name="subjects" label="Subjects" value={subjectsValue} suggestions={subjectNames} form={FORM} placeholder="Add a subject…" />
+      <TagInput name="subjects" label="Subjects" suggestions={subjectNames} form={formId} placeholder="Add a subject…" />
     </label>
 
     <p id="dialog-error" hidden role="alert" class="rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>

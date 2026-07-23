@@ -408,9 +408,20 @@ html.reader-open {
 .reader {
   width: min(44rem, 100vw);
   max-width: 100vw;
-  display: flex;
   flex-direction: column;
   /* height, right-pin, and the slide-in come from .drawer-dialog */
+}
+/* Lay the sheet out ONLY while it's open. A bare `.reader { display: flex }`
+   would beat the UA's `dialog:not([open]) { display: none }` — author origin
+   wins over UA regardless of specificity — so the CLOSED drawer stayed in the
+   layout: absolutely positioned, full height, translated 100% off the right at
+   the very end of the document. That phantom box is what produced the blank
+   scroll-space below and to the right of the feed, and it broke the native
+   discrete-display animation (close felt instant). Gating `display` on [open]
+   hands the closed state back to display:none, letting the allow-discrete
+   transition on .drawer-dialog animate the slide the SAME in both directions. */
+.reader[open] {
+  display: flex;
 }
 .reader-scroll {
   flex: 1;
@@ -454,7 +465,8 @@ html.reader-open {
 /* Back-to-top — a quiet floating return control (components/BackToTop.astro),
    mounted once in SiteLayout. Hidden until you've scrolled a screen down, and
    suppressed while the Reader owns the top layer. */
-.back-to-top {
+.back-to-top,
+.sky-return {
   position: fixed;
   right: 1.25rem;
   bottom: 1.25rem;
@@ -480,19 +492,121 @@ html.reader-open {
     color 0.15s ease,
     background 0.15s ease;
 }
-.back-to-top:hover {
+.back-to-top:hover,
+.sky-return:hover {
   color: var(--color-base-content);
   background: var(--color-base-200);
 }
-.back-to-top.is-visible {
+.back-to-top.is-visible,
+.sky-return.is-visible {
   opacity: 1;
   translate: 0 0;
   pointer-events: auto;
 }
 /* Never bleed through the reader's backdrop. */
-html.reader-open .back-to-top {
+html.reader-open .back-to-top,
+html.reader-open .sky-return {
   opacity: 0;
   pointer-events: none;
+}
+/* The sky-return ✦ is a return to the overview, not a scroll control — it
+   reads serif (a mark, not an icon) in the lamplight accent. */
+.sky-return {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: color-mix(in oklab, var(--color-primary) 70%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   The Sky — the constellation suite (components/ConstellationSuite.astro).
+   Typeset, not carded (decided 2026-07-23, prototyped in /sky-lab): each
+   medium in its own register, star-marks in the margin joined by a drawn
+   line, and the fragment nearest the reading line takes a passing lamplight.
+   Lines are currentColor at low opacity; every color is a semantic token.
+   ------------------------------------------------------------------------- */
+.suite {
+  position: relative;
+}
+.suite-item {
+  position: relative;
+  z-index: 1;
+}
+/* asymmetric offsets (wide screens) — the drawn line gets its angles here */
+@media (min-width: 640px) {
+  .suite-item {
+    margin-inline-start: var(--indent, 0%);
+  }
+}
+/* the drawn line — an SVG injected behind the stanzas */
+.suite-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* one slow, even breath for every warming element (glow + hover) */
+.suite-mark,
+.suite-item blockquote,
+.suite-item figcaption,
+.sw-title,
+.sw-excerpt {
+  transition:
+    color 0.5s ease,
+    text-shadow 0.5s ease;
+}
+
+/* the passing lamplight — the fragment nearest the reading line warms,
+   SOFTER than hover: a tint and a faint halo, never the full amber */
+.suite-item.is-lit .suite-mark {
+  color: color-mix(in oklab, var(--color-primary) 55%, transparent);
+}
+.suite-item.is-lit blockquote {
+  color: color-mix(in oklab, var(--color-primary) 24%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+/* the attribution warms with its quote — same light, a step quieter */
+.suite-item.is-lit figcaption {
+  color: color-mix(
+    in oklab,
+    var(--color-primary) 30%,
+    color-mix(in oklab, var(--color-base-content) 58%, transparent)
+  );
+}
+.suite-item.is-lit .sw-title {
+  color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 18%, transparent);
+}
+.suite-item.is-lit .sw-excerpt {
+  color: color-mix(
+    in oklab,
+    var(--color-primary) 14%,
+    color-mix(in oklab, var(--color-base-content) 76%, transparent)
+  );
+}
+
+/* writing carries no chrome — hover is the stronger, deliberate light
+   (kept AFTER the .is-lit rules so it wins at equal specificity) */
+.suite-writing:hover .sw-title {
+  color: var(--color-primary);
+}
+.suite-writing:hover .sw-excerpt {
+  color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
+}
+.suite-writing:hover .suite-mark {
+  color: color-mix(in oklab, var(--color-primary) 75%, transparent);
+}
+
+/* excerpts clamp with a true ellipsis (line-clamp at the call site); the
+   mask fades the tail but bottoms out at partial opacity so the … stays */
+.excerpt-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    black 45%,
+    color-mix(in srgb, black 38%, transparent) 100%
+  );
 }
 
 /* Subjects rail (blog/index.astro) — a long taxonomy crowds the top of the
@@ -504,8 +618,9 @@ html.reader-open .back-to-top {
 [data-subjects].is-expanded .subject-extra {
   display: block;
 }
-/* Never hide the active filter, even collapsed — it must always be reachable. */
-[data-subjects] .subject-extra:has(> [aria-current='true']) {
+/* Never hide a selected filter, even collapsed — it must always be reachable
+   (so it can be removed). Selected tags carry aria-pressed="true". */
+[data-subjects] .subject-extra:has([aria-pressed='true']) {
   display: block;
 }
 @media (min-width: 768px) {
@@ -525,6 +640,34 @@ html.reader-open .back-to-top {
 }
 .feed-sentinel.is-loading .feed-spin {
   display: inline-flex;
+}
+
+/* Blog feed cards (components/PostCard.astro) — the constellation's reading
+   surface brought to the feed (sky-lab round 2): the title + a faded, clamped
+   excerpt are ONE reader trigger. There is no "Read more" button — the fade +
+   ellipsis is the invitation, and the pair warms toward lamplight on hover (or
+   keyboard focus, so it's reachable without a mouse). Metadata stays as chrome;
+   motion self-disables under the global reduced-motion rule. */
+.post-title,
+.post-excerpt {
+  transition:
+    color 0.4s ease,
+    text-shadow 0.4s ease;
+}
+.post-read:hover .post-title,
+.post-read:focus-within .post-title {
+  color: var(--color-primary);
+}
+.post-read:hover .post-excerpt,
+.post-read:focus-within .post-excerpt {
+  color: color-mix(in oklab, var(--color-primary) 30%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+/* The excerpt fades toward its clamped last line so the ellipsis reads as
+   "there's more" — the mask bottoms at partial opacity, keeping it legible. */
+.post-excerpt-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, color-mix(in srgb, black 45%, transparent) 100%);
+  mask-image: linear-gradient(to bottom, black 55%, color-mix(in srgb, black 45%, transparent) 100%);
 }
 
 /* Bulk-action bar — a floating pill that slides up from the bottom when rows

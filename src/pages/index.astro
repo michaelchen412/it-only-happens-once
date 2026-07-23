@@ -1,23 +1,70 @@
 ---
 /*
-  / — Home, the Sky's front door.
+  / — Home: the whole sky (vision.md §4, amended 2026-07; design.md §13).
 
-  CHROME ONLY for now: this wires the public shell so `/` is a real room instead
-  of the Astro scaffold. The Sky itself — landing inside a living constellation,
-  and the zoom out to the whole sky (vision.md §4) — is the next design pass and
-  lands here later. Kept deliberately quiet and honest in the meantime, in the
-  same calibrated-placeholder voice as the other unbuilt rooms.
+  The front door IS the overview: every constellation at a glance — names set
+  larger by weight, and beneath each one its DESCRIPTION: why this way of
+  seeing exists, what truth it tells, how it relates to who Michael is. The
+  same words reappear as the epigraph inside the suite, so the zoom carries
+  both name and meaning. Tap a name and it morphs down into the landing
+  header (shared transition:name with ConstellationSuite).
+
+  ("Land inside a constellation" + the cycling "tonight" door, and then
+  fragment-excerpt glimpse lines, were each tried and retired — the first
+  disoriented, the second read as awkward fragments-of-fragments.)
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
+import { listConstellations } from '../lib/constellations';
+
+const supabase = Astro.locals.supabase;
+const refs = await listConstellations(supabase);
+
+// weight → type scale: distinct counts, heaviest first, share tiers on ties
+const TIERS = [
+  'text-4xl sm:text-5xl',
+  'text-3xl sm:text-4xl',
+  'text-2xl sm:text-3xl',
+  'text-xl sm:text-2xl',
+  'text-lg sm:text-xl',
+];
+const distinct = [...new Set(refs.map((r) => r.count))].sort((a, b) => b - a);
+const tierOf = (count: number) => TIERS[Math.min(distinct.indexOf(count), TIERS.length - 1)];
 ---
 
-<SiteLayout>
-  <section
-    class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 py-24 text-center"
-  >
-    <p class="font-serif text-lg text-base-content/55">The sky is being composed.</p>
-    <p class="mt-2 max-w-sm font-sans text-sm text-base-content/40">
-      The front door — landing inside a living constellation — lands here in a later pass.
-    </p>
+<SiteLayout
+  description="A walkable self-portrait — constellations of writing, quotes, and music."
+  active="home"
+>
+  <section class="mx-auto flex min-h-[80vh] max-w-4xl flex-col justify-center px-5 py-20 sm:px-8">
+    {
+      refs.length > 0 ? (
+        <div class="flex flex-col gap-12 sm:gap-16">
+          {refs.map((c, i) => (
+            <div class={`${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}>
+              <a href={`/${c.slug}`} class="group block">
+                <span class="flex items-baseline gap-3">
+                  <span class="text-xs text-primary/60" aria-hidden="true">&#10022;</span>
+                  <span
+                    class={`${tierOf(c.count)} font-display font-light transition-colors group-hover:text-primary`}
+                    transition:name={`c-${c.slug}`}
+                  >
+                    {c.name}
+                  </span>
+                </span>
+                {/* why this constellation exists — the same words that greet
+                    you as the epigraph inside, so the zoom carries meaning */}
+                {c.description && (
+                  <p class="mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed text-base-content/55">
+                    {c.description}
+                  </p>
+                )}
+              </a>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p class="text-center font-serif text-lg text-base-content/55">The sky is being composed.</p>
+      )
+    }
   </section>
 </SiteLayout>

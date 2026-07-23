@@ -43,8 +43,17 @@ export interface QuoteItem {
   subjects: SubjectRef[];
 }
 
-export interface SubjectCount extends SubjectRef {
+export interface RailSubject extends SubjectRef {
+  /** Contextual narrowing count: fragments matching the current search AND every
+   *  already-selected subject AND this one. This is what disables a dead-end. */
   count: number;
+  /** Global count for this type — stable ordering for the rail, and the rank the
+   *  feed threads through to sort each card's own tags busiest-first. */
+  total: number;
+  /** In the current selection (rendered as a removable, active chip). */
+  selected: boolean;
+  /** Nothing combines this with the current filter → shown muted, not clickable. */
+  disabled: boolean;
 }
 
 export interface Page<T> {
@@ -72,26 +81,45 @@ function subjectsOf(
     : subs.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Resolve a subject slug to the ids of the fragments tagged with it (any type;
- *  the caller's `.eq('type', …)` narrows it). `null` = unknown subject. */
-async function fragmentIdsForSubject(supabase: DB, subjectSlug: string): Promise<string[] | null> {
-  const { data: subject } = await supabase.from('subjects').select('id').eq('slug', subjectSlug).maybeSingle();
-  if (!subject) return null; // unknown subject → caller renders an empty feed
-  const { data } = await supabase.from('fragment_subjects').select('fragment_id').eq('subject_id', subject.id);
-  return (data ?? []).map((r) => r.fragment_id);
+/** Resolve subject slugs to the ids of the fragments tagged with EVERY one of
+ *  them (AND / intersection; the caller's `.eq('type', …)` narrows by type).
+ *  `null` = no subject filter (empty input). `[]` = an unsatisfiable combination
+ *  — an unknown slug, or simply no fragment carries them all — so the caller
+ *  renders an empty feed. */
+async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<string[] | null> {
+  const wanted = Array.from(new Set(slugs.filter(Boolean)));
+  if (wanted.length === 0) return null;
+
+  const { data: subs } = await supabase.from('subjects').select('id, slug').in('slug', wanted);
+  if (!subs || subs.length !== wanted.length) return []; // a slug didn't resolve → AND impossible
+  const ids = subs.map((s) => s.id);
+
+  const { data: links } = await supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', ids);
+  // A fragment satisfies the AND iff it links to all selected subjects. Track a
+  // Set per fragment so a duplicate link can never fake a match.
+  const perFragment = new Map<string, Set<string>>();
+  for (const l of links ?? []) {
+    let set = perFragment.get(l.fragment_id);
+    if (!set) perFragment.set(l.fragment_id, (set = new Set()));
+    set.add(l.subject_id);
+  }
+  const result: string[] = [];
+  for (const [fid, set] of perFragment) if (set.size === ids.length) result.push(fid);
+  return result;
 }
 
-/** One page of published writing, newest first, optionally filtered by subject and/or search. */
+/** One page of published writing, newest first, optionally narrowed by an AND of
+ *  subjects and/or a search term. */
 export async function listWriting(
   supabase: DB,
-  opts: { page?: number; subject?: string | null; q?: string | null; subjectRank?: Map<string, number> } = {}
+  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {}
 ): Promise<Page<WritingItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const q = opts.q ? sanitizeQuery(opts.q) : '';
 
   let ids: string[] | null = null;
-  if (opts.subject) {
-    ids = await fragmentIdsForSubject(supabase, opts.subject);
+  if (opts.subjects && opts.subjects.length > 0) {
+    ids = await fragmentIdsForSubjects(supabase, opts.subjects);
     if (!ids || ids.length === 0) {
       return { items: [], total: 0, page, pageCount: 0 };
     }
@@ -137,17 +165,18 @@ export async function listWriting(
   return { items, total, page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
-/** One page of published quotes, newest first, optionally filtered by subject and/or search. */
+/** One page of published quotes, newest first, optionally narrowed by an AND of
+ *  subjects and/or a search term. */
 export async function listQuotes(
   supabase: DB,
-  opts: { page?: number; subject?: string | null; q?: string | null; subjectRank?: Map<string, number> } = {}
+  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {}
 ): Promise<Page<QuoteItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const searchTerm = opts.q ? sanitizeQuery(opts.q) : '';
 
   let ids: string[] | null = null;
-  if (opts.subject) {
-    ids = await fragmentIdsForSubject(supabase, opts.subject);
+  if (opts.subjects && opts.subjects.length > 0) {
+    ids = await fragmentIdsForSubjects(supabase, opts.subjects);
     if (!ids || ids.length === 0) {
       return { items: [], total: 0, page, pageCount: 0 };
     }
@@ -214,23 +243,77 @@ export async function getWritingBySlug(supabase: DB, slug: string): Promise<Writ
 
 type FragmentType = 'writing' | 'quote' | 'song';
 
-/** The subject taxonomy that actually has published fragments of `type`, with counts, busiest first. */
-export async function listSubjects(supabase: DB, type: FragmentType): Promise<SubjectCount[]> {
-  const [{ data: links }, { data: subjects }] = await Promise.all([
-    supabase
-      .from('fragment_subjects')
-      .select('subject_id, fragments!inner(type, status, deleted_at)')
-      .eq('fragments.type', type)
-      .eq('fragments.status', 'published')
-      .is('fragments.deleted_at', null),
-    supabase.from('subjects').select('id, name, slug'),
-  ]);
+/**
+ * The subject taxonomy that actually has published fragments of `type`, each
+ * annotated for a STACKABLE rail: its global count, its contextual narrowing
+ * count against the current filter, and whether it's selected / a dead-end.
+ *
+ * Faceted-search convention: `count` is how many results REMAIN if you add this
+ * subject to what's already chosen (an AND across selected subjects, intersected
+ * with the search term). count === 0 (and not already selected) ⇒ disabled, so
+ * the rail can only ever offer combinations that exist. Ordering stays by global
+ * `total` so tags don't reshuffle as you filter — only their numbers change.
+ */
+export async function listSubjects(
+  supabase: DB,
+  type: FragmentType,
+  opts: { selected?: string[]; q?: string | null } = {}
+): Promise<RailSubject[]> {
+  const selected = Array.from(new Set((opts.selected ?? []).filter(Boolean)));
+  const q = opts.q ? sanitizeQuery(opts.q) : '';
 
-  const counts = new Map<string, number>();
-  for (const l of links ?? []) counts.set(l.subject_id, (counts.get(l.subject_id) ?? 0) + 1);
+  // Every (fragment, subject) link for published, non-deleted fragments of this
+  // type — enough to build the taxonomy AND the per-fragment subject sets below.
+  const { data: links } = await supabase
+    .from('fragment_subjects')
+    .select('fragment_id, subjects(name, slug), fragments!inner(type, status, deleted_at)')
+    .eq('fragments.type', type)
+    .eq('fragments.status', 'published')
+    .is('fragments.deleted_at', null);
 
-  return (subjects ?? [])
-    .map((s) => ({ name: s.name, slug: s.slug, count: counts.get(s.id) ?? 0 }))
-    .filter((s) => s.count > 0)
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const fragSubs = new Map<string, Set<string>>(); // fragment id → its subject slugs
+  const meta = new Map<string, { name: string; total: number }>(); // slug → name + global count
+  for (const l of links ?? []) {
+    const s = (l as { subjects: SubjectRef | null }).subjects;
+    if (!s) continue;
+    let set = fragSubs.get(l.fragment_id);
+    if (!set) fragSubs.set(l.fragment_id, (set = new Set()));
+    if (set.has(s.slug)) continue; // ignore any duplicate link
+    set.add(s.slug);
+    const m = meta.get(s.slug);
+    if (m) m.total++;
+    else meta.set(s.slug, { name: s.name, total: 1 });
+  }
+
+  // Which fragments match the search term (null → no term, so everything does).
+  let matchIds: Set<string> | null = null;
+  if (q) {
+    const or = type === 'quote' ? `body.ilike.%${q}%,attribution.ilike.%${q}%` : `title.ilike.%${q}%,body.ilike.%${q}%`;
+    const { data } = await supabase
+      .from('fragments')
+      .select('id')
+      .eq('type', type)
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .or(or);
+    matchIds = new Set((data ?? []).map((r) => r.id));
+  }
+
+  // Base set B = fragments matching the term AND carrying every selected subject.
+  // For each subject, count how many B-fragments also carry it → its rail count.
+  const ctx = new Map<string, number>();
+  for (const [fid, set] of fragSubs) {
+    if (matchIds && !matchIds.has(fid)) continue;
+    if (!selected.every((sl) => set.has(sl))) continue;
+    for (const sl of set) ctx.set(sl, (ctx.get(sl) ?? 0) + 1);
+  }
+
+  const selectedSet = new Set(selected);
+  return Array.from(meta.entries())
+    .map(([slug, m]) => {
+      const isSelected = selectedSet.has(slug);
+      const count = ctx.get(slug) ?? 0;
+      return { slug, name: m.name, total: m.total, count, selected: isSelected, disabled: count === 0 && !isSelected };
+    })
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 }

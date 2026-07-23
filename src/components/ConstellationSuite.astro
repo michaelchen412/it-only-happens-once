@@ -1,0 +1,294 @@
+---
+/*
+  ConstellationSuite — a constellation, landed inside (the Sky's core surface).
+
+  Typeset, not carded (decided 2026-07-23 after /sky-lab): each medium in its
+  own register at its natural size. Star-marks in the margin are joined by a
+  drawn line (gentle arcs — phrase marks, not a wire), and the fragment nearest
+  the reading line takes a passing lamplight as you scroll (app.css "The Sky").
+
+  Writing carries NO metadata here — title + fading excerpt only; clicking
+  opens the blog's own Reader (the same component, the same PostArticle), so
+  the essay reads identically everywhere. Quotes are set whole with serif
+  small-caps attributions. Songs join the suite when the corpus has them.
+
+  The zoom out is navigation: the name itself (popover semantics — the trigger
+  that opened it closes it), the ✦ beside it, the floating ✦ once you scroll,
+  and Escape all go home — `/` IS the whole sky (the overview) — and the title
+  morphs there via its transition:name, shared with the overview list. The
+  suite ends by resolving UPWARD — "all constellations", never a sideways
+  hop — restoring perspective. ("Sky" stays internal design vocabulary;
+  visitors see "constellations".)
+*/
+import Reader from './Reader.astro';
+import PostArticle from './PostArticle.astro';
+import Label from './Label.astro';
+import type { Constellation, SuiteItem } from '../lib/constellations';
+import type { WritingItem } from '../lib/blog';
+import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+
+interface Props {
+  constellation: Constellation;
+}
+const { constellation } = Astro.props;
+
+const glyph = { song: '♪', quote: '”', writing: '▤' } as const;
+// asymmetric offsets (sm+) — the drawn line gets its angles from these
+const INDENTS = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
+
+const writings = constellation.items
+  .filter((i): i is Extract<SuiteItem, { kind: 'writing' }> => i.kind === 'writing')
+  .map((i) => i.item as WritingItem);
+
+// the score — a playlist for the whole read, rendered only when set
+const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl) : null;
+---
+
+<section class="mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
+  {
+    constellation.status === 'draft' && (
+      <Label variant="chrome" class="mb-4">
+        draft — visible only to you
+      </Label>
+    )
+  }
+  <div class="flex items-baseline gap-3">
+    <a
+      href="/"
+      class="text-primary transition-opacity hover:opacity-70"
+      aria-label="All constellations"
+      title="All constellations"
+    >&#10022;</a>
+    {/* The name is the same trigger that opened it — tap again to close
+        (zoom out), popover semantics at page scale. */}
+    <h1
+      class="font-display text-4xl leading-[1.05] font-light sm:text-5xl"
+      transition:name={`c-${constellation.slug}`}
+    >
+      <a href="/" class="transition-colors hover:text-primary" title="All constellations">
+        {constellation.name}
+      </a>
+    </h1>
+  </div>
+  {
+    constellation.description && (
+      <p class="prose-measure mt-5 border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
+        {constellation.description}
+      </p>
+    )
+  }
+
+  {
+    score && (
+      <div class="mt-9 max-w-xl">
+        <iframe
+          src={spotifyEmbedSrc(score)}
+          width="100%"
+          height="152"
+          loading="lazy"
+          allow="encrypted-media"
+          title={`The score — ${constellation.name}`}
+          style="border-radius: var(--radius-box); border: 0"></iframe>
+        <p class="mt-2 font-sans text-xs text-base-content/40">the score — press play, then read</p>
+      </div>
+    )
+  }
+
+  <div id="suite" class="suite mt-16 flex flex-col gap-16 text-base-content">
+    {
+      constellation.items.map((f, i) => (
+        <article
+          class:list={['suite-item flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
+          style={`--indent:${INDENTS[i % INDENTS.length]}`}
+        >
+          <span
+            class="suite-mark mt-1.5 w-5 shrink-0 text-center font-serif text-base text-base-content/35 select-none"
+            aria-hidden="true"
+          >
+            {glyph[f.kind]}
+          </span>
+          <div class="min-w-0 grow">
+            {f.kind === 'quote' && (
+              <figure>
+                <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
+                  {f.body}
+                </blockquote>
+                {f.attribution && (
+                  <figcaption class="mt-3 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+                    — {f.attribution}
+                  </figcaption>
+                )}
+              </figure>
+            )}
+            {f.kind === 'writing' && (
+              <a href={`/blog/${f.item.slug}`} data-read={f.item.slug} class="block cursor-pointer">
+                <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{f.item.title}</h2>
+                <p class="sw-excerpt excerpt-fade prose-measure mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] text-base-content/70">
+                  {f.item.excerpt}
+                </p>
+              </a>
+            )}
+          </div>
+        </article>
+      ))
+    }
+  </div>
+
+  {/* The outro always resolves UPWARD to the overview, never sideways — and
+      it names the one term a visitor needs, at the exact moment it lands:
+      they just walked a constellation; here are all of them. (Its generous
+      height is also scroll runway for the lamplight's hand-off.) */}
+  <div class="mt-24 border-t border-base-300 pt-16 pb-10 sm:pt-24">
+    <a href="/" class="group inline-flex items-baseline gap-3">
+      <span class="text-primary transition-opacity group-hover:opacity-70" aria-hidden="true">&#10022;</span>
+      <span class="font-display text-3xl font-light transition-colors group-hover:text-primary sm:text-4xl">
+        all constellations
+      </span>
+    </a>
+  </div>
+</section>
+
+{/* The blog's Reader, verbatim — essays read identically everywhere. */}
+<Reader />
+{writings.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
+
+<a href="/" class="sky-return" data-sky-return aria-label="All constellations" title="All constellations">&#10022;</a>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  type Pt = { x: number; y: number };
+
+  let suiteEl: HTMLElement | null = null;
+  let items: HTMLElement[] = [];
+  let svg: SVGSVGElement | null = null;
+  let lit: HTMLElement | null = null;
+  let returnBtn: HTMLElement | null = null;
+  let ro: ResizeObserver | null = null;
+
+  // The drawn line: per-segment arcs that stop short of each mark and bow
+  // gently side to side — phrase marks in a score, not a wire. (The single
+  // continuous-spline "thread" variant lives in /sky-lab if we ever swap.)
+  function arcsPath(pts: Pt[]): string {
+    const GAP = 14;
+    let d = '';
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < GAP * 2.5) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      const a = { x: p1.x + ux * GAP, y: p1.y + uy * GAP };
+      const b = { x: p2.x - ux * GAP, y: p2.y - uy * GAP };
+      const bow = Math.min(30, len * 0.16) * (i % 2 ? -1 : 1);
+      const c = { x: (a.x + b.x) / 2 + -uy * bow, y: (a.y + b.y) / 2 + ux * bow };
+      d += `M ${a.x} ${a.y} Q ${c.x} ${c.y} ${b.x} ${b.y} `;
+    }
+    return d;
+  }
+
+  function drawLine() {
+    if (!suiteEl?.isConnected) return;
+    svg?.remove();
+    svg = null;
+    const box = suiteEl.getBoundingClientRect();
+    const pts = items.map((el) => {
+      const r = el.querySelector('.suite-mark')!.getBoundingClientRect();
+      return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+    });
+    const d = arcsPath(pts);
+    if (!d) return;
+    svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'suite-line');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-opacity', '0.16');
+    path.setAttribute('stroke-width', '1');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
+    suiteEl.prepend(svg);
+  }
+
+  // The passing lamplight: the fragment nearest the reading line (a little
+  // above true center — where eyes rest) takes the glow. Exactly one at a
+  // time; none once the suite is out of view.
+  function updateGlow() {
+    let best: HTMLElement | null = null;
+    if (suiteEl?.isConnected) {
+      // The reading line DRIFTS with scroll progress — high in the viewport
+      // at the top of the page, low near the end — so the hand-off passes
+      // through EVERY stanza in order: the first and last get the light at
+      // the extremes, and nothing between is skipped. (A fixed line starves
+      // the edges; edge-clamps starve their neighbors.)
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const t = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0.5;
+      const line = window.innerHeight * (0.15 + 0.7 * t);
+      let bestD = Infinity;
+      for (const el of items) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) continue;
+        const d = Math.abs(r.top + r.height / 2 - line);
+        if (d < bestD) {
+          bestD = d;
+          best = el;
+        }
+      }
+    }
+    if (best !== lit) {
+      lit?.classList.remove('is-lit');
+      best?.classList.add('is-lit');
+      lit = best;
+    }
+  }
+
+  // The floating ✦ appears once you've scrolled into the suite's depths.
+  function updateReturn() {
+    returnBtn?.classList.toggle('is-visible', window.scrollY > window.innerHeight * 0.75);
+  }
+
+  let raf = 0;
+  function onScroll() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      updateGlow();
+      updateReturn();
+    });
+  }
+
+  function init() {
+    suiteEl = document.getElementById('suite');
+    returnBtn = document.querySelector('[data-sky-return]');
+    ro?.disconnect();
+    ro = null;
+    lit = null;
+    if (!suiteEl) return;
+    items = [...suiteEl.querySelectorAll<HTMLElement>('.suite-item')];
+    drawLine();
+    updateGlow();
+    updateReturn();
+    ro = new ResizeObserver(drawLine);
+    ro.observe(document.body);
+    (document as any).fonts?.ready?.then(drawLine);
+  }
+
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+
+  // Escape lifts you to the sky — unless the Reader is open (it owns Escape).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !document.getElementById('suite')) return;
+    const reader = document.getElementById('site-reader') as HTMLDialogElement | null;
+    if (reader?.open) return;
+    navigate('/');
+  });
+
+  document.addEventListener('astro:page-load', init);
+  init();
+</script>

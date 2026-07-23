@@ -7,12 +7,16 @@
 
   Layout notes (deliberate):
     · The quote is NOT italicized — a full italic block at this size reads as
-      strained; upright serif is easier on the eyes.
-    · The caption reads: attribution on the left, then subjects, then the date
-      pinned to the far RIGHT. The date is intentionally last, after the tags,
-      and labelled "Added …": a quote's date is provenance (when it entered
-      Michael's life), NOT when it was said — putting a bare date next to the
-      attribution wrongly implies the latter.
+      strained; upright serif is easier on the eyes. Set light, at reading
+      size, with line breaks preserved (poetry survives).
+    · The attribution is serif ALL-SMALL-CAPS in muted ink — the same
+      convention the constellation suite uses (sky-lab round 1; Michael's
+      call 2026-07-23: the blog follows the Sky here, not the reverse).
+      Subjects + the date stay sans — they're chrome, not content.
+    · The date is intentionally last, after the tags, and labelled "Added …":
+      a quote's date is provenance (when it entered Michael's life), NOT when
+      it was said — putting a bare date next to the attribution wrongly
+      implies the latter.
 */
 import Timestamp from './Timestamp.astro';
 import Highlighted from './admin/Highlighted.astro';
@@ -33,13 +37,15 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
 <figure class="py-9 first:pt-0">
-  <blockquote class="font-serif text-xl leading-relaxed text-base-content/85">
+  <blockquote class="font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line text-base-content">
     {searching ? <Highlighted text={item.body} term={term} /> : item.body}
   </blockquote>
   <figcaption class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm text-base-content/45">
     {
       item.attribution && (
-        <span>— {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}</span>
+        <span class="font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+          — {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}
+        </span>
       )
     }
     {/* Subjects then the "Added" date, pinned right (provenance, not when-said). */}

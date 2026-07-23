@@ -1,18 +1,38 @@
-// Client behaviour for the blog feed (/blog): live search + infinite scroll.
-// Both operate on #blog-feed and are coordinated here so they never fight:
+// Client behaviour for the blog feed (/blog): live search, stackable subject
+// filters, and infinite scroll. All three operate on #blog-feed and the rail,
+// coordinated here so they never fight:
 //
-//   · Search  — a debounced fetch-and-swap of #blog-feed (input lives in the rail,
-//     outside the swap, so it keeps focus). Mirrors the admin + docs/search.md:
-//     MIN_SEARCH gating, effective-query comparison, URL hygiene, clear reverts.
-//     After a swap it re-arms the infinite-scroll observer on the fresh sentinel.
+//   · Search  — a debounced fetch-and-swap (input lives in the rail, outside the
+//     swap, so it keeps focus). Mirrors the admin + docs/search.md: MIN_SEARCH
+//     gating, effective-query comparison, URL hygiene, clear reverts.
+//   · Subjects — the rail's tags are toggle links whose href the server already
+//     builds to the post-toggle selection (AND semantics). We intercept the click
+//     and swap in place instead of navigating. Search and subjects COMPOSE, so a
+//     swap re-renders both the feed AND the rail (counts, disabled dead-ends,
+//     which tags are selected) — that's why every path funnels through swapTo().
 //   · Infinite scroll — an IntersectionObserver on #feed-sentinel appends the next
-//     page (fetched via X-Requested-With, so the server honours ?page) into
-//     #feed-list. The sentinel carries data-next-url; the manual "Load older" link
-//     inside it is the no-JS fallback and also works as a click-to-load.
+//     page (fetched via X-Requested-With so the server honours ?page) into
+//     #feed-list. Re-armed after every swap on the fresh sentinel.
 import { MIN_SEARCH } from '../lib/search-highlight';
 
 let io: IntersectionObserver | null = null;
 let loadingMore = false;
+
+// Only the newest swap may write the DOM — a fast typist or a tag tapped
+// mid-fetch must not let a stale response clobber a newer one.
+let swapToken = 0;
+
+// Search state at module scope so the Clear control can reset the baseline in
+// lockstep when it empties the field from outside the search closure.
+let qInput: HTMLInputElement | null = null;
+let searchTimer = 0;
+let lastEffective = '';
+
+/** The query the server would actually act on (below MIN_SEARCH ⇒ none). */
+function effective(): string {
+  const raw = qInput?.value.trim() ?? '';
+  return raw.length >= MIN_SEARCH ? raw : '';
+}
 
 /** (Re)arm the observer on the current sentinel — call after any feed swap. */
 function observeSentinel() {
@@ -66,77 +86,115 @@ async function loadMore(): Promise<void> {
   }
 }
 
-/** Bind the rail search input to a debounced fetch-and-swap of the feed. */
+/**
+ * Fetch a /blog URL as a partial and swap the feed AND the subjects rail in
+ * place, keeping the search field (which lives outside both) focused. Returns
+ * false if the fetch failed, so the caller can fall back to a full navigation.
+ */
+async function swapTo(target: string): Promise<boolean> {
+  const feed = document.getElementById('blog-feed');
+  if (!feed) return false;
+  const mine = ++swapToken;
+  feed.classList.add('list-loading');
+  try {
+    const res = await fetch(target, { headers: { 'X-Requested-With': 'fetch' } });
+    if (!res.ok) throw new Error('bad status');
+    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const nextFeed = doc.getElementById('blog-feed');
+    if (!nextFeed) throw new Error('no feed');
+    if (mine !== swapToken) return true; // a newer swap already won — not an error
+
+    feed.innerHTML = nextFeed.innerHTML;
+
+    // Re-render the subjects block so counts, disabled dead-ends, and selection
+    // track the new filter. Only its innards are swapped — the search field is
+    // untouched, so caret + focus survive. The wrapper element persists, so its
+    // is-expanded (mobile "Show all") state carries over; realign the button.
+    const rail = document.querySelector('[data-subjects]');
+    const nextRail = doc.querySelector('[data-subjects]');
+    if (rail && nextRail) {
+      rail.innerHTML = nextRail.innerHTML;
+      if (rail.classList.contains('is-expanded')) {
+        const btn = rail.querySelector('[data-subjects-toggle]');
+        if (btn) {
+          btn.textContent = 'Show fewer';
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      }
+    } else if (rail && !nextRail) {
+      rail.remove(); // filtered into a state with no subjects at all
+    }
+
+    history.replaceState({}, '', target);
+    observeSentinel(); // the swap brought a fresh sentinel (or none)
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (mine === swapToken) feed.classList.remove('list-loading');
+  }
+}
+
+/** Reflect the current search term into the URL and swap. Hard-fallback to a
+ *  real form submit if the fetch fails. */
+async function runSearch(form: HTMLFormElement): Promise<void> {
+  lastEffective = effective();
+  const url = new URL(location.href);
+  if (lastEffective) url.searchParams.set('q', lastEffective);
+  else url.searchParams.delete('q'); // below MIN_SEARCH → omitted (URL stays clean)
+  url.searchParams.delete('page'); // a changed query restarts at page 1
+  const ok = await swapTo(url.pathname + url.search);
+  if (!ok) form.submit();
+}
+
+/** Bind the rail search input to a debounced fetch-and-swap of the feed + rail. */
 function setupSearch() {
   const form = document.getElementById('blog-filters') as HTMLFormElement | null;
-  const feed = document.getElementById('blog-feed');
-  const qInput = form?.elements.namedItem('q') as HTMLInputElement | null;
-  if (!form || !feed || !qInput) return;
+  qInput = (form?.elements.namedItem('q') as HTMLInputElement | null) ?? null;
+  if (!form || !qInput) return;
+  lastEffective = effective();
 
-  const effective = () => {
-    const raw = qInput.value.trim();
-    return raw.length >= MIN_SEARCH ? raw : '';
+  const maybeRun = () => {
+    if (effective() !== lastEffective) runSearch(form);
   };
-  let lastSearch = effective();
-  let timer: number;
-  let token = 0;
-
-  async function apply() {
-    const params = new URLSearchParams();
-    const currentView = (form!.elements.namedItem('view') as HTMLInputElement | null)?.value.trim();
-    if (currentView) params.set('view', currentView); // keep Quotes/Songs on their own view
-    const subject = (form!.elements.namedItem('subject') as HTMLInputElement | null)?.value.trim();
-    if (subject) params.set('subject', subject);
-    const eff = effective();
-    if (eff) params.set('q', eff); // below MIN_SEARCH → omitted (URL stays clean)
-    const target = '/blog' + (params.toString() ? `?${params}` : '');
-
-    const mine = ++token;
-    feed!.classList.add('list-loading');
-    try {
-      const res = await fetch(target, { headers: { 'X-Requested-With': 'fetch' } });
-      if (!res.ok) throw new Error('bad status');
-      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-      const next = doc.getElementById('blog-feed');
-      if (!next) throw new Error('no feed');
-      if (mine !== token) return; // a newer keystroke already won
-      feed!.innerHTML = next.innerHTML;
-      history.replaceState({}, '', target);
-      observeSentinel(); // the swap brought a fresh sentinel (or none)
-    } catch {
-      form!.submit(); // hard fallback: let the form navigate
-      return;
-    } finally {
-      if (mine === token) feed!.classList.remove('list-loading');
-    }
-  }
-
-  function maybeApply() {
-    const eff = effective();
-    if (eff === lastSearch) return; // effective query unchanged → skip
-    lastSearch = eff;
-    apply();
-  }
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    clearTimeout(timer);
-    lastSearch = effective();
-    apply();
+    clearTimeout(searchTimer);
+    runSearch(form);
   });
   qInput.addEventListener('input', () => {
-    clearTimeout(timer);
-    timer = window.setTimeout(maybeApply, 250);
+    clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(maybeRun, 250);
   });
   qInput.addEventListener('search', () => {
     // Native clear (✕) / Enter in a type=search field.
-    clearTimeout(timer);
-    maybeApply();
+    clearTimeout(searchTimer);
+    maybeRun();
   });
 }
 
-// Manual "Load older" click → load in place instead of navigating (delegated,
-// bound once; survives feed swaps and view-transition navigation).
+// Subject tags + Clear (delegated, bound once; survives swaps + view-transition
+// navigation). The <a> already encodes the resulting URL — server builds the
+// toggle — so we just intercept and swap in place instead of navigating.
+document.addEventListener('click', (e) => {
+  const link = (e.target as Element)?.closest?.('[data-subject-link], [data-subject-clear]') as HTMLAnchorElement | null;
+  if (!link) return;
+  e.preventDefault();
+  const u = new URL(link.href, location.href);
+  const target = u.pathname + u.search;
+  // Clear empties the search field too — it lives outside the swapped rail, so
+  // reset it AND the baseline so retyping the same term still fires a search.
+  if (link.matches('[data-subject-clear]') && qInput) {
+    qInput.value = '';
+    lastEffective = '';
+  }
+  swapTo(target).then((ok) => {
+    if (!ok) location.href = link.href; // fetch failed → let the browser navigate
+  });
+});
+
+// Manual "Load older" click → load in place instead of navigating.
 document.addEventListener('click', (e) => {
   const more = (e.target as Element)?.closest?.('[data-feed-more]');
   if (more) {
@@ -146,8 +204,6 @@ document.addEventListener('click', (e) => {
 });
 
 // Subjects rail (mobile): reveal the long tail behind "Show all" / "Show fewer".
-// The rail lives outside #blog-feed, so this is delegated on document (survives
-// search swaps and view-transition navigation) rather than bound per-render.
 document.addEventListener('click', (e) => {
   const btn = (e.target as Element)?.closest?.('[data-subjects-toggle]') as HTMLElement | null;
   const wrap = btn?.closest('[data-subjects]');

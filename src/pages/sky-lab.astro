@@ -1,0 +1,493 @@
+---
+/*
+  /sky-lab — a LOCAL-ONLY prototyping bench for the Sky's visual language.
+  Never rendered in production (dev-gated below); never linked from anywhere.
+
+  Round 2 (after Michael's calls): the carded suite and the star-field are OUT.
+  What remains is the model of what will actually be built:
+    1. The suite, TYPESET — each medium in its own register; writing opens the
+       real Reader (the same component the blog uses); music via Spotify embeds
+       in two candidate roles (a score at the top / a stanza in the suite);
+       the star-line softened into drawn arcs, with a style cycler to compare.
+    2. The sky as a weighted LIST — the zoomed-out overview.
+
+  Once the remaining calls are made, the winner gets rebuilt properly
+  (primitives, tokens, styleguide band) and this page is deleted.
+*/
+import Base from '../layouts/Base.astro';
+import Label from '../components/Label.astro';
+import Reader from '../components/Reader.astro';
+import PostArticle from '../components/PostArticle.astro';
+import { getWritingBySlug, type WritingItem } from '../lib/blog';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+// Real published essays — full bodies, for the Reader templates.
+const supabase = Astro.locals.supabase;
+const [forgiveness, regret, oppression] = await Promise.all([
+  getWritingBySlug(supabase, 'forgiveness'),
+  getWritingBySlug(supabase, 'regret'),
+  getWritingBySlug(supabase, 'oppression'),
+]);
+const essays = [forgiveness, regret, oppression].filter((w): w is WritingItem => !!w);
+const essayBySlug = new Map(essays.map((w) => [w.slug, w]));
+
+// ── the suite: real published fragments, composed (not sorted) ─────────────
+type SuiteItem =
+  | { kind: 'quote'; text: string; attribution: string }
+  | { kind: 'writing'; slug: string }
+  | { kind: 'song'; embedId: string; note: string };
+
+const suite: SuiteItem[] = [
+  {
+    kind: 'quote',
+    text: 'Well being is good luck, or good character.',
+    attribution: 'Marcus Aurelius · Meditations 7:17',
+  },
+  { kind: 'writing', slug: 'forgiveness' },
+  {
+    kind: 'quote',
+    text: 'The line separating good and evil passes not through states, nor between classes, nor between political parties either—but right through every human heart—and through all human hearts. This line shifts. Inside us, it oscillates with the years.',
+    attribution: 'Aleksandr Solzhenitsyn',
+  },
+  {
+    kind: 'song',
+    embedId: '4EYx2QQoBTwMEzl5Tpfljx',
+    note: 'added 2023 · the song that scored “Choice”',
+  },
+  { kind: 'writing', slug: 'regret' },
+  {
+    kind: 'quote',
+    text: 'When you wake up in the morning, tell yourself: The people I deal with today will be meddling, ungrateful, arrogant, dishonest, jealous, and surly. They are like this because they can’t tell good from evil.',
+    attribution: 'Marcus Aurelius · Meditations 2:1',
+  },
+  { kind: 'writing', slug: 'oppression' },
+  {
+    kind: 'quote',
+    text: 'Do not seek for things to happen the way you want them to; rather, wish that what happens happen the way it happens: then you will be happy.',
+    attribution: 'Epictetus',
+  },
+];
+
+const glyph = { song: '♪', quote: '”', writing: '▤' } as const;
+
+// asymmetric offsets (sm+ only) — the drawn line gets its angles from these
+const indents = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
+
+const weightedList = [
+  { name: 'conditions, not character', weight: 'text-4xl sm:text-5xl' },
+  { name: 'it only happens once', weight: 'text-3xl sm:text-4xl' },
+  { name: 'the one who reaches first', weight: 'text-2xl sm:text-3xl' },
+  { name: 'not looking away', weight: 'text-xl sm:text-2xl' },
+  { name: 'the invisible graveyard', weight: 'text-lg sm:text-xl' },
+  { name: 'love stretched too thin', weight: 'text-base sm:text-lg' },
+  { name: 'built for depth', weight: 'text-base' },
+];
+---
+
+<Base title="Sky lab — It Only Happens Once">
+  <!-- ── lab bar ─────────────────────────────────────────────────────── -->
+  <div class="sticky top-0 z-50 border-b border-base-300 bg-base-100/85 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+      <Label variant="chrome" as="span">Sky lab · local only</Label>
+      <div class="flex flex-wrap items-center gap-2 font-sans text-sm">
+        <button id="t-line" class="btn btn-ghost btn-sm normal-case">line: arcs</button>
+        <button id="t-glow" class="btn btn-ghost btn-sm normal-case" aria-pressed="true">glow: on</button>
+        <button id="t-offset" class="btn btn-ghost btn-sm normal-case" aria-pressed="true">offsets: on</button>
+        <button id="t-theme" class="btn btn-ghost btn-sm normal-case">dusk</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-5xl px-6 py-16">
+    <header class="mb-20">
+      <Label variant="voice">prototype · round two</Label>
+      <h1 class="mt-4 font-display text-4xl leading-[1.1] font-light sm:text-6xl">
+        The suite, refined
+      </h1>
+      <p class="prose-measure mt-6 text-lg text-base-content/70">
+        Real fragments, the real Reader, both music treatments, and a softer
+        drawn line — cycle its style from the bar above. This is the model of
+        what gets built.
+      </p>
+    </header>
+
+    <!-- ═══ 1 · the suite ═════════════════════════════════════════════ -->
+    <section class="mb-28">
+      <Label as="h2" variant="voice" class="mb-2">1 · The constellation</Label>
+      <p class="prose-measure mb-10 text-base-content/60">
+        Writing carries no metadata here — hover it and the lamplight falls on
+        it; click and the blog's own Reader opens. The playlist under the
+        epigraph and the track inside the suite are the two candidate roles
+        for music — judge them against each other.
+      </p>
+
+      <div class="rounded-box border border-base-300 bg-base-100 px-5 py-12 sm:px-12 sm:py-16">
+        <!-- the landing header -->
+        <Label variant="voice">tonight</Label>
+        <div class="mt-2 flex items-baseline gap-3">
+          <span class="text-primary" aria-hidden="true">&#10022;</span>
+          <h3 class="font-display text-4xl leading-[1.05] font-light sm:text-5xl">
+            conditions, not character
+          </h3>
+        </div>
+        <p class="prose-measure mt-5 border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
+          Outcomes are shaped by structural conditions far more than individual
+          willpower.
+        </p>
+
+        <!-- candidate A: the set's score — one tap, plays through the read -->
+        <div class="mt-9 max-w-xl">
+          <iframe
+            src="https://open.spotify.com/embed/playlist/28ohILaOsYNo8vZlmkfFkf"
+            width="100%"
+            height="152"
+            frameborder="0"
+            loading="lazy"
+            allow="encrypted-media"
+            title="The score — Disconsolate (2013–2015)"
+            style="border-radius: var(--radius-box)"></iframe>
+          <p class="mt-2 font-sans text-xs text-base-content/40">
+            candidate a · the set&rsquo;s score — press play, then read
+          </p>
+        </div>
+
+        <!-- the suite -->
+        <div id="suite" class="suite relative mt-16 flex flex-col gap-16 text-base-content">
+          {
+            suite.map((f, i) => (
+              <article
+                class:list={['suite-item relative flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
+                style={`--indent:${indents[i]}`}
+              >
+                <span
+                  class="suite-mark mt-1.5 w-5 shrink-0 text-center font-serif text-base text-base-content/35 select-none"
+                  aria-hidden="true"
+                >
+                  {glyph[f.kind]}
+                </span>
+                <div class="min-w-0 grow">
+                  {f.kind === 'quote' && (
+                    <figure>
+                      <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
+                        {f.text}
+                      </blockquote>
+                      <figcaption class="mt-3 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+                        — {f.attribution}
+                      </figcaption>
+                    </figure>
+                  )}
+                  {f.kind === 'writing' && essayBySlug.has(f.slug) && (
+                    <a href={`/blog/${essayBySlug.get(f.slug)!.slug}`} data-read={f.slug} class="block cursor-pointer">
+                      <h4 class="sw-title font-display text-2xl leading-tight font-light transition-colors sm:text-3xl">
+                        {essayBySlug.get(f.slug)!.title}
+                      </h4>
+                      <p class="sw-excerpt excerpt-fade prose-measure mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] text-base-content/70 transition-colors">
+                        {essayBySlug.get(f.slug)!.excerpt}
+                      </p>
+                    </a>
+                  )}
+                  {f.kind === 'song' && (
+                    <div class="max-w-xl">
+                      <iframe
+                        src={`https://open.spotify.com/embed/track/${f.embedId}`}
+                        width="100%"
+                        height="152"
+                        frameborder="0"
+                        loading="lazy"
+                        allow="encrypted-media"
+                        title="Mantra — Makaya McCraven"
+                        style="border-radius: var(--radius-box)"></iframe>
+                      <p class="mt-2 font-sans text-xs text-base-content/40">candidate b · a stanza in the suite · {f.note}</p>
+                    </div>
+                  )}
+                </div>
+              </article>
+            ))
+          }
+        </div>
+
+        <!-- the peek: the next constellation, drifting in -->
+        <div class="mt-20 border-t border-base-300 pt-8">
+          <div class="flex items-baseline gap-3 opacity-40">
+            <span class="text-primary" aria-hidden="true">&#10022;</span>
+            <p class="font-display text-2xl font-light">the one who reaches first</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 2 · the sky — weighted list ═══════════════════════════════ -->
+    <section class="mb-28">
+      <Label as="h2" variant="voice" class="mb-2">2 · The sky</Label>
+      <p class="prose-measure mb-10 text-base-content/60">
+        Zoomed out: the weighted, staggered list. Uneven on purpose — weight is
+        signal.
+      </p>
+
+      <div class="rounded-box border border-base-300 bg-base-100 px-6 py-14 sm:px-16">
+        <div class="flex flex-col gap-5">
+          {
+            weightedList.map((c, i) => (
+              <div class={`flex items-baseline gap-3 ${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}>
+                <span class="text-xs text-primary/60" aria-hidden="true">&#10022;</span>
+                <span class={`${c.weight} font-display cursor-pointer font-light transition-colors hover:text-primary`}>{c.name}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <footer class="border-t border-base-300 pt-8 font-sans text-xs text-base-content/30">
+      Local prototype — dev only, never deployed. Every value comes from
+      <code>src/styles/app.css</code>; the lines are currentColor at low opacity.
+    </footer>
+  </main>
+
+  <!-- the blog's own Reader — literally the same component -->
+  <Reader />
+  {essays.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
+</Base>
+
+<style is:global>
+  /* lab-only structural rules; colors stay semantic (currentColor / tokens) */
+
+  /* suite offsets — the angles of the drawn line (wide screens only) */
+  @media (min-width: 640px) {
+    .suite-item {
+      margin-inline-start: var(--indent, 0%);
+    }
+  }
+  .lab-flat .suite-item {
+    margin-inline-start: 0 !important;
+  }
+
+  /* one slow, even breath for every warming element (glow + hover) */
+  .suite-mark,
+  .suite-item blockquote,
+  .suite-item figcaption,
+  .sw-title,
+  .sw-excerpt {
+    transition:
+      color 0.5s ease,
+      text-shadow 0.5s ease;
+  }
+
+  /* the passing lamplight — the fragment nearest the reading line warms,
+     SOFTER than hover: a tint and a faint halo, never the full amber */
+  .suite-item.is-lit .suite-mark {
+    color: color-mix(in oklab, var(--color-primary) 55%, transparent);
+  }
+  .suite-item.is-lit blockquote {
+    color: color-mix(in oklab, var(--color-primary) 24%, var(--color-base-content));
+    text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 20%, transparent);
+  }
+  /* the attribution warms with its quote — same light, kept a step quieter */
+  .suite-item.is-lit figcaption {
+    color: color-mix(
+      in oklab,
+      var(--color-primary) 30%,
+      color-mix(in oklab, var(--color-base-content) 58%, transparent)
+    );
+  }
+  .suite-item.is-lit .sw-title {
+    color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
+    text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 18%, transparent);
+  }
+  .suite-item.is-lit .sw-excerpt {
+    color: color-mix(
+      in oklab,
+      var(--color-primary) 14%,
+      color-mix(in oklab, var(--color-base-content) 76%, transparent)
+    );
+  }
+
+  /* writing: no chrome — hover is the stronger, deliberate light (must come
+     AFTER the .is-lit rules so it wins at equal specificity) */
+  .suite-writing:hover .sw-title {
+    color: var(--color-primary);
+  }
+  .suite-writing:hover .sw-excerpt {
+    color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
+  }
+  .suite-writing:hover .suite-mark {
+    color: color-mix(in oklab, var(--color-primary) 75%, transparent);
+  }
+
+  /* excerpts: clamped with a true ellipsis (line-clamp) AND a fade —
+     the mask bottoms out at partial opacity so the ellipsis stays legible */
+  .excerpt-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      black 45%,
+      color-mix(in srgb, black 38%, transparent) 100%
+    );
+  }
+
+  /* the drawn line: injected SVG, behind the text */
+  .suite-line {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .suite-item {
+    z-index: 1;
+  }
+</style>
+
+<script>
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
+  type Pt = { x: number; y: number };
+  const LINE_MODES = ['arcs', 'thread', 'straight', 'off'] as const;
+  let lineMode: (typeof LINE_MODES)[number] = 'arcs';
+
+  function center(el: Element, within: Element): Pt {
+    const a = el.getBoundingClientRect();
+    const b = within.getBoundingClientRect();
+    return { x: a.left - b.left + a.width / 2, y: a.top - b.top + a.height / 2 };
+  }
+
+  // ── path builders ───────────────────────────────────────────────────────
+  // arcs: per-segment quadratic curves that stop short of each mark and bow
+  // gently side to side — phrase marks in a score, not a wire.
+  function arcsPath(pts: Pt[]): string {
+    const GAP = 14;
+    let d = '';
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < GAP * 2.5) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      const a = { x: p1.x + ux * GAP, y: p1.y + uy * GAP };
+      const b = { x: p2.x - ux * GAP, y: p2.y - uy * GAP };
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const bow = Math.min(30, len * 0.16) * (i % 2 ? -1 : 1);
+      const c = { x: mid.x + (-uy) * bow, y: mid.y + ux * bow };
+      d += `M ${a.x} ${a.y} Q ${c.x} ${c.y} ${b.x} ${b.y} `;
+    }
+    return d;
+  }
+
+  // thread: one continuous Catmull-Rom spline through every mark — a single
+  // drifting line, like a hand that never lifted from the page.
+  function threadPath(pts: Pt[]): string {
+    if (pts.length < 2) return '';
+    let d = `M ${pts[0].x} ${pts[0].y} `;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] ?? pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] ?? p2;
+      const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+      const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+      d += `C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y} `;
+    }
+    return d;
+  }
+
+  function straightPath(pts: Pt[]): string {
+    return pts.length ? `M ${pts.map((p) => `${p.x} ${p.y}`).join(' L ')}` : '';
+  }
+
+  // ── draw ────────────────────────────────────────────────────────────────
+  const suiteEl = document.getElementById('suite');
+  let suiteSvg: SVGSVGElement | null = null;
+  function drawSuite() {
+    if (!suiteEl) return;
+    suiteSvg?.remove();
+    suiteSvg = null;
+    if (lineMode === 'off') return;
+    const pts = [...suiteEl.querySelectorAll('.suite-mark')].map((m) => center(m, suiteEl));
+    const d = lineMode === 'arcs' ? arcsPath(pts) : lineMode === 'thread' ? threadPath(pts) : straightPath(pts);
+    if (!d) return;
+    suiteSvg = document.createElementNS(SVGNS, 'svg');
+    suiteSvg.setAttribute('class', 'suite-line');
+    suiteSvg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-opacity', '0.16');
+    path.setAttribute('stroke-width', '1');
+    path.setAttribute('stroke-linecap', 'round');
+    suiteSvg.appendChild(path);
+    suiteEl.prepend(suiteSvg);
+  }
+
+  drawSuite();
+  new ResizeObserver(drawSuite).observe(document.body);
+  (document as any).fonts?.ready?.then(drawSuite);
+
+  // ── the passing lamplight: warm the fragment nearest the reading line ───
+  const items = [...document.querySelectorAll<HTMLElement>('.suite-item')];
+  let glowOn = true;
+  let lit: HTMLElement | null = null;
+  function updateGlow() {
+    let best: HTMLElement | null = null;
+    if (glowOn) {
+      // the reading line sits a little above true center — where eyes rest
+      const line = window.innerHeight * 0.42;
+      let bestD = Infinity;
+      for (const el of items) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) continue;
+        const d = Math.abs(r.top + r.height / 2 - line);
+        if (d < bestD) {
+          bestD = d;
+          best = el;
+        }
+      }
+    }
+    if (best !== lit) {
+      lit?.classList.remove('is-lit');
+      best?.classList.add('is-lit');
+      lit = best;
+    }
+  }
+  let glowRaf = 0;
+  function queueGlow() {
+    cancelAnimationFrame(glowRaf);
+    glowRaf = requestAnimationFrame(updateGlow);
+  }
+  addEventListener('scroll', queueGlow, { passive: true });
+  addEventListener('resize', queueGlow);
+  updateGlow();
+
+  // ── lab controls ────────────────────────────────────────────────────────
+  const lineBtn = document.getElementById('t-line');
+  lineBtn?.addEventListener('click', () => {
+    lineMode = LINE_MODES[(LINE_MODES.indexOf(lineMode) + 1) % LINE_MODES.length];
+    lineBtn.textContent = `line: ${lineMode}`;
+    drawSuite();
+  });
+  const glowBtn = document.getElementById('t-glow');
+  glowBtn?.addEventListener('click', () => {
+    glowOn = !glowOn;
+    glowBtn.textContent = `glow: ${glowOn ? 'on' : 'off'}`;
+    glowBtn.setAttribute('aria-pressed', String(glowOn));
+    updateGlow();
+  });
+  const offsetBtn = document.getElementById('t-offset');
+  offsetBtn?.addEventListener('click', () => {
+    const off = document.documentElement.classList.toggle('lab-flat');
+    offsetBtn.textContent = `offsets: ${off ? 'off' : 'on'}`;
+    offsetBtn.setAttribute('aria-pressed', String(!off));
+    drawSuite();
+  });
+  const themeBtn = document.getElementById('t-theme');
+  themeBtn?.addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'paper' ? 'dusk' : 'paper';
+    root.dataset.theme = next;
+    themeBtn.textContent = next;
+  });
+</script>

@@ -1,0 +1,157 @@
+---
+/*
+  /admin/constellations — the sky's index (design.md §13; the composing room).
+  Every constellation, draft and published: create, publish/unpublish, reorder
+  the sky's authored order, delete (placements cascade; fragments untouched).
+  A "pile" is just a draft constellation — start one in seconds, compose later.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+
+const sb = Astro.locals.supabase;
+const [{ data: cs }, { data: links }] = await Promise.all([
+  sb.from('constellations').select('id, name, slug, description, status, sort').order('sort'),
+  sb
+    .from('fragment_constellations')
+    .select('constellation_id, fragments!inner(status, deleted_at)')
+    .is('fragments.deleted_at', null),
+]);
+
+const placed = new Map<string, { total: number; published: number }>();
+for (const l of links ?? []) {
+  const e = placed.get(l.constellation_id) ?? { total: 0, published: 0 };
+  e.total++;
+  if ((l.fragments as unknown as { status: string }).status === 'published') e.published++;
+  placed.set(l.constellation_id, e);
+}
+const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, published: 0 }) }));
+---
+
+<AdminLayout title="Constellations" active="constellations">
+  <div class="mx-auto max-w-4xl px-6 py-8">
+    <h1 class="font-display text-2xl">Constellations</h1>
+    <p class="mt-1 mb-6 max-w-2xl font-sans text-sm text-base-content/55">
+      The sky's authored order. A draft never reaches the public sky — start one as a pile, compose
+      when you're ready. Deleting removes placements only; fragments are never touched.
+    </p>
+
+    <p id="cl-error" hidden role="alert" class="mb-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 font-sans text-sm text-error"></p>
+
+    <form id="new-constellation" class="mb-8 flex flex-wrap items-center gap-2">
+      <input
+        name="name"
+        required
+        placeholder="A new way of seeing…"
+        class="input input-bordered w-full max-w-xs font-sans"
+      />
+      <button type="submit" class="btn btn-primary font-sans normal-case">
+        <Icon name="ph:plus" /> New constellation
+      </button>
+    </form>
+
+    <ul id="cl-list" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200">
+      {
+        rows.map((c) => (
+          <li class="flex items-center gap-3 px-4 py-3" data-id={c.id}>
+            <span class="text-primary/60" aria-hidden="true">&#10022;</span>
+            <div class="min-w-0 grow">
+              <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">
+                {c.name}
+              </a>
+              <span class="ml-3 font-sans text-xs text-base-content/45">
+                {c.total} placed · {c.published} public
+              </span>
+              {c.status === 'draft' && (
+                <span class="ml-2 rounded-field border border-warning/40 px-1.5 py-0.5 font-sans text-[0.65rem] tracking-wide text-warning uppercase">
+                  draft
+                </span>
+              )}
+            </div>
+            <button type="button" class="btn btn-ghost btn-xs font-sans" data-move="up" title="Move up">
+              <Icon name="ph:arrow-up" />
+            </button>
+            <button type="button" class="btn btn-ghost btn-xs font-sans" data-move="down" title="Move down">
+              <Icon name="ph:arrow-down" />
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs font-sans"
+              data-toggle-status={c.status}
+              data-name={c.name}
+            >
+              {c.status === 'published' ? 'Unpublish' : 'Publish'}
+            </button>
+            <button type="button" class="btn btn-ghost btn-xs text-error" data-delete data-name={c.name} title="Delete">
+              <Icon name="ph:trash" />
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+    {rows.length === 0 && <p class="mt-6 font-sans text-sm text-base-content/50">No constellations yet — name the first one above.</p>}
+  </div>
+</AdminLayout>
+
+<script>
+  import { actions } from 'astro:actions';
+  import { confirmDialog } from '../../../scripts/confirm-dialog';
+  import { formatActionError } from '../../../scripts/action-error';
+
+  const errBox = document.getElementById('cl-error') as HTMLParagraphElement;
+  const show = (m: string) => ((errBox.textContent = m), (errBox.hidden = false));
+
+  // create → straight into the composer
+  document.getElementById('new-constellation')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target as HTMLFormElement);
+    const { data, error } = await actions.constellations.save(fd);
+    if (error) return show(formatActionError(error));
+    location.href = `/admin/constellations/${data.id}`;
+  });
+
+  document.getElementById('cl-list')?.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest('button');
+    const row = (e.target as Element).closest('li[data-id]') as HTMLLIElement | null;
+    if (!btn || !row) return;
+    const id = row.dataset.id!;
+
+    if (btn.dataset.move) {
+      const sib = btn.dataset.move === 'up' ? row.previousElementSibling : row.nextElementSibling;
+      if (!sib) return;
+      btn.dataset.move === 'up' ? sib.before(row) : sib.after(row);
+      const ids = [...row.parentElement!.querySelectorAll<HTMLElement>('li[data-id]')].map((l) => l.dataset.id).join(',');
+      const fd = new FormData();
+      fd.set('ids', ids);
+      const { error } = await actions.constellations.reorder(fd);
+      if (error) show(formatActionError(error));
+      return;
+    }
+
+    if (btn.hasAttribute('data-toggle-status')) {
+      const next = btn.dataset.toggleStatus === 'published' ? 'draft' : 'published';
+      const fd = new FormData();
+      fd.set('id', id);
+      fd.set('name', btn.dataset.name ?? '');
+      fd.set('status', next);
+      const { error } = await actions.constellations.save(fd);
+      if (error) return show(formatActionError(error));
+      location.reload();
+      return;
+    }
+
+    if (btn.hasAttribute('data-delete')) {
+      const ok = await confirmDialog({
+        title: 'Delete constellation',
+        message: `Delete “${btn.dataset.name}”? Its composition is lost; the fragments themselves are untouched.`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      const fd = new FormData();
+      fd.set('id', id);
+      const { error } = await actions.constellations.remove(fd);
+      if (error) return show(formatActionError(error));
+      location.reload();
+    }
+  });
+</script>

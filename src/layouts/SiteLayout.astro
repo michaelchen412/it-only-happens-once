@@ -20,12 +20,19 @@ interface Props {
   /** Optional meta description, passed through to <head>. */
   description?: string;
   /** Which top-nav item is highlighted. */
-  active?: 'blog' | 'about';
+  active?: 'home' | 'blog' | 'about';
+  /** Constellation pages bring their own floating control (the sky-return ✦)
+   *  and pass false — one quiet corner control at a time. */
+  backToTop?: boolean;
 }
-const { title, description, active } = Astro.props;
+const { title, description, active, backToTop = true } = Astro.props;
 const pageTitle = title ? `${title} — It Only Happens Once` : 'It Only Happens Once';
 
+// "Home" is explicit (not only the wordmark): the homepage is the site's
+// strangest, most load-bearing room — visitors wandering the blog need an
+// unambiguous way back to it. Constellation pages light it as active.
 const nav = [
+  { key: 'home', label: 'Home', href: '/' },
   { key: 'blog', label: 'Blog', href: '/blog' },
   { key: 'about', label: 'About', href: '/about' },
 ] as const;
@@ -111,7 +118,7 @@ const nav = [
     </main>
   </div>
 
-  <BackToTop />
+  {backToTop && <BackToTop />}
 
   <script>
     // ---- Theme toggle — dusk ⇄ paper, persisted. Delegated on document so it

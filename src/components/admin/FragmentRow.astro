@@ -1,10 +1,16 @@
 ---
 /*
-  One row of the Fragment Manager table (<tr>). The TITLE is the real, focusable
-  control — an <a> (writing → composer, supports middle/⌘-click) or a <button>
-  (quote/song → sheet). A click anywhere else on the row is a mouse-only
-  convenience that triggers the same thing (src/scripts/admin-list.ts). In trash
-  view the row isn't an edit target and shows Restore / Delete-forever actions.
+  One row of the fragment table (<tr>), shared by the Fragment Manager and the
+  composer's browser sheet (mode="pick"). The TITLE is the real, focusable
+  control — a <button> for every type: quote/song rows open the FragmentSheet,
+  writing rows open the WritingSheet (`data-writing`). A click anywhere else on
+  the row is a mouse-only convenience that triggers the same thing
+  (src/scripts/fragment-panel.ts). In trash view the row isn't an edit target
+  and shows Restore / Delete-forever actions.
+
+  mode="pick" (the browser sheet): rows already placed in the target
+  constellation render dimmed with a disabled checkbox — visible, never
+  re-addable; everything else gets a per-row ＋ place button (data-act).
 
   When a search term is active, the title/attribution highlight matches and a
   `writing` fragment shows an excerpt line per match window (search-highlight.ts).
@@ -21,14 +27,17 @@ interface Props {
   authorName?: string;
   workName?: string;
   view?: 'list' | 'trash';
+  mode?: 'manage' | 'pick';
+  placed?: boolean;
   searchTerm?: string;
 }
-const { fragment: r, subjects, authorName, workName, view = 'list', searchTerm = '' } = Astro.props;
+const { fragment: r, subjects, authorName, workName, view = 'list', mode = 'manage', placed = false, searchTerm = '' } = Astro.props;
 // The combo prefill needs ids (to select the existing entity), not just names.
 const authorId = r.author_id ?? '';
 const workId = r.work_id ?? '';
 const meta = TYPE_META[r.type as FragmentType];
-const trash = view === 'trash';
+const trash = mode === 'manage' && view === 'trash';
+const pick = mode === 'pick';
 const term = searchTerm.trim();
 
 // Excerpt the essay body (writing only — for quotes the body IS the shown title).
@@ -65,14 +74,25 @@ const editorData =
 ---
 
 <tr
-  class:list={['fragment-row border-b border-base-300 last:border-0', !trash && 'hover:bg-base-200/40']}
+  class:list={[
+    'fragment-row border-b border-base-300 last:border-0',
+    !trash && !placed && 'hover:bg-base-200/40',
+    pick && placed && 'opacity-45',
+  ]}
   data-id={r.id}
   data-type={r.type}
-  data-href={r.type === 'writing' ? `/admin/writing/${r.id}` : undefined}
+  data-writing={r.type === 'writing' ? r.id : undefined}
   data-fragment={editorData || undefined}
+  data-placed={placed ? '' : undefined}
 >
   <td class="w-8 px-3 py-2.5 align-top" data-noedit>
-    <input type="checkbox" class="row-check checkbox checkbox-xs" value={r.id} aria-label={`Select ${primaryText}`} />
+    <input
+      type="checkbox"
+      class="row-check checkbox checkbox-xs"
+      value={r.id}
+      disabled={pick && placed}
+      aria-label={`Select ${primaryText}`}
+    />
   </td>
   <td class:list={['w-6 pt-2.5 text-center align-top', meta.tone]}>
     <span aria-hidden="true">{meta.glyph}</span>
@@ -84,8 +104,6 @@ const editorData =
         <div class:list={r.type === 'quote' ? 'line-clamp-3 italic' : 'truncate'}>
           <Highlighted text={primaryText} term={term} />
         </div>
-      ) : r.type === 'writing' ? (
-        <a href={`/admin/writing/${r.id}`} class="row-open block truncate"><Highlighted text={primaryText} term={term} /></a>
       ) : r.type === 'quote' ? (
         <button type="button" class="row-open line-clamp-3 max-w-full text-left italic">
           <Highlighted text={primaryText} term={term} />
@@ -135,10 +153,29 @@ const editorData =
     {shortDate(r.updated_at)}
   </td>
   {
+    pick && (
+      <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
+        {placed ? (
+          <span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">✦ placed</span>
+        ) : (
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs font-sans normal-case"
+            data-act="place"
+            data-id={r.id}
+            title="Place in this constellation"
+          >
+            ＋
+          </button>
+        )}
+      </td>
+    )
+  }
+  {
     trash && (
       <td class="px-3 pt-2.5 text-right align-top whitespace-nowrap" data-noedit>
-        <button class="restore-btn font-sans text-xs text-base-content/70 hover:text-primary" data-id={r.id}>Restore</button>
-        <button class="purge-btn ml-3 font-sans text-xs text-base-content/70 hover:text-error" data-id={r.id}>Delete</button>
+        <button class="font-sans text-xs text-base-content/70 hover:text-primary" data-act="restore" data-id={r.id}>Restore</button>
+        <button class="ml-3 font-sans text-xs text-base-content/70 hover:text-error" data-act="purge" data-id={r.id}>Delete</button>
       </td>
     )
   }

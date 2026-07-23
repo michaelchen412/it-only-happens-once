@@ -52,24 +52,30 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          score_url: string | null
           slug: string
           sort: number
+          status: string
         }
         Insert: {
           created_at?: string
           description?: string | null
           id?: string
           name: string
+          score_url?: string | null
           slug: string
           sort?: number
+          status?: string
         }
         Update: {
           created_at?: string
           description?: string | null
           id?: string
           name?: string
+          score_url?: string | null
           slug?: string
           sort?: number
+          status?: string
         }
         Relationships: []
       }

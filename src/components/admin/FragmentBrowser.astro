@@ -1,0 +1,185 @@
+---
+/*
+  FragmentBrowser — the composer's "Add" surface: a large <dialog> drawer
+  holding a mini Fragment Manager (the same table/filters as /admin, served by
+  the fragments-panel partial in mode=pick). Browse the whole corpus, place
+  with the per-row ＋ or checkbox-select many and place them together. Rows
+  already in this constellation render dimmed and unselectable (visible truth,
+  never re-addable). Clicking a row opens its real editor in a sheet on top —
+  quote/song → FragmentSheet, writing → WritingSheet — and the header's own
+  Add ▾ creates new fragments that auto-place via body[data-place-in].
+
+  While open the hash is #browse, so the full-page reload an editor-sheet save
+  triggers lands back inside the browser with fresh rows. Closing after any
+  placement reloads the page so the suite reflects what was added.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  constellation: string;
+}
+const { constellation } = Astro.props;
+---
+
+<dialog id="fbrowser" class="drawer-dialog w-full max-w-5xl" data-constellation={constellation} aria-labelledby="fb-title">
+  <div class="flex h-full flex-col">
+    <header class="flex shrink-0 items-center gap-3 border-b border-base-300 px-6 py-3">
+      <h2 id="fb-title" class="font-display text-xl">Add to this constellation</h2>
+      <p id="fb-error" hidden role="alert" class="rounded-field border border-error/40 bg-error/10 px-2 py-1 font-sans text-xs text-error"></p>
+      <div class="relative ml-auto">
+        <button id="fb-add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
+          <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
+        </button>
+        <div id="fb-add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
+          <button data-new-writing role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-accent" aria-hidden="true">▤</span> Writing</button>
+          <button data-new="quote" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-secondary" aria-hidden="true">”</span> Quote</button>
+          <button data-new="song" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-primary" aria-hidden="true">♪</span> Song</button>
+        </div>
+      </div>
+      <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <div id="fb-panel" class="grow overflow-y-auto overscroll-contain px-6 py-4">
+      <p class="font-sans text-sm text-base-content/50">Loading fragments…</p>
+    </div>
+
+    {/* bulk place bar — appears once something is checked */}
+    <footer id="fb-bulkbar" hidden class="flex shrink-0 items-center gap-3 border-t border-base-300 bg-base-200 px-6 py-2.5 font-sans text-sm">
+      <span id="fb-bulkcount" class="text-base-content/70">0 selected</span>
+      <button id="fb-place-selected" class="btn btn-primary btn-xs normal-case">Place in constellation</button>
+    </footer>
+  </div>
+</dialog>
+
+<script>
+  import { actions } from 'astro:actions';
+  import { wireFragmentPanel, wireAddMenu, type PanelHandle } from '../../scripts/fragment-panel';
+  import { formatActionError } from '../../scripts/action-error';
+  import '../../scripts/subject-filter'; // the fetched partial's <subject-filter> needs the definition
+
+  const browser = document.getElementById('fbrowser') as HTMLDialogElement;
+  const cid = browser.dataset.constellation!;
+  const panelHost = document.getElementById('fb-panel')!;
+  const errBox = document.getElementById('fb-error') as HTMLParagraphElement;
+  const bulkbar = document.getElementById('fb-bulkbar') as HTMLElement;
+  const bulkcount = document.getElementById('fb-bulkcount') as HTMLElement;
+  const placeSelectedBtn = document.getElementById('fb-place-selected') as HTMLButtonElement;
+
+  const showError = (m: string) => ((errBox.textContent = m), (errBox.hidden = false));
+  const clearError = () => (errBox.hidden = true);
+
+  let panel: PanelHandle | null = null;
+  let placedAny = false;
+
+  async function place(id: string): Promise<boolean> {
+    const fd = new FormData();
+    fd.set('constellation_id', cid);
+    fd.set('fragment_id', id);
+    const { error } = await actions.constellations.place(fd);
+    if (error) {
+      showError(formatActionError(error));
+      return false;
+    }
+    placedAny = true;
+    return true;
+  }
+
+  /** Flip a row to its placed state in place — no refetch, the sheet stays open. */
+  function markPlaced(row: HTMLElement) {
+    row.classList.add('opacity-45');
+    row.classList.remove('hover:bg-base-200/40');
+    row.dataset.placed = '';
+    const check = row.querySelector<HTMLInputElement>('.row-check');
+    if (check) {
+      check.checked = false;
+      check.disabled = true;
+    }
+    const cell = row.querySelector('[data-act="place"]')?.closest('td');
+    if (cell) cell.innerHTML = '<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">✦ placed</span>';
+  }
+
+  async function loadPanel() {
+    const res = await fetch(`/admin/fragments-panel?mode=pick&constellation=${cid}`, { headers: { 'X-Requested-With': 'fetch' } });
+    if (!res.ok) {
+      panelHost.innerHTML = '<p class="font-sans text-sm text-error">Couldn’t load the fragments — close and try again.</p>';
+      return;
+    }
+    panelHost.innerHTML = await res.text();
+    const root = panelHost.querySelector('.fpanel') as HTMLElement;
+    panel = wireFragmentPanel(root, {
+      extraParams: { mode: 'pick', constellation: cid },
+      historyBase: null,
+      onOpen(row) {
+        clearError();
+        if (row.dataset.writing) {
+          document.dispatchEvent(new CustomEvent('writing:edit', { detail: row.dataset.writing }));
+        } else if (row.dataset.fragment) {
+          document.dispatchEvent(new CustomEvent('fragment:edit', { detail: row.dataset.fragment }));
+        }
+      },
+      async onAction(act, id, row) {
+        if (act !== 'place') return;
+        clearError();
+        if (await place(id)) markPlaced(row);
+      },
+      onSelectionChange(ids) {
+        bulkbar.hidden = ids.length === 0;
+        bulkcount.textContent = `${ids.length} selected`;
+        placeSelectedBtn.textContent = `Place ${ids.length === 1 ? 'it' : `all ${ids.length}`} in constellation`;
+      },
+      onSwap() {
+        bulkbar.hidden = true;
+      },
+    });
+  }
+
+  placeSelectedBtn.addEventListener('click', async () => {
+    if (!panel) return;
+    const ids = panel.getSelected();
+    if (!ids.length) return;
+    clearError();
+    placeSelectedBtn.disabled = true;
+    // sequential — each placement appends position = max+1, so order holds
+    for (const id of ids) {
+      const ok = await place(id);
+      if (!ok) break;
+      const row = panel.root.querySelector<HTMLElement>(`tr.fragment-row[data-id="${id}"]`);
+      if (row) markPlaced(row);
+    }
+    placeSelectedBtn.disabled = false;
+    panel.clearSelection();
+  });
+
+  // --- open / close -----------------------------------------------------------
+  const setHash = (h: string) => history.replaceState(null, '', location.pathname + location.search + h);
+
+  function openBrowser() {
+    clearError();
+    setHash('#browse');
+    browser.showModal();
+    if (!panel) void loadPanel();
+  }
+  function closeBrowser() {
+    setHash('');
+    browser.close();
+    // the suite underneath is stale the moment something was placed
+    if (placedAny) location.reload();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-browse]').forEach((btn) => btn.addEventListener('click', () => openBrowser()));
+  browser.querySelector('[data-fb-close]')?.addEventListener('click', () => closeBrowser());
+  browser.addEventListener('cancel', (e) => {
+    e.preventDefault(); // Escape → still refresh the suite if we placed things
+    closeBrowser();
+  });
+  let pressedOnBackdrop = false;
+  browser.addEventListener('pointerdown', (e) => (pressedOnBackdrop = e.target === browser));
+  browser.addEventListener('click', (e) => {
+    if (e.target === browser && pressedOnBackdrop) closeBrowser();
+  });
+
+  wireAddMenu(document.getElementById('fb-add-btn')!, document.getElementById('fb-add-menu')!);
+
+  // A reload from an editor-sheet save lands back here (#browse) with fresh rows.
+  if (location.hash === '#browse') openBrowser();
+</script>

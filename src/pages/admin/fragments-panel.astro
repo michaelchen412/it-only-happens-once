@@ -1,0 +1,29 @@
+---
+/*
+  /admin/fragments-panel — an Astro PARTIAL (no doctype/head/scripts) serving
+  the shared FragmentListPanel. Two consumers fetch it:
+
+   · /admin's in-place refresh (mode=manage, filters as query params);
+   · the composer's browser sheet (mode=pick&constellation=<id>), which also
+     marks already-placed rows so they render dimmed and unselectable.
+
+  Auth: middleware gates every /admin path, so this partial is admin-only too.
+  Styling comes from the host page's global stylesheet; behavior from the host's
+  fragment-panel.ts wiring — this route ships HTML only.
+*/
+import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
+import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
+
+export const partial = true;
+
+const mode = Astro.url.searchParams.get('mode') === 'pick' ? 'pick' : 'manage';
+const params = parseListParams(Astro.url.searchParams);
+if (mode === 'pick') {
+  params.view = 'list'; // trash never reaches the picker
+} else {
+  params.constellation = null; // placed-marking is a pick-mode concern
+}
+const data = await queryFragmentList(Astro.locals.supabase, params);
+---
+
+<FragmentListPanel data={data} params={params} mode={mode} />

@@ -1,0 +1,135 @@
+---
+/*
+  FragmentListPanel — the Fragment Manager's toolbar + table, shared verbatim by
+  /admin (mode="manage") and the fragments-panel partial the composer's browser
+  sheet fetches (mode="pick"). Everything inside is CLASS-scoped (no ids) so two
+  panels can never collide, and src/scripts/fragment-panel.ts wires any instance
+  from its root element. Keep it script-free: partials strip component scripts.
+*/
+import { Icon } from 'astro-icon/components';
+import FragmentRow from './FragmentRow.astro';
+import SubjectFilter from './SubjectFilter.astro';
+import type { FragmentListData, FragmentListParams } from '../../lib/fragment-query';
+
+interface Props {
+  data: FragmentListData;
+  params: FragmentListParams;
+  mode?: 'manage' | 'pick';
+}
+const { data, params: p, mode = 'manage' } = Astro.props;
+const view = mode === 'manage' ? p.view : 'list'; // trash never reaches pick mode
+const TYPES = ['writing', 'quote', 'song'] as const;
+
+const COLUMNS = [
+  { field: 'title', label: 'Fragment', align: 'left', cls: 'w-full', sortable: true },
+  { field: 'status', label: 'Status', align: 'left', cls: 'hidden sm:table-cell', sortable: false },
+  { field: 'posted', label: 'Posted', align: 'right', cls: 'hidden md:table-cell', sortable: true },
+  { field: 'edited', label: 'Edited', align: 'right', cls: '', sortable: true },
+] as const;
+---
+
+<div class="fpanel" data-mode={mode} data-view={view} data-constellation={p.constellation ?? undefined}>
+  {/* Toolbar */}
+  <form method="GET" action="/admin" class="fpanel-filters flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+    <input type="hidden" name="sort" class="fpanel-sort" value={`${p.sortField}_${p.sortDir}`} />
+    <input type="hidden" name="type" class="fpanel-type" value={p.type ?? ''} />
+    <input type="hidden" name="view" value={view === 'trash' ? 'trash' : ''} />
+
+    {/* type filter = segmented control (single-select), with counts */}
+    <div class="seg" role="radiogroup" aria-label="Filter by type">
+      <button type="button" role="radio" aria-checked={!p.type} class:list={['type-badge', !p.type && 'is-active']} data-type-filter="">
+        All <span class="type-badge__n">{data.totalCount}</span>
+      </button>
+      {TYPES.map((t) => (
+        <button type="button" role="radio" aria-checked={p.type === t} class:list={['type-badge capitalize', p.type === t && 'is-active']} data-type-filter={t}>
+          {t} <span class="type-badge__n">{data.typeCounts[t]}</span>
+        </button>
+      ))}
+    </div>
+
+    {/* search — icon lives inside the field (daisyUI pattern; no overlay) */}
+    <label class="input input-sm input-bordered flex min-w-[12rem] flex-1 items-center gap-2 font-sans md:max-w-xs">
+      <Icon name="ph:magnifying-glass" class="shrink-0 text-base-content/50" />
+      <input type="search" name="q" value={p.q} placeholder="Search fragments…" class="grow" aria-label="Search fragments" />
+    </label>
+
+    <SubjectFilter subjects={data.allSubjects} value={p.subjectSlugs} />
+    <select name="author" aria-label="Filter by author" class="select select-sm select-bordered max-w-[10rem] font-sans">
+      <option value="">All authors</option>
+      {data.allAuthors.map((a) => (
+        <option value={a.slug} selected={a.slug === p.authorSlug}>{a.name}</option>
+      ))}
+    </select>
+    <select name="work" aria-label="Filter by work" class="select select-sm select-bordered max-w-[10rem] font-sans">
+      <option value="">All works</option>
+      {data.allWorks.map((w) => (
+        <option value={w.slug} selected={w.slug === p.workSlug}>{w.title}</option>
+      ))}
+    </select>
+    <button type="button" data-clear class="text-base-content/60 underline hover:text-base-content">clear</button>
+  </form>
+
+  {/* The table (swapped in place on filter/sort) */}
+  <div class="fpanel-list mt-4">
+    {
+      data.rows.length === 0 ? (
+        <div class="mt-6 rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
+          <p class="font-display text-xl text-base-content/60">
+            {view === 'trash' ? 'Trash is empty.' : p.filtered ? 'Nothing matches.' : 'Nothing here yet.'}
+          </p>
+          {view !== 'trash' && !p.filtered && (
+            <p class="mt-2 text-sm text-base-content/50">Add a piece of writing, a quote, or a song to begin.</p>
+          )}
+        </div>
+      ) : (
+        <div class="overflow-x-auto rounded-box border border-base-300">
+          <table class="w-full text-sm">
+            <caption class="sr-only">{view === 'trash' ? 'Trashed fragments' : 'Fragments'}</caption>
+            <thead>
+              <tr class="border-b border-base-300 bg-base-200/50">
+                <th scope="col" class="w-8 px-3 py-2">
+                  <input type="checkbox" class="select-all checkbox checkbox-xs" aria-label="Select all" />
+                </th>
+                <th scope="col" class="w-6"><span class="sr-only">Type</span></th>
+                {COLUMNS.map((c) => (
+                  <th
+                    scope="col"
+                    class:list={[c.cls, 'px-3 py-2.5 font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase', c.align === 'right' ? 'text-right' : 'text-left']}
+                    aria-sort={c.sortable && p.sortField === c.field ? (p.sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                  >
+                    {c.sortable ? (
+                      <button type="button" class:list={['sort-header inline-flex items-center gap-1 hover:text-base-content', p.sortField === c.field && 'text-base-content']} data-field={c.field}>
+                        {c.label}
+                        <span class:list={['text-[0.6rem]', p.sortField !== c.field && 'opacity-30']} aria-hidden="true">
+                          {p.sortField === c.field ? (p.sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                        </span>
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </th>
+                ))}
+                {mode === 'pick' && <th scope="col" class="px-3 py-2 text-right font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase"><span class="sr-only">Place</span></th>}
+                {view === 'trash' && <th scope="col" class="px-3 py-2 text-right font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <FragmentRow
+                  fragment={r}
+                  subjects={data.subjectsByFragment[r.id] ?? []}
+                  authorName={r.author_id ? data.authorNameById[r.author_id] : undefined}
+                  workName={r.work_id ? data.workTitleById[r.work_id] : undefined}
+                  view={view}
+                  mode={mode}
+                  placed={data.placedIds.has(r.id)}
+                  searchTerm={p.searching ? p.q : ''}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+  </div>
+</div>

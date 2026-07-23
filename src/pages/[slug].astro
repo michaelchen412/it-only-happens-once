@@ -1,0 +1,32 @@
+---
+/*
+  /{slug} — a constellation's canonical page: landed inside the suite.
+  Root-level slugs by design: sharing is a core use (vision.md §5) and
+  `/conditions-not-character` is the prettiest URL for it. Static routes
+  (/blog, /about, …) always win over this dynamic one.
+
+  An unknown slug drifts home (the overview) rather than a hard 404 — a
+  mistyped star is a curiosity, and the overview is the kindest place to land.
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
+import ConstellationSuite from '../components/ConstellationSuite.astro';
+import { getConstellation } from '../lib/constellations';
+
+const supabase = Astro.locals.supabase;
+const { slug = '' } = Astro.params;
+
+const constellation = await getConstellation(supabase, slug);
+if (!constellation || constellation.items.length === 0) {
+  return Astro.redirect('/', 302);
+}
+
+---
+
+<SiteLayout
+  title={constellation.name}
+  description={constellation.description ?? undefined}
+  active="home"
+  backToTop={false}
+>
+  <ConstellationSuite constellation={constellation} />
+</SiteLayout>

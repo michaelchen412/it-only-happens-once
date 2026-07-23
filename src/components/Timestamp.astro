@@ -72,9 +72,9 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
   >
     <Icon name="ph:clock-light" class="size-3.5 opacity-70" />
     {prefix && <span>{prefix}</span>}
-    <span class="underline decoration-dotted decoration-base-content/20 underline-offset-4">
-      <time datetime={d.toISOString()}>{label}</time>
-    </span>
+    {/* No underline: the clock icon + hover already read as interactive, and the
+        date is a quiet detail — an underline over-advertises a non-critical tap. */}
+    <time datetime={d.toISOString()}>{label}</time>
   </button>
   <div
     id={pid}
