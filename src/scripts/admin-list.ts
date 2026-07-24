@@ -33,6 +33,7 @@ const panel = wireFragmentPanel(root, {
   onSelectionChange(ids) {
     bulkbar.classList.toggle('is-open', ids.length > 0);
     bulkcount.textContent = `${ids.length} selected`;
+    syncRemovableConstellations(ids);
   },
   onSwap(doc) {
     // trash count + empty-trash state live outside the panel
@@ -98,3 +99,45 @@ document.getElementById('empty-trash')?.addEventListener('click', async () => {
 const addBtn = document.getElementById('add-btn');
 const addMenu = document.getElementById('add-menu');
 if (view !== 'trash' && addBtn && addMenu) wireAddMenu(addBtn, addMenu);
+
+// --- bulk membership: elevate (or drop) a whole selection --------------------
+const cnBtn = document.getElementById('bulk-cn-btn');
+const cnMenu = document.getElementById('bulk-cn-menu');
+if (cnBtn && cnMenu) wireAddMenu(cnBtn, cnMenu);
+
+/**
+ * "Remove from" only lists constellations the selection actually belongs to —
+ * offering to remove something from a suite it was never in is noise. Read off
+ * each row's data-constellations, which the server rendered.
+ */
+function syncRemovableConstellations(ids: string[]) {
+  if (!cnMenu) return;
+  const present = new Set<string>();
+  for (const id of ids) {
+    const row = root.querySelector<HTMLElement>(`tr.fragment-row[data-id="${id}"]`);
+    for (const cid of (row?.dataset.constellations || '').split(',').filter(Boolean)) present.add(cid);
+  }
+  let any = false;
+  cnMenu.querySelectorAll<HTMLElement>('[data-cn-remove]').forEach((el) => {
+    const on = present.has(el.dataset.cnRemove!);
+    el.hidden = !on;
+    if (on) any = true;
+  });
+  const label = document.getElementById('bulk-cn-remove-label');
+  if (label) label.hidden = !any;
+}
+
+cnMenu?.addEventListener('click', async (e) => {
+  const el = (e.target as Element).closest<HTMLElement>('[data-cn-add], [data-cn-remove]');
+  if (!el) return;
+  const add = el.hasAttribute('data-cn-add');
+  const ids = panel.getSelected();
+  if (!ids.length) return;
+  const fd = new FormData();
+  fd.set('constellation_id', (add ? el.dataset.cnAdd : el.dataset.cnRemove)!);
+  fd.set('fragment_ids', ids.join(','));
+  fd.set('op', add ? 'add' : 'remove');
+  const { error } = await actions.constellations.bulkMembership(fd);
+  if (error) return showBulkError(error.message);
+  await panel.refresh(); // the membership column is now stale
+});

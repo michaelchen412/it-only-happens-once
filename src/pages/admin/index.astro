@@ -80,6 +80,42 @@ const subjectNames = data.allSubjects.map((s) => s.name);
           </>
         ) : (
           <>
+            {/* Elevate a selection into the sky — the bulk half of the
+                fragment→constellation view (docs/admin.md §2). */}
+            <div class="relative">
+              <button id="bulk-cn-btn" class="btn btn-xs btn-ghost gap-1 normal-case" aria-haspopup="menu" aria-expanded="false">
+                <span class="text-primary" aria-hidden="true">&#10022;</span> Constellation <span aria-hidden="true">▾</span>
+              </button>
+              <div
+                id="bulk-cn-menu"
+                hidden
+                role="menu"
+                aria-label="Add to or remove from a constellation"
+                class="absolute bottom-full left-0 z-40 mb-1 max-h-96 w-96 overflow-y-auto rounded-box border border-base-300 bg-base-100 py-1 shadow-lg"
+              >
+                {/* The full description (4-line cap): you're about to elevate a
+                    whole selection, so "what is this constellation for" should
+                    be readable here, not hidden behind a hover. */}
+                <p class="admin-label px-3 pt-1.5">Add to</p>
+                {data.allConstellations.map((c) => (
+                  <button role="menuitem" class="add-item block w-full px-3 py-2 text-left" data-cn-add={c.id}>
+                    <span class="block truncate text-sm leading-snug">{c.name}</span>
+                    {c.description && (
+                      <span class="mt-0.5 block line-clamp-4 text-xs leading-snug text-base-content/55">{c.description}</span>
+                    )}
+                  </button>
+                ))}
+                <p id="bulk-cn-remove-label" class="admin-label mt-1 border-t border-base-300 px-3 pt-2" hidden>Remove from</p>
+                {data.allConstellations.map((c) => (
+                  <button role="menuitem" hidden class="add-item block w-full truncate px-3 py-1.5 text-left text-sm text-error/80" data-cn-remove={c.id}>
+                    {c.name}
+                  </button>
+                ))}
+                {data.allConstellations.length === 0 && (
+                  <p class="admin-hint px-3 py-2">No constellations yet.</p>
+                )}
+              </div>
+            </div>
             <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
             <button data-bulk="unpublish" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
             <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
@@ -94,8 +130,9 @@ const subjectNames = data.allSubjects.map((s) => s.name);
     subjects={subjectNames}
     authors={data.allAuthors.map((a) => ({ id: a.id, name: a.name }))}
     works={data.allWorks.map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
+    constellations={data.allConstellations}
   />
-  <WritingSheet subjects={subjectNames} />
+  <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
 
   <script>
     import '../../scripts/admin-list';

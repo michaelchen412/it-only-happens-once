@@ -23,6 +23,12 @@ export interface FragmentListParams {
   workSlug: string;
   /** pick mode: mark rows already placed in this constellation */
   constellation: string | null;
+  /**
+   * Membership filter (`?in=`): a constellation SLUG, or the literal 'none' for
+   * "belongs to no constellation" — the curatorial question the manager could
+   * not answer before. Distinct from `constellation`, which only marks rows.
+   */
+  membership: string | null;
   filtered: boolean;
 }
 
@@ -35,6 +41,7 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
   const sortMatch = (sp.get('sort') ?? 'edited_desc').match(/^(title|posted|edited)_(asc|desc)$/);
   const authorSlug = (sp.get('author') || '').trim();
   const workSlug = (sp.get('work') || '').trim();
+  const membership = (sp.get('in') || '').trim() || null;
   return {
     view,
     type: typeParam,
@@ -46,13 +53,27 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     authorSlug,
     workSlug,
     constellation: (sp.get('constellation') || '').trim() || null,
-    filtered: !!typeParam || subjectSlugs.length > 0 || q.length >= MIN_SEARCH || !!authorSlug || !!workSlug,
+    membership,
+    filtered:
+      !!typeParam || subjectSlugs.length > 0 || q.length >= MIN_SEARCH || !!authorSlug || !!workSlug || !!membership,
   };
+}
+
+export interface ConstellationRefLite {
+  id: string;
+  name: string;
+  slug: string;
+  /** Shown wherever a constellation is offered as a target (4-line cap). */
+  description?: string | null;
 }
 
 export interface FragmentListData {
   rows: FragmentRowT[];
   subjectsByFragment: Record<string, string[]>;
+  /** The other end of the composer: where each fragment already lives. */
+  constellationsByFragment: Record<string, ConstellationRefLite[]>;
+  /** Every constellation (draft included) — the filter + the pickers. */
+  allConstellations: ConstellationRefLite[];
   authorNameById: Record<string, string>;
   workTitleById: Record<string, string>;
   allAuthors: { id: string; name: string; slug: string }[];
@@ -83,6 +104,30 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     }
   }
 
+  // membership filter (`?in=`): a constellation slug, or 'none' for the orphans.
+  // Resolved to an id list here, exactly like the subject filter above.
+  const { data: allConstellations } = await supabase
+    .from('constellations')
+    .select('id, name, slug, description')
+    .order('sort');
+  let membershipFilterIds: string[] | null = null; // whitelist: fragments in the chosen constellation
+  let membershipExcludeIds: string[] | null = null; // blacklist: everything placed anywhere ('none')
+  if (p.membership === 'none') {
+    const { data: links } = await supabase.from('fragment_constellations').select('fragment_id');
+    membershipExcludeIds = [...new Set((links ?? []).map((l) => l.fragment_id))];
+  } else if (p.membership) {
+    const target = (allConstellations ?? []).find((c) => c.slug === p.membership);
+    if (!target) {
+      membershipFilterIds = []; // unknown slug → match nothing, don't silently ignore
+    } else {
+      const { data: links } = await supabase
+        .from('fragment_constellations')
+        .select('fragment_id')
+        .eq('constellation_id', target.id);
+      membershipFilterIds = (links ?? []).map((l) => l.fragment_id);
+    }
+  }
+
   // provenance facets: authors & works (for the datalists, filters, and editor prefill)
   const { data: allAuthors } = await supabase.from('authors').select('id, name, slug').order('name');
   const { data: allWorks } = await supabase.from('works').select('id, title, slug, author_id').order('title');
@@ -101,6 +146,10 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   if (authorFilterId) query = query.eq('author_id', authorFilterId);
   if (workFilterId) query = query.eq('work_id', workFilterId);
   if (subjectFilterIds) query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  if (membershipFilterIds) query = query.in('id', membershipFilterIds.length ? membershipFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  // 'none': everything NOT placed anywhere. An empty exclusion list is a no-op
+  // (nothing is placed yet), so guard it — `not.in.()` is invalid syntax.
+  if (membershipExcludeIds?.length) query = query.not('id', 'in', `(${membershipExcludeIds.join(',')})`);
   if (p.searching) {
     const safe = p.q.replace(/[(),]/g, ' ');
     query = query.or(`title.ilike.%${safe}%,body.ilike.%${safe}%,attribution.ilike.%${safe}%,excerpt.ilike.%${safe}%`);
@@ -127,6 +176,25 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
       if (name) (subjectsByFragment[link.fragment_id] ??= []).push(name);
     }
   }
+  // where each listed fragment lives (the membership column). Ordered by the
+  // sky's authored order so a row's chips always read in the same sequence.
+  const constellationsByFragment: Record<string, ConstellationRefLite[]> = {};
+  if (ids.length) {
+    const byId = new Map((allConstellations ?? []).map((c) => [c.id, c]));
+    const order = new Map((allConstellations ?? []).map((c, i) => [c.id, i]));
+    const { data: links } = await supabase
+      .from('fragment_constellations')
+      .select('fragment_id, constellation_id')
+      .in('fragment_id', ids);
+    for (const l of links ?? []) {
+      const ref = byId.get(l.constellation_id);
+      if (ref) (constellationsByFragment[l.fragment_id] ??= []).push(ref);
+    }
+    for (const refs of Object.values(constellationsByFragment)) {
+      refs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+  }
+
   const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
   const { count: trashCount } = await supabase.from('fragments').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null);
 
@@ -143,6 +211,8 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   return {
     rows,
     subjectsByFragment,
+    constellationsByFragment,
+    allConstellations: allConstellations ?? [],
     authorNameById,
     workTitleById,
     allAuthors: allAuthors ?? [],

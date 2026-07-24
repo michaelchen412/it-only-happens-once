@@ -762,6 +762,22 @@ html.reader-open .sky-return {
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   background: var(--color-base-300);
 }
+/* Membership: which constellations a fragment lives in. `--none` is deliberately
+   a dashed OUTLINE against `--in`'s filled lamplight, so a column of orphans
+   reads as absence at a glance rather than as small print. */
+.admin-chip--in {
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-primary) 25%, transparent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.7rem;
+}
+.admin-chip--none {
+  color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+  background: transparent;
+  border: 1px dashed color-mix(in oklab, var(--color-base-content) 22%, transparent);
+}
 
 /* Count badge — "▤ 5 writing". The mark keeps its type color inside. */
 .admin-stat {
@@ -850,6 +866,46 @@ html.reader-open .sky-return {
 }
 .admin-title-input:focus {
   border-bottom-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* Sheet tabs — an underline strip inside the editor drawers, so a fragment's
+   composition (which constellations it belongs to) is a peer of its content
+   rather than a popover hiding in the chrome. */
+.admin-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.admin-tab {
+  padding: 0.4rem 0.7rem;
+  margin-bottom: -1px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
+}
+.admin-tab:hover {
+  color: var(--color-base-content);
+}
+.admin-tab[aria-selected='true'] {
+  color: var(--color-base-content);
+  border-bottom-color: var(--color-primary);
+}
+.admin-tab:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: -2px;
+  border-radius: var(--radius-field);
+}
+.admin-tab__n {
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--color-primary) 85%, transparent);
 }
 
 /* Composer suite rows — hover lift, and a held row while dragging. */

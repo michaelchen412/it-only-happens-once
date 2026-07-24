@@ -27,6 +27,12 @@ const optText = z.preprocess(blankToUndef, z.string().optional());
 const optUrl = z.preprocess(blankToUndef, z.string().url('That doesn’t look like a URL').optional());
 const optInt = z.preprocess(blankToUndef, z.coerce.number().int().optional());
 const optUuid = z.preprocess(blankToUndef, z.string().uuid().optional());
+/**
+ * A comma-joined id list where EMPTY is a meaningful value, not absence
+ * ("belongs to no constellation"). Astro's form→object step turns a blank
+ * field into `null`, so a bare z.string() rejects the very case we mean.
+ */
+const idList = z.preprocess((v) => (v == null ? '' : v), z.string());
 const status = z.enum(['draft', 'published']).default('draft');
 
 // --- shared internals --------------------------------------------------------
@@ -357,11 +363,14 @@ export const server = {
         requireAdmin(ctx);
         const { data, error } = await ctx.locals.supabase
           .from('fragments')
-          .select('id, type, title, slug, excerpt, body, status, occurred_at, fragment_subjects(subjects(name))')
+          .select(
+            'id, type, title, slug, excerpt, body, status, occurred_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id)',
+          )
           .eq('id', id)
           .single();
         if (error || !data) throw fail('That fragment no longer exists', 'NOT_FOUND');
         return {
+          constellationIds: (data.fragment_constellations ?? []).map((l) => l.constellation_id),
           id: data.id,
           type: data.type,
           title: data.title ?? '',
@@ -742,6 +751,98 @@ export const server = {
         return { ok: true };
       },
     }),
+    /**
+     * The FRAGMENT's side of the relationship: reconcile which constellations
+     * one fragment belongs to, in a single call. Additions append to each
+     * suite's end (order is the constellation's business — recompose there);
+     * removals unplace only. Used by the pickers in the editor sheets.
+     */
+    setMembership: defineAction({
+      accept: 'form',
+      input: z.object({
+        fragment_id: z.string().uuid(),
+        /** Comma-separated constellation ids; EMPTY means "belongs to none". */
+        constellation_ids: idList,
+      }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const want = new Set(input.constellation_ids.split(',').map((s) => s.trim()).filter(Boolean));
+        const { data: current, error: readErr } = await sb
+          .from('fragment_constellations')
+          .select('constellation_id')
+          .eq('fragment_id', input.fragment_id);
+        if (readErr) throw fail(readErr.message);
+        const have = new Set((current ?? []).map((r) => r.constellation_id));
+
+        const remove = [...have].filter((id) => !want.has(id));
+        if (remove.length) {
+          const { error } = await sb
+            .from('fragment_constellations')
+            .delete()
+            .eq('fragment_id', input.fragment_id)
+            .in('constellation_id', remove);
+          if (error) throw fail(error.message);
+        }
+        for (const id of [...want].filter((c) => !have.has(c))) {
+          const { data: last } = await sb
+            .from('fragment_constellations')
+            .select('position')
+            .eq('constellation_id', id)
+            .order('position', { ascending: false })
+            .limit(1);
+          const { error } = await sb.from('fragment_constellations').upsert(
+            { constellation_id: id, fragment_id: input.fragment_id, position: (last?.[0]?.position ?? 0) + 1 },
+            { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
+          );
+          if (error) throw fail(error.message);
+        }
+        return { ok: true };
+      },
+    }),
+
+    /**
+     * Bulk elevate/remove from the Fragment Manager's selection bar. `op=add`
+     * appends each fragment to the suite in the order given; `op=remove`
+     * unplaces them. Both are idempotent.
+     */
+    bulkMembership: defineAction({
+      accept: 'form',
+      input: z.object({
+        constellation_id: z.string().uuid(),
+        fragment_ids: z.string().min(1),
+        op: z.enum(['add', 'remove']),
+      }),
+      handler: async (input, ctx) => {
+        const sb = ctx.locals.supabase;
+        const ids = input.fragment_ids.split(',').map((s) => s.trim()).filter(Boolean);
+        if (!ids.length) return { ok: true, count: 0 };
+
+        if (input.op === 'remove') {
+          const { error } = await sb
+            .from('fragment_constellations')
+            .delete()
+            .eq('constellation_id', input.constellation_id)
+            .in('fragment_id', ids);
+          if (error) throw fail(error.message);
+          return { ok: true, count: ids.length };
+        }
+
+        const { data: last } = await sb
+          .from('fragment_constellations')
+          .select('position')
+          .eq('constellation_id', input.constellation_id)
+          .order('position', { ascending: false })
+          .limit(1);
+        let next = (last?.[0]?.position ?? 0) + 1;
+        const rows = ids.map((fragment_id) => ({ constellation_id: input.constellation_id, fragment_id, position: next++ }));
+        const { error } = await sb
+          .from('fragment_constellations')
+          .upsert(rows, { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true });
+        if (error) throw fail(error.message);
+        return { ok: true, count: ids.length };
+      },
+    }),
+
     /** The composed order: positions rewritten 1..n from the given list. */
     reorderPlacements: defineAction({
       accept: 'form',

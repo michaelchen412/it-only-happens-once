@@ -33,7 +33,7 @@ const { data: c } = await sb
   .maybeSingle();
 if (!c) return Astro.redirect('/admin/constellations');
 
-const [{ data: placements }, { data: allLinks }, { data: subjectRows }, { data: authors }, { data: works }] =
+const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { data: subjectRows }, { data: authors }, { data: works }] =
   await Promise.all([
     sb
       .from('fragment_constellations')
@@ -44,6 +44,7 @@ const [{ data: placements }, { data: allLinks }, { data: subjectRows }, { data: 
       .is('fragments.deleted_at', null)
       .order('position'),
     sb.from('fragment_constellations').select('fragment_id, constellation_id'),
+    sb.from('constellations').select('id, name, slug, description').order('sort'),
     sb.from('subjects').select('name').order('name'),
     sb.from('authors').select('id, name').order('name'),
     sb.from('works').select('id, title, author_id').order('title'),
@@ -79,6 +80,7 @@ const suite = (placements ?? []).map((p) => {
           authorId: f.author_id, authorName: f.authors?.name ?? '',
           workId: f.work_id, workName: f.works?.title ?? '',
           subjects, details: f.details ?? {},
+          constellationIds: (allLinks ?? []).filter((l) => l.fragment_id === f.id).map((l) => l.constellation_id),
         });
   return {
     id: f.id, type: f.type, status: f.status, editorData,
@@ -246,9 +248,14 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     </section>
   </div>
 
-  <FragmentSheet subjects={subjectNames} authors={authors ?? []} works={(works ?? []).map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))} />
-  <WritingSheet subjects={subjectNames} />
-  <FragmentBrowser constellation={c.id} />
+  <FragmentSheet
+    subjects={subjectNames}
+    authors={authors ?? []}
+    works={(works ?? []).map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
+    constellations={allConstellations ?? []}
+  />
+  <WritingSheet subjects={subjectNames} constellations={allConstellations ?? []} />
+  <FragmentBrowser constellation={c.id} constellationName={c.name} constellationDescription={c.description} />
 </AdminLayout>
 
 <script>

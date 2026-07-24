@@ -1,0 +1,72 @@
+---
+/*
+  ConstellationPicker — the fragment's side of the composer: which ways of
+  seeing does THIS fragment belong to. A checkbox list (the sky is small enough
+  to show whole, and seeing the unchecked ones is half the value), wired by
+  src/scripts/constellation-picker.ts.
+
+  Each row carries the constellation's description IN FULL (capped at four
+  lines for a runaway one) — you're deciding where a fragment belongs, and a
+  truncated opening clause makes you hover to finish the thought. The panel is
+  its own tab, so it has the room; the sheet's own scroll handles a long sky,
+  and a filter field appears once names outnumber what you can scan. No inner
+  scrollbox — nested scrolling inside a drawer is its own small misery.
+
+  Membership is a RELATIONSHIP, not a field on the fragment, so a toggle
+  applies immediately — no save, instantly reversible, exactly like unplacing
+  in the composer. The one exception is a fragment that doesn't exist yet: its
+  toggles are queued and flushed the moment the first save mints an id.
+
+  Adding here APPENDS to the end of that constellation's suite; composed order
+  is the constellation's business (recompose in /admin/constellations/[id]).
+
+  `scope` namespaces the ids so the two editor sheets can each hold one.
+*/
+interface Props {
+  scope: string;
+  constellations: { id: string; name: string; slug: string; description?: string | null }[];
+  class?: string;
+}
+const { scope, constellations, class: className = '' } = Astro.props;
+const FILTER_THRESHOLD = 8; // below this, a filter field is just another control
+---
+
+<div class:list={['cn-picker', className]} data-scope={scope}>
+  {
+    constellations.length === 0 ? (
+      <p class="admin-hint">
+        No constellations yet — make one in <a href="/admin/constellations" class="underline">Constellations</a>.
+      </p>
+    ) : (
+      <>
+        {constellations.length > FILTER_THRESHOLD && (
+          <input
+            type="search"
+            class="cn-filter input input-xs input-bordered mb-1.5 w-full font-sans"
+            placeholder="Filter constellations…"
+            aria-label="Filter constellations"
+          />
+        )}
+        <ul class="cn-list space-y-0.5">
+          {constellations.map((c) => (
+            <li class="cn-row" data-search={`${c.name} ${c.description ?? ''}`.toLowerCase()}>
+              <label class="flex cursor-pointer items-start gap-2.5 rounded-field px-2 py-2 hover:bg-base-200">
+                <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
+                <span class="min-w-0 grow">
+                  <span class="block truncate text-sm leading-snug">{c.name}</span>
+                  {c.description && (
+                    <span class="mt-0.5 block line-clamp-4 font-sans text-xs leading-snug text-base-content/55">
+                      {c.description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <p class="cn-empty admin-hint mt-1" hidden>Nothing matches.</p>
+      </>
+    )
+  }
+  <p class="cn-picker-status admin-hint mt-1" role="status" aria-live="polite"></p>
+</div>

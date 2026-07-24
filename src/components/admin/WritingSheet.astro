@@ -23,11 +23,14 @@ import EditorToolbar from './EditorToolbar.astro';
 import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
 import LinkDialog from './LinkDialog.astro';
+import ConstellationPicker from './ConstellationPicker.astro';
 
 interface Props {
   subjects: string[];
+  /** Every constellation — the membership picker (docs/admin.md §2). */
+  constellations?: { id: string; name: string; slug: string }[];
 }
-const { subjects } = Astro.props;
+const { subjects, constellations = [] } = Astro.props;
 ---
 
 <dialog id="wsheet" class="drawer-dialog w-full max-w-4xl" aria-labelledby="ws-heading">
@@ -40,6 +43,18 @@ const { subjects } = Astro.props;
       <div class="flex items-center gap-3 px-6 py-2">
         <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
         <span id="ws-heading" class="flex items-center gap-1.5 font-sans text-xs tracking-widest text-base-content/40 uppercase"><TypeMark type="writing" /> Writing</span>
+
+        {/* Membership is a TAB, not a popover, and lives here rather than in
+            the publish dialog: a DRAFT essay never opens that dialog, and
+            placing drafts in piles is what the composing room is for. */}
+        <div class="admin-tabs ml-2 border-b-0" role="tablist" aria-label="Editor sections">
+          <button type="button" role="tab" class="admin-tab" data-tab="doc" aria-selected="true" aria-controls="ws-panel-doc">
+            Document
+          </button>
+          <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="ws-panel-cn">
+            Constellations<span id="ws-cn-count" class="admin-tab__n"></span>
+          </button>
+        </div>
 
         <div id="ws-status" class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55" aria-live="polite">
           <span id="ws-spinner" hidden class="loading loading-spinner loading-xs"></span>
@@ -59,12 +74,15 @@ const { subjects } = Astro.props;
 
         <button type="button" id="ws-delete" hidden class="font-sans text-sm text-base-content/55 hover:text-error">Delete</button>
       </div>
-      <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" />
+      {/* wrapped (not given an id) so EditorToolbar stays shared-as-is */}
+      <div id="ws-toolbar">
+        <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" />
+      </div>
     </div>
 
     {/* Document */}
     <div class="grow overflow-y-auto overscroll-contain">
-      <div class="mx-auto w-full max-w-2xl px-6 pt-10 pb-24">
+      <div id="ws-panel-doc" role="tabpanel" data-tabpanel="doc" class="mx-auto w-full max-w-2xl px-6 pt-10 pb-24">
         <input
           name="title"
           placeholder="Title"
@@ -73,6 +91,15 @@ const { subjects } = Astro.props;
         />
         <p id="ws-error" hidden role="alert" class="admin-alert mt-4"></p>
         <div id="ws-editor" class="reading mt-6"></div>
+      </div>
+
+      <div id="ws-panel-cn" role="tabpanel" data-tabpanel="constellations" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+        <h3 class="font-display text-lg">In which constellations</h3>
+        <p class="admin-hint mt-1 mb-4">
+          The ways of seeing this piece belongs to. Changes apply immediately — no save needed. Adding puts it at the
+          end of that constellation's suite; reorder in the composer.
+        </p>
+        <ConstellationPicker scope="writing" constellations={constellations} />
       </div>
     </div>
   </form>
@@ -87,6 +114,8 @@ const { subjects } = Astro.props;
   import { slugify } from '../../lib/slug';
   import { formatActionError, nowTime } from '../../scripts/action-error';
   import { confirmDialog } from '../../scripts/confirm-dialog';
+  import { wireConstellationPicker } from '../../scripts/constellation-picker';
+  import { wireSheetTabs } from '../../scripts/sheet-tabs';
 
   const sheet = document.getElementById('wsheet') as HTMLDialogElement;
   const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -209,7 +238,13 @@ const { subjects } = Astro.props;
     timer = window.setTimeout(() => save(savedStatus, { silentEmpty: true }), 1200);
   }
   editor.on('update', onEdit);
-  form.addEventListener('input', onEdit);
+  // The constellations tab lives inside the form element, but membership is a
+  // relationship that already persisted itself — never treat it as an edit
+  // (it would arm "Unsaved changes" and kick off an autosave).
+  form.addEventListener('input', (e) => {
+    if ((e.target as Element)?.closest?.('#ws-panel-cn')) return;
+    onEdit();
+  });
 
   /** Serialize saves so a Publish click never races an in-flight autosave. */
   function save(status: string, opts: { silentEmpty?: boolean } = {}): Promise<boolean> {
@@ -244,15 +279,9 @@ const { subjects } = Astro.props;
     if (data) {
       if (!idField.value) {
         idField.value = data.id;
-        // Composer context (body[data-place-in]): the new piece joins that
-        // constellation's suite on its FIRST save. Idempotent, like the sheet.
-        const placeIn = document.body.dataset.placeIn;
-        if (placeIn) {
-          const pf = new FormData();
-          pf.set('constellation_id', placeIn);
-          pf.set('fragment_id', data.id);
-          await actions.constellations.place(pf);
-        }
+        // Whatever was ticked before the piece existed (including the
+        // composer's pre-tick) can only be written now that it has an id.
+        await picker.flush(data.id);
         setHash(`#edit=${data.id}`);
         deleteBtn.hidden = false;
       }
@@ -274,6 +303,21 @@ const { subjects } = Astro.props;
     }
   });
 
+  // ---- constellation membership (its own tab) ----
+  const cnPanel = document.getElementById('ws-panel-cn') as HTMLElement;
+  const picker = wireConstellationPicker(cnPanel.querySelector('.cn-picker') as HTMLElement);
+  const cnCount = document.getElementById('ws-cn-count')!;
+  const toolbar = document.getElementById('ws-toolbar') as HTMLElement;
+  // The formatting toolbar belongs to the document; hide it on the other tab.
+  const tabs = wireSheetTabs(sheet, (key) => (toolbar.hidden = key !== 'doc'));
+
+  function setCnLabel(n: number) {
+    cnCount.textContent = n ? String(n) : '';
+  }
+  cnPanel.addEventListener('change', () => {
+    setCnLabel(cnPanel.querySelectorAll<HTMLInputElement>('.cn-check:checked').length);
+  });
+
   // ---- opening ----
   const setHash = (h: string) => history.replaceState(null, '', location.pathname + location.search + h);
   const setSubjects = (v: string) =>
@@ -288,6 +332,7 @@ const { subjects } = Astro.props;
     status: string;
     occurredIso: string;
     subjects: string;
+    constellationIds?: string[];
   }
 
   function populate(d: Loaded | null) {
@@ -315,6 +360,10 @@ const { subjects } = Astro.props;
     statusText.textContent = isPublished() ? 'Up to date' : 'Autosaves as you write';
     spinner.hidden = true;
     updateViewLink(d?.slug ?? '');
+    const memberIds = d?.constellationIds ?? [];
+    picker.setFragment(d?.id ?? null, memberIds);
+    setCnLabel(memberIds.length);
+    tabs.select('doc'); // always open on the writing, never mid-composition
   }
 
   function openSheet(hash: string, fromHash: boolean) {
@@ -325,6 +374,13 @@ const { subjects } = Astro.props;
 
   function openNew(fromHash = false) {
     populate(null);
+    // Composer context: pre-tick that constellation, so the implicit
+    // data-place-in hook is now something you can see and untick.
+    const placeIn = document.body.dataset.placeIn;
+    if (placeIn) {
+      picker.preselect(placeIn);
+      setCnLabel(1);
+    }
     openSheet('#new-writing', fromHash);
     titleField.focus();
   }
@@ -347,7 +403,7 @@ const { subjects } = Astro.props;
   // ---- closing (every exit funnels through here) ----
   function closeNow() {
     dirty = false;
-    const reload = everSaved;
+    const reload = everSaved || picker.changed();
     setHash(prevHash); // restore the underlying context (e.g. #browse) first
     sheet.close();
     if (reload) location.reload();

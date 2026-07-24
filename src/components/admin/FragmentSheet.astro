@@ -15,13 +15,16 @@
 import { actions } from 'astro:actions';
 import TagInput from '../TagInput.astro';
 import EntityCombo from './EntityCombo.astro';
+import ConstellationPicker from './ConstellationPicker.astro';
 
 interface Props {
   subjects: string[];
   authors?: { id: string; name: string }[];
   works?: { id: string; title: string; authorId: string | null }[];
+  /** Every constellation — the membership picker (docs/admin.md §2). */
+  constellations?: { id: string; name: string; slug: string }[];
 }
-const { subjects, authors = [], works = [] } = Astro.props;
+const { subjects, authors = [], works = [], constellations = [] } = Astro.props;
 const authorOptions = authors.map((a) => ({ id: a.id, name: a.name }));
 const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
 const thisYear = new Date().getUTCFullYear();
@@ -34,8 +37,18 @@ const thisYear = new Date().getUTCFullYear();
       <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
     </header>
 
+    <div class="admin-tabs px-6" role="tablist" aria-label="Editor sections">
+      <button type="button" role="tab" class="admin-tab" data-tab="fields" aria-selected="true" aria-controls="sheet-panel-fields">
+        <span id="sheet-tab-fields-label">Quote</span>
+      </button>
+      <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="sheet-panel-cn">
+        Constellations<span id="sheet-cn-count" class="admin-tab__n"></span>
+      </button>
+    </div>
+
     <p id="sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
+    <div id="sheet-panel-fields" role="tabpanel" data-tabpanel="fields">
     {/* QUOTE */}
     <form id="quote-form" method="POST" action={actions.fragments.saveQuote} class="flex flex-col gap-4 p-6 font-sans">
       <input type="hidden" name="id" />
@@ -182,6 +195,15 @@ const thisYear = new Date().getUTCFullYear();
         <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
       </div>
     </form>
+    </div>
+
+    <div id="sheet-panel-cn" role="tabpanel" data-tabpanel="constellations" hidden class="p-6">
+      <p class="admin-hint mb-3">
+        Which ways of seeing this belongs to. Changes apply immediately — no save needed. Adding puts it at the end of
+        that constellation's suite; reorder in the composer.
+      </p>
+      <ConstellationPicker scope="fragment" constellations={constellations} />
+    </div>
   </div>
 </dialog>
 
@@ -193,6 +215,8 @@ const thisYear = new Date().getUTCFullYear();
   import { actions } from 'astro:actions';
   import { formatActionError } from '../../scripts/action-error';
   import { confirmDialog } from '../../scripts/confirm-dialog';
+  import { wireConstellationPicker } from '../../scripts/constellation-picker';
+  import { wireSheetTabs } from '../../scripts/sheet-tabs';
 
   const sheet = document.getElementById('sheet') as HTMLDialogElement;
   const sheetTitle = document.getElementById('sheet-title')!;
@@ -386,15 +410,42 @@ const thisYear = new Date().getUTCFullYear();
 
   // --- unsaved-work guard: an accidental dismiss must never delete edits ---
   let dirty = false;
-  const markDirty = () => (dirty = true);
+  // Membership applies immediately and isn't part of the form, so ticking a
+  // constellation must NOT arm the unsaved-work guard (it would warn about
+  // "unsaved edits" that were already written).
+  // (the arg is optional: TipTap's `update` calls this with no event)
+  const markDirty = (e?: Event) => {
+    if (e && (e.target as Element)?.closest?.('#sheet-panel-cn')) return;
+    dirty = true;
+  };
   sheet.addEventListener('input', markDirty); // typing in any field, incl. the editor
   sheet.addEventListener('change', markDirty); // toggles, selects, the date field
-  quoteEditor.on('update', markDirty);
+  quoteEditor.on('update', () => markDirty()); // TipTap passes its own props, not an Event
+
+  // --- constellation membership: its own tab, one picker for both types ---
+  // (It applies immediately, so it never belonged inside either <form>.)
+  const picker = wireConstellationPicker(document.getElementById('sheet-panel-cn')!.querySelector('.cn-picker') as HTMLElement);
+  const tabs = wireSheetTabs(sheet);
+  const cnCount = document.getElementById('sheet-cn-count')!;
+  const fieldsTabLabel = document.getElementById('sheet-tab-fields-label')!;
+  const cnPanel = document.getElementById('sheet-panel-cn')!;
+
+  function refreshCnCount() {
+    const n = cnPanel.querySelectorAll<HTMLInputElement>('.cn-check:checked').length;
+    cnCount.textContent = n ? String(n) : '';
+  }
+  cnPanel.addEventListener('change', refreshCnCount);
+
+  /** A membership edit changes the list underneath — refresh on close. */
+  const membershipTouched = () => picker.changed();
 
   function openSheet(type: 'quote' | 'song') {
     clearError();
     quoteForm.hidden = type !== 'quote';
     songForm.hidden = type !== 'song';
+    fieldsTabLabel.textContent = type === 'quote' ? 'Quote' : 'Song';
+    tabs.select('fields'); // always open on the content, never mid-composition
+    refreshCnCount();
     sheet.showModal(); // native: focus-trap + Escape + focus restore on close
     dirty = false; // the fields we just populated don't count as user edits
   }
@@ -411,6 +462,8 @@ const thisYear = new Date().getUTCFullYear();
       if (!ok) return;
     }
     dirty = false;
+    // Membership applies immediately, so the list/suite behind us is stale.
+    if (membershipTouched()) return void window.location.reload();
     sheet.close();
   }
 
@@ -459,6 +512,12 @@ const thisYear = new Date().getUTCFullYear();
         proposedBox.hidden = true;
       }
       if (type === 'song') document.getElementById('song-lookup')!.textContent = '';
+      // Nothing to be a member of yet — ticks queue until the first save. In a
+      // composer context, pre-tick that constellation (the old data-place-in
+      // hook, now visible in the UI rather than implicit).
+      picker.setFragment(null, []);
+      const placeIn = document.body.dataset.placeIn;
+      if (placeIn) picker.preselect(placeIn);
       sheetTitle.textContent = type === 'quote' ? 'New quote' : 'New song';
       openSheet(type);
     });
@@ -504,6 +563,7 @@ const thisYear = new Date().getUTCFullYear();
         document.getElementById('song-lookup')!.textContent = '';
       }
       toggleDelete(form, true);
+      picker.setFragment(d.id, Array.isArray(d.constellationIds) ? d.constellationIds : []);
       sheetTitle.textContent = type === 'quote' ? 'Edit quote' : 'Edit song';
       openSheet(type);
     }
@@ -551,15 +611,9 @@ const thisYear = new Date().getUTCFullYear();
       const { data, error } = await action(fd);
       submitBtn.disabled = false;
       if (!error) {
-        // Composer context (body[data-place-in]): whatever was saved here also
-        // joins that constellation's suite. Idempotent — re-placing is a no-op.
-        const placeIn = document.body.dataset.placeIn;
-        if (placeIn && data?.id) {
-          const pf = new FormData();
-          pf.set('constellation_id', placeIn);
-          pf.set('fragment_id', data.id);
-          await actions.constellations.place(pf);
-        }
+        // A brand-new fragment's queued memberships (including the composer's
+        // pre-ticked constellation) can only be written once it has an id.
+        if (data?.id) await picker.flush(data.id);
         dirty = false; // saved — don't prompt on the reload
         window.location.reload();
         return;

@@ -66,6 +66,14 @@ const COLUMNS = [
         <option value={w.slug} selected={w.slug === p.workSlug}>{w.title}</option>
       ))}
     </select>
+    {/* The fragment→constellation view: what's placed where, and what's placed nowhere. */}
+    <select name="in" aria-label="Filter by constellation" class="select select-sm select-bordered max-w-[12rem] font-sans">
+      <option value="">Any constellation</option>
+      <option value="none" selected={p.membership === 'none'}>— in none —</option>
+      {data.allConstellations.map((c) => (
+        <option value={c.slug} selected={c.slug === p.membership}>{c.name}</option>
+      ))}
+    </select>
     <button type="button" data-clear class="text-base-content/60 underline hover:text-base-content">clear</button>
   </form>
 
@@ -92,22 +100,30 @@ const COLUMNS = [
                 </th>
                 <th scope="col" class="w-6"><span class="sr-only">Type</span></th>
                 {COLUMNS.map((c) => (
-                  <th
-                    scope="col"
-                    class:list={[c.cls, 'px-3 py-2.5 font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase', c.align === 'right' ? 'text-right' : 'text-left']}
-                    aria-sort={c.sortable && p.sortField === c.field ? (p.sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
-                  >
-                    {c.sortable ? (
-                      <button type="button" class:list={['sort-header inline-flex items-center gap-1 hover:text-base-content', p.sortField === c.field && 'text-base-content']} data-field={c.field}>
-                        {c.label}
-                        <span class:list={['text-[0.6rem]', p.sortField !== c.field && 'opacity-30']} aria-hidden="true">
-                          {p.sortField === c.field ? (p.sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-                        </span>
-                      </button>
-                    ) : (
-                      c.label
+                  <>
+                    <th
+                      scope="col"
+                      class:list={[c.cls, 'px-3 py-2.5 font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase', c.align === 'right' ? 'text-right' : 'text-left']}
+                      aria-sort={c.sortable && p.sortField === c.field ? (p.sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    >
+                      {c.sortable ? (
+                        <button type="button" class:list={['sort-header inline-flex items-center gap-1 hover:text-base-content', p.sortField === c.field && 'text-base-content']} data-field={c.field}>
+                          {c.label}
+                          <span class:list={['text-[0.6rem]', p.sortField !== c.field && 'opacity-30']} aria-hidden="true">
+                            {p.sortField === c.field ? (p.sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                          </span>
+                        </button>
+                      ) : (
+                        c.label
+                      )}
+                    </th>
+                    {/* sits beside the fragment's identity, before its lifecycle columns */}
+                    {c.field === 'title' && view !== 'trash' && (
+                      <th scope="col" class="hidden px-3 py-2.5 text-left font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase lg:table-cell">
+                        Constellations
+                      </th>
                     )}
-                  </th>
+                  </>
                 ))}
                 {mode === 'pick' && <th scope="col" class="px-3 py-2 text-right font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase"><span class="sr-only">Place</span></th>}
                 {view === 'trash' && <th scope="col" class="px-3 py-2 text-right font-sans text-xs font-normal tracking-wide text-base-content/60 uppercase">Actions</th>}
@@ -118,6 +134,7 @@ const COLUMNS = [
                 <FragmentRow
                   fragment={r}
                   subjects={data.subjectsByFragment[r.id] ?? []}
+                  constellations={data.constellationsByFragment[r.id] ?? []}
                   authorName={r.author_id ? data.authorNameById[r.author_id] : undefined}
                   workName={r.work_id ? data.workTitleById[r.work_id] : undefined}
                   view={view}

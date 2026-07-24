@@ -18,14 +18,31 @@ import TypeMark from './TypeMark.astro';
 
 interface Props {
   constellation: string;
+  /** Shown on rows the moment they're placed, so the column stays truthful. */
+  constellationName: string;
+  /** The "what is this for" reminder while you pick (docs/admin.md §2). */
+  constellationDescription?: string | null;
 }
-const { constellation } = Astro.props;
+const { constellation, constellationName, constellationDescription } = Astro.props;
 ---
 
-<dialog id="fbrowser" class="drawer-dialog w-full max-w-5xl" data-constellation={constellation} aria-labelledby="fb-title">
+<dialog
+  id="fbrowser"
+  class="drawer-dialog w-full max-w-5xl"
+  data-constellation={constellation}
+  data-constellation-name={constellationName}
+  aria-labelledby="fb-title"
+>
   <div class="flex h-full flex-col">
     <header class="flex shrink-0 items-center gap-3 border-b border-base-300 px-6 py-3">
-      <h2 id="fb-title" class="font-display text-xl">Add to this constellation</h2>
+      <div class="min-w-0">
+        <h2 id="fb-title" class="truncate font-display text-xl">
+          Add to <span class="text-primary">{constellationName}</span>
+        </h2>
+        {constellationDescription && (
+          <p class="admin-hint line-clamp-1" title={constellationDescription}>{constellationDescription}</p>
+        )}
+      </div>
       <p id="fb-error" hidden role="alert" class="admin-alert px-2 py-1 text-xs"></p>
       <div class="relative ml-auto">
         <button id="fb-add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
@@ -60,6 +77,7 @@ const { constellation } = Astro.props;
 
   const browser = document.getElementById('fbrowser') as HTMLDialogElement;
   const cid = browser.dataset.constellation!;
+  const cname = browser.dataset.constellationName ?? '';
   const panelHost = document.getElementById('fb-panel')!;
   const errBox = document.getElementById('fb-error') as HTMLParagraphElement;
   const bulkbar = document.getElementById('fb-bulkbar') as HTMLElement;
@@ -97,6 +115,27 @@ const { constellation } = Astro.props;
     }
     const cell = row.querySelector('[data-act="place"]')?.closest('td');
     if (cell) cell.innerHTML = '<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">✦ placed</span>';
+
+    // Keep the membership column honest without a refetch: drop the "none"
+    // chip if this was an orphan, and add this constellation's own chip.
+    const chips = row.querySelector('td.lg\\:table-cell');
+    if (chips) {
+      chips.querySelector('.admin-chip--none')?.remove();
+      let list = chips.querySelector('span.flex');
+      if (!list) {
+        list = document.createElement('span');
+        list.className = 'flex flex-wrap gap-1';
+        chips.appendChild(list);
+      }
+      const chip = document.createElement('span');
+      chip.className = 'admin-chip admin-chip--in max-w-[11rem] truncate';
+      chip.innerHTML = '<span class="mr-1 opacity-70" aria-hidden="true">&#10022;</span>';
+      chip.append(cname);
+      list.appendChild(chip);
+    }
+    const ids = new Set((row.dataset.constellations || '').split(',').filter(Boolean));
+    ids.add(cid);
+    row.dataset.constellations = [...ids].join(',');
   }
 
   async function loadPanel() {
