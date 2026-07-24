@@ -7,6 +7,7 @@
   loser), or delete (FK-safe: fragments are never orphaned). Counts show usage.
 */
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
 
 const supabase = Astro.locals.supabase;
 
@@ -32,12 +33,11 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
 
 <AdminLayout title="Library" active="library">
   <div class="mx-auto max-w-5xl px-6 py-8">
-    <h1 class="font-display text-2xl">Library</h1>
-    <p class="mt-1 mb-8 max-w-2xl font-sans text-sm text-base-content/55">
-      The vocabulary the workshop shares. <b>Subjects</b> (what a piece is about — definitions feed the AI suggester),
-      <b>Authors</b> and <b>Works</b> (where it comes from). Edit in place, merge duplicates, or delete.
-    </p>
-    <p id="lib-error" hidden role="alert" class="mb-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 font-sans text-sm text-error"></p>
+    <PageHeader
+      title="Library"
+      subtitle="The vocabulary the workshop shares — subjects (what a piece is about; their definitions feed the AI suggester), authors and works (where it comes from). Edit in place, merge duplicates, or delete."
+    />
+    <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
 
     {/* SUBJECTS */}
     <section class="mb-12">

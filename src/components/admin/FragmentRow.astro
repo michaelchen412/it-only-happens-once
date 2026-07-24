@@ -16,9 +16,11 @@
   `writing` fragment shows an excerpt line per match window (search-highlight.ts).
 */
 import type { Database } from '../../lib/database.types';
-import { TYPE_META, shortDate, rowTitle, type FragmentType } from '../../lib/fragments-display';
+import { shortDate, rowTitle } from '../../lib/fragments-display';
 import { excerpts, toPlain } from '../../lib/search-highlight';
 import Highlighted from './Highlighted.astro';
+import TypeMark from './TypeMark.astro';
+import StatusChip from './StatusChip.astro';
 
 type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
 interface Props {
@@ -35,7 +37,6 @@ const { fragment: r, subjects, authorName, workName, view = 'list', mode = 'mana
 // The combo prefill needs ids (to select the existing entity), not just names.
 const authorId = r.author_id ?? '';
 const workId = r.work_id ?? '';
-const meta = TYPE_META[r.type as FragmentType];
 const trash = mode === 'manage' && view === 'trash';
 const pick = mode === 'pick';
 const term = searchTerm.trim();
@@ -94,9 +95,8 @@ const editorData =
       aria-label={`Select ${primaryText}`}
     />
   </td>
-  <td class:list={['w-6 pt-2.5 text-center align-top', meta.tone]}>
-    <span aria-hidden="true">{meta.glyph}</span>
-    <span class="sr-only">{meta.label}</span>
+  <td class="w-6 pt-2.5 text-center align-top">
+    <TypeMark type={r.type} />
   </td>
   <td class="w-full max-w-0 py-2.5 pr-3 align-top">
     {
@@ -137,14 +137,7 @@ const editorData =
     }
   </td>
   <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
-    <span
-      class:list={[
-        'rounded-selector px-1.5 py-0.5 font-sans text-[0.65rem] tracking-wide uppercase',
-        r.status === 'published' ? 'bg-primary/15 text-primary' : 'bg-base-300 text-base-content/70',
-      ]}
-    >
-      {r.status}
-    </span>
+    <StatusChip status={r.status} />
   </td>
   <td class="hidden px-3 pt-2.5 text-right align-top font-sans text-xs text-base-content/65 md:table-cell whitespace-nowrap">
     {shortDate(r.occurred_at)}

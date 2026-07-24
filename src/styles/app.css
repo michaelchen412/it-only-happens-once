@@ -722,6 +722,133 @@ html.reader-open .sky-return {
   }
 }
 
+/* ── Admin chrome primitives (docs/admin.md §2) ──────────────────────────────
+   One implementation each of the small pieces every workshop surface repeats:
+   status chips, count badges, field labels, inline alerts, back links. Before
+   these existed, four pages each rolled their own — and drifted. */
+
+/* Status chip: draft / published. Calm on purpose — a draft is a normal state
+   in the workshop, not a warning. */
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-radius: var(--radius-selector);
+}
+.admin-chip--on {
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+.admin-chip--off {
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  background: var(--color-base-300);
+}
+
+/* Count badge — "▤ 5 writing". The mark keeps its type color inside. */
+.admin-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+}
+.admin-stat__n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.admin-stat__label {
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+/* Field label + helper text for admin forms. */
+.admin-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+.admin-hint {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+}
+
+/* Inline error banner (was hand-rolled on five separate pages). */
+.admin-alert {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--color-error);
+  background: color-mix(in oklab, var(--color-error) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent);
+  border-radius: var(--radius-field);
+}
+
+/* One level up — the workshop is never deeper than that, so this replaces a
+   breadcrumb trail that could only ever have two crumbs. */
+.admin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  transition: color 0.12s;
+}
+.admin-back:hover {
+  color: var(--color-base-content);
+}
+
+/* A name edited in place AS the page title (the constellation composer). Reads
+   as a heading; reveals its editability on hover/focus. */
+.admin-title-input {
+  width: 100%;
+  padding: 0.1rem 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--color-base-content);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.admin-title-input::placeholder {
+  color: color-mix(in oklab, var(--color-base-content) 25%, transparent);
+}
+.admin-title-input:hover {
+  border-bottom-color: var(--color-base-300);
+}
+.admin-title-input:focus {
+  border-bottom-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* Composer suite rows — hover lift, and a held row while dragging. */
+.suite-row {
+  transition: background 0.12s;
+}
+.suite-row:hover {
+  background: color-mix(in oklab, var(--color-base-300) 45%, transparent);
+}
+.suite-row.is-dragging {
+  opacity: 0.4;
+}
+
 /* Fragment-manager type filter — a segmented control with counts. */
 .seg {
   display: inline-flex;

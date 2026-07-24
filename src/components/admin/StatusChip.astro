@@ -1,0 +1,15 @@
+---
+/*
+  StatusChip — draft / published, one implementation for every admin surface
+  (fragment rows, constellation rows, the composer suite). Deliberately calm:
+  a draft is a normal state in this workshop, not a warning.
+*/
+interface Props {
+  status: string;
+  class?: string;
+}
+const { status, class: className = '' } = Astro.props;
+const published = status === 'published';
+---
+
+<span class:list={['admin-chip', published ? 'admin-chip--on' : 'admin-chip--off', className]}>{status}</span>

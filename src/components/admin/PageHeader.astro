@@ -1,0 +1,35 @@
+---
+/*
+  PageHeader — the top of every admin page: an optional back link, the title
+  (or a `title` slot when the title is an editable field), a right-aligned
+  actions cluster, and an optional one-line explanation. Keeps the workshop's
+  surfaces from each inventing their own header geometry.
+*/
+interface Props {
+  title?: string;
+  /** A single level up — the workshop is never deeper than that. */
+  back?: { href: string; label: string };
+  subtitle?: string;
+  class?: string;
+}
+const { title, back, subtitle, class: className = '' } = Astro.props;
+---
+
+<header class:list={['mb-6', className]}>
+  {
+    back && (
+      <a href={back.href} class="admin-back mb-2">
+        <span aria-hidden="true">←</span> {back.label}
+      </a>
+    )
+  }
+  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <div class="min-w-0 grow">
+      {title ? <h1 class="font-display text-2xl font-light">{title}</h1> : <slot name="title" />}
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <slot name="actions" />
+    </div>
+  </div>
+  {subtitle && <p class="mt-2 max-w-2xl font-sans text-sm text-base-content/55">{subtitle}</p>}
+</header>

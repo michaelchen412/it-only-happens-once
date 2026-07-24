@@ -14,6 +14,7 @@
   placement reloads the page so the suite reflects what was added.
 */
 import { Icon } from 'astro-icon/components';
+import TypeMark from './TypeMark.astro';
 
 interface Props {
   constellation: string;
@@ -25,15 +26,15 @@ const { constellation } = Astro.props;
   <div class="flex h-full flex-col">
     <header class="flex shrink-0 items-center gap-3 border-b border-base-300 px-6 py-3">
       <h2 id="fb-title" class="font-display text-xl">Add to this constellation</h2>
-      <p id="fb-error" hidden role="alert" class="rounded-field border border-error/40 bg-error/10 px-2 py-1 font-sans text-xs text-error"></p>
+      <p id="fb-error" hidden role="alert" class="admin-alert px-2 py-1 text-xs"></p>
       <div class="relative ml-auto">
         <button id="fb-add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
           <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
         </button>
         <div id="fb-add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
-          <button data-new-writing role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-accent" aria-hidden="true">▤</span> Writing</button>
-          <button data-new="quote" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-secondary" aria-hidden="true">”</span> Quote</button>
-          <button data-new="song" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-primary" aria-hidden="true">♪</span> Song</button>
+          <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
+          <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
+          <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
         </div>
       </div>
       <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>

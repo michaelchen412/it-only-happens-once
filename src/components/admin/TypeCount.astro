@@ -1,0 +1,30 @@
+---
+/*
+  TypeCount — "▤ 5 writing" as a proper badge. Replaces the old cryptic
+  "mix ” 6 ▤ 5 ♪ 1" run-on: each type gets its own labelled pill in its own
+  color, so the mix of a constellation is legible at a glance.
+*/
+import TypeMark from './TypeMark.astro';
+import { type FragmentType } from '../../lib/fragments-display';
+
+interface Props {
+  type: FragmentType;
+  count: number;
+  /** Shown on hover — e.g. a gentle nudge when the mix is thin. */
+  title?: string;
+}
+const { type, count, title } = Astro.props;
+
+// "writing" is a mass noun; the other two count normally.
+const LABEL: Record<FragmentType, (n: number) => string> = {
+  writing: () => 'writing',
+  quote: (n) => (n === 1 ? 'quote' : 'quotes'),
+  song: (n) => (n === 1 ? 'song' : 'songs'),
+};
+---
+
+<span class:list={['admin-stat', count === 0 && 'opacity-50']} title={title}>
+  <TypeMark type={type} />
+  <b class="admin-stat__n">{count}</b>
+  <span class="admin-stat__label">{LABEL[type](count)}</span>
+</span>

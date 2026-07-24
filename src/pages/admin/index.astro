@@ -10,7 +10,9 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
 import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
+import TypeMark from '../../components/admin/TypeMark.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
@@ -25,17 +27,21 @@ const subjectNames = data.allSubjects.map((s) => s.name);
 
 <AdminLayout title={view === 'trash' ? 'Trash' : 'Fragments'} active="fragments">
   <div class="mx-auto max-w-5xl px-6 py-8">
-    <div class="flex items-baseline justify-between gap-4">
-      <h1 class="font-display text-3xl font-light">{view === 'trash' ? 'Trash' : 'Fragments'}</h1>
-      <div class="flex items-center gap-2">
+    <PageHeader
+      title={view === 'trash' ? 'Trash' : 'Fragments'}
+      back={view === 'trash' ? { href: '/admin', label: 'Fragments' } : undefined}
+      subtitle={
+        view === 'trash'
+          ? 'Deleted fragments wait here until you empty them. Anything placed in a constellation leaves that suite while it sits in the trash.'
+          : undefined
+      }
+    >
+      <Fragment slot="actions">
         {
           view === 'trash' ? (
-            <>
-              <a href="/admin" class="btn btn-ghost btn-sm gap-1.5 font-sans">← Fragments</a>
-              <button id="empty-trash" class="btn btn-outline btn-sm gap-1.5 font-sans text-error" disabled={data.rows.length === 0}>
-                <Icon name="ph:trash" class="text-base" /> Empty trash
-              </button>
-            </>
+            <button id="empty-trash" class="btn btn-outline btn-sm gap-1.5 font-sans text-error" disabled={data.rows.length === 0}>
+              <Icon name="ph:trash" class="text-base" /> Empty trash
+            </button>
           ) : (
             <>
               <a href="/admin?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
@@ -48,20 +54,18 @@ const subjectNames = data.allSubjects.map((s) => s.name);
                   <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
                 </button>
                 <div id="add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
-                  <button data-new-writing role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-accent" aria-hidden="true">▤</span> Writing</button>
-                  <button data-new="quote" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-secondary" aria-hidden="true">”</span> Quote</button>
-                  <button data-new="song" role="menuitem" class="add-item block w-full px-3 py-2 text-left text-sm"><span class="text-primary" aria-hidden="true">♪</span> Song</button>
+                  <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
+                  <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
+                  <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
                 </div>
               </div>
             </>
           )
         }
-      </div>
-    </div>
+      </Fragment>
+    </PageHeader>
 
-    <div class="mt-6">
-      <FragmentListPanel data={data} params={params} mode="manage" />
-    </div>
+    <FragmentListPanel data={data} params={params} mode="manage" />
   </div>
 
   {/* Floating bulk-action bar (buttons rendered per view) */}

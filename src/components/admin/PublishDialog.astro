@@ -61,7 +61,7 @@ const { formId, subjectNames } = Astro.props;
       <TagInput name="subjects" label="Subjects" suggestions={subjectNames} form={formId} placeholder="Add a subject…" />
     </label>
 
-    <p id="dialog-error" hidden role="alert" class="rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"></p>
+    <p id="dialog-error" hidden role="alert" class="admin-alert"></p>
 
     <div class="mt-1 flex items-center justify-end gap-2">
       <button type="button" id="dialog-cancel" class="btn btn-ghost btn-sm normal-case">Cancel</button>

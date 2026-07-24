@@ -1,0 +1,22 @@
+---
+/*
+  TypeMark — a fragment's signature mark (▤ ” ♪) in its type color, with the
+  type name for screen readers. ONE implementation of the site's type coding,
+  so every admin surface (manager table, composer suite, browser sheet) reads
+  the same way. Colors come from TYPE_META (design.md §7: writing = accent,
+  quote = secondary, song = primary).
+*/
+import { TYPE_META, type FragmentType } from '../../lib/fragments-display';
+
+interface Props {
+  type: FragmentType | string;
+  class?: string;
+}
+const { type, class: className = '' } = Astro.props;
+const meta = TYPE_META[type as FragmentType] ?? TYPE_META.writing;
+---
+
+<span class:list={['shrink-0 font-serif select-none', meta.tone, className]}>
+  <span aria-hidden="true">{meta.glyph}</span>
+  <span class="sr-only">{meta.label}</span>
+</span>

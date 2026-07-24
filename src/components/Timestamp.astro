@@ -70,7 +70,13 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     style={`anchor-name: --${pid}`}
     class="inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-base-content/70"
   >
-    <Icon name="ph:clock-light" class="size-3.5 opacity-70" />
+    {/* is:inline renders the clock SELF-CONTAINED (path inline; no <symbol>/<use>).
+        A Timestamp is cloned from a <template> into the Reader, and astro-icon's
+        page-level <symbol> dedup would otherwise emit the single symbol inside the
+        FIRST essay's inert template — leaving every other essay's <use> dangling
+        (the clock vanishes for all but one, most visibly in the constellation,
+        where no live Timestamp seeds the symbol). Inlining sidesteps the sprite. */}
+    <Icon name="ph:clock-light" is:inline class="size-3.5 opacity-70" />
     {prefix && <span>{prefix}</span>}
     {/* No underline: the clock icon + hover already read as interactive, and the
         date is a quiet detail — an underline over-advertises a non-critical tap. */}

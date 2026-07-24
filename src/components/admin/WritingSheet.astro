@@ -20,6 +20,7 @@
   new piece into that constellation — same hook FragmentSheet uses.
 */
 import EditorToolbar from './EditorToolbar.astro';
+import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
 import LinkDialog from './LinkDialog.astro';
 
@@ -38,7 +39,7 @@ const { subjects } = Astro.props;
     <div class="shrink-0 border-b border-base-300 bg-base-100/95">
       <div class="flex items-center gap-3 px-6 py-2">
         <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
-        <span id="ws-heading" class="font-sans text-xs tracking-widest text-base-content/40 uppercase"><span class="text-accent" aria-hidden="true">▤</span> Writing</span>
+        <span id="ws-heading" class="flex items-center gap-1.5 font-sans text-xs tracking-widest text-base-content/40 uppercase"><TypeMark type="writing" /> Writing</span>
 
         <div id="ws-status" class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55" aria-live="polite">
           <span id="ws-spinner" hidden class="loading loading-spinner loading-xs"></span>
@@ -70,7 +71,7 @@ const { subjects } = Astro.props;
           aria-label="Title"
           class="w-full border-none bg-transparent font-display text-4xl font-light outline-none placeholder:text-base-content/25"
         />
-        <p id="ws-error" hidden role="alert" class="mt-4 rounded-field border border-error/40 bg-error/10 px-4 py-2 text-sm text-error"></p>
+        <p id="ws-error" hidden role="alert" class="admin-alert mt-4"></p>
         <div id="ws-editor" class="reading mt-6"></div>
       </div>
     </div>

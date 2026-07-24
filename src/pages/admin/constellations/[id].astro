@@ -2,20 +2,26 @@
 /*
   /admin/constellations/[id] — the Composer (design.md §13; the composing room).
 
-  Dense utilitarian rows over the composed suite (speed over poetry — the
-  REAL preview is the public page itself, which renders drafts for the admin).
-  Adding goes through ONE door: the Add button opens the FragmentBrowser, a
-  mini Fragment Manager (same table/filters as /admin) where already-placed
-  rows render dimmed; its own Add ▾ creates new fragments that auto-place here
-  via body[data-place-in]. Every fragment edits in an overlay (quote/song →
-  FragmentSheet, writing → WritingSheet) so you never leave the composition.
-  Remove unplaces, never deletes.
+  Two stacked concerns, in the order you think about them:
+   1. THE CONSTELLATION — its name (edited in place, as the page title), then a
+      labelled settings card: slug, visibility, description, score. One primary
+      Save; Preview opens the real public page; Delete sits apart, below a rule.
+   2. THE SUITE — dense editable rows in composed order (drag or nudge; ✕
+      unplaces, never deletes), under count badges reading the constellation's
+      shape at a glance. One Add button opens the FragmentBrowser (the Fragment
+      Manager in miniature). Every fragment edits in an overlay, so composing is
+      never interrupted by a navigation.
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PageHeader from '../../../components/admin/PageHeader.astro';
+import TypeMark from '../../../components/admin/TypeMark.astro';
+import TypeCount from '../../../components/admin/TypeCount.astro';
+import StatusChip from '../../../components/admin/StatusChip.astro';
 import FragmentSheet from '../../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../../components/admin/WritingSheet.astro';
 import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
+import type { FragmentType } from '../../../lib/fragments-display';
 
 const sb = Astro.locals.supabase;
 const { id = '' } = Astro.params;
@@ -44,7 +50,6 @@ const [{ data: placements }, { data: allLinks }, { data: subjectRows }, { data: 
   ]);
 
 const snip = (s: string | null | undefined, max = 110) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
-const glyph = { song: '♪', quote: '”', writing: '▤' } as const;
 
 // how many OTHER constellations each fragment lives in (the ✦×n hint)
 const elsewhere = new Map<string, number>();
@@ -55,7 +60,7 @@ for (const l of allLinks ?? []) {
 
 const suite = (placements ?? []).map((p) => {
   const f = p.fragments as unknown as {
-    id: string; type: 'song' | 'quote' | 'writing'; slug: string; title: string | null; body: string | null;
+    id: string; type: FragmentType; slug: string; title: string | null; body: string | null;
     attribution: string | null; source_url: string | null; status: string; occurred_at: string;
     date_precision: string; details: Record<string, unknown> | null; author_id: string | null; work_id: string | null;
     authors: { name: string } | null; works: { title: string } | null;
@@ -78,113 +83,165 @@ const suite = (placements ?? []).map((p) => {
   return {
     id: f.id, type: f.type, status: f.status, editorData,
     summary: f.type === 'quote' ? snip(f.body) : f.type === 'song' ? `${f.title ?? ''} — ${f.attribution ?? ''}` : (f.title ?? '(untitled)'),
+    attribution: f.type === 'quote' ? (f.attribution ?? '') : '',
     subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
     others: elsewhere.get(f.id) ?? 0,
   };
 });
 
-// gauges: the three tests as instruments, never police
+// The three tests, as instruments — never police. Hints appear only off-band.
 const placedCount = suite.length;
 const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
-const mix = { quote: 0, writing: 0, song: 0 } as Record<string, number>;
+const mix = { writing: 0, quote: 0, song: 0 } as Record<FragmentType, number>;
 for (const s of suite) mix[s.type]++;
+const sizeHint =
+  placedCount === 0 ? '' : placedCount < 5 ? 'thin — a constellation usually holds ~5–15' : placedCount > 15 ? 'heavy — two constellations fused? (~5–15)' : '';
+const spreadHint = placedCount > 0 && subjectSpread < 3 ? 'narrow — a way of seeing usually crosses ≥3 subjects' : '';
 
 const subjectNames = (subjectRows ?? []).map((s) => s.name);
+const TYPES = ['writing', 'quote', 'song'] as const;
 ---
 
 <AdminLayout title={c.name} active="constellations">
   <div id="ccomposer" class="mx-auto max-w-4xl px-6 py-8" data-id={c.id} data-slug={c.slug}>
-    <p class="mb-3 font-sans text-xs text-base-content/45">
-      <a href="/admin/constellations" class="hover:underline">Constellations</a> / {c.name}
-    </p>
+    <p id="cc-error" hidden role="alert" class="admin-alert mb-4"></p>
 
-    <p id="cc-error" hidden role="alert" class="mb-4 rounded-field border border-error/40 bg-error/10 px-3 py-2 font-sans text-sm text-error"></p>
-
-    {/* ── header: the constellation itself ─────────────────────────── */}
-    <form id="cc-form" class="rounded-box border border-base-300 bg-base-200 p-4">
+    {/* ── 1. the constellation itself ──────────────────────────────── */}
+    <form id="cc-form">
       <input type="hidden" name="id" value={c.id} />
-      <div class="flex flex-wrap items-center gap-3">
-        <input name="name" required value={c.name} class="input input-bordered max-w-xs font-display text-lg" />
-        <input name="slug" value={c.slug} class="input input-bordered input-sm max-w-[14rem] font-mono text-xs" title="Slug" />
-        <select name="status" class="select select-bordered select-sm font-sans">
-          <option value="draft" selected={c.status === 'draft'}>draft</option>
-          <option value="published" selected={c.status === 'published'}>published</option>
-        </select>
-        <button type="submit" class="btn btn-primary btn-sm font-sans normal-case">Save</button>
-        <span id="cc-saved" hidden class="font-sans text-xs text-success">saved</span>
-        <span class="ml-auto flex items-center gap-2">
-          <a href={`/${c.slug}`} target="_blank" class="btn btn-ghost btn-sm font-sans normal-case" title="The public page — drafts render for you only">
+
+      <PageHeader back={{ href: '/admin/constellations', label: 'Constellations' }}>
+        <div slot="title" class="flex items-center gap-3">
+          <span class="font-display text-xl leading-none text-primary/70" aria-hidden="true">&#10022;</span>
+          <input name="name" required value={c.name} aria-label="Constellation name" class="admin-title-input" />
+        </div>
+        <Fragment slot="actions">
+          <span id="cc-saved" hidden class="font-sans text-xs text-success">saved</span>
+          <a
+            id="cc-preview"
+            href={`/${c.slug}`}
+            target="_blank"
+            class="btn btn-ghost btn-sm gap-1.5 font-sans normal-case"
+            title="Opens the real public page — a draft renders for you only"
+          >
             Preview <Icon name="ph:arrow-up-right" />
           </a>
-          <button type="button" id="cc-delete" class="btn btn-ghost btn-sm text-error" title="Delete constellation">
-            <Icon name="ph:trash" />
+          <button type="submit" id="cc-save" class="btn btn-primary btn-sm font-sans normal-case" disabled>Save</button>
+        </Fragment>
+      </PageHeader>
+
+      <div class="rounded-box border border-base-300 bg-base-200/50 p-5">
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label class="admin-label" for="cc-slug">URL</label>
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-xs text-base-content/40">/</span>
+              <input id="cc-slug" name="slug" value={c.slug} class="input input-sm input-bordered w-full font-mono text-xs" />
+            </div>
+            <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
+          </div>
+          <div>
+            <label class="admin-label" for="cc-status">Visibility</label>
+            <select id="cc-status" name="status" class="select select-sm select-bordered w-full font-sans">
+              <option value="draft" selected={c.status === 'draft'}>Draft — visible only to you</option>
+              <option value="published" selected={c.status === 'published'}>Published — live in the sky</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <label class="admin-label" for="cc-description">Description</label>
+          <textarea id="cc-description" name="description" rows="3" class="textarea textarea-bordered w-full font-serif leading-relaxed"
+            placeholder="Why this way of seeing exists — what truth it tells, how it relates to who you are.">{c.description}</textarea>
+          <p class="admin-hint mt-1.5">Shown under the name on the home overview, and again as the suite's epigraph.</p>
+        </div>
+
+        <div class="mt-5">
+          <label class="admin-label" for="cc-score">The score <span class="normal-case opacity-70">— optional</span></label>
+          <input
+            id="cc-score"
+            name="score_url"
+            value={c.score_url}
+            placeholder="https://open.spotify.com/playlist/…"
+            class="input input-sm input-bordered w-full font-sans"
+          />
+          <p class="admin-hint mt-1.5">A Spotify playlist to play through the read; it appears above the first fragment.</p>
+        </div>
+
+        <div class="mt-5 flex items-center justify-between gap-4 border-t border-base-300 pt-4">
+          <p class="admin-hint">Deleting removes this composition only — the fragments themselves are never touched.</p>
+          <button type="button" id="cc-delete" class="btn btn-ghost btn-sm gap-1.5 font-sans text-error normal-case">
+            <Icon name="ph:trash" /> Delete
           </button>
-        </span>
+        </div>
       </div>
-      <textarea
-        name="description"
-        rows="2"
-        placeholder="Why this way of seeing exists — shown on the home overview and as the suite's epigraph."
-        class="textarea textarea-bordered mt-3 w-full font-serif">{c.description}</textarea>
-      <input
-        name="score_url"
-        value={c.score_url}
-        placeholder="Spotify playlist URL — the constellation's score (optional)"
-        class="input input-bordered input-sm mt-2 w-full max-w-lg font-sans text-xs"
-      />
-      {/* the three tests, as quiet dials */}
-      <p class="mt-3 font-sans text-xs text-base-content/45">
-        {placedCount} placed{placedCount < 5 ? ' · thin (healthy is ~5–15)' : placedCount > 15 ? ' · heavy — two constellations fused? (~5–15)' : ''}
-        · {subjectSpread} subjects{subjectSpread < 3 ? ' · narrow (a way of seeing crosses ≥3)' : ''}
-        · mix ” {mix.quote} ▤ {mix.writing} ♪ {mix.song}
-      </p>
     </form>
 
-    {/* ── the suite: composed order ───────────────────────────────── */}
-    <section class="mt-6">
-      <div class="mb-2 flex items-center justify-between">
-        <h2 class="font-sans text-xs tracking-widest text-base-content/40 uppercase">The suite — drag or nudge to compose</h2>
+    {/* ── 2. the suite ─────────────────────────────────────────────── */}
+    <section class="mt-10">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-display text-lg">The suite</h2>
         <button type="button" data-browse class="btn btn-primary btn-sm gap-1 font-sans normal-case">
           <Icon name="ph:plus" /> Add
         </button>
       </div>
-      <ol id="suite-rows" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200">
-        {
-          suite.map((s) => (
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        {TYPES.map((t) => <TypeCount type={t} count={mix[t]} />)}
+        <span class="admin-stat" title={spreadHint || undefined}>
+          <b class="admin-stat__n">{subjectSpread}</b>
+          <span class="admin-stat__label">{subjectSpread === 1 ? 'subject' : 'subjects'}</span>
+        </span>
+        <span class="admin-stat" title={sizeHint || undefined}>
+          <b class="admin-stat__n">{placedCount}</b>
+          <span class="admin-stat__label">placed</span>
+        </span>
+      </div>
+      {
+        (sizeHint || spreadHint) && (
+          <p class="admin-hint mt-2">{[sizeHint, spreadHint].filter(Boolean).join(' · ')}</p>
+        )
+      }
+
+      {suite.length === 0 ? (
+        <div class="mt-4 rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
+          <p class="font-display text-lg text-base-content/60">Nothing placed yet.</p>
+          <p class="admin-hint mt-1">Press <b>Add</b> to browse everything you've written, quoted, or heard — or make something new inside it.</p>
+        </div>
+      ) : (
+        <ol id="suite-rows" class="mt-4 divide-y divide-base-300 rounded-box border border-base-300 bg-base-200/50">
+          {suite.map((s, i) => (
             <li
-              class="group flex items-center gap-3 px-3 py-2.5"
+              class="suite-row group flex items-center gap-3 px-3 py-2.5"
               draggable="true"
               data-fid={s.id}
               data-type={s.type}
               data-fragment={s.editorData}
               data-writing={s.type === 'writing' ? s.id : undefined}
             >
-              <span class="cursor-grab text-base-content/30 select-none" title="Drag to reorder">⋮⋮</span>
-              <span class="w-4 text-center font-serif text-base-content/45" aria-hidden="true">{glyph[s.type]}</span>
+              <span class="cursor-grab text-base-content/25 transition-colors select-none group-hover:text-base-content/50" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
+              <span data-num class="w-4 shrink-0 text-right font-sans text-xs tabular-nums text-base-content/35" aria-hidden="true">{i + 1}</span>
+              <TypeMark type={s.type} class="w-4 text-center" />
               <button type="button" class="row-open min-w-0 grow truncate text-left font-serif text-[0.95rem]" data-open>
                 {s.summary}
+                {s.attribution && <span class="ml-1.5 font-sans text-xs text-base-content/45">— {s.attribution}</span>}
               </button>
-              {s.status === 'draft' && (
-                <span class="rounded-field border border-warning/40 px-1.5 py-0.5 font-sans text-[0.65rem] tracking-wide text-warning uppercase">draft</span>
-              )}
+              {s.status === 'draft' && <StatusChip status={s.status} />}
               {s.others > 0 && (
                 <span class="font-sans text-xs text-base-content/40" title={`Also lives in ${s.others} other constellation${s.others > 1 ? 's' : ''}`}>
                   &#10022;&times;{s.others + 1}
                 </span>
               )}
-              <button type="button" class="btn btn-ghost btn-xs" data-move="up" title="Move up"><Icon name="ph:arrow-up" /></button>
-              <button type="button" class="btn btn-ghost btn-xs" data-move="down" title="Move down"><Icon name="ph:arrow-down" /></button>
-              <button type="button" class="btn btn-ghost btn-xs text-error/70" data-unplace title="Remove from this constellation (never deletes)">
-                <Icon name="ph:x" />
-              </button>
+              <span class="row-edit flex shrink-0 items-center gap-0.5">
+                <button type="button" class="btn btn-ghost btn-xs" data-move="up" title="Move up" aria-label="Move up"><Icon name="ph:arrow-up" /></button>
+                <button type="button" class="btn btn-ghost btn-xs" data-move="down" title="Move down" aria-label="Move down"><Icon name="ph:arrow-down" /></button>
+                <button type="button" class="btn btn-ghost btn-xs text-error/70" data-unplace title="Remove from this constellation" aria-label="Remove from this constellation">
+                  <Icon name="ph:x" />
+                </button>
+              </span>
             </li>
-          ))
-        }
-      </ol>
-      {suite.length === 0 && (
-        <p class="mt-4 font-sans text-sm text-base-content/50">
-          Empty sky here — press Add to browse everything, or create something new inside it.
-        </p>
+          ))}
+        </ol>
       )}
     </section>
   </div>
@@ -207,20 +264,42 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
   const errBox = document.getElementById('cc-error') as HTMLParagraphElement;
   const show = (m: string) => ((errBox.textContent = m), (errBox.hidden = false));
 
-  // ── header save / delete ───────────────────────────────────────────
-  document.getElementById('cc-form')?.addEventListener('submit', async (e) => {
+  // ── the constellation form: save is armed only by an actual edit ───
+  const form = document.getElementById('cc-form') as HTMLFormElement;
+  const saveBtn = document.getElementById('cc-save') as HTMLButtonElement;
+  const savedFlash = document.getElementById('cc-saved')!;
+  let dirty = false;
+  const setDirty = () => {
+    dirty = true;
+    saveBtn.disabled = false;
+    savedFlash.hidden = true;
+  };
+  form.addEventListener('input', setDirty);
+  form.addEventListener('change', setDirty);
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { data, error } = await actions.constellations.save(new FormData(e.target as HTMLFormElement));
-    if (error) return show(formatActionError(error));
+    saveBtn.disabled = true;
+    const { data, error } = await actions.constellations.save(new FormData(form));
+    if (error) {
+      saveBtn.disabled = false;
+      return show(formatActionError(error));
+    }
     errBox.hidden = true;
+    dirty = false;
     if (data?.slug) {
       root.dataset.slug = data.slug;
-      const prev = root.querySelector<HTMLAnchorElement>('a[target="_blank"]');
-      if (prev) prev.href = `/${data.slug}`;
+      (document.getElementById('cc-slug') as HTMLInputElement).value = data.slug;
+      (document.getElementById('cc-preview') as HTMLAnchorElement).href = `/${data.slug}`;
     }
-    const saved = document.getElementById('cc-saved')!;
-    saved.hidden = false;
-    setTimeout(() => (saved.hidden = true), 1600);
+    savedFlash.hidden = false;
+    setTimeout(() => (savedFlash.hidden = true), 1600);
   });
 
   document.getElementById('cc-delete')?.addEventListener('click', async () => {
@@ -235,13 +314,15 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
     fd.set('id', cid);
     const { error } = await actions.constellations.remove(fd);
     if (error) return show(formatActionError(error));
+    dirty = false; // don't fight the unload guard on the way out
     location.href = '/admin/constellations';
   });
 
   // ── the suite: reorder / unplace / open ────────────────────────────
-  const rows = document.getElementById('suite-rows')!;
+  const rows = document.getElementById('suite-rows');
 
   async function persistOrder() {
+    if (!rows) return;
     const ids = [...rows.querySelectorAll<HTMLElement>('li[data-fid]')].map((l) => l.dataset.fid).join(',');
     if (!ids) return;
     const fd = new FormData();
@@ -249,9 +330,18 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
     fd.set('fragment_ids', ids);
     const { error } = await actions.constellations.reorderPlacements(fd);
     if (error) show(formatActionError(error));
+    else renumber();
   }
 
-  rows.addEventListener('click', async (e) => {
+  /** Keep the visible position numbers honest after any reorder. */
+  function renumber() {
+    rows?.querySelectorAll<HTMLElement>('li[data-fid]').forEach((li, i) => {
+      const n = li.querySelector('[data-num]');
+      if (n) n.textContent = String(i + 1);
+    });
+  }
+
+  rows?.addEventListener('click', async (e) => {
     const li = (e.target as Element).closest('li[data-fid]') as HTMLElement | null;
     if (!li) return;
     const btn = (e.target as Element).closest('button');
@@ -260,6 +350,7 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
       const sib = btn.dataset.move === 'up' ? li.previousElementSibling : li.nextElementSibling;
       if (!sib) return;
       btn.dataset.move === 'up' ? sib.before(li) : sib.after(li);
+      (btn as HTMLButtonElement).focus(); // keep the keyboard where the row went
       return persistOrder();
     }
     if (btn?.hasAttribute('data-unplace')) {
@@ -276,22 +367,30 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
     }
   });
 
-  // drag to reorder (buttons remain the touch/keyboard path)
+  // drag to reorder (the nudge buttons remain the touch/keyboard path)
   let dragged: HTMLElement | null = null;
-  rows.addEventListener('dragstart', (e) => {
+  rows?.addEventListener('dragstart', (e) => {
     dragged = (e.target as Element).closest('li[data-fid]');
-    if (dragged) e.dataTransfer?.setData('text/plain', dragged.dataset.fid!);
+    if (dragged) {
+      dragged.classList.add('is-dragging');
+      e.dataTransfer?.setData('text/plain', dragged.dataset.fid!);
+    }
   });
-  rows.addEventListener('dragover', (e) => {
+  rows?.addEventListener('dragover', (e) => {
     e.preventDefault();
     const over = (e.target as Element).closest('li[data-fid]') as HTMLElement | null;
     if (!over || !dragged || over === dragged) return;
     const r = over.getBoundingClientRect();
     e.clientY < r.top + r.height / 2 ? over.before(dragged) : over.after(dragged);
   });
-  rows.addEventListener('drop', (e) => {
+  rows?.addEventListener('drop', (e) => {
     e.preventDefault();
+    dragged?.classList.remove('is-dragging');
     if (dragged) persistOrder();
+    dragged = null;
+  });
+  rows?.addEventListener('dragend', () => {
+    dragged?.classList.remove('is-dragging');
     dragged = null;
   });
 </script>
