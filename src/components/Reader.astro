@@ -122,6 +122,9 @@ import { Icon } from 'astro-icon/components';
       const target = e.target as Element;
       const trigger = target?.closest?.('[data-read]');
       if (trigger) {
+        // Let ⌘/Ctrl/Shift/Alt-click (or a non-primary button) fall through to
+        // the href — power users can still open the permalink in a new tab.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
         const slug = trigger.getAttribute('data-read');
@@ -141,21 +144,33 @@ import { Icon } from 'astro-icon/components';
     true
   );
 
-  // Escape: the native <dialog> closes visually; we still sync the hash.
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && reader()?.open) {
+  // Escape on a modal <dialog> is governed by the `cancel` event — a keydown
+  // preventDefault() does NOT stop the native close. If the browser pre-closes
+  // the dialog, close() then sees it already shut and drops the scroll-lock
+  // synchronously, so the feed reflows behind the still-sliding drawer (the very
+  // close-jank the deferred unlock exists to avoid). Intercept `cancel` and route
+  // Escape through dismiss() instead — exactly like the admin drawer. (cancel
+  // doesn't bubble, so it binds on the element; the dataset flag keeps it
+  // idempotent across the view-transition swaps that replace the reader.)
+  function bindCancel() {
+    const d = reader();
+    if (!d || d.dataset.cancelBound) return;
+    d.dataset.cancelBound = '1';
+    d.addEventListener('cancel', (e) => {
       e.preventDefault();
       dismiss();
-    }
-  });
+    });
+  }
 
   window.addEventListener('hashchange', sync);
   // Deep links + view-transition navigation: reconcile on arrival.
   document.addEventListener('astro:page-load', () => {
     openedViaTrigger = false;
+    bindCancel();
     sync();
   });
   // <html> persists across view transitions — never leak the scroll lock.
   document.addEventListener('astro:before-swap', unlockScroll);
+  bindCancel();
   sync(); // first load
 </script>

@@ -180,6 +180,9 @@ function setupSearch() {
 document.addEventListener('click', (e) => {
   const link = (e.target as Element)?.closest?.('[data-subject-link], [data-subject-clear]') as HTMLAnchorElement | null;
   if (!link) return;
+  // Let ⌘/Ctrl/Shift/Alt-click (or a non-primary button) open the filtered URL
+  // in a new tab, rather than swapping in place.
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
   e.preventDefault();
   const u = new URL(link.href, location.href);
   const target = u.pathname + u.search;
@@ -198,6 +201,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   const more = (e.target as Element)?.closest?.('[data-feed-more]');
   if (more) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // allow new-tab
     e.preventDefault();
     loadMore();
   }

@@ -112,6 +112,9 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 
 <SiteLayout title="Blog" active="blog">
   <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
+    {/* The page heading, for the document outline + screen readers. The visible
+        anchor is the Writing/Quotes/Music switch below, so this stays sr-only. */}
+    <h1 class="sr-only">Blog — {view === 'quotes' ? 'Quotes' : 'Writing'}</h1>
     {/* ─────────  PRIMARY AXIS: content-type switch  ───────── */}
     <nav class="mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b border-base-300" aria-label="Content">
       {
@@ -191,7 +194,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                       <a
                         href={toggleHref(s.slug)}
                         data-subject-link
-                        aria-pressed={s.selected ? 'true' : 'false'}
+                        aria-current={s.selected ? 'true' : undefined}
                         class:list={[
                           'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors md:rounded-field',
                           s.selected

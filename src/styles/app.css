@@ -321,6 +321,20 @@
 
 /* Animated native <dialog>s. `transition-behavior: allow-discrete` on display +
    overlay lets the EXIT animate too; @starting-style provides the enter-from. */
+/* Top-layer centering — DO NOT REMOVE.
+   Tailwind's preflight resets `margin: 0` on every element (`*, ::before,
+   ::after, ::backdrop`), and an author rule beats the UA stylesheet whatever
+   its specificity. That silently defeats the UA's `dialog { margin: auto }`,
+   which is the ONLY thing centering a modal — so every <dialog> and [popover]
+   that doesn't set its own margin lands in the top-left corner. Restoring it
+   at element/attribute specificity keeps the two deliberate exceptions
+   working: .drawer-dialog pins itself right, .colophon-popover to its
+   trigger — both out-specify this. */
+dialog,
+[popover] {
+  margin: auto;
+}
+
 .modal-dialog,
 .drawer-dialog {
   padding: 0;
@@ -619,8 +633,8 @@ html.reader-open .sky-return {
   display: block;
 }
 /* Never hide a selected filter, even collapsed — it must always be reachable
-   (so it can be removed). Selected tags carry aria-pressed="true". */
-[data-subjects] .subject-extra:has([aria-pressed='true']) {
+   (so it can be removed). Selected tags carry aria-current="true". */
+[data-subjects] .subject-extra:has([aria-current='true']) {
   display: block;
 }
 @media (min-width: 768px) {
