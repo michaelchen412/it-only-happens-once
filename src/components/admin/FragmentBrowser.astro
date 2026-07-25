@@ -15,6 +15,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import TypeMark from './TypeMark.astro';
+import BackToTop from '../BackToTop.astro';
 
 interface Props {
   constellation: string;
@@ -63,6 +64,8 @@ const { constellation, constellationName, constellationDescription, constellatio
     <div id="fb-panel" class="grow overflow-y-auto overscroll-contain px-6 py-4">
       <p class="font-sans text-sm text-base-content/50">Loading fragments…</p>
     </div>
+
+    <BackToTop scroller="#fb-panel" inDialog class="bottom-20" />
 
     {/* bulk place bar — appears once something is checked */}
     <footer id="fb-bulkbar" hidden class="flex shrink-0 items-center gap-3 border-t border-base-300 bg-base-200 px-6 py-2.5 font-sans text-sm">

@@ -639,7 +639,17 @@ html.reader-open {
   pointer-events: auto;
 }
 /* Never bleed through the reader's backdrop. */
-html.reader-open .back-to-top,
+/* Mounted INSIDE a dialog: the control belongs to the sheet, so it anchors to
+   the sheet's corner (absolute) and rides above its footer, rather than the
+   viewport's — where it would collide with the page's own control. */
+.back-to-top--in-sheet {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 5;
+}
+
+html.reader-open .back-to-top:not(.back-to-top--in-sheet),
 html.reader-open .sky-return {
   opacity: 0;
   pointer-events: none;

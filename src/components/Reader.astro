@@ -17,6 +17,7 @@
   prefers-reduced-motion (global rule).
 */
 import { Icon } from 'astro-icon/components';
+import BackToTop from './BackToTop.astro';
 ---
 
 <dialog id="site-reader" class="reader drawer-dialog" aria-label="Reading view">
@@ -26,6 +27,7 @@ import { Icon } from 'astro-icon/components';
   <div class="reader-scroll">
     <div class="reader-inner prose-measure mx-auto"></div>
   </div>
+  <BackToTop scroller="#site-reader .reader-scroll" inDialog />
 </dialog>
 
 <script>

@@ -24,6 +24,7 @@ import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
 import LinkDialog from './LinkDialog.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
+import BackToTop from '../BackToTop.astro';
 
 interface Props {
   subjects: string[];
@@ -102,6 +103,7 @@ const { subjects, constellations = [] } = Astro.props;
         <ConstellationPicker scope="writing" constellations={constellations} />
       </div>
     </div>
+    <BackToTop scroller="#wsheet .grow.overflow-y-auto" inDialog />
   </form>
 </dialog>
 

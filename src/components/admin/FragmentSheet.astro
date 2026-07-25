@@ -16,6 +16,7 @@ import { actions } from 'astro:actions';
 import TagInput from '../TagInput.astro';
 import EntityCombo from './EntityCombo.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
+import BackToTop from '../BackToTop.astro';
 
 interface Props {
   subjects: string[];
@@ -205,6 +206,7 @@ const thisYear = new Date().getUTCFullYear();
       <ConstellationPicker scope="fragment" constellations={constellations} />
     </div>
   </div>
+  <BackToTop scroller="#sheet > div" inDialog />
 </dialog>
 
 <script>
