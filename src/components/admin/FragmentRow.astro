@@ -21,6 +21,7 @@ import { excerpts, toPlain } from '../../lib/search-highlight';
 import Highlighted from './Highlighted.astro';
 import TypeMark from './TypeMark.astro';
 import StatusChip from './StatusChip.astro';
+import StarMark from '../StarMark.astro';
 
 type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
 interface Props {
@@ -158,7 +159,7 @@ const editorData =
           <span class="flex flex-wrap gap-1" title={constellations.map((c) => c.name).join(' · ')}>
             {constellations.map((c) => (
               <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
-                <span class="mr-1" aria-hidden="true">&#10022;</span>
+                <StarMark class="mr-1" />
                 {c.name}
               </span>
             ))}
@@ -180,7 +181,7 @@ const editorData =
     pick && (
       <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
         {placed ? (
-          <span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">✦ placed</span>
+          <span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase"><StarMark /> placed</span>
         ) : (
           <button
             type="button"

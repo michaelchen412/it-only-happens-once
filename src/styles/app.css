@@ -532,6 +532,17 @@ html.reader-open {
   }
 }
 
+/* The signature mark (components/StarMark.astro). Sized in em so it sits
+   inline with text at any scale; `currentColor` lets it take a
+   constellation's --cn wherever one is set. */
+.star-mark {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
 /* ── The overview's stars ────────────────────────────────────────────────────
    Each constellation's ✦ out front, in its own colour. Weight is carried by
    BRIGHTNESS more than size — magnitude is how bright a star looks, not how
@@ -542,12 +553,13 @@ html.reader-open {
    the whole point is that a sky is alive without asking to be watched. */
 .sky-star {
   color: var(--cn, var(--color-primary));
-  text-shadow: 0 0 calc(16px * var(--glow, 0.6))
-    color-mix(in oklab, var(--cn, var(--color-primary)) calc(60% * var(--glow, 0.6)), transparent);
+  filter: drop-shadow(
+    0 0 calc(7px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) calc(70% * var(--glow, 0.6)), transparent)
+  );
   animation: star-breathe 9s ease-in-out infinite;
   animation-delay: var(--phase, 0s);
   transition:
-    text-shadow 0.4s ease,
+    filter 0.4s ease,
     opacity 0.4s ease;
 }
 @keyframes star-breathe {
@@ -573,8 +585,7 @@ html.reader-open {
 .group:hover .sky-star,
 .group:focus-visible .sky-star {
   opacity: 1;
-  text-shadow: 0 0 calc(26px * var(--glow, 0.6))
-    color-mix(in oklab, var(--cn, var(--color-primary)) 75%, transparent);
+  filter: drop-shadow(0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent));
 }
 /* The global reduced-motion rule only clamps DURATION, which would leave an
    infinite animation flickering — kill it by NAME instead, and hold a steady
@@ -1007,7 +1018,7 @@ html.reader-open .sky-return {
   opacity: 1;
   background: color-mix(in oklab, var(--cn) 14%, transparent);
   border-color: color-mix(in oklab, var(--cn) 45%, transparent);
-  text-shadow: 0 0 12px color-mix(in oklab, var(--cn) 55%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--cn) 65%, transparent));
 }
 .cn-swatch:focus-within {
   outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);

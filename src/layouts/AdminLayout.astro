@@ -9,6 +9,7 @@
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
+import StarMark from '../components/StarMark.astro';
 
 interface Props {
   title?: string;
@@ -43,7 +44,7 @@ const nav = [
     >
       <div class="flex h-14 shrink-0 items-center gap-2 border-b border-base-300 px-4">
         <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
-          <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
+          <span class="text-lg leading-none text-primary"><StarMark /></span>
           <span class="font-display text-lg leading-none">Workshop</span>
         </a>
         <button id="sb-close" class="ml-auto rounded-field p-1 text-base-content/50 hover:bg-base-200 hover:text-base-content md:hidden" aria-label="Close menu">
@@ -96,7 +97,7 @@ const nav = [
         <button id="sb-open" class="-ml-1 rounded-field p-1.5 text-base-content/70 hover:bg-base-200 hover:text-base-content" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
           <Icon name="ph:list" class="text-xl" />
         </button>
-        <span class="font-display text-lg leading-none text-primary" aria-hidden="true">✦</span>
+        <span class="text-lg leading-none text-primary"><StarMark /></span>
         <span class="font-display text-base leading-none">{title}</span>
       </header>
 

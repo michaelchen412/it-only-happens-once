@@ -1,0 +1,32 @@
+---
+/*
+  StarMark — the site's signature mark, drawn rather than borrowed
+  (design.md §8). Chosen 2026-07-24 from four candidates; the shape and the
+  reasoning live in src/lib/star-mark.ts.
+
+  Inherits `currentColor`, so it takes a constellation's `--cn` wherever one is
+  set, and glows via `filter: drop-shadow` the way the old glyph did with
+  `text-shadow`. Sized in `em`, so it sits inline with text at any scale.
+
+  Decorative by default — pass `label` only when it is the sole content of a
+  control that has no other accessible name.
+*/
+import { STAR_PATH, STAR_VIEWBOX } from '../lib/star-mark';
+
+interface Props {
+  class?: string;
+  label?: string;
+}
+const { class: className = '', label } = Astro.props;
+---
+
+<svg
+  viewBox={STAR_VIEWBOX}
+  class:list={['star-mark', className]}
+  role={label ? 'img' : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : 'true'}
+  fill="none"
+>
+  <path d={STAR_PATH} fill="currentColor" />
+</svg>

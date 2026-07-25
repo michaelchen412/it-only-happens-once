@@ -13,6 +13,7 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
 import TypeMark from '../../components/admin/TypeMark.astro';
+import StarMark from '../../components/StarMark.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
@@ -84,7 +85,7 @@ const subjectNames = data.allSubjects.map((s) => s.name);
                 fragment→constellation view (docs/admin.md §2). */}
             <div class="relative">
               <button id="bulk-cn-btn" class="btn btn-xs btn-ghost gap-1 normal-case" aria-haspopup="menu" aria-expanded="false">
-                <span class="text-primary" aria-hidden="true">&#10022;</span> Constellation <span aria-hidden="true">▾</span>
+                <span class="text-primary"><StarMark /></span> Constellation <span aria-hidden="true">▾</span>
               </button>
               <div
                 id="bulk-cn-menu"

@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import StarMark from '../components/StarMark.astro';
 import FragmentCard from '../components/FragmentCard.astro';
 import Timestamp from '../components/Timestamp.astro';
 import Label from '../components/Label.astro';
@@ -230,7 +231,7 @@ const constellations = [
       >
         <div class="p-6 sm:p-10">
           <div class="flex items-baseline gap-3">
-            <span class="text-primary">✦</span>
+            <span class="text-primary"><StarMark /></span>
             <h3 class="font-display text-3xl font-light sm:text-4xl">
               conditions, not character
             </h3>
@@ -279,7 +280,7 @@ const constellations = [
         <!-- the peek -->
         <div class="border-t border-base-300 px-6 pt-6 pb-2 sm:px-10">
           <div class="flex items-baseline gap-3 opacity-40">
-            <span class="text-primary">✦</span>
+            <span class="text-primary"><StarMark /></span>
             <h3 class="font-display text-2xl font-light">the one who reaches first</h3>
           </div>
         </div>
@@ -306,7 +307,7 @@ const constellations = [
               <div
                 class={`flex items-baseline gap-3 ${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}
               >
-                <span class="text-primary/60 text-xs">✦</span>
+                <span class="text-primary/60 text-xs"><StarMark /></span>
                 <span
                   class={`${c.weight} font-display cursor-pointer font-light transition-colors hover:text-primary`}
                 >

@@ -9,6 +9,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import StatusChip from '../../../components/admin/StatusChip.astro';
+import StarMark from '../../../components/StarMark.astro';
 
 const sb = Astro.locals.supabase;
 const [{ data: cs }, { data: links }] = await Promise.all([
@@ -72,7 +73,7 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
         <ul id="cl-list" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200/50">
           {rows.map((c) => (
             <li class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]} data-id={c.id}>
-              <span class="shrink-0" style="color: var(--cn)" aria-hidden="true">&#10022;</span>
+              <span class="shrink-0" style="color: var(--cn)"><StarMark /></span>
               <div class="min-w-0 grow">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">{c.name}</a>

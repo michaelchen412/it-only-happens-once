@@ -77,6 +77,7 @@ const { constellation, constellationName, constellationDescription, constellatio
   import { wireFragmentPanel, wireAddMenu, type PanelHandle } from '../../scripts/fragment-panel';
   import { formatActionError } from '../../scripts/action-error';
   import '../../scripts/subject-filter'; // the fetched partial's <subject-filter> needs the definition
+  import { starMarkHtml } from '../../lib/star-mark';
 
   const browser = document.getElementById('fbrowser') as HTMLDialogElement;
   const cid = browser.dataset.constellation!;
@@ -118,7 +119,9 @@ const { constellation, constellationName, constellationDescription, constellatio
       check.disabled = true;
     }
     const cell = row.querySelector('[data-act="place"]')?.closest('td');
-    if (cell) cell.innerHTML = '<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">✦ placed</span>';
+    if (cell)
+      cell.innerHTML =
+        `<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">${starMarkHtml()} placed</span>`;
 
     // Keep the membership column honest without a refetch: drop the "none"
     // chip if this was an orphan, and add this constellation's own chip.
@@ -133,7 +136,7 @@ const { constellation, constellationName, constellationDescription, constellatio
       }
       const chip = document.createElement('span');
       chip.className = `admin-chip admin-chip--in max-w-[11rem] truncate${ccolor ? ` cn-${ccolor}` : ''}`;
-      chip.innerHTML = '<span class="mr-1 opacity-70" aria-hidden="true">&#10022;</span>';
+      chip.innerHTML = starMarkHtml('mr-1');
       chip.append(cname);
       list.appendChild(chip);
     }
