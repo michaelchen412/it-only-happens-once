@@ -1,6 +1,7 @@
 ---
 import Timestamp from './Timestamp.astro';
 import Label from './Label.astro';
+import { TYPE_META } from '../lib/fragments-display';
 
 /*
   FragmentCard — the atom, standardized.
@@ -45,11 +46,14 @@ const {
   class: className = '',
 } = Astro.props;
 
-const cfg = {
-  song: { glyph: '♪', label: 'song', tone: 'text-primary', hover: 'hover:border-primary/40', kind: 'added' },
-  quote: { glyph: '”', label: 'quote', tone: 'text-secondary', hover: 'hover:border-secondary/40', kind: 'added' },
-  writing: { glyph: '▤', label: 'writing', tone: 'text-accent', hover: 'hover:border-accent/40', kind: 'posted' },
+// glyph/label/tone come from TYPE_META (the one map); the card adds only what
+// is its own business — the hover border and which date word it uses.
+const CARD = {
+  song: { hover: 'hover:border-primary/40', kind: 'added' },
+  quote: { hover: 'hover:border-secondary/40', kind: 'added' },
+  writing: { hover: 'hover:border-accent/40', kind: 'posted' },
 }[type];
+const cfg = { ...TYPE_META[type], ...CARD };
 ---
 
 <article

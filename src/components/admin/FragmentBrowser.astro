@@ -22,8 +22,10 @@ interface Props {
   constellationName: string;
   /** The "what is this for" reminder while you pick (docs/admin.md §2). */
   constellationDescription?: string | null;
+  /** Colour slot, so a chip added live matches the server-rendered ones. */
+  constellationColor?: string | null;
 }
-const { constellation, constellationName, constellationDescription } = Astro.props;
+const { constellation, constellationName, constellationDescription, constellationColor } = Astro.props;
 ---
 
 <dialog
@@ -31,6 +33,7 @@ const { constellation, constellationName, constellationDescription } = Astro.pro
   class="drawer-dialog w-full max-w-5xl"
   data-constellation={constellation}
   data-constellation-name={constellationName}
+  data-constellation-color={constellationColor}
   aria-labelledby="fb-title"
 >
   <div class="flex h-full flex-col">
@@ -78,6 +81,7 @@ const { constellation, constellationName, constellationDescription } = Astro.pro
   const browser = document.getElementById('fbrowser') as HTMLDialogElement;
   const cid = browser.dataset.constellation!;
   const cname = browser.dataset.constellationName ?? '';
+  const ccolor = browser.dataset.constellationColor ?? '';
   const panelHost = document.getElementById('fb-panel')!;
   const errBox = document.getElementById('fb-error') as HTMLParagraphElement;
   const bulkbar = document.getElementById('fb-bulkbar') as HTMLElement;
@@ -128,7 +132,7 @@ const { constellation, constellationName, constellationDescription } = Astro.pro
         chips.appendChild(list);
       }
       const chip = document.createElement('span');
-      chip.className = 'admin-chip admin-chip--in max-w-[11rem] truncate';
+      chip.className = `admin-chip admin-chip--in max-w-[11rem] truncate${ccolor ? ` cn-${ccolor}` : ''}`;
       chip.innerHTML = '<span class="mr-1 opacity-70" aria-hidden="true">&#10022;</span>';
       chip.append(cname);
       list.appendChild(chip);

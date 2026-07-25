@@ -22,13 +22,14 @@ import FragmentSheet from '../../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../../components/admin/WritingSheet.astro';
 import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
 import type { FragmentType } from '../../../lib/fragments-display';
+import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 
 const sb = Astro.locals.supabase;
 const { id = '' } = Astro.params;
 
 const { data: c } = await sb
   .from('constellations')
-  .select('id, name, slug, description, status, score_url')
+  .select('id, name, slug, description, status, score_url, color')
   .eq('id', id)
   .maybeSingle();
 if (!c) return Astro.redirect('/admin/constellations');
@@ -44,7 +45,7 @@ const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { 
       .is('fragments.deleted_at', null)
       .order('position'),
     sb.from('fragment_constellations').select('fragment_id, constellation_id'),
-    sb.from('constellations').select('id, name, slug, description').order('sort'),
+    sb.from('constellations').select('id, name, slug, description, color').order('sort'),
     sb.from('subjects').select('name').order('name'),
     sb.from('authors').select('id, name').order('name'),
     sb.from('works').select('id, title, author_id').order('title'),
@@ -113,8 +114,8 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       <input type="hidden" name="id" value={c.id} />
 
       <PageHeader back={{ href: '/admin/constellations', label: 'Constellations' }}>
-        <div slot="title" class="flex items-center gap-3">
-          <span class="font-display text-xl leading-none text-primary/70" aria-hidden="true">&#10022;</span>
+        <div slot="title" class:list={['flex items-center gap-3', `cn-${c.color}`]}>
+          <span id="cc-star" class="font-display text-xl leading-none" style="color: var(--cn)" aria-hidden="true">&#10022;</span>
           <input name="name" required value={c.name} aria-label="Constellation name" class="admin-title-input" />
         </div>
         <Fragment slot="actions">
@@ -141,6 +142,21 @@ const TYPES = ['writing', 'quote', 'song'] as const;
               <input id="cc-slug" name="slug" value={c.slug} class="input input-sm input-bordered w-full font-mono text-xs" />
             </div>
             <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
+          </div>
+          <div>
+            <label class="admin-label">Star colour</label>
+            {/* The colour is a SLOT, not a value — app.css owns what each means
+                in dusk and paper (design.md §13). It tints this constellation's
+                star out front, its lamplight inside, and its chips in here. */}
+            <div class="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Star colour">
+              {COLOR_SLOTS.map((slot) => (
+                <label class:list={['cn-swatch', `cn-${slot}`, c.color === slot && 'is-active']} title={slot}>
+                  <input type="radio" name="color" value={slot} checked={c.color === slot} class="sr-only" />
+                  <span aria-hidden="true">&#10022;</span>
+                  <span class="sr-only">{slot}</span>
+                </label>
+              ))}
+            </div>
           </div>
           <div>
             <label class="admin-label" for="cc-status">Visibility</label>
@@ -255,7 +271,12 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     constellations={allConstellations ?? []}
   />
   <WritingSheet subjects={subjectNames} constellations={allConstellations ?? []} />
-  <FragmentBrowser constellation={c.id} constellationName={c.name} constellationDescription={c.description} />
+  <FragmentBrowser
+    constellation={c.id}
+    constellationName={c.name}
+    constellationDescription={c.description}
+    constellationColor={c.color}
+  />
 </AdminLayout>
 
 <script>

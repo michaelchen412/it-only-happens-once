@@ -12,7 +12,7 @@ import StatusChip from '../../../components/admin/StatusChip.astro';
 
 const sb = Astro.locals.supabase;
 const [{ data: cs }, { data: links }] = await Promise.all([
-  sb.from('constellations').select('id, name, slug, description, status, sort').order('sort'),
+  sb.from('constellations').select('id, name, slug, description, status, sort, color').order('sort'),
   sb
     .from('fragment_constellations')
     .select('constellation_id, fragments!inner(status, deleted_at)')
@@ -71,8 +71,8 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
       ) : (
         <ul id="cl-list" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200/50">
           {rows.map((c) => (
-            <li class="group flex items-center gap-3 px-4 py-3" data-id={c.id}>
-              <span class="shrink-0 text-primary/60" aria-hidden="true">&#10022;</span>
+            <li class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]} data-id={c.id}>
+              <span class="shrink-0" style="color: var(--cn)" aria-hidden="true">&#10022;</span>
               <div class="min-w-0 grow">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">{c.name}</a>

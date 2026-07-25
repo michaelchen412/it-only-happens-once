@@ -185,6 +185,62 @@
 }
 
 /* ---------------------------------------------------------------------------
+   CONSTELLATION COLOURS — the sky's own ramp.
+
+   Each constellation carries a colour so you can tell one from another at a
+   glance (in the workshop's membership chips, and as its star out front). The
+   database stores a SLOT NAME, never a value — so this file stays the single
+   source of truth for the site's mood, and each theme renders the same slot at
+   its own lightness. A hex in the database would break both.
+
+   The ramp is stellar temperature, not a colour wheel: hot violet-blue through
+   white-gold to cool ember and rose. That is self-limiting (a line, not a
+   plane), it is true of real stars, and it already passes through the theme's
+   three anchors — secondary (dusk blue ~232), primary (lamplight amber 68),
+   accent (ember ~22). Any constellation colour therefore belongs to the palette
+   by construction.
+
+   Chroma stays low on purpose. These are stars seen from a porch, not tags in
+   a dashboard — and colour never carries meaning alone: the name is always
+   there beside it.
+   ------------------------------------------------------------------------ */
+[data-theme='dusk'] {
+  --cn-violet: oklch(74% 0.095 305);
+  --cn-ice: oklch(78% 0.085 242);
+  --cn-azure: oklch(72% 0.095 222);
+  --cn-gold: oklch(82% 0.105 98);
+  --cn-amber: oklch(76% 0.115 68); /* = primary, the lamplight itself */
+  --cn-sand: oklch(74% 0.1 45);
+  --cn-ember: oklch(70% 0.11 25);
+  --cn-rose: oklch(72% 0.1 5);
+}
+[data-theme='paper'] {
+  --cn-violet: oklch(50% 0.11 305);
+  --cn-ice: oklch(54% 0.1 242);
+  --cn-azure: oklch(50% 0.11 222);
+  --cn-gold: oklch(58% 0.11 98);
+  --cn-amber: oklch(56% 0.11 62); /* = primary */
+  --cn-sand: oklch(54% 0.11 45);
+  --cn-ember: oklch(52% 0.13 25);
+  --cn-rose: oklch(52% 0.12 5);
+}
+
+/* `--cn` is the constellation's colour; `--lamp` is the light a surface reads
+   under. They're set together so a suite lights itself in its own colour, and
+   everything else falls back to the house lamplight. */
+:root {
+  --lamp: var(--color-primary);
+}
+.cn-violet { --cn: var(--cn-violet); --lamp: var(--cn-violet); }
+.cn-ice { --cn: var(--cn-ice); --lamp: var(--cn-ice); }
+.cn-azure { --cn: var(--cn-azure); --lamp: var(--cn-azure); }
+.cn-gold { --cn: var(--cn-gold); --lamp: var(--cn-gold); }
+.cn-amber { --cn: var(--cn-amber); --lamp: var(--cn-amber); }
+.cn-sand { --cn: var(--cn-sand); --lamp: var(--cn-sand); }
+.cn-ember { --cn: var(--cn-ember); --lamp: var(--cn-ember); }
+.cn-rose { --cn: var(--cn-rose); --lamp: var(--cn-rose); }
+
+/* ---------------------------------------------------------------------------
    Timestamp popover — native top-layer popover so it never clips inside a
    scrolling rail. Anchored under its trigger where CSS anchor positioning is
    supported; elsewhere it falls back to the browser default (centered) —
@@ -476,6 +532,60 @@ html.reader-open {
   }
 }
 
+/* ── The overview's stars ────────────────────────────────────────────────────
+   Each constellation's ✦ out front, in its own colour. Weight is carried by
+   BRIGHTNESS more than size — magnitude is how bright a star looks, not how
+   large it is — so a heavy constellation burns rather than merely swells.
+
+   The breathing is deliberately slow and shallow, and every star gets its own
+   phase (--phase, set per row): synchronised pulsing reads as machinery, and
+   the whole point is that a sky is alive without asking to be watched. */
+.sky-star {
+  color: var(--cn, var(--color-primary));
+  text-shadow: 0 0 calc(16px * var(--glow, 0.6))
+    color-mix(in oklab, var(--cn, var(--color-primary)) calc(60% * var(--glow, 0.6)), transparent);
+  animation: star-breathe 9s ease-in-out infinite;
+  animation-delay: var(--phase, 0s);
+  transition:
+    text-shadow 0.4s ease,
+    opacity 0.4s ease;
+}
+@keyframes star-breathe {
+  0%,
+  100% {
+    opacity: calc(0.46 + 0.34 * var(--glow, 0.6));
+  }
+  50% {
+    opacity: calc(0.68 + 0.32 * var(--glow, 0.6));
+  }
+}
+/* On the overview, a name warms toward its OWN colour rather than the house
+   lamplight — the hover is the constellation introducing itself. */
+.sky-name {
+  transition: color 0.3s ease;
+}
+.group:hover .sky-name,
+.group:focus-visible .sky-name {
+  color: var(--cn, var(--color-primary));
+}
+
+/* The lamp turns toward the constellation you're considering. */
+.group:hover .sky-star,
+.group:focus-visible .sky-star {
+  opacity: 1;
+  text-shadow: 0 0 calc(26px * var(--glow, 0.6))
+    color-mix(in oklab, var(--cn, var(--color-primary)) 75%, transparent);
+}
+/* The global reduced-motion rule only clamps DURATION, which would leave an
+   infinite animation flickering — kill it by NAME instead, and hold a steady
+   brightness. */
+@media (prefers-reduced-motion: reduce) {
+  .sky-star {
+    animation-name: none;
+    opacity: calc(0.6 + 0.4 * var(--glow, 0.6));
+  }
+}
+
 /* Back-to-top — a quiet floating return control (components/BackToTop.astro),
    mounted once in SiteLayout. Hidden until you've scrolled a screen down, and
    suppressed while the Reader owns the top layer. */
@@ -575,28 +685,28 @@ html.reader-open .sky-return {
 /* the passing lamplight — the fragment nearest the reading line warms,
    SOFTER than hover: a tint and a faint halo, never the full amber */
 .suite-item.is-lit .suite-mark {
-  color: color-mix(in oklab, var(--color-primary) 55%, transparent);
+  color: color-mix(in oklab, var(--lamp) 55%, transparent);
 }
 .suite-item.is-lit blockquote {
-  color: color-mix(in oklab, var(--color-primary) 24%, var(--color-base-content));
-  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 20%, transparent);
+  color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
 }
 /* the attribution warms with its quote — same light, a step quieter */
 .suite-item.is-lit figcaption {
   color: color-mix(
     in oklab,
-    var(--color-primary) 30%,
+    var(--lamp) 30%,
     color-mix(in oklab, var(--color-base-content) 58%, transparent)
   );
 }
 .suite-item.is-lit .sw-title {
-  color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
-  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 18%, transparent);
 }
 .suite-item.is-lit .sw-excerpt {
   color: color-mix(
     in oklab,
-    var(--color-primary) 14%,
+    var(--lamp) 14%,
     color-mix(in oklab, var(--color-base-content) 76%, transparent)
   );
 }
@@ -604,13 +714,13 @@ html.reader-open .sky-return {
 /* writing carries no chrome — hover is the stronger, deliberate light
    (kept AFTER the .is-lit rules so it wins at equal specificity) */
 .suite-writing:hover .sw-title {
-  color: var(--color-primary);
+  color: var(--lamp);
 }
 .suite-writing:hover .sw-excerpt {
-  color: color-mix(in oklab, var(--color-primary) 42%, var(--color-base-content));
+  color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
 }
 .suite-writing:hover .suite-mark {
-  color: color-mix(in oklab, var(--color-primary) 75%, transparent);
+  color: color-mix(in oklab, var(--lamp) 75%, transparent);
 }
 
 /* excerpts clamp with a true ellipsis (line-clamp at the call site); the
@@ -670,12 +780,12 @@ html.reader-open .sky-return {
 }
 .post-read:hover .post-title,
 .post-read:focus-within .post-title {
-  color: var(--color-primary);
+  color: var(--lamp);
 }
 .post-read:hover .post-excerpt,
 .post-read:focus-within .post-excerpt {
-  color: color-mix(in oklab, var(--color-primary) 30%, var(--color-base-content));
-  text-shadow: 0 0 28px color-mix(in oklab, var(--color-primary) 15%, transparent);
+  color: color-mix(in oklab, var(--lamp) 30%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 15%, transparent);
 }
 /* The excerpt fades toward its clamped last line so the ellipsis reads as
    "there's more" — the mask bottoms at partial opacity, keeping it legible. */
@@ -765,10 +875,13 @@ html.reader-open .sky-return {
 /* Membership: which constellations a fragment lives in. `--none` is deliberately
    a dashed OUTLINE against `--in`'s filled lamplight, so a column of orphans
    reads as absence at a glance rather than as small print. */
+/* Tinted with the constellation's own colour (a `cn-*` class on the chip), so
+   you can tell which is which by hue before reading the name. Falls back to
+   lamplight if a constellation somehow has no slot. */
 .admin-chip--in {
-  color: var(--color-primary);
-  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-  border: 1px solid color-mix(in oklab, var(--color-primary) 25%, transparent);
+  color: var(--cn, var(--color-primary));
+  background: color-mix(in oklab, var(--cn, var(--color-primary)) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--cn, var(--color-primary)) 30%, transparent);
   text-transform: none;
   letter-spacing: 0;
   font-size: 0.7rem;
@@ -866,6 +979,39 @@ html.reader-open .sky-return {
 }
 .admin-title-input:focus {
   border-bottom-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* Star-colour swatches in the composer — the ✦ itself in each slot, so you
+   pick the star you'll actually see rather than an abstract colour chip. */
+.cn-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  cursor: pointer;
+  color: var(--cn);
+  font-family: var(--font-display);
+  border: 1px solid transparent;
+  border-radius: var(--radius-field);
+  opacity: 0.55;
+  transition:
+    opacity 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+}
+.cn-swatch:hover {
+  opacity: 1;
+}
+.cn-swatch.is-active {
+  opacity: 1;
+  background: color-mix(in oklab, var(--cn) 14%, transparent);
+  border-color: color-mix(in oklab, var(--cn) 45%, transparent);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--cn) 55%, transparent);
+}
+.cn-swatch:focus-within {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
 }
 
 /* Sheet tabs — an underline strip inside the editor drawers, so a fragment's

@@ -27,8 +27,18 @@ const TIERS = [
   'text-xl sm:text-2xl',
   'text-lg sm:text-xl',
 ];
+// The star grows only a little across tiers — weight is carried mostly by
+// BRIGHTNESS (--glow), because magnitude is how bright a star looks, not how
+// big it is. Doubling size and glow would say the same thing twice.
+const STAR_TIERS = ['text-base', 'text-sm', 'text-sm', 'text-xs', 'text-xs'];
+const GLOW_TIERS = [1, 0.82, 0.66, 0.5, 0.36];
 const distinct = [...new Set(refs.map((r) => r.count))].sort((a, b) => b - a);
-const tierOf = (count: number) => TIERS[Math.min(distinct.indexOf(count), TIERS.length - 1)];
+const tierIndex = (count: number) => Math.min(distinct.indexOf(count), TIERS.length - 1);
+const tierOf = (count: number) => TIERS[tierIndex(count)];
+// Each star breathes on its own phase — synchronised pulsing reads as
+// machinery. Derived from the slug so it's stable across renders.
+const phaseOf = (slug: string) =>
+  -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
 ---
 
 <SiteLayout
@@ -41,11 +51,15 @@ const tierOf = (count: number) => TIERS[Math.min(distinct.indexOf(count), TIERS.
         <div class="flex flex-col gap-12 sm:gap-16">
           {refs.map((c, i) => (
             <div class={`${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}>
-              <a href={`/${c.slug}`} class="group block">
+              <a href={`/${c.slug}`} class:list={['group block', `cn-${c.color}`]}>
                 <span class="flex items-baseline gap-3">
-                  <span class="text-xs text-primary/60" aria-hidden="true">&#10022;</span>
                   <span
-                    class={`${tierOf(c.count)} font-display font-light transition-colors group-hover:text-primary`}
+                    class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
+                    style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}; --phase: ${phaseOf(c.slug)}`}
+                    transition:name={`star-${c.slug}`}
+                    aria-hidden="true">&#10022;</span>
+                  <span
+                    class={`${tierOf(c.count)} sky-name font-display font-light transition-colors`}
                     transition:name={`c-${c.slug}`}
                   >
                     {c.name}

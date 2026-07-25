@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { slugify } from '../lib/slug';
 import { lookupSpotifyTrack, parseSpotifyTrackId } from '../lib/spotify';
+import { COLOR_SLOTS, leastUsedSlot } from '../lib/constellation-colors';
 import type { Database, Json } from '../lib/database.types';
 
 type DB = SupabaseClient<Database>;
@@ -648,6 +649,10 @@ export const server = {
         // (the composer form always submits both).
         description: z.string().optional(),
         score_url: z.string().optional(),
+        // The colour SLOT (app.css owns the value). Absent on create → we pick
+        // the least-used one, so a new constellation is distinguishable from
+        // its neighbours without anyone thinking about it.
+        color: z.enum(COLOR_SLOTS).optional(),
         status,
       }),
       handler: async (input, ctx) => {
@@ -674,12 +679,19 @@ export const server = {
         const row: Database['public']['Tables']['constellations']['Update'] = { name: input.name.trim(), slug, status: input.status };
         if (input.description !== undefined) row.description = input.description.trim() || null;
         if (input.score_url !== undefined) row.score_url = scoreUrl || null;
+        if (input.color) row.color = input.color;
         if (input.id) {
           const { error } = await sb.from('constellations').update(row).eq('id', input.id);
           if (error) throw fail(error.message);
           return { id: input.id, slug };
         }
         const { data: last } = await sb.from('constellations').select('sort').order('sort', { ascending: false }).limit(1);
+        // A new star should not arrive wearing a neighbour's colour: take the
+        // least-used slot, earliest on the ramp breaking ties.
+        if (!row.color) {
+          const { data: taken } = await sb.from('constellations').select('color');
+          row.color = leastUsedSlot((taken ?? []).map((t) => t.color));
+        }
         const { data, error } = await sb
           .from('constellations')
           .insert({ ...row, name: input.name.trim(), slug, sort: (last?.[0]?.sort ?? 0) + 1 })

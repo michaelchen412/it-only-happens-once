@@ -26,7 +26,7 @@ type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
 interface Props {
   fragment: FragmentRowT;
   subjects: string[];
-  constellations?: { id: string; name: string; slug: string }[];
+  constellations?: { id: string; name: string; slug: string; color?: string | null }[];
   authorName?: string;
   workName?: string;
   view?: 'list' | 'trash';
@@ -157,8 +157,8 @@ const editorData =
         ) : (
           <span class="flex flex-wrap gap-1" title={constellations.map((c) => c.name).join(' · ')}>
             {constellations.map((c) => (
-              <span class="admin-chip admin-chip--in max-w-[11rem] truncate">
-                <span class="mr-1 opacity-70" aria-hidden="true">&#10022;</span>
+              <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
+                <span class="mr-1" aria-hidden="true">&#10022;</span>
                 {c.name}
               </span>
             ))}

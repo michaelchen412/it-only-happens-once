@@ -63,6 +63,8 @@ export interface ConstellationRefLite {
   id: string;
   name: string;
   slug: string;
+  /** The colour SLOT name (app.css owns what it means). */
+  color?: string | null;
   /** Shown wherever a constellation is offered as a target (4-line cap). */
   description?: string | null;
 }
@@ -108,7 +110,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // Resolved to an id list here, exactly like the subject filter above.
   const { data: allConstellations } = await supabase
     .from('constellations')
-    .select('id, name, slug, description')
+    .select('id, name, slug, description, color')
     .order('sort');
   let membershipFilterIds: string[] | null = null; // whitelist: fragments in the chosen constellation
   let membershipExcludeIds: string[] | null = null; // blacklist: everything placed anywhere ('none')

@@ -26,13 +26,17 @@ import Label from './Label.astro';
 import type { Constellation, SuiteItem } from '../lib/constellations';
 import type { WritingItem } from '../lib/blog';
 import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+import { TYPE_META } from '../lib/fragments-display';
 
 interface Props {
   constellation: Constellation;
 }
 const { constellation } = Astro.props;
 
-const glyph = { song: '♪', quote: '”', writing: '▤' } as const;
+// the signature marks come from the one map (design.md §2: no second copy)
+const glyph = Object.fromEntries(
+  Object.entries(TYPE_META).map(([k, v]) => [k, v.glyph]),
+) as Record<keyof typeof TYPE_META, string>;
 // asymmetric offsets (sm+) — the drawn line gets its angles from these
 const INDENTS = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
 
@@ -44,7 +48,7 @@ const writings = constellation.items
 const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl) : null;
 ---
 
-<section class="mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
+<section class:list={['mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20', `cn-${constellation.color}`]}>
   {
     constellation.status === 'draft' && (
       <Label variant="chrome" class="mb-4">
@@ -55,7 +59,9 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
   <div class="flex items-baseline gap-3">
     <a
       href="/"
-      class="text-primary transition-opacity hover:opacity-70"
+      class="sky-star transition-opacity hover:opacity-70"
+      style="--glow: 1"
+      transition:name={`star-${constellation.slug}`}
       aria-label="All constellations"
       title="All constellations"
     >&#10022;</a>
@@ -208,8 +214,10 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
     const path = document.createElementNS(SVGNS, 'path');
     path.setAttribute('d', d);
     path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-opacity', '0.16');
+    // the drawn line takes the constellation's own light, like everything else
+    // in the suite (app.css --lamp, set by the `cn-*` class on the section)
+    path.setAttribute('stroke', 'var(--lamp)');
+    path.setAttribute('stroke-opacity', '0.22');
     path.setAttribute('stroke-width', '1');
     path.setAttribute('stroke-linecap', 'round');
     svg.appendChild(path);

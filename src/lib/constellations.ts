@@ -16,6 +16,8 @@ export interface ConstellationRef {
    *  epigraph, so the zoom carries both name and meaning. */
   description: string | null;
   sort: number;
+  /** The colour SLOT for its star (app.css owns what each slot looks like). */
+  color: string;
   /** Published fragments placed in it — the constellation's weight in the sky. */
   count: number;
 }
@@ -33,6 +35,8 @@ export interface Constellation {
   /** Drafts are RLS-hidden from anon — reaching one here means the viewer is
    *  the admin, and the public page doubles as the draft preview. */
   status: 'draft' | 'published';
+  /** The colour SLOT — this suite reads under its own lamplight. */
+  color: string;
   /** Optional Spotify playlist — the constellation's score (design.md §14). */
   scoreUrl: string | null;
   items: SuiteItem[];
@@ -43,7 +47,7 @@ export async function listConstellations(supabase: DB): Promise<ConstellationRef
   const [{ data: cs }, { data: links }] = await Promise.all([
     // The overview always shows the PUBLIC truth — even to the admin, whose
     // session could otherwise see drafts (draft preview lives on /{slug}).
-    supabase.from('constellations').select('name, slug, description, sort').eq('status', 'published').order('sort'),
+    supabase.from('constellations').select('name, slug, description, sort, color').eq('status', 'published').order('sort'),
     supabase
       .from('fragment_constellations')
       .select('constellations!inner(slug), fragments!inner(status, deleted_at)')
@@ -66,7 +70,7 @@ export async function listConstellations(supabase: DB): Promise<ConstellationRef
 export async function getConstellation(supabase: DB, slug: string): Promise<Constellation | null> {
   const { data: c } = await supabase
     .from('constellations')
-    .select('id, name, slug, description, sort, status, score_url')
+    .select('id, name, slug, description, sort, status, score_url, color')
     .eq('slug', slug)
     .maybeSingle();
   if (!c) return null;
@@ -130,6 +134,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     description: c.description,
     sort: c.sort,
     status: c.status as 'draft' | 'published',
+    color: c.color,
     scoreUrl: c.score_url ?? null,
     items,
   };

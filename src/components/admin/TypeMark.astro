@@ -1,10 +1,14 @@
 ---
 /*
-  TypeMark — a fragment's signature mark (▤ ” ♪) in its type color, with the
-  type name for screen readers. ONE implementation of the site's type coding,
-  so every admin surface (manager table, composer suite, browser sheet) reads
-  the same way. Colors come from TYPE_META (design.md §7: writing = accent,
-  quote = secondary, song = primary).
+  TypeMark — a fragment's signature mark (▤ ” ♪) with its type name for screen
+  readers. ONE implementation, so every admin surface reads the same way.
+
+  The mark is NOT colour-coded (changed 2026-07-24, design.md §14 resolved).
+  The three glyphs already distinguish type unambiguously by SHAPE, which made
+  the colour redundant — and colour was needed for something it can only mean
+  once: WHICH CONSTELLATION a fragment belongs to. So the division of labour is
+  now shape = what kind of thing this is, colour = which way of seeing it
+  belongs to. Keeping both would have put two colour languages on every row.
 */
 import { TYPE_META, type FragmentType } from '../../lib/fragments-display';
 
@@ -16,7 +20,7 @@ const { type, class: className = '' } = Astro.props;
 const meta = TYPE_META[type as FragmentType] ?? TYPE_META.writing;
 ---
 
-<span class:list={['shrink-0 font-serif select-none', meta.tone, className]}>
+<span class:list={['shrink-0 font-serif text-base-content/45 select-none', className]}>
   <span aria-hidden="true">{meta.glyph}</span>
   <span class="sr-only">{meta.label}</span>
 </span>

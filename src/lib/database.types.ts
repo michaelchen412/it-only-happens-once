@@ -48,6 +48,7 @@ export type Database = {
       }
       constellations: {
         Row: {
+          color: string
           created_at: string
           description: string | null
           id: string
@@ -58,6 +59,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          color?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -68,6 +70,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          color?: string
           created_at?: string
           description?: string | null
           id?: string

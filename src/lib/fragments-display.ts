@@ -1,6 +1,9 @@
 // Presentation helpers shared by the admin list + its row component.
 // (Kept out of the .astro files so the list page stays lean.)
 
+// `tone` is retained for any surface that still wants a per-type accent, but
+// the admin no longer uses it: the glyph SHAPE carries type, and colour was
+// reassigned to constellation membership (see TypeMark.astro, design.md §14).
 export const TYPE_META = {
   writing: { glyph: '▤', label: 'writing', tone: 'text-accent' },
   quote: { glyph: '”', label: 'quote', tone: 'text-secondary' },
