@@ -6,11 +6,17 @@
    1. THE CONSTELLATION — its name (edited in place, as the page title), then a
       labelled settings card: slug, visibility, description, score. One primary
       Save; Preview opens the real public page; Delete sits apart, below a rule.
-   2. THE SUITE — dense editable rows in composed order (drag or nudge; ✕
-      unplaces, never deletes), under count badges reading the constellation's
-      shape at a glance. One Add button opens the FragmentBrowser (the Fragment
-      Manager in miniature). Every fragment edits in an overlay, so composing is
-      never interrupted by a navigation.
+   2. THE SUITE — in two views over one sequence, under count badges reading
+      the constellation's shape at a glance:
+        • COMPOSE — dense editable rows in composed order (drag, or Alt+↑/↓;
+          the arrow buttons survive on touch only, where drag doesn't exist).
+          ✕ unplaces, never deletes.
+        • READ — the same stanzas the public sky sets (SuiteStanza, verbatim),
+          so a composition is judged on the writing rather than on truncated
+          snips, and DRAFTS are included — which the public page can't show.
+      One Add button opens the FragmentBrowser (the Fragment Manager in
+      miniature). Every fragment edits in an overlay, so composing is never
+      interrupted by a navigation.
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
@@ -21,7 +27,13 @@ import StatusChip from '../../../components/admin/StatusChip.astro';
 import FragmentSheet from '../../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../../components/admin/WritingSheet.astro';
 import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
-import type { FragmentType } from '../../../lib/fragments-display';
+import Reader from '../../../components/Reader.astro';
+import PostArticle from '../../../components/PostArticle.astro';
+import SuiteStanza from '../../../components/SuiteStanza.astro';
+import { TYPE_META, type FragmentType } from '../../../lib/fragments-display';
+import { excerpt, readingMinutes } from '../../../lib/markdown';
+import type { SuiteItem } from '../../../lib/constellations';
+import type { SubjectRef } from '../../../lib/blog';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 import StarMark from '../../../components/StarMark.astro';
 
@@ -40,7 +52,7 @@ const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { 
     sb
       .from('fragment_constellations')
       .select(
-        'position, fragments!inner(id, type, slug, title, body, attribution, source_url, status, occurred_at, date_precision, details, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name)))'
+        'position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, status, occurred_at, updated_at, date_precision, details, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)))'
       )
       .eq('constellation_id', c.id)
       .is('fragments.deleted_at', null)
@@ -64,10 +76,11 @@ for (const l of allLinks ?? []) {
 const suite = (placements ?? []).map((p) => {
   const f = p.fragments as unknown as {
     id: string; type: FragmentType; slug: string; title: string | null; body: string | null;
-    attribution: string | null; source_url: string | null; status: string; occurred_at: string;
-    date_precision: string; details: Record<string, unknown> | null; author_id: string | null; work_id: string | null;
+    excerpt: string | null; attribution: string | null; source_url: string | null; status: string;
+    occurred_at: string; updated_at: string | null;
+    date_precision: 'day' | 'year'; details: Record<string, unknown> | null; author_id: string | null; work_id: string | null;
     authors: { name: string } | null; works: { title: string } | null;
-    fragment_subjects: { subjects: { name: string } | null }[] | null;
+    fragment_subjects: { subjects: SubjectRef | null }[] | null;
   };
   const subjects = (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean).join(', ');
   // the FragmentSheet edit payload (same shape FragmentRow emits)
@@ -84,14 +97,50 @@ const suite = (placements ?? []).map((p) => {
           subjects, details: f.details ?? {},
           constellationIds: (allLinks ?? []).filter((l) => l.fragment_id === f.id).map((l) => l.constellation_id),
         });
+  // The Read view's stanza — the SAME SuiteItem shape the public sky renders,
+  // built from this admin query so DRAFT fragments are included (the public
+  // `getConstellation` stays published-only, deliberately).
+  const authored = (f.excerpt ?? '').trim();
+  const lede = authored || excerpt(f.body, 400);
+  const read: SuiteItem =
+    f.type === 'quote'
+      ? { kind: 'quote', body: f.body ?? '', attribution: f.attribution }
+      : f.type === 'song'
+        ? { kind: 'song', title: f.title || '(untitled)', attribution: f.attribution, sourceUrl: f.source_url }
+        : {
+            kind: 'writing',
+            item: {
+              id: f.id,
+              slug: f.slug,
+              title: f.title || '(untitled)',
+              bodyMarkdown: f.body ?? '',
+              excerpt: lede,
+              hasMore: (f.body ?? '').trim().length > lede.length,
+              occurredAt: f.occurred_at,
+              updatedAt: f.updated_at,
+              precision: f.date_precision,
+              readMinutes: readingMinutes(f.body),
+              subjects: (f.fragment_subjects ?? [])
+                .map((fs) => fs.subjects)
+                .filter((s): s is SubjectRef => !!s)
+                .sort((a, b) => a.name.localeCompare(b.name)),
+            },
+          };
+
   return {
-    id: f.id, type: f.type, status: f.status, editorData,
+    id: f.id, type: f.type, status: f.status, editorData, read,
     summary: f.type === 'quote' ? snip(f.body) : f.type === 'song' ? `${f.title ?? ''} — ${f.attribution ?? ''}` : (f.title ?? '(untitled)'),
     attribution: f.type === 'quote' ? (f.attribution ?? '') : '',
     subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
     others: elsewhere.get(f.id) ?? 0,
   };
 });
+
+// the writings placed here — their full text rides along for the Reader
+const readerWritings = suite
+  .map((s) => s.read)
+  .filter((r): r is Extract<SuiteItem, { kind: 'writing' }> => r.kind === 'writing')
+  .map((r) => r.item);
 
 // The three tests, as instruments — never police. Hints appear only off-band.
 const placedCount = suite.length;
@@ -200,9 +249,19 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     <section class="mt-10">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-display text-lg">The suite</h2>
-        <button type="button" data-browse class="btn btn-primary btn-sm gap-1 font-sans normal-case">
-          <Icon name="ph:plus" /> Add
-        </button>
+        <div class="flex items-center gap-2">
+          {
+            suite.length > 0 && (
+              <div class="seg" role="group" aria-label="Suite view">
+                <button type="button" class="type-badge is-active" data-view="compose" aria-pressed="true">Compose</button>
+                <button type="button" class="type-badge" data-view="read" aria-pressed="false">Read</button>
+              </div>
+            )
+          }
+          <button type="button" data-browse class="btn btn-primary btn-sm gap-1 font-sans normal-case">
+            <Icon name="ph:plus" /> Add
+          </button>
+        </div>
       </div>
 
       <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -238,7 +297,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
               data-fragment={s.editorData}
               data-writing={s.type === 'writing' ? s.id : undefined}
             >
-              <span class="cursor-grab text-base-content/25 transition-colors select-none group-hover:text-base-content/50" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
+              <span class="cursor-grab text-base-content/25 transition-colors select-none group-hover:text-base-content/50" title="Drag to reorder (or Alt+↑/↓)" aria-hidden="true">⋮⋮</span>
               <span data-num class="w-4 shrink-0 text-right font-sans text-xs tabular-nums text-base-content/35" aria-hidden="true">{i + 1}</span>
               <TypeMark type={s.type} class="w-4 text-center" />
               <button type="button" class="row-open min-w-0 grow truncate text-left font-serif text-[0.95rem]" data-open>
@@ -251,9 +310,13 @@ const TYPES = ['writing', 'quote', 'song'] as const;
                   <StarMark />&times;{s.others + 1}
                 </span>
               )}
+              {/* The nudges are the TOUCH path only — with a pointer you drag,
+                  and with a keyboard you Alt+↑/↓. On a hovering device they'd
+                  reserve row width for a duplicate of drag, so `.row-nudge`
+                  removes them there entirely (app.css). */}
               <span class="row-edit flex shrink-0 items-center gap-0.5">
-                <button type="button" class="btn btn-ghost btn-xs" data-move="up" title="Move up" aria-label="Move up"><Icon name="ph:arrow-up" /></button>
-                <button type="button" class="btn btn-ghost btn-xs" data-move="down" title="Move down" aria-label="Move down"><Icon name="ph:arrow-down" /></button>
+                <button type="button" class="row-nudge btn btn-ghost btn-xs" data-move="up" title="Move up" aria-label="Move up"><Icon name="ph:arrow-up" /></button>
+                <button type="button" class="row-nudge btn btn-ghost btn-xs" data-move="down" title="Move down" aria-label="Move down"><Icon name="ph:arrow-down" /></button>
                 <button type="button" class="btn btn-ghost btn-xs text-error/70" data-unplace title="Remove from this constellation" aria-label="Remove from this constellation">
                   <Icon name="ph:x" />
                 </button>
@@ -262,8 +325,69 @@ const TYPES = ['writing', 'quote', 'song'] as const;
           ))}
         </ol>
       )}
+
+      {/* ── the Read view ────────────────────────────────────────────────
+          The same stanzas the sky sets (SuiteStanza, verbatim), so composing
+          can be judged on the writing rather than on 110-character snips —
+          and it includes DRAFTS, which the public page can't show. It stops
+          at the content on purpose: the arcs, the lamplight and the score are
+          Preview's job. Read asks "is this composition any good?"; Preview
+          asks "does the page look right?" */}
+      {
+        suite.length > 0 && (
+          <div id="suite-read" class:list={['mt-8', `cn-${c.color}`]} hidden>
+            {c.description && (
+              <p class="prose-measure border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
+                {c.description}
+              </p>
+            )}
+            <div id="suite-read-list" class="mt-10 flex flex-col gap-14">
+              {suite.map((s, i) => (
+                <article
+                  class:list={['group flex gap-4 sm:gap-6', s.type === 'writing' && 'suite-writing']}
+                  data-fid={s.id}
+                  data-type={s.type}
+                  data-fragment={s.editorData}
+                  data-writing={s.type === 'writing' ? s.id : undefined}
+                >
+                  <div class="flex w-6 shrink-0 flex-col items-center gap-1">
+                    <span class="suite-mark font-serif text-base text-base-content/35 select-none" aria-hidden="true">
+                      {TYPE_META[s.type].glyph}
+                    </span>
+                    <span data-num class="font-sans text-[0.65rem] text-base-content/30 tabular-nums" aria-hidden="true">
+                      {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      class="row-edit btn btn-ghost btn-xs mt-0.5 px-1"
+                      data-open
+                      title="Edit this fragment"
+                      aria-label="Edit this fragment"
+                    >
+                      <Icon name="ph:pencil-simple" />
+                    </button>
+                  </div>
+                  <div class="min-w-0 grow">
+                    {s.status === 'draft' && (
+                      <div class="mb-2">
+                        <StatusChip status={s.status} />
+                      </div>
+                    )}
+                    <SuiteStanza item={s.read} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )
+      }
     </section>
   </div>
+
+  {/* Essays open in the blog's own Reader — the same component, the same
+      PostArticle, so a piece reads here exactly as it will out there. */}
+  <Reader />
+  {readerWritings.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
 
   <FragmentSheet
     subjects={subjectNames}
@@ -359,15 +483,22 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     fd.set('fragment_ids', ids);
     const { error } = await actions.constellations.reorderPlacements(fd);
     if (error) show(formatActionError(error));
-    else renumber();
+    else syncOrder();
   }
 
-  /** Keep the visible position numbers honest after any reorder. */
-  function renumber() {
-    rows?.querySelectorAll<HTMLElement>('li[data-fid]').forEach((li, i) => {
-      const n = li.querySelector('[data-num]');
-      if (n) n.textContent = String(i + 1);
-    });
+  /** Carry a reorder across to the Read view and renumber both — otherwise
+   *  switching views after a drag would show yesterday's sequence. */
+  function syncOrder() {
+    const ids = [...(rows?.querySelectorAll<HTMLElement>('li[data-fid]') ?? [])].map((l) => l.dataset.fid!);
+    const list = document.getElementById('suite-read-list');
+    // re-appending each stanza in composed order re-sorts the list in place
+    for (const id of ids) {
+      const stanza = list?.querySelector(`[data-fid="${CSS.escape(id)}"]`);
+      if (stanza) list!.appendChild(stanza);
+    }
+    for (const el of [rows, list]) {
+      el?.querySelectorAll<HTMLElement>('[data-num]').forEach((n, i) => (n.textContent = String(i + 1)));
+    }
   }
 
   rows?.addEventListener('click', async (e) => {
@@ -396,7 +527,53 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     }
   });
 
-  // drag to reorder (the nudge buttons remain the touch/keyboard path)
+  // Alt+↑/↓ nudges the focused row — the keyboard's reorder path, now that the
+  // arrow buttons only exist on touch (app.css `.row-nudge`).
+  rows?.addEventListener('keydown', (e) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const li = (e.target as Element).closest('li[data-fid]');
+    const sib = e.key === 'ArrowUp' ? li?.previousElementSibling : li?.nextElementSibling;
+    if (!li || !sib) return;
+    e.preventDefault();
+    e.key === 'ArrowUp' ? sib.before(li) : sib.after(li);
+    (e.target as HTMLElement).focus(); // keep the keyboard where the row went
+    persistOrder();
+  });
+
+  // ── Compose ⇄ Read ─────────────────────────────────────────────────
+  // Two ways of looking at one suite: the dense rows to build it, the real
+  // stanzas to judge it. The choice sticks, because it's a mode you're in.
+  const readPanel = document.getElementById('suite-read');
+  const viewBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-view]')];
+  const VIEW_KEY = 'cc-suite-view';
+
+  function setView(v: string, persist = true) {
+    if (!rows || !readPanel) return;
+    const read = v === 'read';
+    rows.hidden = read;
+    readPanel.hidden = !read;
+    for (const b of viewBtns) {
+      const on = b.dataset.view === v;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    if (persist) try { localStorage.setItem(VIEW_KEY, v); } catch {}
+  }
+  for (const b of viewBtns) b.addEventListener('click', () => setView(b.dataset.view!));
+  try {
+    if (localStorage.getItem(VIEW_KEY) === 'read') setView('read', false);
+  } catch {}
+
+  // The pencil in the stanza's margin — writing still READS on click (the
+  // Reader owns `data-read`), so editing needs its own target.
+  readPanel?.addEventListener('click', (e) => {
+    if (!(e.target as Element).closest('button[data-open]')) return;
+    const art = (e.target as Element).closest('[data-fid]') as HTMLElement | null;
+    if (art?.dataset.writing) return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: art.dataset.writing }));
+    if (art?.dataset.fragment) document.dispatchEvent(new CustomEvent('fragment:edit', { detail: art.dataset.fragment }));
+  });
+
+  // drag to reorder (the nudges remain the touch path, Alt+↑/↓ the keyboard's)
   let dragged: HTMLElement | null = null;
   rows?.addEventListener('dragstart', (e) => {
     dragged = (e.target as Element).closest('li[data-fid]');

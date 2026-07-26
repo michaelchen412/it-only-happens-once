@@ -14,6 +14,10 @@ about-michael.md
 vision.md
 design.md
 
+# plan stubs — jumping-off notes for upcoming work, fleshed out one per
+# conversation. Working thoughts, not documentation; docs/ holds what shipped.
+docs/plans/
+
 # dependencies
 node_modules/
 

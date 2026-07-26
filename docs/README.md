@@ -27,6 +27,7 @@ Durable records of what this site is and how it's built — so that neither a hu
 | Composer editor | **TipTap** (ProseMirror), fixed toolbar, stores Markdown | [0006](adr/0006-composer-editor-tiptap.md) |
 | AI subject tagging | **Claude Haiku 4.5**, structured output, human-in-loop | [0007](adr/0007-ai-subject-tagging.md) |
 | Provenance | **authors/works** as query facets, decoupled from display | [0008](adr/0008-provenance-and-facets.md) |
+| Music | Three roles — **score / paired / annotated fragment**; a song's `body` is its *why*, the embed is the citation | [0009](adr/0009-music-three-roles.md) |
 
 ## Status
 

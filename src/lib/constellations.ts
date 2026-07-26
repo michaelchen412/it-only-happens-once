@@ -22,10 +22,13 @@ export interface ConstellationRef {
   count: number;
 }
 
-/** One stanza of a suite. Songs join when the corpus has them (no rows yet). */
+/** One stanza of a suite, in whichever register its medium reads at.
+ *  `SuiteStanza.astro` renders every variant, public and composer alike —
+ *  a song plays where it was placed (design.md §14, resolved 2026-07-25). */
 export type SuiteItem =
   | { kind: 'quote'; body: string; attribution: string | null }
-  | { kind: 'writing'; item: WritingItem };
+  | { kind: 'writing'; item: WritingItem }
+  | { kind: 'song'; title: string; attribution: string | null; sourceUrl: string | null };
 
 export interface Constellation {
   name: string;
@@ -78,7 +81,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   const { data: rows } = await supabase
     .from('fragment_constellations')
     .select(
-      'position, fragments!inner(id, type, slug, title, body, excerpt, attribution, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)))'
+      'position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)))'
     )
     .eq('constellation_id', c.id)
     .eq('fragments.status', 'published')
@@ -95,6 +98,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       body: string | null;
       excerpt: string | null;
       attribution: string | null;
+      source_url: string | null;
       occurred_at: string;
       updated_at: string | null;
       date_precision: 'day' | 'year';
@@ -124,8 +128,17 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
             .sort((a, b) => a.name.localeCompare(b.name)),
         },
       });
+    } else if (f.type === 'song') {
+      // A song is a stanza in the sequence (design.md §14, resolved 2026-07-25):
+      // it plays where it was placed. The score above the suite and stanzas
+      // inside it are independent — either, both, or neither.
+      items.push({
+        kind: 'song',
+        title: f.title || '(untitled)',
+        attribution: f.attribution,
+        sourceUrl: f.source_url,
+      });
     }
-    // songs: none in the corpus yet; the suite renders them when they arrive
   }
 
   return {

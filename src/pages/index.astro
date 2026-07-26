@@ -15,7 +15,7 @@
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { listConstellations } from '../lib/constellations';
-import StarMark from '../components/StarMark.astro';
+import StarBloom from '../components/StarBloom.astro';
 
 const supabase = Astro.locals.supabase;
 const refs = await listConstellations(supabase);
@@ -58,7 +58,7 @@ const phaseOf = (slug: string) =>
                     class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
                     style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}; --phase: ${phaseOf(c.slug)}`}
                     transition:name={`star-${c.slug}`}
-                    ><StarMark /></span>
+                    ><StarBloom /></span>
                   <span
                     class={`${tierOf(c.count)} sky-name font-display font-light transition-colors`}
                     transition:name={`c-${c.slug}`}

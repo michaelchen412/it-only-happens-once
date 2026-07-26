@@ -1,0 +1,77 @@
+---
+/*
+  StarBloom — the signature mark, blooming.
+
+  A constellation is drawn BETWEEN stars, never one star, so a single ✦ beside
+  a constellation's name is a small lie. Rather than redraw the sky's whole
+  vocabulary to fix it, the mark simply parts when you attend to it: the core
+  recedes and companions arrive from beyond, the way a point of light resolves
+  into more than one under magnification. It says "several things live here"
+  and then gets out of the way.
+
+  The companions carry no data — not the fragment count, not weight. Weight is
+  already said twice on the overview (type scale and glow) and a third telling
+  would be clutter for a number nobody needs. This is a gesture, not a chart.
+
+  Everything is sized in `em`, so one component serves a 5xl overview name and
+  a 1rem floating control with no props. Only the core sits in normal flow —
+  companions are absolutely positioned — so blooming NEVER reflows the text
+  beside it.
+
+  Blooms on `.group:hover`, so hovering anywhere on the constellation's row or
+  link triggers it, not just the mark itself. Every call site therefore needs
+  `group` on whichever ancestor should be the hover target. Styles live in
+  app.css ("The bloom").
+
+  TWO STATES, because the bloom is not only a hover flourish:
+
+    · at rest   — a single point. You are outside; the constellation is
+                  unresolved at distance, and hovering is a preview that
+                  releases when you leave.
+    · `active`  — held open. You are INSIDE this constellation, and it stays
+                  parted for the whole visit rather than for the length of an
+                  animation. Going back to the sky collapses it to a point
+                  again, which the shared `transition:name` on the star
+                  animates for free across the navigation.
+
+  Hover always previews what the click will do, so on an active mark the
+  gesture runs BACKWARDS: pointing at it (or at the title beside it) sends the
+  companions back out and restores the single point — the close, rehearsed.
+
+  Only the suite's header mark is active: it IS the constellation you are
+  standing in. The ways back out (the outro, the floating ✦) stay at rest —
+  they point at the sky, not at where you are.
+
+  Decorative throughout: each mark is aria-hidden, and the enclosing link
+  carries the accessible name.
+*/
+import StarMark from './StarMark.astro';
+
+interface Props {
+  class?: string;
+  /** Held open — the constellation currently being read. */
+  active?: boolean;
+}
+const { class: className = '', active = false } = Astro.props;
+
+/* Four companions, deliberately uneven — the mark itself has an uneven reach
+   (star-mark.ts), and a symmetrical ring of them would read as machinery.
+   Offsets are the prototype's, converted to `em` so they hold at any size. */
+const COMPANIONS = [
+  { dx: '-1.00em', dy: '-0.69em' },
+  { dx: '1.07em', dy: '-0.48em' },
+  { dx: '-0.65em', dy: '0.97em' },
+  { dx: '0.95em', dy: '0.84em' },
+];
+---
+
+<span class:list={['star-bloom', active && 'is-active', className]}>
+  <span class="star-bloom__core"><StarMark /></span>
+  {
+    COMPANIONS.map((c) => (
+      <span class="star-bloom__sat" style={`--dx:${c.dx}; --dy:${c.dy}`}>
+        <StarMark />
+      </span>
+    ))
+  }
+</span>

@@ -543,6 +543,131 @@ html.reader-open {
   flex-shrink: 0;
 }
 
+/* ── The bloom ───────────────────────────────────────────────────────────────
+   components/StarBloom.astro. A constellation is the figure drawn BETWEEN
+   stars, so one ✦ standing for a whole constellation is a small lie. The mark
+   parts when you attend to it — the core recedes while companions arrive from
+   beyond — the way a point of light resolves into several under magnification.
+
+   The companions mean nothing countable; this is a gesture, not a chart.
+
+   Sized entirely in `em` so one component serves a 5xl name on the overview
+   and a 1rem floating control. Only the core is in flow — companions are
+   absolutely positioned — so a bloom never reflows the text beside it. The
+   trigger is `.group:hover`, so hovering a constellation's whole row blooms
+   its star, not merely the mark. */
+.star-bloom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Companions reach ~1.31em from the centre while the box in flow is only 1em
+     wide — so roughly 0.8em of an open bloom hangs outside its own box on each
+     side. Reserve that room at rest, or the mark lands on the name beside it
+     the moment it opens. (The box stays 1em rather than growing, so
+     `items-baseline` at every call site still aligns the STAR to the name's
+     baseline.) */
+  margin-inline: 0.85em;
+}
+/* …except inside the floating ✦, which already centres the mark in its own
+   2.75rem plate and which the companions are meant to overflow. */
+.sky-return .star-bloom {
+  margin-inline: 0;
+}
+.star-bloom__core {
+  display: inline-flex;
+  transition:
+    scale 0.42s cubic-bezier(0.22, 0.8, 0.3, 1),
+    opacity 0.42s ease;
+}
+/* Companions keep the PARENT's font-size so `--dx`/`--dy` resolve against the
+   mark they orbit; their own size comes from the inner .star-mark instead.
+   (Shrinking this element would silently shrink the offsets with it.) */
+.star-bloom__sat {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -0.24em 0 0 -0.24em; /* centres the 0.48em mark on the core */
+  display: inline-flex;
+  opacity: 0;
+  translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+  pointer-events: none;
+  transition:
+    translate 0.46s cubic-bezier(0.22, 0.8, 0.3, 1),
+    opacity 0.4s ease;
+}
+.star-bloom__sat .star-mark {
+  width: 0.48em;
+  height: 0.48em;
+}
+/* Held open — the constellation you are currently inside. The `.is-active`
+   flag is wrapped in `:where()` so it adds nothing to specificity, letting the
+   plain hover rules below win by weight rather than by source order. */
+.star-bloom:where(.is-active) .star-bloom__core {
+  scale: 0.72;
+  opacity: 0.75;
+}
+.star-bloom:where(.is-active) .star-bloom__sat {
+  opacity: 0.6;
+  translate: var(--dx) var(--dy);
+}
+
+.group:hover .star-bloom__core,
+.group:focus-visible .star-bloom__core,
+.star-bloom:hover .star-bloom__core {
+  scale: 0.72;
+  opacity: 0.75;
+}
+.group:hover .star-bloom__sat,
+.group:focus-visible .star-bloom__sat,
+.star-bloom:hover .star-bloom__sat {
+  opacity: 0.8;
+  translate: var(--dx) var(--dy);
+}
+
+/* …but an already-open mark runs the gesture BACKWARDS. Hover always previews
+   what the click will do: closed, that is opening; open, it is closing. So
+   pointing at the mark — or at the title beside it, which shares the `group` —
+   sends the companions back out the way they came and lets the single point
+   reassert. Here `.is-active` is deliberately NOT in `:where()`: these need to
+   outweigh the plain hover rules above, not merely follow them. */
+.group:hover .star-bloom.is-active .star-bloom__core,
+.group:focus-visible .star-bloom.is-active .star-bloom__core,
+.star-bloom.is-active:hover .star-bloom__core {
+  scale: 1;
+  opacity: 1;
+}
+.group:hover .star-bloom.is-active .star-bloom__sat,
+.group:focus-visible .star-bloom.is-active .star-bloom__sat,
+.star-bloom.is-active:hover .star-bloom__sat {
+  opacity: 0;
+  translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+}
+/* Transitions only, so the global rule's duration clamp is enough — but land
+   the companions at rest rather than leaving them mid-flight. */
+@media (prefers-reduced-motion: reduce) {
+  .star-bloom__sat {
+    translate: var(--dx) var(--dy);
+  }
+}
+
+/* ── The way back ────────────────────────────────────────────────────────────
+   The return at the foot of a suite. It leans the way you're about to go: the
+   arrow eases out to the left on hover, opening the gap to the words rather
+   than sliding the whole control. Warm accent (--color-primary) rather than
+   the constellation's own --lamp, which on an ice or azure suite would not be
+   warm at all. */
+.return-arrow {
+  width: 0.62em;
+  height: 0.62em;
+  flex-shrink: 0;
+  transition: translate 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.group:hover .return-arrow,
+.group:focus-visible .return-arrow {
+  translate: -0.28em 0;
+}
+
 /* ── The overview's stars ────────────────────────────────────────────────────
    Each constellation's ✦ out front, in its own colour. Weight is carried by
    BRIGHTNESS more than size — magnitude is how bright a star looks, not how
@@ -553,14 +678,19 @@ html.reader-open {
    the whole point is that a sky is alive without asking to be watched. */
 .sky-star {
   color: var(--cn, var(--color-primary));
+  animation: star-breathe 9s ease-in-out infinite;
+  animation-delay: var(--phase, 0s);
+  transition: opacity 0.4s ease;
+}
+/* The glow belongs to the MARKS, not to the container. A filter rasterises its
+   whole subtree and a descendant cannot opt out, so anything ever added inside
+   .sky-star — chrome, a plate, a badge — would silently be lit too. Keeping it
+   on .star-mark means the light stops at the stars' edges by construction. */
+.sky-star .star-mark {
   filter: drop-shadow(
     0 0 calc(7px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) calc(70% * var(--glow, 0.6)), transparent)
   );
-  animation: star-breathe 9s ease-in-out infinite;
-  animation-delay: var(--phase, 0s);
-  transition:
-    filter 0.4s ease,
-    opacity 0.4s ease;
+  transition: filter 0.4s ease;
 }
 @keyframes star-breathe {
   0%,
@@ -581,10 +711,14 @@ html.reader-open {
   color: var(--cn, var(--color-primary));
 }
 
-/* The lamp turns toward the constellation you're considering. */
+/* The lamp turns toward the constellation you're considering — again on the
+   marks, for the same reason. */
 .group:hover .sky-star,
 .group:focus-visible .sky-star {
   opacity: 1;
+}
+.group:hover .sky-star .star-mark,
+.group:focus-visible .sky-star .star-mark {
   filter: drop-shadow(0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent));
 }
 /* The global reduced-motion rule only clamps DURATION, which would leave an
@@ -661,6 +795,12 @@ html.reader-open .sky-return {
   font-size: 1.05rem;
   color: color-mix(in oklab, var(--color-primary) 70%, transparent);
 }
+/* …and it warms TOWARD that accent on hover, rather than to the neutral the
+   shared back-to-top rule above wants — the bloom underneath is an accent
+   gesture, and washing it grey at the exact moment it opens fights it. */
+.sky-return:hover {
+  color: var(--color-primary);
+}
 
 /* ---------------------------------------------------------------------------
    The Sky — the constellation suite (components/ConstellationSuite.astro).
@@ -690,12 +830,42 @@ html.reader-open .sky-return {
   height: 100%;
   pointer-events: none;
   z-index: 0;
+  /* SVG clips to its own box by default, and the leftmost marks sit close
+     enough to the edge that a star's points and glow were being sliced off
+     against the margin. There is no overflow risk: the widest star reaches
+     ~13px past the suite's content box, well inside the section's px-5. */
+  overflow: visible;
+}
+
+/* Stars at the figure's JOINTS — one per fragment, dropped into the gap each
+   arc leaves around its endpoints. So the stars line up with what you are
+   reading and the arcs read as drawn BETWEEN them, which is what a
+   constellation is. The halo pools around the fragment's glyph, which sits on
+   top of it (stanzas are z-index 1, the figure 0) and becomes the star's body.
+
+   `--lit` is written per scroll frame from each star's distance to the reading
+   line, on a much wider, softer falloff than the stanza lamplight: that one is
+   a spotlight on a single fragment, this is the ambient half — dozens alight
+   at once, brightest where you're reading and dimming outward, so the figure
+   kindles ahead of you and settles behind.
+
+   It is the site's own mark (STAR_PATH), not a dot, so a fragment's star is
+   the same object as the one on the overview at a smaller magnitude. The glow
+   is a drop-shadow at a FIXED blur radius — `--lit` drives opacity only, and
+   opacity fades the shadow along with the shape, so the two brighten together
+   without re-rasterising a blur on every scroll frame. `--lamp` throughout, so
+   the figure burns in the constellation's own colour. */
+.suite-star {
+  fill: var(--lamp);
+  opacity: calc(var(--lit, 0) * 0.7);
+  filter: drop-shadow(0 0 5px var(--lamp));
 }
 
 /* one slow, even breath for every warming element (glow + hover) */
 .suite-mark,
 .suite-item blockquote,
 .suite-item figcaption,
+.suite-attrib,
 .sw-title,
 .sw-excerpt {
   transition:
@@ -712,8 +882,10 @@ html.reader-open .sky-return {
   color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
   text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
 }
-/* the attribution warms with its quote — same light, a step quieter */
-.suite-item.is-lit figcaption {
+/* the attribution warms with its quote — same light, a step quieter.
+   `.suite-attrib` is the song's artist line: not a <figcaption>, same register. */
+.suite-item.is-lit figcaption,
+.suite-item.is-lit .suite-attrib {
   color: color-mix(
     in oklab,
     var(--lamp) 30%,
@@ -1084,6 +1256,15 @@ html.reader-open .sky-return {
 }
 .suite-row.is-dragging {
   opacity: 0.4;
+}
+/* Nudge arrows are the TOUCH reorder path only. With a pointer you drag and
+   with a keyboard you Alt+↑/↓, so on a hovering device they'd only reserve row
+   width for a duplicate of drag — `opacity: 0` (the .row-edit default) hides
+   them but still holds the space, which is the whole complaint. Remove them. */
+@media (hover: hover) {
+  .row-nudge {
+    display: none;
+  }
 }
 
 /* Fragment-manager type filter — a segmented control with counts. */

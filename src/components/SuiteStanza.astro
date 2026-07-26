@@ -1,0 +1,81 @@
+---
+/*
+  SuiteStanza — ONE stanza of a suite, in its own register (design.md §13).
+
+  Extracted so the public suite and the composer's Read view render a placed
+  fragment from a single definition (§2.3: a pattern that exists in two places
+  becomes a primitive). This is the CONTENT only — the margin mark, the stanza
+  offsets, the drawn line and the passing lamplight are the public suite's
+  chrome and stay in ConstellationSuite.astro.
+
+    • quote   — set whole, never truncated; line breaks preserved; a serif
+                all-small-caps attribution.
+    • writing — display title + fading excerpt and NO metadata; the block opens
+                the blog's own Reader (`data-read`), so an essay reads
+                identically everywhere.
+    • song    — title over artist in the quote's attribution register, with the
+                Spotify embed when the URL parses. A song is a STANZA: it plays
+                where it was placed (design.md §14, resolved 2026-07-25). The
+                score above the suite is independent — either, both, or neither.
+*/
+import type { SuiteItem } from '../lib/constellations';
+import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+
+interface Props {
+  item: SuiteItem;
+}
+const { item } = Astro.props;
+
+const embed = item.kind === 'song' && item.sourceUrl ? parseSpotifyEmbed(item.sourceUrl) : null;
+---
+
+{
+  item.kind === 'quote' && (
+    <figure>
+      <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
+        {item.body}
+      </blockquote>
+      {item.attribution && (
+        <figcaption class="mt-3 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+          — {item.attribution}
+        </figcaption>
+      )}
+    </figure>
+  )
+}
+
+{
+  item.kind === 'writing' && (
+    <a href={`/blog/${item.item.slug}`} data-read={item.item.slug} class="block cursor-pointer">
+      <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.item.title}</h2>
+      <p class="sw-excerpt excerpt-fade prose-measure mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] text-base-content/70">
+        {item.item.excerpt}
+      </p>
+    </a>
+  )
+}
+
+{
+  item.kind === 'song' && (
+    <div>
+      <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.title}</h2>
+      {item.attribution && (
+        <p class="suite-attrib mt-2 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+          — {item.attribution}
+        </p>
+      )}
+      {embed && (
+        <iframe
+          class="mt-4 max-w-xl"
+          src={spotifyEmbedSrc(embed)}
+          width="100%"
+          height="152"
+          loading="lazy"
+          allow="encrypted-media"
+          title={item.title}
+          style="border-radius: var(--radius-box); border: 0"
+        />
+      )}
+    </div>
+  )
+}
