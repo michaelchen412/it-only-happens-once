@@ -11,7 +11,8 @@ Durable records of what this site is and how it's built — so that neither a hu
 5. **[`data-model.md`](data-model.md)** — database schema, ERD, and how the domain maps to tables.
 6. **[`auth.md`](auth.md)** — authentication (Supabase Auth), Row Level Security, admin protection, secrets.
 7. **[`search.md`](search.md)** — search & match-highlighting: the engine, the XSS boundary, the perf traps, and the checklist for reusing it on the public frontend.
-8. **[`adr/`](adr/)** — Architecture Decision Records: the reasoning, alternatives, and consequences behind each major choice.
+8. **[`backups.md`](backups.md)** — how the corpus is protected: the nightly dump (private repo), what it covers, what it doesn't.
+9. **[`adr/`](adr/)** — Architecture Decision Records: the reasoning, alternatives, and consequences behind each major choice.
 
 ## Decisions locked so far
 
