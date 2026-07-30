@@ -103,7 +103,7 @@ Paste a Spotify **track or album** URL. We call `https://open.spotify.com/oembed
 
 **The annotation — "Why this one".** A song fragment's `body` is Michael's sentence (or few) on why this song ([ADR 0009](adr/0009-music-three-roles.md)): the one field Spotify has nowhere to put, and what makes a song a fragment rather than a link. It's a short-form editor (bold/italic, the same one the quote body uses — `mountMiniEditor`) and it is **optional, always**. On the public stanza the annotation **leads** and the embed **closes as citation**; an unannotated song falls back to title + artist, which is also what a reader with a content blocker sees.
 
-**The constraint, stated plainly:** oEmbed's `title` is the track name only; it carries no artist or album. Getting those automatically requires the Spotify **Web API** (client-credentials flow → a registered Spotify app + `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`). We judged that setup not worth it for a modest, hand-curated library — typing the artist is a two-second step. The Web API upgrade is listed in §9 if that ever changes.
+**The constraint, stated plainly:** oEmbed's `title` is the track name only; it carries no artist or album. Getting those automatically requires the Spotify **Web API** (client-credentials flow → a registered Spotify app + `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`). We judged that setup not worth it for a modest, hand-curated library — typing the artist is a two-second step. The Web API upgrade is listed in §10 if that ever changes.
 
 ## 7. Quotes
 
@@ -123,7 +123,47 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 
 **✦ Suggest with AI.** Each editor's subject field has a button that sends the fragment's text + the taxonomy (names **and** definitions, read live from the DB) to **Claude Haiku 4.5** and pre-fills the tag input with the existing subjects that apply (capped at 3). The human stays in control — suggestions are ordinary editable chips. If the model proposes a *new* subject it appears as a distinct "New subject: X — Add it" affordance that must be **explicitly accepted** (accepting just drops the name into the field; `syncSubjects` mints it on save). Runs server-side ([`suggestSubjects` action](../src/actions/index.ts) → [`src/lib/suggest-subjects.ts`](../src/lib/suggest-subjects.ts)) with `ANTHROPIC_API_KEY`; structured output (`zodOutputFormat`) pins picks to the real taxonomy. The taxonomy's one source of truth is [`src/lib/subjects.ts`](../src/lib/subjects.ts) (re-exporting `scripts/reflections-subjects.json`). Absent key → the button degrades to an inline "not configured" message; manual tagging is unaffected. Wired for quotes now; songs/essays are the same call when added. Cost ≈ $0.0015/call.
 
-## 9. Deferred (not in admin v1)
+## 9. Installing the Workshop (phone & iPad) — and why it's not optional
+
+**The Workshop is installable to the home screen; the public site is not.** Only
+[`AdminLayout`](../src/layouts/AdminLayout.astro) carries a manifest
+([`public/workshop.webmanifest`](../public/workshop.webmanifest)), so readers are
+never offered an "install" they'd have no use for.
+
+**Why it matters.** Safari deletes script-written storage — IndexedDB included —
+after **7 days without a visit**, and **home-screen web apps are exempt**
+(they keep their own counter of days of use). The writing sheet's offline outbox
+(§5) lives in IndexedDB, so on an iPhone or iPad *the install is what makes
+offline words durable between sessions*. Not a nicety: it's the last link in the
+chain that keeps a Wi-Fi-less flight from costing you an afternoon.
+
+**How, on iOS:** open `/admin` in **Safari** (not another browser) → Share →
+**Add to Home Screen** → leave **"Open as Web App"** switched **on**. Since
+iOS 26 that toggle defaults to on for every site, and turning it off is what
+would forfeit the storage exemption. On Android/desktop Chrome, the install
+prompt appears in the address bar.
+
+**Install from `/admin`, not from the homepage** — nothing public links into the
+Workshop, so an app that lands anywhere else means typing the URL every time.
+The manifest's `start_url` says `/admin` for the same reason; `scope` is `/` so
+tapping **Site ↗** stays inside the app instead of bouncing you to Safari.
+
+**What it does *not* do.** There is **no service worker**, deliberately, so the
+app still needs the network to **load**. An editing session that goes offline is
+covered (the sheet is already open, and the outbox catches every save);
+cold-starting with no signal is not. That's a separate, deliberately deferred
+decision — see the offline plan, not a TODO.
+
+**Icons** are generated from the one drawn mark by
+[`scripts/build-app-icons.mjs`](../scripts/build-app-icons.mjs) (`node
+scripts/build-app-icons.mjs`), which reads `STAR_PATH` out of
+[`src/lib/star-mark.ts`](../src/lib/star-mark.ts) so the star is never copied.
+It writes the favicon (both formats) and the app icons together — redraw the
+mark, re-run it once, and everything follows. One small known seam: the
+standalone status-bar tint follows the **system** colour scheme, so forcing the
+theme toggle against it can leave the bar a shade out.
+
+## 10. Deferred (not in admin v1)
 
 - ~~**Constellation placement + composed ordering**~~ — **shipped 2026-07-23** with the composing room (§2: composer + fragment browser).
 - **Spotify Web API metadata** (auto artist/album) — §6. Only if manual entry becomes a real annoyance.

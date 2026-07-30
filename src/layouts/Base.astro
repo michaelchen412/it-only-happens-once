@@ -35,6 +35,9 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />
     {transitions && <ClientRouter />}
+    {/* A room's own <head> additions — the Workshop puts its web-app manifest
+        here (AdminLayout). Last, so a room can override a default above. */}
+    <slot name="head" />
   </head>
   <body class="bg-base-100 text-base-content">
     <slot />

@@ -1,0 +1,25 @@
+{
+  "id": "/admin",
+  "name": "Workshop — It Only Happens Once",
+  "short_name": "Workshop",
+  "description": "Where the writing happens: drafts, quotes, songs, and the sky.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1a1511",
+  "theme_color": "#1a1511",
+  "icons": [
+    {
+      "src": "/icons/workshop-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/workshop-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
