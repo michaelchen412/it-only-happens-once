@@ -49,7 +49,7 @@ const panel = wireFragmentPanel(root, {
 const bulkBtns = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-bulk]'));
 bulkBtns.forEach((btn) =>
   btn.addEventListener('click', async () => {
-    const op = btn.dataset.bulk as 'publish' | 'unpublish' | 'trash' | 'restore' | 'purge';
+    const op = btn.dataset.bulk as 'publish' | 'draft' | 'note' | 'trash' | 'restore' | 'purge';
     const ids = panel.getSelected();
     if (!ids.length) return;
     if ((op === 'trash' || op === 'purge') && !(await confirmBulk(op, ids.length))) return;

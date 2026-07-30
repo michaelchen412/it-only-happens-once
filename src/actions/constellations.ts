@@ -9,7 +9,7 @@ import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
 import { COLOR_SLOTS, leastUsedSlot } from '../lib/constellation-colors';
 import type { Database } from '../lib/database.types';
-import { fail, idList, optText, optUuid, status } from './_shared';
+import { constellationStatus, fail, idList, optText, optUuid } from './_shared';
 
 export const constellations = {
   save: defineAction({
@@ -27,7 +27,7 @@ export const constellations = {
       // the least-used one, so a new constellation is distinguishable from
       // its neighbours without anyone thinking about it.
       color: z.enum(COLOR_SLOTS).optional(),
-      status,
+      status: constellationStatus,
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;

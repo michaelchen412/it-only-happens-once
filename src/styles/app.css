@@ -1083,6 +1083,14 @@ html.reader-open .sky-return {
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   background: var(--color-base-300);
 }
+/* A note sits one step below a draft, so it reads one step quieter: outlined
+   rather than filled, the same way `--none` says absence in the membership
+   column. Nothing about it should look unfinished-and-worrying. */
+.admin-chip--note {
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+}
 /* Membership: which constellations a fragment lives in. `--none` is deliberately
    a dashed OUTLINE against `--in`'s filled lamplight, so a column of orphans
    reads as absence at a glance rather than as small print. */

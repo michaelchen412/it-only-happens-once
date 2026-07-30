@@ -17,7 +17,9 @@ interface Props {
   mode?: 'manage' | 'pick';
 }
 const { data, params: p, mode = 'manage' } = Astro.props;
-const view = mode === 'manage' ? p.view : 'list'; // trash never reaches pick mode
+// Neither trash nor notes reaches the picker: you compose a constellation out
+// of finished work, not out of scratch.
+const view = mode === 'manage' ? p.view : 'list';
 const TYPES = ['writing', 'quote', 'song'] as const;
 
 const COLUMNS = [
@@ -33,7 +35,7 @@ const COLUMNS = [
   <form method="GET" action="/admin" class="fpanel-filters flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
     <input type="hidden" name="sort" class="fpanel-sort" value={`${p.sortField}_${p.sortDir}`} />
     <input type="hidden" name="type" class="fpanel-type" value={p.type ?? ''} />
-    <input type="hidden" name="view" value={view === 'trash' ? 'trash' : ''} />
+    <input type="hidden" name="view" value={view === 'list' ? '' : view} />
 
     {/* type filter = segmented control (single-select), with counts */}
     <div class="seg" role="radiogroup" aria-label="Filter by type">
@@ -83,16 +85,21 @@ const COLUMNS = [
       data.rows.length === 0 ? (
         <div class="mt-6 rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
           <p class="font-display text-xl text-base-content/60">
-            {view === 'trash' ? 'Trash is empty.' : p.filtered ? 'Nothing matches.' : 'Nothing here yet.'}
+            {p.filtered ? 'Nothing matches.' : view === 'trash' ? 'Trash is empty.' : view === 'notes' ? 'No notes yet.' : 'Nothing here yet.'}
           </p>
-          {view !== 'trash' && !p.filtered && (
+          {view === 'list' && !p.filtered && (
             <p class="mt-2 text-sm text-base-content/50">Add a piece of writing, a quote, or a song to begin.</p>
+          )}
+          {view === 'notes' && !p.filtered && (
+            <p class="mt-2 text-sm text-base-content/50">
+              Notes are the scratch tier — thoughts that aren’t drafts yet. Nothing here is public, ever.
+            </p>
           )}
         </div>
       ) : (
         <div class="overflow-x-auto rounded-box border border-base-300">
           <table class="w-full text-sm">
-            <caption class="sr-only">{view === 'trash' ? 'Trashed fragments' : 'Fragments'}</caption>
+            <caption class="sr-only">{view === 'trash' ? 'Trashed fragments' : view === 'notes' ? 'Notes' : 'Fragments'}</caption>
             <thead>
               <tr class="border-b border-base-300 bg-base-200/50">
                 <th scope="col" class="w-8 px-3 py-2">

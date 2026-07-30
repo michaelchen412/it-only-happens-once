@@ -43,7 +43,9 @@ const { subjects, constellations = [] } = Astro.props;
     <div class="shrink-0 border-b border-base-300 bg-base-100/95">
       <div class="flex items-center gap-3 px-6 py-2">
         <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
-        <span id="ws-heading" class="flex items-center gap-1.5 font-sans text-xs tracking-widest text-base-content/40 uppercase"><TypeMark type="writing" /> Writing</span>
+        <span id="ws-heading" class="flex items-center gap-1.5 font-sans text-xs tracking-widest text-base-content/40 uppercase">
+          <TypeMark type="writing" /> <span id="ws-heading-label">Writing</span>
+        </span>
 
         {/* Membership is a TAB, not a popover, and lives here rather than in
             the publish dialog: a DRAFT essay never opens that dialog, and
@@ -63,6 +65,9 @@ const { subjects, constellations = [] } = Astro.props;
         </div>
 
         <div id="ws-actions-draft" class="flex items-center gap-2">
+          {/* Notes promote one step at a time — note → draft → published — but
+              nothing stops a finished note going straight out via Publish… */}
+          <button type="button" id="ws-to-draft" hidden class="btn btn-outline btn-sm normal-case">Make it a draft</button>
           <button type="button" id="ws-open-publish" class="btn btn-primary btn-sm normal-case">Publish…</button>
         </div>
         <div id="ws-actions-published" hidden class="flex items-center gap-2">

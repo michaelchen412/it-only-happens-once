@@ -1,0 +1,14 @@
+-- The notes tier (docs/plans/09 Piece 2): a private scratch status below
+-- 'draft'. Safe by construction — the public read policy is an ALLOWLIST
+-- (fragments_select_published: status = 'published' and deleted_at is null),
+-- so a new enum value is unreadable by anon with no policy edit and no way to
+-- leak by omission.
+--
+-- BEFORE 'draft' is load-bearing, not cosmetic: the Fragment Manager sorts
+-- `.order('status')` to pin the least-finished work to the top, so the list
+-- reads note → draft → published — the order the promotion pipeline runs in.
+-- Enum ordering cannot be changed later without recreating the type.
+--
+-- This gets its own migration because a value added by ALTER TYPE cannot be
+-- USED until the adding transaction commits.
+alter type fragment_status add value if not exists 'note' before 'draft';

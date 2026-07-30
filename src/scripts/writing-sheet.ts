@@ -80,6 +80,8 @@ const saveChangesBtn = document.getElementById('ws-save-changes') as HTMLButtonE
 const discardBtn = document.getElementById('ws-discard') as HTMLButtonElement;
 const viewLink = document.getElementById('ws-view-link') as HTMLAnchorElement;
 const deleteBtn = document.getElementById('ws-delete') as HTMLButtonElement;
+const toDraftBtn = document.getElementById('ws-to-draft') as HTMLButtonElement;
+const headingLabel = document.getElementById('ws-heading-label') as HTMLElement;
 let savedStatus = 'draft';
 let dirty = false;
 let everSaved = false; // any successful server save this open → reload on close
@@ -94,10 +96,14 @@ let baseUpdatedAt: string | null = null;
  *  a declined dialog would return every time the autosave timer fires.) */
 let conflictParked = false;
 const isPublished = () => savedStatus === 'published';
+/** The scratch tier (docs/plans/09 Piece 2) — autosaves exactly like a draft. */
+const isNote = () => savedStatus === 'note';
 
 function reflectStatus() {
   draftActions.hidden = isPublished();
   publishedActions.hidden = !isPublished();
+  toDraftBtn.hidden = !isNote();
+  headingLabel.textContent = isNote() ? 'Note' : 'Writing';
   updateDirtyUI();
 }
 function updateViewLink(slug: string) {
@@ -396,7 +402,7 @@ function populate(d: Loaded | null) {
   deleteBtn.hidden = !d;
   reflectStatus();
   statusText.classList.remove('text-error', 'text-warning');
-  statusText.textContent = isPublished() ? 'Up to date' : 'Autosaves as you write';
+  statusText.textContent = isPublished() ? 'Up to date' : isNote() ? 'A note — autosaves, never public' : 'Autosaves as you write';
   spinner.hidden = true;
   updateViewLink(d?.slug ?? '');
   const memberIds = d?.constellationIds ?? [];
@@ -412,8 +418,13 @@ function openSheet(hash: string, fromHash: boolean) {
   if (!sheet.open) sheet.showModal();
 }
 
-function openNew(fromHash = false) {
+function openNew(fromHash = false, asNote = false) {
   populate(null);
+  if (asNote) {
+    savedStatus = 'note';
+    reflectStatus();
+    statusText.textContent = 'A note — autosaves, never public';
+  }
   // Composer context: pre-tick that constellation, so the implicit
   // data-place-in hook is now something you can see and untick.
   const placeIn = document.body.dataset.placeIn;
@@ -421,7 +432,7 @@ function openNew(fromHash = false) {
     picker.preselect(placeIn);
     setCnLabel(1);
   }
-  openSheet('#new-writing', fromHash);
+  openSheet(asNote ? '#new-note' : '#new-writing', fromHash);
   titleField.focus();
 }
 
@@ -548,6 +559,19 @@ dialogConfirm.addEventListener('click', async () => {
   }
 });
 
+// ---- notes: one step up the pipeline (note → draft) ----
+// No confirmation: nothing is destroyed, nothing goes public, and the reverse
+// move is one click away in the manager's bulk bar.
+toDraftBtn.addEventListener('click', async () => {
+  toDraftBtn.disabled = true;
+  const saved = await save('draft');
+  toDraftBtn.disabled = false;
+  if (!saved) return;
+  reflectStatus(); // save() has already advanced savedStatus
+  setSaved('Now a draft ' + nowTime());
+  everSaved = true; // the list underneath moves it out of Notes
+});
+
 document.getElementById('ws-unpublish')?.addEventListener('click', async () => {
   const btn = document.getElementById('ws-unpublish') as HTMLButtonElement;
   const ok = await confirmDialog({
@@ -612,7 +636,9 @@ document.addEventListener('writing:edit', (e) => {
   if (typeof id === 'string' && id) void openEdit(id);
 });
 document.querySelectorAll<HTMLElement>('[data-new-writing]').forEach((btn) => btn.addEventListener('click', () => openNew()));
+document.querySelectorAll<HTMLElement>('[data-new-note]').forEach((btn) => btn.addEventListener('click', () => openNew(false, true)));
 
 const m = location.hash.match(/^#edit=([0-9a-f][0-9a-f-]{30,40})$/i);
 if (m) void openEdit(m[1], true);
 else if (location.hash === '#new-writing') openNew(true);
+else if (location.hash === '#new-note') openNew(true, true);

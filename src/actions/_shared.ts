@@ -25,7 +25,23 @@ export const optUuid = z.preprocess(blankToUndef, z.string().uuid().optional());
  * field into `null`, so a bare z.string() rejects the very case we mean.
  */
 export const idList = z.preprocess((v) => (v == null ? '' : v), z.string());
-export const status = z.enum(['draft', 'published']).default('draft');
+
+/**
+ * A fragment's tier: note → draft → published (docs/plans/09 Piece 2). `note`
+ * is the private scratch level, and it is private *by construction* — the
+ * public RLS policy is an allowlist on `status = 'published'`, so a new tier
+ * can never leak by omission.
+ */
+export const fragmentStatus = z.enum(['note', 'draft', 'published']).default('draft');
+
+/**
+ * Constellations have no notes tier — and they need their own schema to say so.
+ * `constellations.status` is a plain `text` column with a CHECK for
+ * ('draft','published'), NOT the fragment_status enum, so a shared Zod const
+ * would happily have let a constellation be filed as a note and only failed at
+ * the database. Two lists, because they are two vocabularies.
+ */
+export const constellationStatus = z.enum(['draft', 'published']).default('draft');
 
 export const fail = (
   message: string,

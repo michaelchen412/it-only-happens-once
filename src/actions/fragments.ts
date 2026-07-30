@@ -11,7 +11,7 @@ import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
 import { lookupSpotify, parseSongRef } from '../lib/spotify';
 import type { Database, Json } from '../lib/database.types';
-import { type DB, fail, requireAdmin, uniqueSlug, optText, optUrl, optInt, optUuid, status } from './_shared';
+import { type DB, fail, fragmentStatus, requireAdmin, uniqueSlug, optText, optUrl, optInt, optUuid } from './_shared';
 
 type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 
@@ -163,7 +163,7 @@ export const fragments = {
       excerpt: optText,
       body: optText,
       occurred_at: optText, // datetime-local override; absent = auto (publish date)
-      status,
+      status: fragmentStatus,
       subjects: optText,
       base_updated_at: optText, // opaque concurrency token; mismatch → CONFLICT
     }),
@@ -213,7 +213,7 @@ export const fragments = {
       author_name: optText, // display stays in attribution
       work_name: optText, //   display stays in details.source_title
       occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
-      status,
+      status: fragmentStatus,
       subjects: optText,
       slug: optText,
     }),
@@ -276,7 +276,7 @@ export const fragments = {
       body: optText,
       thumbnail_url: optText,
       year: z.coerce.number().int(),
-      status,
+      status: fragmentStatus,
       subjects: optText,
       slug: optText,
     }),
@@ -429,7 +429,9 @@ export const fragments = {
     accept: 'form',
     input: z.object({
       ids: z.string().min(1),
-      op: z.enum(['publish', 'unpublish', 'trash', 'restore', 'purge']),
+      // 'draft' and 'note' are plain tier moves, named for the tier they land
+      // in — they run in either direction along note → draft → published.
+      op: z.enum(['publish', 'draft', 'note', 'trash', 'restore', 'purge']),
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
@@ -456,7 +458,9 @@ export const fragments = {
         const { error } = await sb.from('fragments').update({ status: 'published' }).in('id', ids);
         if (error) throw fail(error.message);
       } else {
-        const { error } = await sb.from('fragments').update({ status: 'draft' }).in('id', ids);
+        // 'draft' | 'note' — the op IS the tier. `published_at` is deliberately
+        // left alone: it records when a piece first went live, not where it is.
+        const { error } = await sb.from('fragments').update({ status: input.op }).in('id', ids);
         if (error) throw fail(error.message);
       }
       return { ok: true, count: ids.length };

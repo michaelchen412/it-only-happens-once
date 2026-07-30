@@ -315,7 +315,7 @@ export type Database = {
     }
     Enums: {
       date_precision: "day" | "year"
-      fragment_status: "draft" | "published"
+      fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
     }
     CompositeTypes: {
@@ -445,7 +445,7 @@ export const Constants = {
   public: {
     Enums: {
       date_precision: ["day", "year"],
-      fragment_status: ["draft", "published"],
+      fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
     },
   },

@@ -12,7 +12,13 @@ const TYPES = ['writing', 'quote', 'song'] as const;
 const SORT_COL: Record<string, string> = { title: 'title', posted: 'occurred_at', edited: 'updated_at' };
 
 export interface FragmentListParams {
-  view: 'list' | 'trash';
+  /**
+   * Which slice of the corpus. Notes are a VIEW rather than a filter you can
+   * clear (docs/plans/09 Piece 2): the working list excludes them by
+   * construction, so no default can be cleared into showing scratch work
+   * beside finished pieces. Same shape as `trash`, and for the same reason.
+   */
+  view: 'list' | 'notes' | 'trash';
   type: (typeof TYPES)[number] | null;
   subjectSlugs: string[];
   q: string;
@@ -33,7 +39,8 @@ export interface FragmentListParams {
 }
 
 export function parseListParams(sp: URLSearchParams): FragmentListParams {
-  const view = sp.get('view') === 'trash' ? 'trash' : 'list';
+  const viewParam = sp.get('view');
+  const view = viewParam === 'trash' ? 'trash' : viewParam === 'notes' ? 'notes' : 'list';
   const typeParam = TYPES.find((t) => t === sp.get('type')) ?? null;
   const subjectSlugs = (sp.get('subject') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const q = (sp.get('q') ?? '').trim();
@@ -84,6 +91,8 @@ export interface FragmentListData {
   typeCounts: Record<string, number>;
   totalCount: number;
   trashCount: number;
+  /** Live notes — the pill on the Notes button, like `trashCount`. */
+  noteCount: number;
   /** fragment ids already placed in params.constellation (empty set otherwise) */
   placedIds: Set<string>;
 }
@@ -138,9 +147,14 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   const authorFilterId = p.authorSlug ? (allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—' : null;
   const workFilterId = p.workSlug ? (allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—' : null;
 
-  // deleted-state scope shared by the list query and the per-type counts
-  const scoped = <T extends { not: any; is: any }>(qb: T) =>
-    (p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null)) as T;
+  // The view's scope, shared by the list query AND the per-type counts — so the
+  // badge numbers can never disagree with the rows underneath them. Trash is
+  // any status; the working list and the notes list partition what's left.
+  const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
+    if (p.view === 'trash') return qb.not('deleted_at', 'is', null) as T;
+    const live = qb.is('deleted_at', null);
+    return (p.view === 'notes' ? live.eq('status', 'note') : live.neq('status', 'note')) as T;
+  };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort
   let query = scoped(supabase.from('fragments').select('*'));
@@ -199,6 +213,11 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
 
   const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
   const { count: trashCount } = await supabase.from('fragments').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null);
+  const { count: noteCount } = await supabase
+    .from('fragments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'note')
+    .is('deleted_at', null);
 
   // pick mode: which of these fragments already live in the target constellation
   const placedIds = new Set<string>();
@@ -223,6 +242,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     typeCounts,
     totalCount: (typeRows ?? []).length,
     trashCount: trashCount ?? 0,
+    noteCount: noteCount ?? 0,
     placedIds,
   };
 }
