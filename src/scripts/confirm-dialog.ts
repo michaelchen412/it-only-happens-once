@@ -32,8 +32,7 @@ function wire() {
   });
 }
 
-/** Show the confirm modal; resolves true only if the user confirms. */
-export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+function show(opts: ConfirmOptions): Promise<boolean> {
   wire();
   const dialog = el<HTMLDialogElement>('confirm-dialog');
   el('confirm-title').textContent = opts.title ?? 'Are you sure?';
@@ -51,4 +50,17 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
     // Default focus to the safe action for destructive prompts.
     (opts.danger ? cancel : ok).focus();
   });
+}
+
+// There is one dialog element, so prompts must take turns: a second call
+// while one is open would clobber the visible text and make showModal throw,
+// stranding the first caller's promise. Queue instead — each prompt shows
+// after the previous one resolves.
+let queue: Promise<unknown> = Promise.resolve();
+
+/** Show the confirm modal; resolves true only if the user confirms. */
+export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+  const result = queue.then(() => show(opts));
+  queue = result.catch(() => {});
+  return result;
 }

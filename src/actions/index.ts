@@ -153,20 +153,31 @@ async function syncSubjects(sb: DB, fragmentId: string, raw?: string): Promise<v
  *    a writing's first publish it snaps to now (so the posted date = publish
  *    date, automatically). Otherwise it's left untouched (draft edits, or
  *    re-editing a published piece don't move its posted date).
+ *
+ * A present `id` whose row doesn't exist is an INSERT with that id — the
+ * offline editor mints ids client-side, so "unknown id" means "created while
+ * the server hadn't seen it yet", not an error (docs/plans/09 Piece 1).
+ *
+ * `baseUpdatedAt` is the optimistic-concurrency token: when given, the update
+ * only applies if the row's `updated_at` still equals it — enforced in the
+ * UPDATE's WHERE clause, so the check is atomic — and a miss is a CONFLICT the
+ * client resolves (never a silent overwrite). Callers treat the value as an
+ * opaque string: compared verbatim, never reformatted.
  */
 async function persist(
   sb: DB,
   id: string | undefined,
   row: Omit<FragmentInsert, 'id' | 'published_at'>,
   subjects: string | undefined,
-): Promise<{ id: string; slug: string }> {
+  baseUpdatedAt?: string,
+): Promise<{ id: string; slug: string; updated_at: string }> {
   const publishing = row.status === 'published';
   const now = new Date().toISOString();
 
   let existing: { published_at: string | null; occurred_at: string } | null = null;
   if (id) {
-    const { data, error } = await sb.from('fragments').select('published_at, occurred_at').eq('id', id).single();
-    if (error) throw fail('That fragment no longer exists', 'NOT_FOUND');
+    const { data, error } = await sb.from('fragments').select('published_at, occurred_at').eq('id', id).maybeSingle();
+    if (error) throw fail(error.message);
     existing = data;
   }
 
@@ -179,13 +190,24 @@ async function persist(
     else delete payload.occurred_at; // keep existing on update; DB default on insert
   }
 
-  let saved: { id: string; slug: string };
-  if (id) {
-    const { data, error } = await sb.from('fragments').update(payload).eq('id', id).select('id, slug').single();
+  let saved: { id: string; slug: string; updated_at: string };
+  if (id && existing) {
+    let q = sb.from('fragments').update(payload).eq('id', id);
+    if (baseUpdatedAt) q = q.eq('updated_at', baseUpdatedAt);
+    const { data, error } = await q.select('id, slug, updated_at').maybeSingle();
     if (error) throw fail(error.message);
+    if (!data) {
+      // Zero rows: the guard didn't match (or the row vanished mid-flight).
+      if (baseUpdatedAt) throw fail('This piece changed on the server after it was loaded here', 'CONFLICT');
+      throw fail('That fragment no longer exists', 'NOT_FOUND');
+    }
     saved = data;
   } else {
-    const { data, error } = await sb.from('fragments').insert(payload).select('id, slug').single();
+    const { data, error } = await sb
+      .from('fragments')
+      .insert(id ? { ...payload, id } : payload)
+      .select('id, slug, updated_at')
+      .single();
     if (error) throw fail(error.message);
     saved = data;
   }
@@ -207,7 +229,7 @@ export const server = {
     saveWriting: defineAction({
       accept: 'form',
       input: z.object({
-        id: optText,
+        id: optUuid, // client-minted for offline creation (docs/plans/09 Piece 1)
         title: optText,
         slug: optText,
         excerpt: optText,
@@ -215,6 +237,7 @@ export const server = {
         occurred_at: optText, // datetime-local override; absent = auto (publish date)
         status,
         subjects: optText,
+        base_updated_at: optText, // opaque concurrency token; mismatch → CONFLICT
       }),
       handler: async (input, ctx) => {
         const sb = ctx.locals.supabase;
@@ -238,7 +261,7 @@ export const server = {
           row.occurred_at = new Date(input.occurred_at).toISOString();
           row.date_precision = 'day';
         }
-        return persist(sb, input.id, row, input.subjects);
+        return persist(sb, input.id, row, input.subjects, input.base_updated_at);
       },
     }),
 
@@ -365,7 +388,7 @@ export const server = {
         const { data, error } = await ctx.locals.supabase
           .from('fragments')
           .select(
-            'id, type, title, slug, excerpt, body, status, occurred_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id)',
+            'id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id)',
           )
           .eq('id', id)
           .single();
@@ -380,6 +403,7 @@ export const server = {
           body: data.body ?? '',
           status: data.status,
           occurredIso: data.occurred_at ?? '',
+          updatedAt: data.updated_at, // concurrency token for saveWriting's base_updated_at
           subjects: (data.fragment_subjects ?? [])
             .map((l) => (l.subjects as { name: string } | null)?.name)
             .filter(Boolean)

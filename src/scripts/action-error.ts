@@ -8,5 +8,6 @@ export function formatActionError(error: any): string {
   return isInputError(error) ? Object.values(error.fields).flat().join(' · ') : error.message;
 }
 
-/** "3:45 PM" — the timestamp shown in save indicators. */
-export const nowTime = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** "3:45 PM" — the timestamp shown in save indicators (now, or a given epoch ms). */
+export const nowTime = (at?: number) =>
+  new Date(at ?? Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
