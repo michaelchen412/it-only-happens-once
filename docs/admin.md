@@ -82,12 +82,87 @@ The deep end. A near-fullscreen `<dialog>` drawer ([`WritingSheet`](../src/compo
 - **Editor:** **TipTap** (ProseMirror) + `tiptap-markdown`, with a fixed Google-Docs-style toolbar we own (undo/redo · H2/H3 · bold/italic/strike · quote/lists · link/divider), active-state highlighted. **Markdown is the stored value** (`editor.storage.markdown.getMarkdown()` → the `body` field). The editor surface wears the `.reading` class, so drafting looks like the published article. See [ADR 0006](adr/0006-composer-editor-tiptap.md).
 - **Paste-from-HTML migration path.** ProseMirror ingests pasted HTML natively, so pasting a Squarespace essay converts it to clean Markdown in place. This is how the existing back catalog of essays comes in — through the composer, from real use, **not** a scraper ([architecture.md](architecture.md) §8).
 - **Drafts autosave; published posts don't.** While a piece is a **draft**, the working copy autosaves ~1.2s after you stop typing (debounced, in-flight-guarded), **even when untitled** (title/body are optional for a draft; both are required only to *publish*). The first autosave inserts the row and captures its id (hash → `#edit=<id>`); in a composer context (`body[data-place-in]`) that first save also places the piece into the constellation being composed. Indicator: **spinner → "Saved 3:45 PM."**
-- **Once published, editing is deliberate.** A published post does **not** autosave — edits accumulate, the bar shows **"Unsaved changes,"** and you push them with an explicit **Save changes** (or bail with **Discard**). So fixing a typo on a live post is a conscious act, never a silent live edit — and you never have to unpublish first. Autosave resumes if you Unpublish back to draft.
-- **Online-first, stated plainly ([ADR 0010](adr/0010-online-first-writing.md)).** The sheet needs a connection to open a piece and to save one. A save that can't reach the server is reported as unsaved — there is no local queue, and the close prompts say outright that unsaved words will be lost. An IndexedDB outbox was built for this on 2026-07-29 and removed on 2026-07-30: iOS has no Background Sync, so a queue could only ever drain while the app was open, and the capability was worth roughly one day in three hundred. Offline capture goes to iCloud Notes and is reconciled by hand. **Crash safety for published pieces is [plan 07](plans/07-revision-history.md)'s job** (autosave into a server-side draft version) and is not built yet — until it is, a crash mid-edit on a published piece loses those edits.
+- **Once published, editing is deliberate — but no longer risky.** A published post's **live row** never autosaves: edits accumulate and you push them with an explicit **Save changes** (or bail with **Discard**), so fixing a typo on a live post is a conscious act and you never have to unpublish first. The *words*, meanwhile, autosave into a **draft version** on the same ~1.2s debounce a draft uses (§5a), so the bar reads **"Kept as a draft version · not public yet."** Closing is safe: reopen the piece and the edits are waiting under **Versions**. Autosave to the row itself resumes if you Unpublish back to draft.
+- **Online-first, stated plainly ([ADR 0010](adr/0010-online-first-writing.md)).** The sheet needs a connection to open a piece and to save one. A save that can't reach the server is reported as unsaved — there is no local queue, and the close prompts say outright that unsaved words will be lost. An IndexedDB outbox was built for this on 2026-07-29 and removed on 2026-07-30: iOS has no Background Sync, so a queue could only ever drain while the app was open, and the capability was worth roughly one day in three hundred. Offline capture goes to iCloud Notes and is reconciled by hand. **Crash safety for published pieces came back server-side instead** — see §5a. The one case that still loses words is an edit that never reached the server at all (offline, or a crash inside the debounce window); the sheet only promises safety once a version save has actually landed, and says "these edits haven't reached the server" otherwise.
 - **Two tabs can't silently overwrite each other.** Every save carries `base_updated_at`, the `updated_at` the open copy was loaded from; the action updates only if the row still matches (`UPDATE … WHERE updated_at = base`), so a save against a version that moved is rejected as a **CONFLICT** rather than clobbering it. The sheet then offers **keep both** — your version becomes a separate draft copy and the editor reloads the server's. A second tab on the same fragment also gets a heads-up via the Web Locks API. This is the one piece of the offline work that survived it, because the hazard it guards is fully online.
 - **Publishing is a deliberate act behind a dialog.** The primary bar button is **Publish…**, which opens a dialog that collects the last-mile metadata *and* confirms: **slug** (auto-from-title, editable), **excerpt** (optional; card blurb, else derived — [data-model.md](data-model.md) §6), **subjects** (the [TagInput](../src/components/TagInput.astro) chip field), and the **posted date** (§ below). Confirming publishes (stamps `published_at`, first time only). A published piece instead shows **Unpublish** (→ back to draft, keeping `published_at`) and **Details…** (reopen the same dialog to edit metadata without changing status). Drafts are visible only to the admin — enforced by RLS, not the UI.
 - **Posted date — automatic, override for legacy.** In the normal flow you never touch it: on first publish `occurred_at` (the public posted date) is set to the publish moment automatically. The dialog has a **"Set a custom posted date"** toggle revealing a `datetime-local` — used only to backdate the retrofitted 2023 essays. See [data-model.md](data-model.md) §6 for how `occurred_at` relates to the system timestamps `created_at` / `published_at` / `updated_at`.
 - **Read time:** computed from `body` word count at render; not stored (may cache into `details.reading_minutes` later).
+
+## 5a. Draft versions, and promoting one
+
+**The rule: editing a published piece never mutates the canonical row.** It
+writes to [`fragment_versions`](../supabase/migrations/20260730224623_fragment_versions.sql),
+and the live essay changes only when a human promotes one. Michael's framing:
+*"any number of drafts, and we choose to promote one into the published
+version — like a recipe version manager."* See [plan 07](plans/07-revision-history.md).
+
+A version holds **words only** — title, excerpt, body. Slug, dates, status,
+subjects and constellation membership belong to the fragment, so promoting
+rewrites the piece **without moving its URL** or its place in the sky.
+
+- **`working`** — one per fragment, enforced by a partial unique index. This is
+  the autosave target, so it overwrites rather than accumulating a row per
+  keystroke. It's also the crash net: the words are on the server within a
+  debounce of being typed.
+- **`snapshot`** — a preserved past state. Promoting writes one *first*, holding
+  the outgoing canonical, so rewriting a piece can never destroy the opening you
+  later decide you preferred. **Keep as a variant** turns the current working
+  version into one by hand.
+
+**Promote** is the deliberate moment: confirm, the outgoing text is snapshotted,
+the version's words become the piece. A promoted `working` version is then
+deleted (it *is* the piece now); a promoted `snapshot` stays, because history
+keeps. A version identical to what's live can't be promoted — there'd be nothing
+to change.
+
+The **Versions** tab appears only on published pieces (a draft simply edits
+itself) and shows the markdown source in previews rather than rendered HTML —
+shipping a second sanitizer to the client to preview your own prose isn't worth
+it, and the question the panel answers is "is this the version I meant."
+
+**Privacy:** the table has **no `anon` policy of any kind**, only
+`fv_all_admin … to authenticated using (is_admin())`. That's deliberately
+stronger than "hidden because its status isn't published": an unfinished rewrite
+stays unreadable even if a future join forgets to filter, and even during a
+promote, when statuses are in motion. Verified 2026-07-30 by reading the table
+with the live anon key — empty array, including through an embedded join.
+
+**Retention:** keep everything. At ~125 fragments this is fine for years;
+revisit only if it stops being.
+
+## 5b. Notes — the tier below a draft
+
+A **note** is a private fragment: a thought that isn't a draft yet. It's a
+`status`, not a type, so `note → draft → published` is one linear promotion
+rather than a migration between kinds — private thought graduating into public
+piece, which is the whole shape of this site. See
+[plan 09](plans/09-offline-and-notes.md) Piece 2.
+
+- **Private by construction.** `fragments_select_published` is an *allowlist*
+  (`status = 'published' and deleted_at is null`), so a new tier is unreadable
+  by anon with no policy edit and no way to leak by omission. Verified against
+  live PostgREST with the real anon key on 2026-07-30 — 0 rows by id, by slug,
+  by status, and through the constellation join.
+- **Its own room, not a filter.** Notes live at `/admin?view=notes`, reached
+  from a button beside Trash. A view can't be accidentally cleared into showing
+  scratch work beside finished pieces, and the view's scope is shared by the
+  rows *and* the type-count badges, so the numbers can never disagree with the
+  table.
+- **Where it sorts is load-bearing.** `'note'` was added to the enum **before**
+  `'draft'`, because the manager sorts `.order('status')` — so the list reads in
+  the same order the pipeline runs. Enum ordering can't be changed later without
+  recreating the type.
+- **Creating and promoting.** *Add ▾ → Note*, or `#new-note`. A note autosaves
+  exactly like a draft. **Make it a draft** in the sheet promotes one; the notes
+  view's bulk bar promotes many. The working list can send pieces the other way
+  with **Make notes**.
+- **Every fragment type can be a note** — a jotted quote is a real thing. But
+  constellations can't: `constellations.status` is a plain `text` column, not the
+  enum, so the Zod schema is deliberately split into `fragmentStatus` and
+  `constellationStatus` in [`_shared.ts`](../src/actions/_shared.ts). One shared
+  list would have allowed "a constellation that is a note" and failed only at the
+  database.
 
 ## 6. Songs — what auto-fills, what doesn't
 
@@ -172,5 +247,5 @@ theme toggle against it can leave the bar a shade out.
 - ~~**Constellation placement + composed ordering**~~ — **shipped 2026-07-23** with the composing room (§2: composer + fragment browser).
 - **Spotify Web API metadata** (auto artist/album) — §6. Only if manual entry becomes a real annoyance.
 - **Subjects management UI** (rename/merge/delete-with-reassign) — §8.
-- **Revision history / timeline** — [data-model.md](data-model.md) §9. The composer autosaves one working copy (§5); a *history* of past versions is not stored.
+- ~~**Revision history / timeline**~~ — **shipped 2026-07-30** as draft versions (§5a), and it arrived by a side door: history stopped being a feature to build and became a *consequence* of how editing a published piece works. What is still deferred is a **diff view** — side-by-side preview is enough for one author.
 - **Bulk import tooling** beyond paste (e.g. batch Spotify, quote capture) — [architecture.md](architecture.md) §6.5.

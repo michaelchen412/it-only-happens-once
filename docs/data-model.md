@@ -21,6 +21,7 @@ erDiagram
   constellations ||--o{ fragment_constellations : "gathers"
   fragments ||--o{ fragment_subjects : "tagged"
   subjects ||--o{ fragment_subjects : "applies to"
+  fragments ||--o{ fragment_versions : "drafted as"
 
   fragments {
     uuid id PK
@@ -60,15 +61,32 @@ erDiagram
     uuid fragment_id FK
     uuid subject_id FK
   }
+  fragment_versions {
+    uuid id PK
+    uuid fragment_id FK
+    text title
+    text excerpt
+    text body
+    text kind
+    text label
+    timestamptz created_at
+    timestamptz updated_at
+  }
 ```
 
 ## 3. Enums
 
 ```sql
 create type fragment_type   as enum ('writing', 'quote', 'song');
-create type fragment_status as enum ('draft', 'published');
+create type fragment_status as enum ('note', 'draft', 'published');
 create type date_precision  as enum ('day', 'year');
 ```
+
+`'note'` was added 2026-07-30 **before** `'draft'`, not appended — enum sort
+order is what pins the least-finished work to the top of the Fragment Manager
+(`.order('status')`), so the list reads in the same order the pipeline runs:
+note → draft → published. Ordering can't be changed later without recreating
+the type. See [admin.md](admin.md) §5b.
 
 ## 4. Tables (DDL)
 
@@ -171,10 +189,11 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 
 - **`slug`** — URL identity (`/blog/forgiveness`). Unique across all fragments.
 - **`occurred_at` + `date_precision`** — the *public* date, driving the `Timestamp` component. `writing` → the *posted* date (`day`); `song`/`quote` → *provenance* (often `year`). Verb ("Posted"/"Added") is presentation-only, chosen by type. For `writing` it is **set automatically to the publish moment on first publish**; the composer only exposes it as an optional override for backdating legacy posts (see [admin.md](admin.md) §5). It is distinct from the three **system-maintained audit timestamps**, which are never hand-edited: `created_at` (row created), `published_at` (first went live; stamped once, kept on unpublish), `updated_at` (last edit, via the `moddatetime` trigger).
-- **`status`** — `draft` fragments are visible only to the admin (enforced by RLS). Publishing sets `status='published'` and `published_at`.
+- **`status`** — a linear tier, `note → draft → published`. `note` and `draft` are visible only to the admin, enforced by RLS: `fragments_select_published` is an **allowlist** on `status = 'published'`, so a tier added below the line is private by construction and can never leak by omission. Publishing sets `status='published'` and `published_at`; `published_at` is never cleared afterwards, so demoting a piece back to a note keeps the historical "first went live". See [admin.md](admin.md) §5b.
 - **`deleted_at`** — soft delete (migration `..._soft_delete.sql`). "Delete" sets it and the fragment moves to the admin **Trash** (restorable); public reads exclude `deleted_at is not null`; the admin still sees trashed rows. A "purge" is a real `DELETE`. Keeps years of writing recoverable.
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
 - **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different constellations.
+- **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
 ## 7. Derived data (not stored)
 
@@ -199,4 +218,5 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 ## 9. Deferred (not in v1)
 
 - **Fusion** (binding two atoms into one inseparable fragment) — `vision.md` calls it a rare editorial move. Model later, likely as a self-referential `fragment_parts` table. Not needed now.
-- **View-count / analytics**, **series/collections of posts**, **draft autosave history** — out of scope until wanted.
+- ~~**Draft autosave history**~~ — **shipped 2026-07-30** as `fragment_versions` (§6, [admin.md](admin.md) §5a). It stopped being a feature to schedule once editing a published piece was modelled as writing a version rather than mutating a row: history became a consequence rather than an addition.
+- **View-count / analytics**, **series/collections of posts** — out of scope until wanted.
