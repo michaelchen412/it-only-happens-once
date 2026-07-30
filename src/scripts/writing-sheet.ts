@@ -15,8 +15,13 @@
 // `base_updated_at` optimistic concurrency. Two tabs — or a stale tab on one
 // device against an edit made on another — used to overwrite each other
 // silently. Now the second save is rejected as a CONFLICT and the human is
-// offered "keep both". Crash safety for published pieces is plan 07's job
-// (draft versions), server-side.
+// offered "keep both".
+//
+// Crash safety for published pieces is now handled server-side by plan 07's
+// draft versions: a published piece still never autosaves to the LIVE row, but
+// its edits are written to `fragment_versions` on the same debounce a draft
+// uses. So the words survive a crash without the public site changing under a
+// reader — and every prompt below can finally say where they went.
 import { mountRichEditor } from './rich-editor';
 import { actions } from 'astro:actions';
 import { slugify } from '../lib/slug';
@@ -24,6 +29,7 @@ import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSheetTabs } from './sheet-tabs';
+import { wireVersionsPanel } from './versions-panel';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -82,6 +88,7 @@ const viewLink = document.getElementById('ws-view-link') as HTMLAnchorElement;
 const deleteBtn = document.getElementById('ws-delete') as HTMLButtonElement;
 const toDraftBtn = document.getElementById('ws-to-draft') as HTMLButtonElement;
 const headingLabel = document.getElementById('ws-heading-label') as HTMLElement;
+const versionsTab = sheet.querySelector('[data-tab="versions"]') as HTMLButtonElement;
 let savedStatus = 'draft';
 let dirty = false;
 let everSaved = false; // any successful server save this open → reload on close
@@ -95,6 +102,12 @@ let baseUpdatedAt: string | null = null;
  *  (Kept post-ADR-0010 — conflicts are an ONLINE hazard too, and without this
  *  a declined dialog would return every time the autosave timer fires.) */
 let conflictParked = false;
+/**
+ * A working draft version holds this session's edits on the server (plan 07).
+ * Only set after a version save actually lands — the close prompt reads it, so
+ * an optimistic value here would be a lie about where someone's words are.
+ */
+let versionHeld = false;
 const isPublished = () => savedStatus === 'published';
 /** The scratch tier (docs/plans/09 Piece 2) — autosaves exactly like a draft. */
 const isNote = () => savedStatus === 'note';
@@ -104,6 +117,8 @@ function reflectStatus() {
   publishedActions.hidden = !isPublished();
   toDraftBtn.hidden = !isNote();
   headingLabel.textContent = isNote() ? 'Note' : 'Writing';
+  // Only a published piece has versions: a draft simply edits itself.
+  versionsTab.hidden = !(isPublished() && serverHasRow);
   updateDirtyUI();
 }
 function updateViewLink(slug: string) {
@@ -112,10 +127,14 @@ function updateViewLink(slug: string) {
 }
 
 /**
- * Published posts DON'T autosave — edits accumulate and are pushed via an
- * explicit "Save changes" (docs/admin.md §5). This reflects that dirty state.
- * Nothing else holds those edits: until plan 07's draft versions land, closing
- * or crashing loses them, and every prompt below says so honestly.
+ * Published posts never autosave to the LIVE row — edits accumulate and go out
+ * via an explicit "Save changes" (docs/admin.md §5), because republishing
+ * without a human present is the one thing this editor must not do.
+ *
+ * They DO autosave into a draft version (plan 07), so the dirty state is
+ * "not public yet", not "not saved anywhere". `versionHeld` tracks whether
+ * that has actually landed this session, so the wording never claims a safety
+ * net that isn't there yet — during the first debounce, it isn't.
  */
 function updateDirtyUI() {
   if (isPublished()) {
@@ -123,7 +142,7 @@ function updateDirtyUI() {
     discardBtn.hidden = !dirty;
     if (dirty) {
       spinner.hidden = true;
-      statusText.textContent = 'Unsaved changes';
+      statusText.textContent = versionHeld ? `Kept as a draft version · not public yet` : 'Unsaved changes';
       statusText.classList.add('text-warning');
       return;
     }
@@ -155,16 +174,43 @@ dateToggle.addEventListener('change', () => {
   if (dateToggle.checked && !occurredField.value) occurredField.value = toLocalInput(new Date().toISOString());
 });
 
-// ---- edits: drafts autosave to the server on a debounce ----
+// ---- edits: autosave on a debounce (drafts to the row, published to a version) ----
 const NET_MS = 1200;
 let timer: number | undefined;
 let lock: Promise<unknown> = Promise.resolve();
+
+/**
+ * A published piece's edits go to its working version, never to the live row
+ * (plan 07). Failure is quiet on purpose: the visible state is already
+ * "unsaved and not public", so a red banner every 1.2 seconds while a tunnel
+ * eats the connection would add noise, not information — and "Save changes"
+ * reports loudly when it can't reach the server.
+ */
+async function saveWorkingVersion(): Promise<void> {
+  if (!serverHasRow || !idField.value) return;
+  const fd = new FormData();
+  fd.set('fragment_id', idField.value);
+  fd.set('title', titleField.value);
+  fd.set('excerpt', excerptField.value);
+  fd.set('body', getMarkdown());
+  try {
+    const { error } = await actions.versions.saveWorking(fd);
+    if (error) return;
+    versionHeld = true;
+    versionsPanel.setFragment(idField.value, true);
+    if (dirty) updateDirtyUI(); // upgrade the wording now that it's true
+  } catch {
+    // offline or server down — the piece is unchanged and the UI already says so
+  }
+}
 
 function onEdit() {
   if (loadFailed || !sheet.open) return;
   dirty = true;
   if (isPublished()) {
-    updateDirtyUI(); // no auto-push — light up Save changes / Discard
+    updateDirtyUI(); // the LIVE row waits for an explicit Save changes…
+    clearTimeout(timer);
+    timer = window.setTimeout(() => void saveWorkingVersion(), NET_MS); // …the words don't
     return;
   }
   if (conflictParked) return; // only explicit saves re-ask
@@ -307,8 +353,9 @@ async function handleConflict(): Promise<false> {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  // Nothing but the editor holds unsaved words now (ADR-0010), so any dirty
-  // state is worth a warning — including a draft whose autosave hasn't fired.
+  // Still warn on any dirty state. A published piece's words are usually held
+  // in a draft version by now (plan 07), but "usually" is the whole point: the
+  // debounce may not have fired, and this is the last chance to say so.
   if (sheet.open && dirty) {
     e.preventDefault();
     e.returnValue = '';
@@ -346,6 +393,21 @@ const cnCount = document.getElementById('ws-cn-count')!;
 const toolbar = document.getElementById('ws-toolbar') as HTMLElement;
 // The formatting toolbar belongs to the document; hide it on the other tab.
 const tabs = wireSheetTabs(sheet, (key) => (toolbar.hidden = key !== 'doc'));
+
+// ---- draft versions (its own tab, published pieces only) ----
+const versionsPanel = wireVersionsPanel({
+  listEl: document.getElementById('ws-ver-list') as HTMLElement,
+  errorEl: document.getElementById('ws-ver-error') as HTMLElement,
+  countEl: document.getElementById('ws-ver-count') as HTMLElement,
+  // Promotion rewrote the live piece: reload it so the editor shows what is
+  // actually published rather than whatever was on screen a moment ago.
+  onPromoted() {
+    dirty = false;
+    versionHeld = false;
+    everSaved = true; // the list underneath shows a new "edited" time
+    void openEdit(idField.value);
+  },
+});
 
 function setCnLabel(n: number) {
   cnCount.textContent = n ? String(n) : '';
@@ -398,9 +460,14 @@ function populate(d: Loaded | null) {
   occurredField.value = d?.occurredIso ? toLocalInput(d.occurredIso) : '';
   dirty = false;
   everSaved = false;
+  versionHeld = false;
   jsError.hidden = true;
   deleteBtn.hidden = !d;
   reflectStatus();
+  // Versions are a published-piece concern; the panel fetches on its own and
+  // reports back through the tab's count, including any working version left
+  // behind by a crash.
+  versionsPanel.setFragment(d?.id ?? null, !!d && d.status === 'published');
   statusText.classList.remove('text-error', 'text-warning');
   statusText.textContent = isPublished() ? 'Up to date' : isNote() ? 'A note — autosaves, never public' : 'Autosaves as you write';
   spinner.hidden = true;
@@ -471,16 +538,29 @@ function closeNow() {
 async function requestClose() {
   if (!loadFailed && dirty) {
     if (isPublished()) {
-      // Nothing else holds these edits (ADR-0010) — closing really does lose
-      // them, so the prompt says exactly that.
-      const ok = await confirmDialog({
-        title: 'Discard changes?',
-        message:
-          'This piece has unsaved edits, and they aren’t stored anywhere else. Close without saving?',
-        confirmLabel: 'Discard',
-        danger: true,
-      });
-      if (!ok) return;
+      // One last attempt to park the words in a draft version, then tell the
+      // truth about where they are. Before plan 07 this branch could only warn
+      // that closing lost them outright; now that's the exception, not the rule.
+      clearTimeout(timer);
+      await saveWorkingVersion();
+      if (versionHeld) {
+        const ok = await confirmDialog({
+          title: 'Close without publishing?',
+          message:
+            'Your edits are kept as a draft version — the live piece is unchanged. Reopen this piece and they’ll be waiting under Versions.',
+          confirmLabel: 'Close',
+        });
+        if (!ok) return;
+      } else {
+        const ok = await confirmDialog({
+          title: 'Discard changes?',
+          message:
+            'These edits haven’t reached the server, so they aren’t stored anywhere else. Close without saving?',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      }
     } else {
       // Drafts: one last save attempt. If it can't land, closing loses the
       // words, so ask rather than closing quietly.
@@ -586,20 +666,42 @@ document.getElementById('ws-unpublish')?.addEventListener('click', async () => {
   if (saved) setSaved('Moved to drafts ' + nowTime());
 });
 
-// ---- published: explicit Save changes / Discard (no autosave) ----
+// ---- published: explicit Save changes / Discard (the live row waits for you) ----
+
+/** No pending rewrite any more — for either reason. Never throws. */
+async function dropWorkingVersion(): Promise<void> {
+  if (!idField.value) return;
+  const fd = new FormData();
+  fd.set('fragment_id', idField.value);
+  try {
+    await actions.versions.discardWorking(fd);
+  } catch {
+    // A stale working version is untidy, not dangerous: it shows in the panel
+    // as "identical to what's live" and is one click from being deleted.
+  }
+  versionHeld = false;
+}
+
 saveChangesBtn.addEventListener('click', async () => {
   saveChangesBtn.disabled = true;
   const ok = await save('published');
-  if (!ok) saveChangesBtn.disabled = false; // still dirty
+  if (!ok) return void (saveChangesBtn.disabled = false); // still dirty
+  clearTimeout(timer); // an autosave in flight would re-create what we just cleared
+  await dropWorkingVersion(); // these words ARE the piece now
+  versionsPanel.setFragment(idField.value, true);
 });
+
 discardBtn.addEventListener('click', async () => {
   const ok = await confirmDialog({
     title: 'Discard changes',
-    message: 'Discard your unsaved edits to this published piece?',
+    message:
+      'Throw away your edits to this published piece? The live version is unaffected — and if you might want them later, close instead: they’re kept as a draft version.',
     confirmLabel: 'Discard',
     danger: true,
   });
   if (!ok) return;
+  clearTimeout(timer);
+  await dropWorkingVersion();
   // reload the saved version in place — the sheet stays open
   dirty = false;
   await openEdit(idField.value);

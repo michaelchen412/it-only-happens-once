@@ -14,12 +14,14 @@
 // _shared.ts. Add a namespace by adding a file, never by growing this one.
 // ============================================================================
 import { fragments, songs } from './fragments';
+import { versions } from './versions';
 import { subjects, authors, works } from './vocabulary';
 import { constellations } from './constellations';
 import { pages, contact } from './site';
 
 export const server = {
   fragments,
+  versions,
   songs,
   subjects,
   authors,

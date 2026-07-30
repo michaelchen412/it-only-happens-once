@@ -57,6 +57,10 @@ const { subjects, constellations = [] } = Astro.props;
           <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="ws-panel-cn">
             Constellations<span id="ws-cn-count" class="admin-tab__n"></span>
           </button>
+          {/* Only published pieces have versions — a draft edits itself. */}
+          <button type="button" role="tab" class="admin-tab" data-tab="versions" hidden aria-selected="false" tabindex="-1" aria-controls="ws-panel-versions">
+            Versions<span id="ws-ver-count" class="admin-tab__n"></span>
+          </button>
         </div>
 
         <div id="ws-status" class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55" aria-live="polite">
@@ -106,6 +110,19 @@ const { subjects, constellations = [] } = Astro.props;
           end of that constellation's suite; reorder in the composer.
         </p>
         <ConstellationPicker scope="writing" constellations={constellations} />
+      </div>
+
+      {/* Versions (docs/admin.md §5, plan 07). Editing a published piece writes
+          here, never to the live row — so this panel is both the history and
+          the answer to "where did my unsaved rewrite go". */}
+      <div id="ws-panel-versions" role="tabpanel" data-tabpanel="versions" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+        <h3 class="font-display text-lg">Versions</h3>
+        <p class="admin-hint mt-1 mb-4">
+          Editing a published piece never changes what readers see. Your edits are kept here until you promote one —
+          and promoting keeps whatever it replaces, so an opening you liked better is never gone.
+        </p>
+        <p id="ws-ver-error" hidden role="alert" class="admin-alert mb-3"></p>
+        <ol id="ws-ver-list" class="space-y-2"></ol>
       </div>
     </div>
     <BackToTop scroller="#wsheet .grow.overflow-y-auto" inDialog />

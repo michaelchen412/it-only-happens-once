@@ -148,6 +148,50 @@ export type Database = {
           },
         ]
       }
+      fragment_versions: {
+        Row: {
+          body: string | null
+          created_at: string
+          excerpt: string | null
+          fragment_id: string
+          id: string
+          kind: string
+          label: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          excerpt?: string | null
+          fragment_id: string
+          id?: string
+          kind?: string
+          label?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          excerpt?: string | null
+          fragment_id?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fragment_versions_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fragments: {
         Row: {
           attribution: string | null
