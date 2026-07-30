@@ -24,6 +24,21 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    ssr: {
+      // sanitize-html is CommonJS but (since 2.17.6) depends on htmlparser2 v12,
+      // which is ESM-only. Left external, the server does a real `require()` of
+      // an ES module at runtime — legal only on a Node that supports
+      // `require(esm)`. Local Node does; Vercel's launcher patches
+      // `Module._load` and does not, so every request died with ERR_REQUIRE_ESM
+      // while `dev`, `build` and `preview` were all green.
+      //
+      // Bundling it lets Rollup rewrite that `require` into a static import at
+      // build time, so no runtime require-of-ESM exists to fail. We do NOT pin
+      // either package back: 2.17.6 is the fix for GHSA-jxwj-j7wr-gfrw
+      // (mutation-XSS via <textarea>/<xmp>) and its escaping assumes
+      // htmlparser2 >= 11 decodes entities inside <textarea>.
+      noExternal: ['sanitize-html'],
+    },
   },
   fonts: [
     {
