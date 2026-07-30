@@ -29,15 +29,14 @@ const nav = [
 ---
 
 <Base title={`${title} — Workshop`}>
-  {/* The Workshop installs to the home screen (docs/admin.md §9) — and on iOS
-      that install is the whole point: Safari deletes script-written storage
-      after 7 days without a visit, and home-screen web apps are exempt, which
-      is what keeps the editor's offline outbox alive between sessions. Only
-      this layout carries a manifest; the public site is not an app.
+  {/* The Workshop installs to the home screen (docs/admin.md §9): its own icon,
+      its own window, opening straight into /admin rather than the homepage.
+      Only this layout carries a manifest; the public site is not an app.
 
-      No service worker, deliberately — so the app still needs the network to
-      LOAD. Mid-session offline is covered by the outbox; cold-start offline is
-      a separate, deferred decision (docs/plans/09). */}
+      It was built to earn iOS's home-screen exemption from the 7-day
+      script-storage wipe, protecting an offline outbox. That outbox is gone
+      (ADR-0010) and this is now simply a convenience — no service worker, and
+      the workshop needs a connection to load and to save. */}
   <Fragment slot="head">
     <link rel="manifest" href="/workshop.webmanifest" />
     {/* iOS reads its home-screen icon from here, never from the manifest. */}

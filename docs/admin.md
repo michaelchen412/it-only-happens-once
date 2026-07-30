@@ -83,6 +83,8 @@ The deep end. A near-fullscreen `<dialog>` drawer ([`WritingSheet`](../src/compo
 - **Paste-from-HTML migration path.** ProseMirror ingests pasted HTML natively, so pasting a Squarespace essay converts it to clean Markdown in place. This is how the existing back catalog of essays comes in — through the composer, from real use, **not** a scraper ([architecture.md](architecture.md) §8).
 - **Drafts autosave; published posts don't.** While a piece is a **draft**, the working copy autosaves ~1.2s after you stop typing (debounced, in-flight-guarded), **even when untitled** (title/body are optional for a draft; both are required only to *publish*). The first autosave inserts the row and captures its id (hash → `#edit=<id>`); in a composer context (`body[data-place-in]`) that first save also places the piece into the constellation being composed. Indicator: **spinner → "Saved 3:45 PM."**
 - **Once published, editing is deliberate.** A published post does **not** autosave — edits accumulate, the bar shows **"Unsaved changes,"** and you push them with an explicit **Save changes** (or bail with **Discard**). So fixing a typo on a live post is a conscious act, never a silent live edit — and you never have to unpublish first. Autosave resumes if you Unpublish back to draft.
+- **Online-first, stated plainly ([ADR 0010](adr/0010-online-first-writing.md)).** The sheet needs a connection to open a piece and to save one. A save that can't reach the server is reported as unsaved — there is no local queue, and the close prompts say outright that unsaved words will be lost. An IndexedDB outbox was built for this on 2026-07-29 and removed on 2026-07-30: iOS has no Background Sync, so a queue could only ever drain while the app was open, and the capability was worth roughly one day in three hundred. Offline capture goes to iCloud Notes and is reconciled by hand. **Crash safety for published pieces is [plan 07](plans/07-revision-history.md)'s job** (autosave into a server-side draft version) and is not built yet — until it is, a crash mid-edit on a published piece loses those edits.
+- **Two tabs can't silently overwrite each other.** Every save carries `base_updated_at`, the `updated_at` the open copy was loaded from; the action updates only if the row still matches (`UPDATE … WHERE updated_at = base`), so a save against a version that moved is rejected as a **CONFLICT** rather than clobbering it. The sheet then offers **keep both** — your version becomes a separate draft copy and the editor reloads the server's. A second tab on the same fragment also gets a heads-up via the Web Locks API. This is the one piece of the offline work that survived it, because the hazard it guards is fully online.
 - **Publishing is a deliberate act behind a dialog.** The primary bar button is **Publish…**, which opens a dialog that collects the last-mile metadata *and* confirms: **slug** (auto-from-title, editable), **excerpt** (optional; card blurb, else derived — [data-model.md](data-model.md) §6), **subjects** (the [TagInput](../src/components/TagInput.astro) chip field), and the **posted date** (§ below). Confirming publishes (stamps `published_at`, first time only). A published piece instead shows **Unpublish** (→ back to draft, keeping `published_at`) and **Details…** (reopen the same dialog to edit metadata without changing status). Drafts are visible only to the admin — enforced by RLS, not the UI.
 - **Posted date — automatic, override for legacy.** In the normal flow you never touch it: on first publish `occurred_at` (the public posted date) is set to the publish moment automatically. The dialog has a **"Set a custom posted date"** toggle revealing a `datetime-local` — used only to backdate the retrofitted 2023 essays. See [data-model.md](data-model.md) §6 for how `occurred_at` relates to the system timestamps `created_at` / `published_at` / `updated_at`.
 - **Read time:** computed from `body` word count at render; not stored (may cache into `details.reading_minutes` later).
@@ -130,12 +132,14 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 ([`public/workshop.webmanifest`](../public/workshop.webmanifest)), so readers are
 never offered an "install" they'd have no use for.
 
-**Why it matters.** Safari deletes script-written storage — IndexedDB included —
-after **7 days without a visit**, and **home-screen web apps are exempt**
-(they keep their own counter of days of use). The writing sheet's offline outbox
-(§5) lives in IndexedDB, so on an iPhone or iPad *the install is what makes
-offline words durable between sessions*. Not a nicety: it's the last link in the
-chain that keeps a Wi-Fi-less flight from costing you an afternoon.
+**Why it exists — and what changed.** It was built to earn a specific
+guarantee: Safari deletes script-written storage after **7 days without a
+visit**, and home-screen web apps are exempt, so installing was what kept the
+writing sheet's offline outbox alive between sessions. **That outbox was removed
+the following day** ([ADR 0010](adr/0010-online-first-writing.md)) — there is no
+local storage left to protect, and the install is now simply a convenience: its
+own icon, its own window, opening straight into the workshop instead of the
+homepage. Kept because it costs nothing and reads better than a browser tab.
 
 **How, on iOS:** open `/admin` in **Safari** (not another browser) → Share →
 **Add to Home Screen** → leave **"Open as Web App"** switched **on**. Since
@@ -148,11 +152,11 @@ Workshop, so an app that lands anywhere else means typing the URL every time.
 The manifest's `start_url` says `/admin` for the same reason; `scope` is `/` so
 tapping **Site ↗** stays inside the app instead of bouncing you to Safari.
 
-**What it does *not* do.** There is **no service worker**, deliberately, so the
-app still needs the network to **load**. An editing session that goes offline is
-covered (the sheet is already open, and the outbox catches every save);
-cold-starting with no signal is not. That's a separate, deliberately deferred
-decision — see the offline plan, not a TODO.
+**What it does *not* do.** There is **no service worker**, and the installed app
+behaves exactly like the site in a tab: it needs the network to **load** and to
+**save**. Installing buys an icon and a window, not offline capability — see
+[ADR 0010](adr/0010-online-first-writing.md) for why that trade was taken
+deliberately rather than left as a TODO.
 
 **Icons** are generated from the one drawn mark by
 [`scripts/build-app-icons.mjs`](../scripts/build-app-icons.mjs) (`node

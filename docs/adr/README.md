@@ -30,3 +30,4 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0007](0007-ai-subject-tagging.md) | AI subject suggestions via Claude Haiku 4.5 (structured output, human-in-loop, privacy) | Accepted |
 | [0008](0008-provenance-and-facets.md) | Authors/works as optional query facets, decoupled from display (the "Bible rule") | Accepted |
 | [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted |
+| [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |

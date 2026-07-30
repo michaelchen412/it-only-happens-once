@@ -4,13 +4,19 @@
 // constellations tab. Kept out of the .astro file so the markup stays legible
 // — the same split as admin-list.ts and fragment-panel.ts.
 //
-// Durability (docs/plans/09 Piece 1): every edit is written to IndexedDB
-// (the outbox, outbox.ts) BEFORE the network is attempted, on a short local
-// debounce. Ids are minted client-side, so a fragment exists locally before
-// the server ever hears of it. A failed push is a pending outbox entry that
-// drains on startup / online / visibilitychange / retry backoff; a push over
-// a server copy that moved is a CONFLICT surfaced to the human, never a
-// silent overwrite. Losing the network means delay, not loss.
+// ONLINE-FIRST, deliberately (ADR-0010). This sheet briefly had an IndexedDB
+// outbox that queued edits offline and drained them later; it was removed on
+// 2026-07-30. A save that can't reach the server is a save that didn't happen,
+// and the UI says so plainly rather than implying a safety net that iOS can't
+// honour (Safari has no Background Sync, so a queue could only ever drain
+// while the app was open anyway).
+//
+// What survives from that work, because it is NOT offline machinery:
+// `base_updated_at` optimistic concurrency. Two tabs — or a stale tab on one
+// device against an edit made on another — used to overwrite each other
+// silently. Now the second save is rejected as a CONFLICT and the human is
+// offered "keep both". Crash safety for published pieces is plan 07's job
+// (draft versions), server-side.
 import { mountRichEditor } from './rich-editor';
 import { actions } from 'astro:actions';
 import { slugify } from '../lib/slug';
@@ -18,7 +24,6 @@ import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSheetTabs } from './sheet-tabs';
-import * as outbox from './outbox';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -32,19 +37,6 @@ const spinner = document.getElementById('ws-spinner') as HTMLElement;
 const statusText = document.getElementById('ws-status-text') as HTMLElement;
 
 form.addEventListener('submit', (e) => e.preventDefault()); // no implicit submit
-
-// Ask the browser to spare this origin from storage-pressure eviction. A
-// request, not a guarantee — and no help against iOS's 7-day ITP wipe, which
-// only a home-screen install avoids (docs/plans/09 Piece 4).
-if (navigator.storage?.persist) void navigator.storage.persist();
-if (navigator.storage?.estimate) {
-  void navigator.storage.estimate().then(({ usage, quota }) => {
-    // The outbox is KBs against a quota of GBs; if this ever fires, something
-    // else is eating the origin. Surfacing it in UI is the "global sync
-    // indicator" open question in docs/plans/09.
-    if (usage && quota && usage / quota > 0.9) console.warn(`Origin storage ${Math.round((usage / quota) * 100)}% full — IndexedDB writes may start failing`);
-  });
-}
 
 // ---- TipTap editor (WYSIWYG → Markdown) + toolbar + link dialog ----
 const { editor, getMarkdown } = mountRichEditor({
@@ -97,16 +89,11 @@ let prevHash = ''; // the hash to restore on close (e.g. the browser's #browse)
 let serverHasRow = false;
 /** Opaque concurrency token: the server `updated_at` this copy is based on. */
 let baseUpdatedAt: string | null = null;
-/** Edits newer than the last IndexedDB write (the only truly at-risk state). */
-let localDirty = false;
-/** A declined conflict: autosave stops re-asking; explicit saves re-surface it. */
+/** A declined conflict: autosave stops re-asking; explicit saves re-surface it.
+ *  (Kept post-ADR-0010 — conflicts are an ONLINE hazard too, and without this
+ *  a declined dialog would return every time the autosave timer fires.) */
 let conflictParked = false;
-/** Fragment whose local entry is mid-restore-offer — drains must skip it. */
-let settling: string | null = null;
 const isPublished = () => savedStatus === 'published';
-
-/** Fire-and-forget outbox bookkeeping — IndexedDB trouble must never break a save. */
-const quiet = (p: Promise<unknown>) => void p.catch(() => {});
 
 function reflectStatus() {
   draftActions.hidden = isPublished();
@@ -121,8 +108,8 @@ function updateViewLink(slug: string) {
 /**
  * Published posts DON'T autosave — edits accumulate and are pushed via an
  * explicit "Save changes" (docs/admin.md §5). This reflects that dirty state.
- * (They ARE snapshotted to the outbox as crash insurance — kind 'manual',
- * never auto-pushed; see writeLocal.)
+ * Nothing else holds those edits: until plan 07's draft versions land, closing
+ * or crashing loses them, and every prompt below says so honestly.
  */
 function updateDirtyUI() {
   if (isPublished()) {
@@ -162,27 +149,19 @@ dateToggle.addEventListener('change', () => {
   if (dateToggle.checked && !occurredField.value) occurredField.value = toLocalInput(new Date().toISOString());
 });
 
-// ---- edits: IndexedDB on a short debounce, network on a longer one ----
-// Local writes are nearly free, so the at-risk window is ~LOCAL_MS of typing;
-// the network keeps its old cadence. Published pieces get the local snapshot
-// only (no auto-push).
-const LOCAL_MS = 300;
+// ---- edits: drafts autosave to the server on a debounce ----
 const NET_MS = 1200;
-let localTimer: number | undefined;
 let timer: number | undefined;
 let lock: Promise<unknown> = Promise.resolve();
 
 function onEdit() {
   if (loadFailed || !sheet.open) return;
   dirty = true;
-  localDirty = true;
-  clearTimeout(localTimer);
-  localTimer = window.setTimeout(() => void writeLocal(), LOCAL_MS);
   if (isPublished()) {
     updateDirtyUI(); // no auto-push — light up Save changes / Discard
     return;
   }
-  if (conflictParked) return; // local snapshots continue; only explicit saves re-ask
+  if (conflictParked) return; // only explicit saves re-ask
   clearTimeout(timer);
   timer = window.setTimeout(() => save(savedStatus, { silentEmpty: true }), NET_MS);
 }
@@ -204,11 +183,7 @@ function save(status: string, opts: { silentEmpty?: boolean } = {}): Promise<boo
 
 const hasContent = () => titleField.value.trim() !== '' || getMarkdown().trim() !== '';
 
-/**
- * One serialization of the form for both destinations: what goes to
- * IndexedDB is byte-for-byte what would go to the server, so a drained
- * entry replays exactly.
- */
+/** One serialization of the form — also reused verbatim by the conflict copy. */
 function buildFields(status: string): Record<string, string> {
   bodyField.value = getMarkdown();
   const fd = new FormData(form);
@@ -223,23 +198,6 @@ function buildFields(status: string): Record<string, string> {
   return fields;
 }
 
-/** The IndexedDB-first half of every save. localDirty clears only once the
- *  words are truly in IndexedDB — if the put fails they exist nowhere but the
- *  editor, and beforeunload must still warn. */
-async function writeLocal(): Promise<void> {
-  clearTimeout(localTimer);
-  if (loadFailed || !sheet.open || !hasContent()) {
-    localDirty = false; // nothing worth losing
-    return;
-  }
-  try {
-    await outbox.put(idField.value, buildFields(savedStatus), isPublished() ? 'manual' : 'auto');
-    localDirty = false;
-  } catch {
-    // IndexedDB unavailable — the words live only in the editor for now.
-  }
-}
-
 async function doSave(status: string, opts: { silentEmpty?: boolean }): Promise<boolean> {
   if (loadFailed) return false;
   if (!hasContent()) {
@@ -248,45 +206,31 @@ async function doSave(status: string, opts: { silentEmpty?: boolean }): Promise<
   }
   setSaving();
   const fields = buildFields(status);
-  // Local first — from here on, the words survive anything short of
-  // IndexedDB itself failing (and then the network attempt below still runs).
-  let entry: outbox.OutboxEntry | null = null;
-  try {
-    entry = await outbox.put(idField.value, fields, 'auto');
-    localDirty = false;
-  } catch {
-    // IndexedDB unavailable: degrade to network-only; beforeunload still warns.
-  }
-
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) fd.set(k, v);
-  // astro:actions THROWS on a dead network (a bare fetch under the hood) —
-  // it only *returns* { error } for failures the server sent back. Offline
-  // is a state here, not an exception.
+  // astro:actions THROWS on a dead network (a bare fetch under the hood) — it
+  // only *returns* { error } for failures the server sent back, so the offline
+  // case has to be caught, not checked. Nothing stores these words but the
+  // editor itself, so say that rather than implying a queue (ADR-0010).
   let result: Awaited<ReturnType<typeof actions.fragments.saveWriting>> | null = null;
   try {
     result = await actions.fragments.saveWriting(fd);
   } catch {
-    setStatusNote(entry ? 'Saved on this device — will sync' : 'Offline — retrying soon');
-    scheduleRetry();
+    setStatusError('Can’t reach the server — these words are unsaved');
     return false;
   }
   const { data, error } = result;
 
   if (error || !data) {
     if (error?.code === 'CONFLICT') return handleConflict();
-    // The server answered and said no — a real rejection, not connectivity.
-    // The words stay queued (retries are backoff-capped), but say what happened.
-    setStatusError(entry ? 'Save failed — kept on this device' : 'Save failed');
+    setStatusError('Save failed');
     jsError.textContent = error ? formatActionError(error) : 'The server returned no data.';
     jsError.hidden = false;
-    scheduleRetry();
     return false;
   }
   jsError.hidden = true;
   conflictParked = false;
   baseUpdatedAt = data.updated_at;
-  if (entry) quiet(outbox.confirmSent(entry.id, entry.rev));
   if (!serverHasRow) {
     serverHasRow = true;
     // Whatever was ticked before the piece existed (including the
@@ -302,7 +246,6 @@ async function doSave(status: string, opts: { silentEmpty?: boolean }): Promise<
   dirty = false;
   reflectStatus();
   setSaved();
-  void drainOutbox(); // a good connection — move anything else that's waiting
   return true;
 }
 
@@ -331,7 +274,6 @@ async function saveAsCopy(fields: Record<string, string>): Promise<boolean> {
 }
 
 async function handleConflict(): Promise<false> {
-  quiet(outbox.markConflict(idField.value));
   setStatusError('Conflict — this piece changed elsewhere');
   const ok = await confirmDialog({
     title: 'This piece changed on the server',
@@ -342,8 +284,6 @@ async function handleConflict(): Promise<false> {
   if (ok) {
     const saved = await saveAsCopy(buildFields(savedStatus));
     if (saved) {
-      // The words are safe in the copy — only now may the entry go.
-      quiet(outbox.remove(idField.value));
       conflictParked = false;
       dirty = false;
       everSaved = true; // the list underneath must refresh (a copy now exists)
@@ -360,80 +300,19 @@ async function handleConflict(): Promise<false> {
   return false;
 }
 
-// ---- the outbox drain: startup, online, visibilitychange, backoff ----
-// Background Sync doesn't exist on iOS, so these foreground triggers ARE the
-// sync mechanism (docs/plans/09).
-const RETRY_MIN = 5_000;
-const RETRY_MAX = 300_000;
-let retryDelay = RETRY_MIN;
-let retryTimer: number | undefined;
-
-/** Exponential backoff toward the next drain; any success or trigger resets it. */
-function scheduleRetry() {
-  clearTimeout(retryTimer);
-  retryTimer = window.setTimeout(() => void drainOutbox(), retryDelay);
-  retryDelay = Math.min(retryDelay * 2, RETRY_MAX);
-}
-
-async function pushEntry(entry: outbox.OutboxEntry): Promise<outbox.PushResult> {
-  // Mid-restore-offer for this id (openEdit → offerLocalEntry): pushing now
-  // could overwrite the crash words with the stale form. Wait a round.
-  if (entry.id === settling) return 'retry';
-  // The fragment open in this sheet goes through the sheet's serialized save:
-  // single-flight, fresher words (the live form beats the stored snapshot),
-  // and conflicts surface through the sheet's own dialog.
-  if (sheet.open && !loadFailed && entry.id === idField.value) {
-    return (await save(savedStatus, { silentEmpty: true })) ? 'done' : 'retry';
-  }
-  const fd = new FormData();
-  for (const [k, v] of Object.entries(entry.fields)) fd.set(k, v);
-  try {
-    const { error } = await actions.fragments.saveWriting(fd);
-    if (!error) return 'done';
-    return error.code === 'CONFLICT' ? 'conflict' : 'retry';
-  } catch {
-    return 'retry'; // offline — the next trigger tries again
-  }
-}
-
-async function drainOutbox(): Promise<void> {
-  clearTimeout(retryTimer);
-  let summary: outbox.DrainSummary;
-  try {
-    summary = await outbox.drain(pushEntry);
-  } catch {
-    return; // IndexedDB unavailable — nothing to drain from
-  }
-  if (summary.remaining > 0) scheduleRetry();
-  else retryDelay = RETRY_MIN;
-}
-
-window.addEventListener('online', () => {
-  retryDelay = RETRY_MIN;
-  void drainOutbox();
-});
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) void drainOutbox();
-});
-// NOTE: the startup drain fires at the END of this module, after the deep-link
-// handlers — openEdit must set `settling` before the first drain can touch a
-// crash-recovery entry.
-
-// Last-resort flushes. pagehide can't await IndexedDB, but an initiated write
-// usually completes — and the LOCAL_MS debounce keeps this window tiny.
-window.addEventListener('pagehide', () => {
-  if (localDirty) void writeLocal();
-});
 window.addEventListener('beforeunload', (e) => {
-  // Warn only for words not yet in IndexedDB (or a published piece's
-  // explicit-save contract) — locally-safe words don't need a scare dialog.
-  if (sheet.open && (localDirty || (isPublished() && dirty))) {
+  // Nothing but the editor holds unsaved words now (ADR-0010), so any dirty
+  // state is worth a warning — including a draft whose autosave hasn't fired.
+  if (sheet.open && dirty) {
     e.preventDefault();
     e.returnValue = '';
   }
 });
 
 // ---- second-tab guard: one writer per fragment ----
+// Web Locks, not IndexedDB — this is the warning half of the same hazard
+// `base_updated_at` catches at save time, and it stays post-ADR-0010. It spans
+// tabs in one browser only; across devices, the concurrency token is the guard.
 let editLockRelease: (() => void) | null = null;
 function releaseEditLock() {
   editLockRelease?.();
@@ -490,16 +369,16 @@ interface Loaded {
 function populate(d: Loaded | null) {
   loadFailed = false;
   clearTimeout(timer);
-  clearTimeout(localTimer);
-  // A fragment has an id from its first keystroke — the server learns it on
-  // the first successful push (docs/plans/09 Piece 1).
+  // Ids are minted client-side and the action upserts by id, so a new piece
+  // has a stable identity before its first save — which is what lets the
+  // constellation picker queue memberships for a row that doesn't exist yet.
   idField.value = d?.id ?? crypto.randomUUID();
   serverHasRow = !!d;
   baseUpdatedAt = d?.updatedAt ?? null;
   conflictParked = false;
   titleField.value = d?.title ?? '';
   // TipTap v3 emits `update` from setContent by default — that would arm the
-  // save timers and mint a phantom outbox snapshot of unchanged content.
+  // save timer and mark unchanged content dirty.
   editor.commands.setContent(d?.body ?? '', { emitUpdate: false });
   slugField.value = d?.slug ?? '';
   slugTouched = !!d?.slug;
@@ -512,7 +391,6 @@ function populate(d: Loaded | null) {
   dateAutoNote.hidden = !!d;
   occurredField.value = d?.occurredIso ? toLocalInput(d.occurredIso) : '';
   dirty = false;
-  localDirty = false;
   everSaved = false;
   jsError.hidden = true;
   deleteBtn.hidden = !d;
@@ -547,85 +425,7 @@ function openNew(fromHash = false) {
   titleField.focus();
 }
 
-/**
- * Local edits that never reached the server (a crash, a closed lid, a dead
- * tab). Based on the current server version → a draft applies silently (it
- * is just the autosave that didn't finish) and a published piece asks.
- * Based on an OLDER version → conflict: offer to keep both.
- *
- * Declining a prompt NEVER discards — the entry stays for next time. The
- * only paths that drop local words are the explicit ones: the Discard
- * button, trash, and a successfully saved conflict copy.
- */
-async function offerLocalEntry(d: Loaded): Promise<void> {
-  let local: outbox.OutboxEntry | undefined;
-  try {
-    local = await outbox.get(d.id);
-  } catch {
-    return; // IndexedDB unavailable — nothing to offer
-  }
-  if (!local) return;
-  const basedOnCurrent = (local.fields.base_updated_at ?? null) === d.updatedAt;
-
-  if (basedOnCurrent && local.kind === 'auto') {
-    applyFields(local.fields);
-    dirty = true;
-    setStatusNote('Saved on this device — syncing');
-    clearTimeout(timer);
-    timer = window.setTimeout(() => save(savedStatus, { silentEmpty: true }), NET_MS);
-    return;
-  }
-
-  if (basedOnCurrent) {
-    // A published piece's unsaved edits, intact from last time.
-    const ok = await confirmDialog({
-      title: 'Unsaved edits found',
-      message: `This piece has unsaved local edits from ${nowTime(local.savedAt)}. Restore them here? Cancel keeps them for next time.`,
-      confirmLabel: 'Restore',
-    });
-    if (ok) {
-      applyFields(local.fields);
-      dirty = true;
-      updateDirtyUI(); // lights up Save changes
-    }
-    return;
-  }
-
-  // The server moved past what these local edits were based on.
-  const ok = await confirmDialog({
-    title: 'Older local edits found',
-    message:
-      'Local edits to this piece were made against an older version than the server now has. Keep them as a separate draft copy? Cancel keeps them for next time.',
-    confirmLabel: 'Keep both',
-  });
-  if (!ok) return;
-  if (await saveAsCopy(local.fields)) {
-    everSaved = true; // the list underneath must refresh (a copy now exists)
-    quiet(outbox.remove(d.id)); // safe in the copy — only now may the entry go
-  } else {
-    setStatusError('Could not save the copy — your local edits are kept');
-  }
-}
-
-function applyFields(f: Record<string, string>) {
-  titleField.value = f.title ?? '';
-  editor.commands.setContent(f.body ?? '', { emitUpdate: false });
-  excerptField.value = f.excerpt ?? '';
-  if (f.subjects !== undefined) setSubjects(f.subjects);
-  if (f.slug) {
-    slugField.value = f.slug;
-    slugTouched = true;
-  }
-  if (f.occurred_at) {
-    dateToggle.checked = true;
-    occurredField.disabled = false;
-    dateAutoNote.hidden = true;
-    occurredField.value = f.occurred_at;
-  }
-}
-
 async function openEdit(id: string, fromHash = false) {
-  settling = id; // set before any await — a racing drain must skip this id
   let loaded: Loaded | null = null;
   let loadError: unknown = null;
   try {
@@ -633,10 +433,9 @@ async function openEdit(id: string, fromHash = false) {
     if (error || !data || data.type !== 'writing') loadError = error ?? null;
     else loaded = data as Loaded;
   } catch (e) {
-    loadError = e; // offline — existing pieces need the network to load (for now)
+    loadError = e; // the workshop needs a connection to open a piece (ADR-0010)
   }
   if (!loaded) {
-    settling = null;
     // open an inert shell with the error visible — nothing here can save
     populate(null);
     loadFailed = true;
@@ -647,17 +446,11 @@ async function openEdit(id: string, fromHash = false) {
   }
   populate(loaded);
   openSheet(`#edit=${id}`, fromHash);
-  try {
-    await offerLocalEntry(loaded);
-  } finally {
-    settling = null;
-  }
 }
 
 // ---- closing (every exit funnels through here) ----
 function closeNow() {
   dirty = false;
-  localDirty = false;
   releaseEditLock();
   const reload = everSaved || picker.changed();
   setHash(prevHash); // restore the underlying context (e.g. #browse) first
@@ -667,21 +460,30 @@ function closeNow() {
 async function requestClose() {
   if (!loadFailed && dirty) {
     if (isPublished()) {
+      // Nothing else holds these edits (ADR-0010) — closing really does lose
+      // them, so the prompt says exactly that.
       const ok = await confirmDialog({
         title: 'Discard changes?',
-        message: 'This piece has unsaved edits. Close without saving?',
+        message:
+          'This piece has unsaved edits, and they aren’t stored anywhere else. Close without saving?',
         confirmLabel: 'Discard',
         danger: true,
       });
       if (!ok) return;
-      await outbox.remove(idField.value); // discarding = the snapshot goes too
     } else {
-      // drafts: make the words safe locally, then try the network once.
+      // Drafts: one last save attempt. If it can't land, closing loses the
+      // words, so ask rather than closing quietly.
       clearTimeout(timer);
-      await writeLocal();
       const ok = await save(savedStatus, { silentEmpty: true });
-      // Locally safe is safe enough to close — the outbox drains later.
-      if (!ok && hasContent() && localDirty) return; // only truly-unsaved words block
+      if (!ok && hasContent()) {
+        const discard = await confirmDialog({
+          title: 'Couldn’t save',
+          message: 'These words haven’t reached the server. Close anyway and lose them?',
+          confirmLabel: 'Close and lose them',
+          danger: true,
+        });
+        if (!discard) return;
+      }
     }
   }
   closeNow();
@@ -774,7 +576,6 @@ discardBtn.addEventListener('click', async () => {
     danger: true,
   });
   if (!ok) return;
-  await outbox.remove(idField.value); // discarding = the snapshot goes too
   // reload the saved version in place — the sheet stays open
   dirty = false;
   await openEdit(idField.value);
@@ -796,13 +597,11 @@ deleteBtn.addEventListener('click', async () => {
   try {
     ({ error } = await actions.fragments.trash(fd));
   } catch (e) {
-    error = e; // offline — trash is an online action, keep the piece
+    error = e; // no connection — keep the piece as it is
   }
   deleteBtn.disabled = false;
   if (error) return setStatusError(formatActionError(error));
-  quiet(outbox.remove(idField.value)); // don't resurrect what was just trashed
   dirty = false;
-  localDirty = false;
   everSaved = true; // the list underneath must refresh
   closeNow();
 });
@@ -817,8 +616,3 @@ document.querySelectorAll<HTMLElement>('[data-new-writing]').forEach((btn) => bt
 const m = location.hash.match(/^#edit=([0-9a-f][0-9a-f-]{30,40})$/i);
 if (m) void openEdit(m[1], true);
 else if (location.hash === '#new-writing') openNew(true);
-
-// Startup drain LAST: a deep-linked openEdit above has already set `settling`
-// synchronously, so the drain cannot clobber a crash-recovery entry that the
-// restore flow is about to offer.
-void drainOutbox(); // yesterday's flight lands now
