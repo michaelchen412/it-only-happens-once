@@ -12,7 +12,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
 import ContactForm from '../components/ContactForm.astro';
 import { renderMarkdown } from '../lib/markdown';
-import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/spotify';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
@@ -42,7 +42,7 @@ const portraitUrl = me.portrait ? `${SUPABASE_URL}/storage/v1/object/public/site
 
 const embed = siteName.spotify_url ? parseSpotifyEmbed(siteName.spotify_url) : null;
 const embedSrc = embed ? spotifyEmbedSrc(embed) : '';
-const embedHeight = embed && embed.kind === 'track' ? 152 : 352;
+const embedHeight = embed ? spotifyEmbedHeight(embed.kind) : 352;
 
 const hasMe = !!(me.headline || meBodyHtml || portraitUrl || interests.length);
 const hasSite = !!(site.thesis || siteBodyHtml || blurbHtml || embedSrc);

@@ -28,7 +28,9 @@ export interface ConstellationRef {
 export type SuiteItem =
   | { kind: 'quote'; body: string; attribution: string | null }
   | { kind: 'writing'; item: WritingItem }
-  | { kind: 'song'; title: string; attribution: string | null; sourceUrl: string | null };
+  /** `body` is the annotation — Michael's words on why this song (ADR-0009).
+   *  Empty is normal: a song may say nothing and simply play. */
+  | { kind: 'song'; title: string; body: string; attribution: string | null; sourceUrl: string | null };
 
 export interface Constellation {
   name: string;
@@ -135,6 +137,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       items.push({
         kind: 'song',
         title: f.title || '(untitled)',
+        body: f.body ?? '',
         attribution: f.attribution,
         sourceUrl: f.source_url,
       });

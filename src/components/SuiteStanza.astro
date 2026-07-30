@@ -13,13 +13,22 @@
     • writing — display title + fading excerpt and NO metadata; the block opens
                 the blog's own Reader (`data-read`), so an essay reads
                 identically everywhere.
-    • song    — title over artist in the quote's attribution register, with the
-                Spotify embed when the URL parses. A song is a STANZA: it plays
-                where it was placed (design.md §14, resolved 2026-07-25). The
-                score above the suite is independent — either, both, or neither.
+    • song    — the ANNOTATION leads and the embed closes as citation (ADR-0009).
+                A song is Michael's words about a track plus the track itself —
+                structurally what a quote is, inverted: someone else's words plus
+                who said them. So the display-register title is gone when there
+                are words (the embed already shows title and artist, and an
+                essay-sized heading made a song stanza read like an essay); the
+                artist keeps the attribution register a quote's figcaption uses.
+                An UNANNOTATED song falls back to title + artist — there's
+                nothing else to set, and the embed may be blocked.
+                A song is a STANZA: it plays where it was placed (design.md §14).
+                The score above the suite is independent — either, or both, or
+                neither.
 */
 import type { SuiteItem } from '../lib/constellations';
-import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/spotify';
+import { renderMarkdown } from '../lib/markdown';
+import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/spotify';
 
 interface Props {
   item: SuiteItem;
@@ -27,6 +36,7 @@ interface Props {
 const { item } = Astro.props;
 
 const embed = item.kind === 'song' && item.sourceUrl ? parseSpotifyEmbed(item.sourceUrl) : null;
+const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
 ---
 
 {
@@ -58,9 +68,19 @@ const embed = item.kind === 'song' && item.sourceUrl ? parseSpotifyEmbed(item.so
 {
   item.kind === 'song' && (
     <div>
-      <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.title}</h2>
+      {noteHtml ? (
+        <div class="suite-note reading prose-measure" set:html={noteHtml} />
+      ) : (
+        <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.title}</h2>
+      )}
       {item.attribution && (
-        <p class="suite-attrib mt-2 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+        <p
+          class:list={[
+            'suite-attrib font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]',
+            // prose wants a little more air beneath it than a title does
+            noteHtml ? 'mt-3' : 'mt-2',
+          ]}
+        >
           — {item.attribution}
         </p>
       )}
@@ -69,7 +89,7 @@ const embed = item.kind === 'song' && item.sourceUrl ? parseSpotifyEmbed(item.so
           class="mt-4 max-w-xl"
           src={spotifyEmbedSrc(embed)}
           width="100%"
-          height="152"
+          height={spotifyEmbedHeight(embed.kind)}
           loading="lazy"
           allow="encrypted-media"
           title={item.title}

@@ -79,7 +79,8 @@ create table fragments (
   type           fragment_type   not null,
   slug           text            not null unique,
   title          text,            -- writing/song title; usually null for quotes
-  body           text,            -- full essay (Markdown) OR full quote text
+  body           text,            -- Markdown: full essay / full quote text /
+                                  -- a song's annotation, the "why" (ADR-0009)
   excerpt        text,            -- authored snippet (writing); may be derived if null
   attribution    text,            -- quote author / song artist
   source_url     text,            -- book link / Spotify URL
@@ -160,7 +161,7 @@ Type-specific fields that don't deserve their own columns:
 
 | type | `details` shape |
 |---|---|
-| `song` | `{ "spotify_id": "…", "album": "…" }` |
+| `song` | `{ "spotify_id": "…", "album": "…", "thumbnail_url": "…" }` — `spotify_id` is a **track or album** id, parsed from `source_url` (which stays the one source of truth for both id and kind) |
 | `quote` | `{ "source_title": "Meditations", "source_author": "Marcus Aurelius", "work_year": 170, "page": 12 }` |
 | `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render) |
 

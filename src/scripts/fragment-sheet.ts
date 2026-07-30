@@ -1,15 +1,13 @@
 // Client logic for the FragmentSheet drawer (components/admin/FragmentSheet.astro)
-// — the quote & song quick-editors: a minimal TipTap body, the Author→Work
-// provenance combos, AI subject suggestions, the Spotify lookup, and the
-// constellations tab. Kept out of the .astro file so the markup stays legible.
-import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import { Markdown } from 'tiptap-markdown';
+// — the quote & song quick-editors: two short-form TipTap bodies (the quote's
+// words, the song's annotation), the Author→Work provenance combos, AI subject
+// suggestions, the Spotify lookup, and the constellations tab. Kept out of the
+// .astro file so the markup stays legible.
 import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
+import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
 
 const sheet = document.getElementById('sheet') as HTMLDialogElement;
@@ -18,44 +16,29 @@ const sheetError = document.getElementById('sheet-error') as HTMLParagraphElemen
 const quoteForm = document.getElementById('quote-form') as HTMLFormElement;
 const songForm = document.getElementById('song-form') as HTMLFormElement;
 
-// --- quote body: a minimal TipTap editor (bold/italic only; breaks preserved) ---
+// --- quote body: the shared short-form editor (bold/italic; breaks preserved) ---
 const quoteBody = document.getElementById('quote-body') as HTMLInputElement;
 const quoteSave = document.getElementById('quote-save') as HTMLButtonElement;
 const quoteAttr = quoteForm.elements.namedItem('attribution') as HTMLInputElement;
-const quoteEditor = new Editor({
-  element: document.getElementById('quote-editor')!,
-  extensions: [
-    StarterKit.configure({
-      heading: false,
-      bulletList: false,
-      orderedList: false,
-      blockquote: false,
-      codeBlock: false,
-      horizontalRule: false,
-    }),
-    Markdown.configure({ breaks: true, transformPastedText: true }),
-    Placeholder.configure({ placeholder: 'The words themselves…' }),
-  ],
-  content: '',
-  editorProps: { attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': 'Quote text' } },
+const quote = mountMiniEditor({
+  editorEl: document.getElementById('quote-editor')!,
+  toolbarRoot: document.getElementById('quote-editor-wrap')!,
+  placeholder: 'The words themselves…',
+  ariaLabel: 'Quote text',
 });
-const quoteMarkdown = () => (quoteEditor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+const quoteEditor = quote.editor;
+const quoteMarkdown = quote.getMarkdown;
 
-const qBtns = Array.from(quoteForm.querySelectorAll<HTMLButtonElement>('.tt-btn'));
-const qCmds: Record<string, () => void> = {
-  bold: () => quoteEditor.chain().focus().toggleBold().run(),
-  italic: () => quoteEditor.chain().focus().toggleItalic().run(),
-};
-qBtns.forEach((b) => b.addEventListener('click', () => qCmds[b.dataset.qcmd!]?.()));
-function syncQuoteToolbar() {
-  qBtns.forEach((b) => {
-    const on = quoteEditor.isActive(b.dataset.qcmd!);
-    b.classList.toggle('is-active', on);
-    b.setAttribute('aria-pressed', String(on));
-  });
-}
-quoteEditor.on('selectionUpdate', syncQuoteToolbar);
-quoteEditor.on('transaction', syncQuoteToolbar);
+// --- song annotation: the same editor, the same register (ADR-0009). This is
+// the "why", the field Spotify doesn't have — optional, and it LEADS the public
+// stanza, with the embed closing as citation. ---
+const songBody = document.getElementById('song-body') as HTMLInputElement;
+const song = mountMiniEditor({
+  editorEl: document.getElementById('song-editor')!,
+  toolbarRoot: document.getElementById('song-editor-wrap')!,
+  placeholder: 'Why this one…',
+  ariaLabel: 'Why this song',
+});
 
 // required-field gate: Quote + Attribution must be non-empty to save
 function refreshQuoteValid() {
@@ -215,6 +198,7 @@ const markDirty = (e?: Event) => {
 sheet.addEventListener('input', markDirty); // typing in any field, incl. the editor
 sheet.addEventListener('change', markDirty); // toggles, selects, the date field
 quoteEditor.on('update', () => markDirty()); // TipTap passes its own props, not an Event
+song.editor.on('update', () => markDirty());
 
 // --- constellation membership: its own tab, one picker for both types ---
 // (It applies immediately, so it never belonged inside either <form>.)
@@ -297,7 +281,9 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
     setSubjects(form, '');
     toggleDelete(form, false);
     if (type === 'quote') {
-      quoteEditor.commands.setContent('');
+      // emitUpdate: false — TipTap v3 fires `update` on setContent, which would
+      // arm the unsaved-work guard against words we just put there ourselves.
+      quoteEditor.commands.setContent('', { emitUpdate: false });
       authorCombo.clear();
       workCombo.clear();
       recomputeWorkScope();
@@ -305,7 +291,10 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
       refreshQuoteValid();
       proposedBox.hidden = true;
     }
-    if (type === 'song') document.getElementById('song-lookup')!.textContent = '';
+    if (type === 'song') {
+      song.editor.commands.setContent('', { emitUpdate: false });
+      document.getElementById('song-lookup')!.textContent = '';
+    }
     // Nothing to be a member of yet — ticks queue until the first save. In a
     // composer context, pre-tick that constellation (the old data-place-in
     // hook, now visible in the UI rather than implicit).
@@ -334,7 +323,7 @@ document.addEventListener('fragment:edit', (e) => {
     setField(form, 'status', d.status);
     setSubjects(form, d.subjects);
     if (type === 'quote') {
-      quoteEditor.commands.setContent(d.body || '');
+      quoteEditor.commands.setContent(d.body || '', { emitUpdate: false });
       setField(form, 'source_url', d.source_url);
       setField(form, 'source_title', d.details.source_title ?? '');
       setField(form, 'source_author', d.details.source_author ?? '');
@@ -351,9 +340,9 @@ document.addEventListener('fragment:edit', (e) => {
       setField(form, 'year', String(d.year));
       setField(form, 'title', d.title);
       setField(form, 'spotify_url', d.source_url);
-      setField(form, 'spotify_id', d.details.spotify_id ?? '');
       setField(form, 'thumbnail_url', d.details.thumbnail_url ?? '');
       setField(form, 'album', d.details.album ?? '');
+      song.editor.commands.setContent(d.body || '', { emitUpdate: false });
       document.getElementById('song-lookup')!.textContent = '';
     }
     toggleDelete(form, true);
@@ -372,13 +361,14 @@ async function runLookup() {
   lookupNote.textContent = 'Looking up…';
   const { data, error } = await actions.songs.lookup({ url });
   if (error || !data) {
-    lookupNote.textContent = 'Couldn’t read that link — fill the fields manually.';
+    lookupNote.textContent = 'Couldn’t read that link — paste a track or album, or fill the fields in by hand.';
     return;
   }
   if (!(songForm.elements.namedItem('title') as HTMLInputElement).value) setField(songForm, 'title', data.title);
-  setField(songForm, 'spotify_id', data.spotifyId);
   if (data.thumbnailUrl) setField(songForm, 'thumbnail_url', data.thumbnailUrl);
-  lookupNote.textContent = `✓ ${data.title}`;
+  // Name the kind: an album link is easy to paste by accident, and the whole
+  // record embeds rather than the one song.
+  lookupNote.textContent = `✓ ${data.title}${data.kind === 'album' ? ' — the whole album' : ''}`;
 }
 urlField.addEventListener('change', runLookup);
 urlField.addEventListener('paste', () => setTimeout(runLookup, 50));
@@ -397,6 +387,10 @@ for (const [form, action] of [
         showError('A quote needs both its words and an attribution.');
         return;
       }
+    } else if (form === songForm) {
+      // An empty doc still serializes to whitespace — send nothing at all, so
+      // an unannotated song stores `body: null` rather than a blank paragraph.
+      songBody.value = song.editor.isEmpty ? '' : song.getMarkdown();
     }
     const fd = new FormData(form);
     if (form === quoteForm && !quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic

@@ -130,3 +130,65 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
 
   return { editor, getMarkdown };
 }
+
+export interface MiniEditorOptions {
+  editorEl: HTMLElement;
+  /** Container holding THIS editor's `.tt-btn` buttons — its own toolbar only,
+   *  so two mini editors can sit in one sheet without stealing each other's. */
+  toolbarRoot: HTMLElement;
+  placeholder?: string;
+  ariaLabel?: string;
+  onChange?: () => void;
+}
+
+/**
+ * The short-form editor: bold and italic, line breaks preserved, no headings /
+ * lists / rules. That's the register a quote's words and a song's annotation
+ * share — a sentence or a few, never an essay — so the composer's full toolbar
+ * would be noise. `breaks: true` keeps a poem's line breaks through the
+ * Markdown round-trip.
+ *
+ * Same handle as `mountRichEditor`, so callers serialize the same way.
+ */
+export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
+  const editor = new Editor({
+    element: opts.editorEl,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+      }),
+      Markdown.configure({ breaks: true, transformPastedText: true }),
+      Placeholder.configure({ placeholder: opts.placeholder ?? 'Write…' }),
+    ],
+    content: '',
+    editorProps: {
+      attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Text' },
+    },
+  });
+  const getMarkdown = () => (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+
+  const cmds: Record<string, () => void> = {
+    bold: () => editor.chain().focus().toggleBold().run(),
+    italic: () => editor.chain().focus().toggleItalic().run(),
+  };
+  const btns = Array.from(opts.toolbarRoot.querySelectorAll<HTMLButtonElement>('.tt-btn'));
+  btns.forEach((b) => b.addEventListener('click', () => cmds[b.dataset.cmd!]?.()));
+
+  function syncToolbar() {
+    btns.forEach((b) => {
+      const on = editor.isActive(b.dataset.cmd!);
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  editor.on('selectionUpdate', syncToolbar);
+  editor.on('transaction', syncToolbar);
+  if (opts.onChange) editor.on('update', opts.onChange);
+
+  return { editor, getMarkdown };
+}

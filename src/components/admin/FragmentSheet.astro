@@ -60,8 +60,8 @@ const thisYear = new Date().getUTCFullYear();
         <span class="flex items-center gap-1 text-base-content/70">Quote <span class="text-error" title="required" aria-hidden="true">*</span></span>
         <div id="quote-editor-wrap" class="rounded-field border border-base-300 focus-within:border-primary">
           <div class="flex items-center gap-0.5 border-b border-base-300/60 px-1.5 py-1" role="toolbar" aria-label="Formatting">
-            <button type="button" class="tt-btn" data-qcmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
-            <button type="button" class="tt-btn" data-qcmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
+            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
           </div>
           <div id="quote-editor" class="max-h-[45vh] min-h-[10rem] overflow-y-auto px-3 py-2"></div>
         </div>
@@ -162,10 +162,10 @@ const thisYear = new Date().getUTCFullYear();
     {/* SONG */}
     <form id="song-form" method="POST" action={actions.fragments.saveSong} hidden class="flex flex-col gap-4 p-6 font-sans">
       <input type="hidden" name="id" />
-      <input type="hidden" name="spotify_id" />
       <input type="hidden" name="thumbnail_url" />
+      <input type="hidden" name="body" id="song-body" />
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Spotify link</span>
+        <span class="text-base-content/70">Spotify link <span class="text-base-content/40">— a track or a whole album</span></span>
         <input name="spotify_url" type="url" required class="input input-sm input-bordered" placeholder="https://open.spotify.com/track/…" />
         <span id="song-lookup" class="text-xs text-base-content/55" role="status"></span>
       </label>
@@ -181,6 +181,20 @@ const thisYear = new Date().getUTCFullYear();
         <span class="text-base-content/70">Album</span>
         <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
       </label>
+
+      {/* The annotation (ADR 0009) — the one thing Spotify has no field for, and
+          what makes this a fragment rather than a link. Optional, always: the
+          stanza falls back to title + artist when a song says nothing. */}
+      <div class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Why this one <span class="text-base-content/40">— optional; it leads the stanza</span></span>
+        <div id="song-editor-wrap" class="rounded-field border border-base-300 focus-within:border-primary">
+          <div class="flex items-center gap-0.5 border-b border-base-300/60 px-1.5 py-1" role="toolbar" aria-label="Formatting">
+            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
+            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+          </div>
+          <div id="song-editor" class="max-h-[40vh] min-h-[7rem] overflow-y-auto px-3 py-2"></div>
+        </div>
+      </div>
       {/* Songs publish on save — no draft lifecycle. Unpublish via the list. */}
       <input type="hidden" name="status" value="published" />
       <label class="flex flex-col gap-1 text-sm">

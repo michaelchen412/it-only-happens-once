@@ -106,7 +106,7 @@ const suite = (placements ?? []).map((p) => {
     f.type === 'quote'
       ? { kind: 'quote', body: f.body ?? '', attribution: f.attribution }
       : f.type === 'song'
-        ? { kind: 'song', title: f.title || '(untitled)', attribution: f.attribution, sourceUrl: f.source_url }
+        ? { kind: 'song', title: f.title || '(untitled)', body: f.body ?? '', attribution: f.attribution, sourceUrl: f.source_url }
         : {
             kind: 'writing',
             item: {

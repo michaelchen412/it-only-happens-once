@@ -861,11 +861,23 @@ html.reader-open .sky-return {
   filter: drop-shadow(0 0 5px var(--lamp));
 }
 
+/* A song's annotation — Michael's words leading the stanza (ADR-0009). It takes
+   `.reading` for its prose typography, but a stanza sets FLUSH: the paragraph
+   margins `.reading` gives an article would push the first line off its mark in
+   the margin and leave a gap above the artist line. */
+.suite-note > :first-child {
+  margin-block-start: 0;
+}
+.suite-note > :last-child {
+  margin-block-end: 0;
+}
+
 /* one slow, even breath for every warming element (glow + hover) */
 .suite-mark,
 .suite-item blockquote,
 .suite-item figcaption,
 .suite-attrib,
+.suite-note,
 .sw-title,
 .sw-excerpt {
   transition:
@@ -891,6 +903,12 @@ html.reader-open .sky-return {
     var(--lamp) 30%,
     color-mix(in oklab, var(--color-base-content) 58%, transparent)
   );
+}
+/* the annotation warms as the stanza's own content — a shade under a quote's
+   blockquote, since it sets at prose size rather than in the quote's register */
+.suite-item.is-lit .suite-note {
+  color: color-mix(in oklab, var(--lamp) 18%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 14%, transparent);
 }
 .suite-item.is-lit .sw-title {
   color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));

@@ -15,7 +15,7 @@ import { z } from 'astro/zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { slugify } from '../lib/slug';
-import { lookupSpotifyTrack, parseSpotifyTrackId } from '../lib/spotify';
+import { lookupSpotify, parseSongRef } from '../lib/spotify';
 import { COLOR_SLOTS, leastUsedSlot } from '../lib/constellation-colors';
 import type { Database, Json } from '../lib/database.types';
 
@@ -331,16 +331,21 @@ export const server = {
       },
     }),
 
-    /** Create or edit a `song` fragment. Title/art come from Spotify; artist is manual. */
+    /**
+     * Create or edit a `song` fragment. Title/art come from Spotify; artist is
+     * manual. `body` is the ANNOTATION — Michael's words on why this song
+     * (ADR-0009), which is what makes a song a fragment rather than a link. It
+     * is optional, always: a song may say nothing and simply play.
+     */
     saveSong: defineAction({
       accept: 'form',
       input: z.object({
         id: optText,
-        spotify_url: z.string().url('Paste a Spotify track link'),
-        spotify_id: optText,
+        spotify_url: z.string().url('Paste a Spotify track or album link'),
         title: z.string().min(1, 'A song title is required'),
         attribution: z.string().min(1, 'Who’s the artist?'),
         album: optText,
+        body: optText,
         thumbnail_url: optText,
         year: z.coerce.number().int(),
         status,
@@ -349,10 +354,12 @@ export const server = {
       }),
       handler: async (input, ctx) => {
         const sb = ctx.locals.supabase;
-        const spotifyId = input.spotify_id || parseSpotifyTrackId(input.spotify_url);
-        if (!spotifyId) throw fail('That doesn’t look like a Spotify track link', 'BAD_REQUEST');
+        // The URL is the single source of truth for what's being cited — the id
+        // and the kind both come from it, so a stale hidden field can't disagree.
+        const ref = parseSongRef(input.spotify_url);
+        if (!ref) throw fail('That doesn’t look like a Spotify track or album link', 'BAD_REQUEST');
         const slug = await uniqueSlug(sb, slugify(input.slug || `${input.title} ${input.attribution}`), input.id);
-        const details: Record<string, Json> = { spotify_id: spotifyId };
+        const details: Record<string, Json> = { spotify_id: ref.id };
         if (input.album) details.album = input.album;
         if (input.thumbnail_url) details.thumbnail_url = input.thumbnail_url;
         // provenance facets follow the shown fields: artist → author, album → work
@@ -362,7 +369,7 @@ export const server = {
           type: 'song',
           title: input.title,
           slug,
-          body: null,
+          body: input.body?.trim() || null,
           attribution: input.attribution,
           source_url: input.spotify_url,
           details,
@@ -535,7 +542,7 @@ export const server = {
       input: z.object({ url: z.string().min(1).max(500) }),
       handler: async (input, ctx) => {
         requireAdmin(ctx);
-        const found = await lookupSpotifyTrack(input.url);
+        const found = await lookupSpotify(input.url);
         if (!found) throw fail('Couldn’t read that Spotify link', 'BAD_REQUEST');
         return found;
       },
