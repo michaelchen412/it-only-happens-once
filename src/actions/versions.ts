@@ -103,8 +103,13 @@ export const versions = {
   }),
 
   /**
-   * Every version of one piece, newest first, with the canonical row alongside
-   * so the sheet can say which of them differ from what's live.
+   * Every version of one piece, with the canonical row alongside so the sheet
+   * can say which of them differ from what's live.
+   *
+   * The working version sorts FIRST — it's the pending rewrite, the reason you
+   * opened this tab — then snapshots newest-first. That means `kind` descending,
+   * since 'working' > 'snapshot' alphabetically; ascending would bury the live
+   * edit under the whole archive.
    */
   list: defineAction({
     input: z.object({ fragment_id: z.string().uuid() }),
@@ -116,7 +121,7 @@ export const versions = {
           .from('fragment_versions')
           .select(WORDS)
           .eq('fragment_id', fragment_id)
-          .order('kind', { ascending: true }) // 'snapshot' < 'working' alphabetically
+          .order('kind', { ascending: false }) // 'working' before 'snapshot'
           .order('created_at', { ascending: false }),
         sb.from('fragments').select('title, excerpt, body, updated_at').eq('id', fragment_id).maybeSingle(),
       ]);
