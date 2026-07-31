@@ -27,21 +27,51 @@ Design notes, so this isn't re-derived later:
 - Restore instructions live in that repo's README (the `psql
   --single-transaction` recipe, with triggers disabled during the data load).
 
+## The storage archive
+
+The same workflow then archives the **`site` bucket** — the About portrait and
+every image in an essay — under `storage/site/**`, with a `storage/manifest.json`
+recording each object's path, size and md5. Built 2026-07-31, the same day
+[plan 03](plans/03-images-in-essays.md) made essays able to hold pictures.
+
+It exists because of something this page previously got wrong: **`supabase db
+dump` covers `auth.*` and `public.*` and nothing else.** There is no `storage.`
+anything in `data.sql` — not the bytes, and not the metadata rows either. So the
+bucket had no off-site copy *and* no record it had ever held a file.
+
+- **An archive, not a mirror.** Files are only ever added, never removed. A
+  backup that faithfully reproduces a deletion is not a backup — the day you
+  most want it is the day something was deleted by mistake. The manifest holds
+  current truth, so an orphan on disk stays identifiable.
+- **Git stays healthy holding binaries** because essay images are
+  content-addressed (`essays/{fragmentId}/{hash}.{ext}`): a changed picture is a
+  new path, not a new version of an old one, so history is additive rather than
+  a pile of binary diffs. `about/portrait.jpg` is the one fixed path.
+- **Bytes come from the bucket's public URL** — the same one a reader uses — so
+  a download failure is real news: it means published essays' pictures aren't
+  being served.
+- **It runs after the SQL is already committed and pushed**, so a rotated key or
+  a bucket turned private can never cost a night of the database backup. It
+  still fails the job, so the email still arrives.
+- **One extra secret**, `SUPABASE_SERVICE_ROLE_KEY`, used only to *list* the
+  bucket. Not a widening of trust: `SUPABASE_DB_URL` was already there and is a
+  full Postgres connection that can do strictly more.
+
+**Verified end to end on 2026-07-31**, in CI rather than locally: the workflow
+ran green, downloaded the object on a GitHub runner, and the bytes fetched back
+out of the repo are md5-identical to the bucket's etag.
+
 ## What the dump does not cover
 
-- **Storage objects** — and this stopped being hypothetical on 2026-07-31, when
-  [plan 03](plans/03-images-in-essays.md) shipped and essays could contain
-  pictures. `pg_dump` captures the metadata rows in `storage.objects`, **not the
-  bytes**. So an essay's prose is backed up nightly and its images are not: lose
-  the Supabase project and every picture goes with it, leaving posts that
-  reference files nobody has.
-  **This is the one real hole in the safety story.** It was tolerable at one
-  portrait. It stops being tolerable at whatever number of essay images makes
-  you wince — the fix is a sync of the `site` bucket into the backups repo
-  (`supabase storage cp -r`, or the S3-compatible endpoint), which is small and
-  currently unbuilt.
-- **Auth users** (Supabase-managed schema). One admin user; re-creating it is
-  a dashboard task, documented in [auth.md](auth.md).
+**Nothing, currently** — and both entries that used to sit here were wrong.
+Corrected 2026-07-31 by reading the committed `data.sql` rather than reasoning
+about it:
+
+- ~~Storage objects~~ — now archived, above.
+- ~~Auth users are excluded by the CLI~~ — **they are not.** `auth.users`,
+  `auth.identities` and the rest of the auth schema are all in `data.sql`, one
+  row each. Re-creating the admin by hand is documented in [auth.md](auth.md)
+  and remains the simpler restore path, but the rows are there.
 
 ## The rest of the safety story
 
