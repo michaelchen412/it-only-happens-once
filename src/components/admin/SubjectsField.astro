@@ -1,0 +1,63 @@
+---
+/*
+  SubjectsField — the Subjects control, wherever subjects are actually edited:
+  the quote form, the song form, and the writing composer's publish dialog
+  (docs/plans/02, docs/admin.md §8).
+
+  It exists so the AI affordance can't drift between the three. The button and
+  the "New subject: … / Add it / ✕" strip are the part that has to stay
+  identical — proposing a brand-new subject *with a definition* is what keeps
+  the taxonomy honest rather than letting it sprawl, and three hand-copied
+  versions of that would not stay in step for long.
+
+  The TagInput itself is a <slot>, because each site needs different props: the
+  publish dialog's must be `form`-associated, since that dialog is a sibling of
+  the writing form rather than a child of it.
+
+  Wire it with `wireSubjectSuggest` (src/scripts/subject-suggest.ts), which
+  finds its parts by the `data-ai-*` attributes below rather than by id — so a
+  page can mount several without a naming scheme.
+
+  The `ai` prefix is not decoration: `data-suggest` is already taken by
+  TagInput, which uses it to carry its datalist JSON, and the TagInput sits
+  INSIDE this element. A plain `[data-suggest]` query from here matches both,
+  and only resolved to the button by document order — luck that would end the
+  first time this markup was reordered.
+*/
+interface Props {
+  /** Identifies this instance to the script; several exist on the admin page. */
+  id: string;
+  /** The sheets tone their labels /70, the publish dialog /80. Kept faithful. */
+  labelClass?: string;
+}
+const { id, labelClass = 'text-base-content/70' } = Astro.props;
+---
+
+<div id={id} class="flex flex-col gap-1 text-sm">
+  <div class="flex items-center justify-between">
+    <span class={labelClass}>Subjects</span>
+    <button
+      type="button"
+      data-ai-run
+      class="flex items-center gap-1 text-xs text-primary hover:underline disabled:no-underline disabled:opacity-40"
+    >
+      <span data-ai-label>Suggest with AI</span>
+    </button>
+  </div>
+  <slot />
+  <div
+    data-ai-proposed
+    hidden
+    class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-field border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs"
+  >
+    <span class="text-base-content/60">New subject:</span>
+    <span data-ai-name class="font-medium text-base-content"></span>
+    <span data-ai-def class="w-full text-base-content/55"></span>
+    <button
+      type="button"
+      data-ai-add
+      class="rounded bg-primary/15 px-2 py-0.5 font-medium text-primary hover:bg-primary/25">Add it</button
+    >
+    <button type="button" data-ai-dismiss class="text-base-content/40 hover:text-base-content" aria-label="Dismiss">✕</button>
+  </div>
+</div>

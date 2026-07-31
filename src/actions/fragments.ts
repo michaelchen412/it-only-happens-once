@@ -367,7 +367,17 @@ export const fragments = {
       try {
         const { suggestSubjects } = await import('../lib/suggest-subjects');
         return await suggestSubjects(text, kind, apiKey, taxonomy ?? []);
-      } catch {
+      } catch (e) {
+        // This catch used to discard the reason and report EVERY failure as
+        // "couldn't reach the model" — including a 400 whose body said, in
+        // plain words, that the account was out of credit. That sends you
+        // looking at your network for a billing problem. The action is
+        // admin-gated, so the API's own message is both safe to show and the
+        // only thing that says where to go.
+        const err = e as { status?: number; error?: { error?: { message?: string } } } | null;
+        const detail = err?.error?.error?.message;
+        console.error('[suggestSubjects] model call failed', err?.status ?? '', detail ?? e);
+        if (detail) throw fail(`The model refused this: ${detail}`, 'BAD_REQUEST');
         throw fail('Couldn’t reach the model — tag it manually.', 'INTERNAL_SERVER_ERROR');
       }
     },

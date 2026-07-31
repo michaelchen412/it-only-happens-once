@@ -11,6 +11,7 @@
   populated by the sheet's script on every open — the markup is a blank shell.
 */
 import TagInput from '../TagInput.astro';
+import SubjectsField from './SubjectsField.astro';
 
 interface Props {
   formId: string;
@@ -56,10 +57,13 @@ const { formId, subjectNames } = Astro.props;
       <textarea name="excerpt" id="excerpt-field" form={formId} rows="2" class="textarea textarea-bordered font-serif text-base"></textarea>
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      <span class="text-base-content/80">Subjects</span>
+    {/* Subjects are edited HERE, not in the sheet, so this is where the AI
+        button belongs — and it lands next to the preflight below, which is the
+        thing that says "no subjects — it won't appear under any of them". The
+        complaint and its fix now sit in the same dialog. */}
+    <SubjectsField id="ws-subjects" labelClass="text-base-content/80">
       <TagInput name="subjects" label="Subjects" suggestions={subjectNames} form={formId} placeholder="Add a subject…" />
-    </label>
+    </SubjectsField>
 
     {/* Preflight (docs/plans/06) — instruments, never gates. It borrows the
         constellation composer's grammar exactly, so the two rooms feel like one

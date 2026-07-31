@@ -9,6 +9,7 @@ import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
 import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
+import { wireSubjectSuggest } from './subject-suggest';
 
 const sheet = document.getElementById('sheet') as HTMLDialogElement;
 const sheetTitle = document.getElementById('sheet-title')!;
@@ -120,39 +121,55 @@ quoteSourceTitle.addEventListener('change', () => {
 });
 
 // --- AI subject suggestions (Haiku) — pre-fill tags; new subject needs accept ---
-const quoteSubjects = quoteForm.elements.namedItem('subjects') as HTMLInputElement;
-const suggestBtn = document.getElementById('quote-suggest') as HTMLButtonElement;
-const suggestLabel = document.getElementById('quote-suggest-label')!;
-const proposedBox = document.getElementById('quote-proposed') as HTMLElement;
-const proposedName = document.getElementById('quote-proposed-name')!;
-const proposedDef = document.getElementById('quote-proposed-def')!;
-const proposedAdd = document.getElementById('quote-proposed-add') as HTMLButtonElement;
-const currentTags = () => quoteSubjects.value.split(',').map((s) => s.trim()).filter(Boolean);
-const addTags = (extra: string[]) => setSubjects(quoteForm, Array.from(new Set([...currentTags(), ...extra])).join(', '));
+// Both types share one implementation (docs/plans/02); only the question "what
+// text is there to read" differs, which is what `gather` answers.
+//
+// `onError` is wrapped rather than passed by reference: `showError` is a `const`
+// declared further down this file, and naming it at module-evaluation time
+// would be a temporal-dead-zone throw. The lambda defers the lookup to click.
+const tagsOf = (form: HTMLFormElement) =>
+  ((form.elements.namedItem('subjects') as HTMLInputElement | null)?.value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-suggestBtn.addEventListener('click', async () => {
-  const text = quoteEditor.getText().trim();
-  if (!text) return showError('Add the quote first, then suggest subjects.');
-  clearError();
-  proposedBox.hidden = true;
-  suggestBtn.disabled = true;
-  suggestLabel.textContent = 'Thinking…';
-  const { data, error } = await actions.fragments.suggestSubjects({ text, kind: 'quote' });
-  suggestBtn.disabled = false;
-  suggestLabel.textContent = 'Suggest with AI';
-  if (error || !data) return showError(error ? formatActionError(error) : 'No suggestions came back.');
-  addTags(data.existing);
-  if (data.proposed) {
-    proposedName.textContent = data.proposed.name;
-    proposedDef.textContent = data.proposed.definition;
-    proposedAdd.onclick = () => {
-      addTags([data.proposed!.name]);
-      proposedBox.hidden = true;
-    };
-    proposedBox.hidden = false;
-  }
+const quoteSuggest = wireSubjectSuggest({
+  root: document.getElementById('quote-subjects')!,
+  kind: 'quote',
+  gather: () => {
+    const text = quoteEditor.getText().trim();
+    return text ? { text } : { missing: 'Add the quote first, then suggest subjects.' };
+  },
+  readTags: () => tagsOf(quoteForm),
+  writeTags: (tags) => setSubjects(quoteForm, tags.join(', ')),
+  onStart: () => clearError(),
+  onError: (m) => showError(m),
 });
-document.getElementById('quote-proposed-dismiss')!.addEventListener('click', () => (proposedBox.hidden = true));
+
+const songSuggest = wireSubjectSuggest({
+  root: document.getElementById('song-subjects')!,
+  kind: 'song',
+  /**
+   * The annotation is REQUIRED here, though the field itself is optional on a
+   * song (ADR 0009). Title + artist + album is exactly the thin signal that
+   * produces "jazz, 1950s, modal" — true, useless, and not what this taxonomy
+   * is for. A song's subjects on this site come from why it matters, and the
+   * only place that exists is what you wrote about it.
+   */
+  gather: () => {
+    const why = song.editor.getText().trim();
+    if (!why) {
+      return { missing: 'Say why this one first — a song’s subjects come from what you wrote about it, not from its genre.' };
+    }
+    const field = (n: string) => (songForm.elements.namedItem(n) as HTMLInputElement | null)?.value.trim() ?? '';
+    const heading = [field('title'), field('attribution')].filter(Boolean).join(' — ');
+    return { text: [heading, field('album'), '', why].filter((l, i) => l || i === 2).join('\n') };
+  },
+  readTags: () => tagsOf(songForm),
+  writeTags: (tags) => setSubjects(songForm, tags.join(', ')),
+  onStart: () => clearError(),
+  onError: (m) => showError(m),
+});
 
 // date: automatic unless the toggle is on
 const quoteDateToggle = document.getElementById('quote-date-toggle') as HTMLInputElement;
@@ -289,11 +306,12 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
       recomputeWorkScope();
       resetQuoteDate();
       refreshQuoteValid();
-      proposedBox.hidden = true;
+      quoteSuggest.reset();
     }
     if (type === 'song') {
       song.editor.commands.setContent('', { emitUpdate: false });
       document.getElementById('song-lookup')!.textContent = '';
+      songSuggest.reset();
     }
     // Nothing to be a member of yet — ticks queue until the first save. In a
     // composer context, pre-tick that constellation (the old data-place-in
@@ -335,7 +353,7 @@ document.addEventListener('fragment:edit', (e) => {
       workCombo.setValue(d.workId ?? '', d.workName ?? '');
       resetQuoteDate(d.occurredIso, d.datePrecision);
       refreshQuoteValid();
-      proposedBox.hidden = true;
+      quoteSuggest.reset();
     } else {
       setField(form, 'year', String(d.year));
       setField(form, 'title', d.title);
@@ -344,6 +362,7 @@ document.addEventListener('fragment:edit', (e) => {
       setField(form, 'album', d.details.album ?? '');
       song.editor.commands.setContent(d.body || '', { emitUpdate: false });
       document.getElementById('song-lookup')!.textContent = '';
+      songSuggest.reset();
     }
     toggleDelete(form, true);
     picker.setFragment(d.id, Array.isArray(d.constellationIds) ? d.constellationIds : []);

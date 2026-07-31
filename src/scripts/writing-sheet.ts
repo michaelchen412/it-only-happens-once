@@ -31,6 +31,7 @@ import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
+import { wireSubjectSuggest } from './subject-suggest';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -704,10 +705,13 @@ const pfHint = document.getElementById('pf-hint') as HTMLParagraphElement;
  *  <tag-input> custom element upgrades, and nothing orders that against this
  *  module. Cached at load time it would be null forever, and the preflight
  *  would quietly report "0 subjects" for a piece that has five. */
-const subjectCount = () => {
-  const field = form.elements.namedItem('subjects') as HTMLInputElement | null;
-  return (field?.value ?? '').split(',').filter((s) => s.trim()).length;
-};
+const subjectsField = () => form.elements.namedItem('subjects') as HTMLInputElement | null;
+const subjectList = () =>
+  (subjectsField()?.value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+const subjectCount = () => subjectList().length;
 
 function renderPreflight() {
   const { words, minutes } = measure();
@@ -738,10 +742,45 @@ document.getElementById('pf-constellations')?.addEventListener('click', () => {
   tabs.select('constellations');
 });
 
+// ---- AI subject suggestions (docs/plans/02) ----
+// In the publish dialog, because that's where writing subjects are edited —
+// and it puts the fix beside the complaint: the preflight above says "no
+// subjects — it won't appear under any of them", and this is the button that
+// answers it. Explicit press, never automatic: it's a paid call, and this
+// dialog's whole contract is instruments that never act on their own.
+const subjectsSuggest = wireSubjectSuggest({
+  root: document.getElementById('ws-subjects')!,
+  kind: 'writing',
+  gather: () => {
+    const title = titleField.value.trim();
+    const body = getMarkdown().trim();
+    if (!title && !body) return { missing: 'Write something first — there’s nothing to read yet.' };
+    // The WHOLE essay, not an opening slice. Measured against the corpus on
+    // 2026-07-31: 51 pieces, median 6,107 characters, longest 14,131, none over
+    // the action's 20,000 cap. So sending "title + first N words" would truncate
+    // the top decile to save nothing. The slice below is a guard, not a budget.
+    return { text: `${title}\n\n${body}`.slice(0, 20_000) };
+  },
+  readTags: subjectList,
+  writeTags: (tags) => {
+    setSubjects(tags.join(', '));
+    // TagInput writes its hidden field directly and fires no `input` event, so
+    // without this the chips would still read "0 subjects" and the hint would
+    // still be complaining about the subjects now sitting above it.
+    renderPreflight();
+  },
+  onStart: () => (dialogError.hidden = true),
+  onError: (m) => {
+    dialogError.textContent = m;
+    dialogError.hidden = false;
+  },
+});
+
 let dialogMode: 'publish' | 'details' = 'publish';
 function openDialog(mode: 'publish' | 'details') {
   dialogMode = mode;
   dialogError.hidden = true;
+  subjectsSuggest.reset(); // a proposal from the last piece must not linger
   dialogTitle.textContent = mode === 'publish' ? 'Publish this piece' : 'Post details';
   dialogSub.textContent =
     mode === 'publish' ? 'A few last details, then it goes live.' : 'Update the metadata for this published piece.';
