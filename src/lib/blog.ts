@@ -213,20 +213,50 @@ export async function listQuotes(
   return { items, total, page, pageCount: Math.max(1, Math.ceil(total / QUOTES_PAGE_SIZE)) };
 }
 
-/** A single published essay by slug, with its subjects. `null` if not found. */
-export async function getWritingBySlug(supabase: DB, slug: string): Promise<WritingItem | null> {
-  const { data: r } = await supabase
+/** The tier a piece is in. Only the single-post fetch below reports it — every
+ *  other query in this file is published-only by construction. */
+export type WritingStatus = 'note' | 'draft' | 'published';
+
+/** A single essay plus the one thing the permalink page needs that a feed card
+ *  never does: whether what you're looking at is actually public. */
+export interface WritingPost extends WritingItem {
+  status: WritingStatus;
+}
+
+/**
+ * A single essay by slug, with its subjects. `null` if not found.
+ *
+ * `includeUnpublished` drops the app-side status filter so the admin can preview
+ * a draft (or a note) on its real public page — the constellation precedent
+ * (`getConstellation`), finally extended to essays (docs/plans/01).
+ *
+ * It is NOT the trust boundary; RLS is. `fragments_select_published` still
+ * limits anon and any non-admin session to published rows, so passing `true`
+ * for the wrong viewer widens nothing — it just stops narrowing something the
+ * database was already narrowing. Trashed pieces stay out either way, and the
+ * feed/related/adjacent queries above are deliberately untouched: a draft is
+ * reachable by direct URL only, never listed.
+ */
+export async function getWritingBySlug(
+  supabase: DB,
+  slug: string,
+  opts: { includeUnpublished?: boolean } = {}
+): Promise<WritingPost | null> {
+  let query = supabase
     .from('fragments')
-    .select('id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug))')
+    .select('id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug))')
     .eq('type', 'writing')
-    .eq('status', 'published')
     .is('deleted_at', null)
-    .eq('slug', slug)
-    .maybeSingle();
+    .eq('slug', slug);
+  // `fragments.slug` is UNIQUE across every type, so this stays a single row.
+  if (!opts.includeUnpublished) query = query.eq('status', 'published');
+
+  const { data: r } = await query.maybeSingle();
   if (!r) return null;
 
   const lede = (r.excerpt ?? '').trim() || excerpt(r.body, 400);
   return {
+    status: r.status,
     id: r.id,
     slug: r.slug,
     title: r.title || '(untitled)',

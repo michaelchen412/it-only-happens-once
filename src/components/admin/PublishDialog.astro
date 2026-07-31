@@ -61,6 +61,34 @@ const { formId, subjectNames } = Astro.props;
       <TagInput name="subjects" label="Subjects" suggestions={subjectNames} form={formId} placeholder="Add a subject…" />
     </label>
 
+    {/* Preflight (docs/plans/06) — instruments, never gates. It borrows the
+        constellation composer's grammar exactly, so the two rooms feel like one
+        building: the number is always a neutral chip, the judgement is one
+        off-band hint line, and NOTHING here can stop Publish. If a signal ever
+        turns red or disables the button, this has become the wrong feature.
+
+        Writing only, for now: a quote has almost no way to be incomplete, and
+        four permanently-green chips would just teach you to stop reading them. */}
+    <div class="flex flex-col gap-2 border-t border-base-300 pt-4">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="admin-stat">
+          <b class="admin-stat__n" id="pf-words">0</b><span class="admin-stat__label">words</span>
+        </span>
+        <span class="admin-stat">
+          <b class="admin-stat__n" id="pf-mins">1</b><span class="admin-stat__label">min read</span>
+        </span>
+        <span class="admin-stat">
+          <b class="admin-stat__n" id="pf-subjects">0</b><span class="admin-stat__label">subjects</span>
+        </span>
+        {/* The only actionable one: the picker is already a tab in the sheet,
+            so this jumps there rather than duplicating it in here. */}
+        <button type="button" id="pf-constellations" class="admin-stat admin-stat--action" title="Open the Constellations tab">
+          <b class="admin-stat__n" id="pf-cn">0</b><span class="admin-stat__label">constellations</span>
+        </button>
+      </div>
+      <p id="pf-hint" hidden class="admin-hint"></p>
+    </div>
+
     <p id="dialog-error" hidden role="alert" class="admin-alert"></p>
 
     <div class="mt-1 flex items-center justify-end gap-2">

@@ -25,6 +25,7 @@
 import { mountRichEditor } from './rich-editor';
 import { actions } from 'astro:actions';
 import { slugify } from '../lib/slug';
+import { countWords, minutesForWords } from '../lib/reading';
 import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
@@ -79,6 +80,35 @@ function setStatusNote(msg: string) {
   statusText.classList.add('text-warning');
 }
 
+// ---- live signals: how long is this (docs/plans/06) ----
+// Counted from TipTap's own plain text, not from the serialized Markdown, so
+// typing doesn't pay for a Markdown round-trip 200ms at a time. The ARITHMETIC
+// is shared with the public read time (../lib/reading) — that module exists
+// precisely so these two can't drift into disagreeing about the same piece.
+const countEl = document.getElementById('ws-count') as HTMLElement;
+
+function measure(): { words: number; minutes: number } {
+  const words = countWords(editor.getText({ blockSeparator: ' ' }));
+  return { words, minutes: minutesForWords(words) };
+}
+
+function renderCount() {
+  const { words, minutes } = measure();
+  countEl.hidden = words === 0; // an empty sheet shouldn't announce "0 words · 1 min"
+  // The trailing separator belongs to the count, so the status text beside it
+  // stays a plain sentence: "1,240 words · 6 min · Saved 14:32".
+  countEl.textContent = `${words === 1 ? '1 word' : `${words.toLocaleString()} words`} · ${minutes} min ·`;
+}
+
+let countTimer: number | undefined;
+function scheduleCount() {
+  clearTimeout(countTimer);
+  countTimer = window.setTimeout(renderCount, 250);
+}
+// Its own listener rather than a line inside onEdit(): length is not a save
+// concern, and it should keep updating in states where saving is paused.
+editor.on('update', scheduleCount);
+
 // ---- publish-state bar toggle ----
 const draftActions = document.getElementById('ws-actions-draft')!;
 const publishedActions = document.getElementById('ws-actions-published')!;
@@ -121,9 +151,23 @@ function reflectStatus() {
   versionsTab.hidden = !(isPublished() && serverHasRow);
   updateDirtyUI();
 }
+/**
+ * The permalink button. Published pieces get "View"; drafts and notes get
+ * "Preview" pointing at the SAME url — plan 01 made /blog/[slug] render an
+ * unpublished piece for an admin session, so there is no separate preview route
+ * to send them to, and that is the point: what you check is what ships.
+ *
+ * Hidden until the row exists on the server. The slug is auto-filled from the
+ * title as you type, so before the first save this would be a link to a piece
+ * the database has never heard of — a 404 with your name on it.
+ */
 function updateViewLink(slug: string) {
-  viewLink.hidden = !(isPublished() && slug);
-  if (slug) viewLink.href = `/blog/${slug}`;
+  const show = !!slug && serverHasRow;
+  viewLink.hidden = !show;
+  if (!show) return;
+  viewLink.href = `/blog/${slug}`;
+  viewLink.textContent = isPublished() ? 'View ↗' : 'Preview ↗';
+  viewLink.title = isPublished() ? '' : 'Opens the real public page — only you can see it until it’s published';
 }
 
 /**
@@ -292,8 +336,8 @@ async function doSave(status: string, opts: { silentEmpty?: boolean }): Promise<
     deleteBtn.hidden = false;
   }
   if (!slugTouched && data.slug) slugField.value = data.slug;
-  updateViewLink(data.slug ?? slugField.value);
   savedStatus = status;
+  updateViewLink(data.slug ?? slugField.value); // after savedStatus: it picks View vs Preview from it
   everSaved = true;
   dirty = false;
   reflectStatus();
@@ -471,6 +515,7 @@ function populate(d: Loaded | null) {
   statusText.classList.remove('text-error', 'text-warning');
   statusText.textContent = isPublished() ? 'Up to date' : isNote() ? 'A note — autosaves, never public' : 'Autosaves as you write';
   spinner.hidden = true;
+  renderCount(); // setContent above emits no update, so measure it directly
   updateViewLink(d?.slug ?? '');
   const memberIds = d?.constellationIds ?? [];
   picker.setFragment(d?.id ?? null, memberIds);
@@ -599,6 +644,55 @@ const dialogSub = document.getElementById('dialog-sub')!;
 const dialogConfirm = document.getElementById('dialog-confirm') as HTMLButtonElement;
 const dialogError = document.getElementById('dialog-error') as HTMLParagraphElement;
 
+// ---- publish preflight (docs/plans/06) ----
+// What the piece is missing, said once, where you can act on it. Every one of
+// these is an instrument: none disables Publish, none turns red, and the
+// judgement is confined to a single hint line — the contract the constellation
+// composer's gauges already keep.
+const pfWords = document.getElementById('pf-words')!;
+const pfMins = document.getElementById('pf-mins')!;
+const pfSubjects = document.getElementById('pf-subjects')!;
+const pfCn = document.getElementById('pf-cn')!;
+const pfHint = document.getElementById('pf-hint') as HTMLParagraphElement;
+/** TagInput's hidden field — comma-joined, associated with the form by id.
+ *  Looked up on every read, never cached: that input doesn't exist until the
+ *  <tag-input> custom element upgrades, and nothing orders that against this
+ *  module. Cached at load time it would be null forever, and the preflight
+ *  would quietly report "0 subjects" for a piece that has five. */
+const subjectCount = () => {
+  const field = form.elements.namedItem('subjects') as HTMLInputElement | null;
+  return (field?.value ?? '').split(',').filter((s) => s.trim()).length;
+};
+
+function renderPreflight() {
+  const { words, minutes } = measure();
+  const subjects = subjectCount();
+  const constellations = cnPanel.querySelectorAll('.cn-check:checked').length;
+  pfWords.textContent = words.toLocaleString();
+  pfMins.textContent = String(minutes);
+  pfSubjects.textContent = String(subjects);
+  pfCn.textContent = String(constellations);
+
+  // Ordered cheapest-to-fix first, and phrased as consequence rather than
+  // instruction — "won't appear under any of them", not "add subjects".
+  const notes: string[] = [];
+  if (!excerptField.value.trim()) notes.push('no excerpt — the card will use the opening of the piece');
+  if (subjects === 0) notes.push('no subjects — it won’t appear under any of them in the Index');
+  if (constellations === 0) notes.push('not placed in any constellation');
+  pfHint.textContent = notes.join(' · ');
+  pfHint.hidden = notes.length === 0;
+}
+
+// TagInput writes its hidden field directly and fires no `input` event, so
+// watching the form isn't enough: a committed chip would go uncounted. keyup
+// catches Enter/Backspace, click catches the ✕. All three are idempotent.
+for (const ev of ['input', 'keyup', 'click']) dialog.addEventListener(ev, renderPreflight);
+
+document.getElementById('pf-constellations')?.addEventListener('click', () => {
+  dialog.close(); // the picker is a tab in the sheet behind this dialog
+  tabs.select('constellations');
+});
+
 let dialogMode: 'publish' | 'details' = 'publish';
 function openDialog(mode: 'publish' | 'details') {
   dialogMode = mode;
@@ -607,6 +701,7 @@ function openDialog(mode: 'publish' | 'details') {
   dialogSub.textContent =
     mode === 'publish' ? 'A few last details, then it goes live.' : 'Update the metadata for this published piece.';
   dialogConfirm.textContent = mode === 'publish' ? 'Publish now' : 'Save details';
+  renderPreflight();
   dialog.showModal();
 }
 document.getElementById('ws-open-publish')?.addEventListener('click', () => openDialog('publish'));

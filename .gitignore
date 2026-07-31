@@ -21,6 +21,13 @@ docs/plans/
 # dependencies
 node_modules/
 
+# Playwright — the e2e harness. `.auth/` holds a REAL admin session minted for
+# the test run (see tests/e2e/auth.setup.ts); it is a live credential and must
+# never be committed. `fixtures.json` names rows discovered in the live DB.
+tests/e2e/.auth/
+test-results/
+playwright-report/
+
 # logs
 npm-debug.log*
 yarn-debug.log*

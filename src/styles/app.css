@@ -1131,6 +1131,19 @@ html.reader-open .sky-return {
 .admin-stat__label {
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
 }
+/* A stat you can act on — the publish preflight's constellations chip opens the
+   tab that would change the number. Still reads as a chip, not a button: the
+   count is the point, and the affordance only shows up under the cursor. */
+.admin-stat--action {
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.admin-stat--action:hover {
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 45%, transparent);
+}
 
 /* Field label + helper text for admin forms. */
 .admin-label {

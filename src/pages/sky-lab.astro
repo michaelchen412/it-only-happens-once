@@ -18,7 +18,7 @@ import Base from '../layouts/Base.astro';
 import Label from '../components/Label.astro';
 import Reader from '../components/Reader.astro';
 import PostArticle from '../components/PostArticle.astro';
-import { getWritingBySlug, type WritingItem } from '../lib/blog';
+import { getWritingBySlug, type WritingPost } from '../lib/blog';
 
 if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
@@ -29,7 +29,7 @@ const [forgiveness, regret, oppression] = await Promise.all([
   getWritingBySlug(supabase, 'regret'),
   getWritingBySlug(supabase, 'oppression'),
 ]);
-const essays = [forgiveness, regret, oppression].filter((w): w is WritingItem => !!w);
+const essays = [forgiveness, regret, oppression].filter((w): w is WritingPost => !!w);
 const essayBySlug = new Map(essays.map((w) => [w.slug, w]));
 
 // ── the suite: real published fragments, composed (not sorted) ─────────────

@@ -9,6 +9,7 @@
 // output in `.reading` so it picks up the article typography from app.css.
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
+import { countWords, minutesForWords } from './reading';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -73,10 +74,9 @@ export function excerpt(md: string | null | undefined, max = 400): string {
   return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—–-]+$/, '') + '…';
 }
 
-/** Estimated minutes to read a Markdown body, at ~220 wpm (min 1). */
+/** Estimated minutes to read a Markdown body, at ~220 wpm (min 1). The rule
+ *  itself lives in ./reading, dependency-free, so the writing composer's live
+ *  gauge can share it without pulling this module into the client bundle. */
 export function readingMinutes(md: string | null | undefined): number {
-  const text = toPlainText(md);
-  if (!text) return 1;
-  const words = text.split(/\s+/).length;
-  return Math.max(1, Math.round(words / 220));
+  return minutesForWords(countWords(toPlainText(md)));
 }

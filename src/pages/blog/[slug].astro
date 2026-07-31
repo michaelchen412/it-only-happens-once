@@ -6,18 +6,40 @@
   crawlable, and a no-JS fallback. The footer offers a way back into the Index,
   filtered to the subjects the piece touches. (Constellations, once they exist,
   will join this footer — the "this piece lives in" pattern.)
+
+  It is also the DRAFT PREVIEW (docs/plans/01). An admin session renders an
+  unpublished piece here rather than the 404 everyone else gets, so a piece can
+  be read exactly as it will ship before it ships. Two things hold that up and
+  neither is optional:
+
+   · RLS decides what can be read. The admin check below only chooses whether to
+     ask for unpublished rows; `fragments_select_published` is what stops anyone
+     else receiving one.
+   · A preview must never enter a shared cache. The published branch opts this
+     route into 60s of CDN caching, so the preview branch has to opt back out
+     explicitly — a draft cached at the edge would be served to the public by a
+     machine that has no idea whose session produced it.
 */
 import { Icon } from 'astro-icon/components';
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import PostArticle from '../../components/PostArticle.astro';
+import PreviewBar from '../../components/PreviewBar.astro';
 import { getWritingBySlug } from '../../lib/blog';
 import { toPlainText } from '../../lib/markdown';
 
 const { slug } = Astro.params;
-const item = slug ? await getWritingBySlug(Astro.locals.supabase, slug) : null;
+const isAdmin = Astro.locals.user?.app_metadata?.role === 'admin';
+const item = slug ? await getWritingBySlug(Astro.locals.supabase, slug, { includeUnpublished: isAdmin }) : null;
+
+// Anything not published is a preview — drafts and notes alike. One rule, so a
+// tier added later can't quietly fall through to the public cache branch.
+const preview =
+  item && item.status !== 'published' ? { status: item.status, editHref: `/admin#edit=${item.id}` } : null;
 
 if (!item) {
   Astro.response.status = 404;
+} else if (preview) {
+  Astro.response.headers.set('Cache-Control', 'private, no-store');
 } else {
   Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 }
@@ -26,6 +48,7 @@ const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
 ---
 
 <SiteLayout title={item ? item.title : 'Not found'} active="blog" description={description}>
+  {preview && <PreviewBar status={preview.status} editHref={preview.editHref} />}
   {
     !item ? (
       <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">

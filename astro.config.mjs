@@ -17,7 +17,7 @@ export default defineConfig({
   integrations: [
     icon({
       include: {
-        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up', 'arrow-up-right', 'arrow-down', 'funnel', 'trash', 'plus', 'pencil-simple', 'sun', 'moon', 'moon-stars', 'list', 'stack', 'books', 'user-circle', 'image', 'note'],
+        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up', 'arrow-up-right', 'arrow-down', 'funnel', 'trash', 'plus', 'pencil-simple', 'sun', 'moon', 'moon-stars', 'list', 'stack', 'books', 'user-circle', 'image', 'note', 'eye'],
         'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel'],
       },
     }),
@@ -37,7 +37,15 @@ export default defineConfig({
       // either package back: 2.17.6 is the fix for GHSA-jxwj-j7wr-gfrw
       // (mutation-XSS via <textarea>/<xmp>) and its escaping assumes
       // htmlparser2 >= 11 decodes entities inside <textarea>.
-      noExternal: ['sanitize-html'],
+      //
+      // BUILD ONLY, and the asymmetry is the point. `astro dev` has no Rollup
+      // pass: Vite hands the module to its dev SSR runtime instead, which gives
+      // CommonJS no `require` — so bundling it there turned every page that
+      // renders Markdown into a 500 (`require is not defined`, sanitize-html
+      // index.js:1). Dev doesn't need the fix anyway: it runs on local Node,
+      // which supports require(esm) natively. Left external in dev, bundled in
+      // build, each environment gets the form it can actually execute.
+      noExternal: process.env.NODE_ENV === 'production' ? ['sanitize-html'] : [],
     },
   },
   fonts: [
