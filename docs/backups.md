@@ -40,6 +40,19 @@ Design notes, so this isn't re-derived later:
 - The **JSON fidelity export** (human-triggered, re-importable, includes
   positions and pages) is [plan 05 Piece 2](plans/05-export-backup.md) — not
   built yet.
-- The **`content/` markdown mirror** (readable-in-fifty-years copy, versioned
-  in this repo's git) is [plan 09 Piece 3](plans/09-offline-and-notes.md) —
-  not built yet.
+- The **`content/` markdown mirror** — a two-way copy of the corpus as files,
+  with a `push` script to write them back — was **cancelled on 2026-07-31 and
+  should not be re-proposed.** Two of its four justifications had shipped as
+  separate work by then (backup here, revision history as plan 07's
+  `fragment_versions`), a third contradicted the admin's whole purpose, and
+  `push` would have been a second write path into the corpus alongside the
+  actions. It also created a sync problem — two representations that can both
+  change — which is the same shape as the offline problem
+  [ADR 0010](adr/0010-online-first-writing.md) had just removed, and this repo
+  being public made a mirror of drafts and notes an outright hazard.
+
+  **What it would have closed, and the cheap way to close it:** `data.sql` holds
+  the prose as SQL `INSERT` statements — recoverable, since it's a text file,
+  but not readable as prose. If that ever matters, write a **one-way** export:
+  published pieces to `.md`, no `push`, no entry ramp, no second write path. An
+  afternoon, and no architecture.
