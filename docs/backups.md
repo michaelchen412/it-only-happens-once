@@ -29,9 +29,17 @@ Design notes, so this isn't re-derived later:
 
 ## What the dump does not cover
 
-- **Storage objects** — the About portrait today; essay images if
-  [plan 03](plans/03-images-in-essays.md) ships. Only their metadata rows are
-  in the dump. Revisit when the bucket holds more than one file.
+- **Storage objects** — and this stopped being hypothetical on 2026-07-31, when
+  [plan 03](plans/03-images-in-essays.md) shipped and essays could contain
+  pictures. `pg_dump` captures the metadata rows in `storage.objects`, **not the
+  bytes**. So an essay's prose is backed up nightly and its images are not: lose
+  the Supabase project and every picture goes with it, leaving posts that
+  reference files nobody has.
+  **This is the one real hole in the safety story.** It was tolerable at one
+  portrait. It stops being tolerable at whatever number of essay images makes
+  you wince — the fix is a sync of the `site` bucket into the backups repo
+  (`supabase storage cp -r`, or the S3-compatible endpoint), which is small and
+  currently unbuilt.
 - **Auth users** (Supabase-managed schema). One admin user; re-creating it is
   a dashboard task, documented in [auth.md](auth.md).
 

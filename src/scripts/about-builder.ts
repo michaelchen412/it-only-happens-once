@@ -5,10 +5,10 @@
 // movement has its own TipTap body (the shared editor supports multiple
 // instances). The portrait uploads to the public `site` bucket using the admin's
 // browser session (RLS enforces is_admin()). No autosave — About is always live.
-import { createBrowserClient } from '@supabase/ssr';
 import { actions } from 'astro:actions';
 import { mountRichEditor, type RichEditorHandle } from './rich-editor';
 import { formatActionError, nowTime } from './action-error';
+import { uploadImage } from './upload';
 
 const init = JSON.parse(document.getElementById('about-init')!.textContent || '{}');
 
@@ -52,46 +52,44 @@ const siteEditor = mountRichEditor({
 $('about-form').addEventListener('input', markDirty);
 
 // ---- portrait upload (browser session → site bucket, RLS = is_admin) ----
-const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
 const portraitInput = $('portrait-input') as HTMLInputElement;
 const portraitPath = $('portrait-path') as HTMLInputElement;
 const portraitPreview = $('portrait-preview') as HTMLImageElement;
 const portraitPlaceholder = $('portrait-placeholder');
 const portraitRemove = $('portrait-remove') as HTMLButtonElement;
 
-function extFor(file: File): string {
-  const byType: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'image/avif': 'avif',
-  };
-  if (byType[file.type]) return byType[file.type];
-  const m = file.name.match(/\.([a-zA-Z0-9]+)$/);
-  return m ? m[1].toLowerCase() : 'img';
-}
-
+// Shares scripts/upload.ts with the essay composer (docs/plans/03) rather than
+// keeping its own copy. That matters now that the bucket enforces a mime
+// allowlist and a size cap: the helper rejects an unsupported file with a
+// sentence you can act on, where the raw upload would have come back with
+// whatever the storage API says. It also downscales, so a 12MP portrait stops
+// being a 5MB page load.
+//
+// The fixed path is why `pathFor` ignores the content hash: there is exactly
+// one portrait, and replacing it must overwrite rather than accumulate.
 portraitInput.addEventListener('change', async () => {
   const file = portraitInput.files?.[0];
   if (!file) return;
-  const path = `about/portrait.${extFor(file)}`;
   statusText.textContent = 'Uploading photo…';
   spinner.hidden = false;
-  const { error } = await supabase.storage.from('site').upload(path, file, { upsert: true, contentType: file.type });
-  spinner.hidden = true;
-  if (error) {
-    showError('Photo upload failed: ' + error.message);
-    return;
+  try {
+    const { path, url } = await uploadImage(file, {
+      pathFor: (_hash, ext) => `about/portrait.${ext}`,
+      upsert: true,
+    });
+    portraitPath.value = path;
+    // Cache-buster: the path is stable, so the browser would show the old one.
+    portraitPreview.src = `${url}?v=${Date.now()}`;
+    portraitPreview.classList.remove('hidden');
+    portraitPlaceholder.classList.add('hidden');
+    portraitRemove.classList.remove('hidden');
+    markDirty();
+  } catch (e) {
+    showError(e instanceof Error ? e.message : 'Photo upload failed.');
+  } finally {
+    spinner.hidden = true;
+    portraitInput.value = '';
   }
-  const { data } = supabase.storage.from('site').getPublicUrl(path);
-  portraitPath.value = path;
-  portraitPreview.src = data.publicUrl + '?v=' + Date.now();
-  portraitPreview.classList.remove('hidden');
-  portraitPlaceholder.classList.add('hidden');
-  portraitRemove.classList.remove('hidden');
-  portraitInput.value = '';
-  markDirty();
 });
 
 portraitRemove.addEventListener('click', () => {

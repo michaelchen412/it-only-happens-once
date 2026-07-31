@@ -8,6 +8,7 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
 
 export interface RichEditorHandle {
@@ -31,19 +32,96 @@ export interface RichEditorOptions {
   ariaLabel?: string;
   /** Called on every document change (the caller decides what to do). */
   onChange?: () => void;
+  /**
+   * Enables images (docs/plans/03). Omit and there is no image node at all —
+   * the toolbar button, paste and drop all stay off, which is what the quote
+   * and song editors want.
+   */
+  images?: ImageSupport;
+}
+
+export interface ImageSupport {
+  /** Put the file somewhere public and return its URL. See scripts/upload.ts. */
+  upload(file: File): Promise<string>;
+  /** Ask for alt text. Resolve '' for "no alt"; the caller decides the UI. */
+  askAlt?(current: string): Promise<string | null>;
+  /** In-flight notice, then null. Uploads are slow enough to need one. */
+  onStatus?(message: string | null): void;
+  onError?(message: string): void;
+}
+
+/**
+ * Upload FIRST, insert on success — deliberately not the usual optimistic
+ * placeholder.
+ *
+ * A placeholder means a `blob:` URL sits in the document while the upload runs,
+ * and this editor autosaves 1.2s after you stop typing. That save would write
+ * `![](blob:…)` into the database, where it is meaningless — and the public
+ * sanitizer only permits http/https/data for `img`, so it would render as
+ * nothing at all. Waiting keeps every state of the document a valid one.
+ */
+async function insertImages(editor: Editor, files: File[], img: ImageSupport) {
+  if (!files.length) return;
+  // Deliberately NOT filtered to image/* here. `upload` is the one validator,
+  // and it explains itself — filtering first meant choosing a PDF from the
+  // picker did nothing at all, with no error and no upload. Paste and drop do
+  // filter, because there silence is right: a non-image belongs to
+  // ProseMirror's default handler, not to an error message.
+  img.onStatus?.(files.length > 1 ? `Uploading ${files.length} images…` : 'Uploading image…');
+  try {
+    for (const file of files) {
+      const src = await img.upload(file);
+      const alt = img.askAlt ? ((await img.askAlt('')) ?? '') : '';
+      editor.chain().focus().setImage({ src, alt }).run();
+    }
+  } catch (e) {
+    img.onError?.(e instanceof Error ? e.message : String(e));
+  } finally {
+    img.onStatus?.(null);
+  }
 }
 
 export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
+  const img = opts.images;
   const editor = new Editor({
     element: opts.editorEl,
     extensions: [
       StarterKit,
       Markdown.configure({ transformPastedText: true, transformCopiedText: true }),
       Placeholder.configure({ placeholder: opts.placeholder ?? 'Start writing…' }),
+      // `inline: false` — an image is its own block, which is what
+      // `![alt](src)` round-trips to and what the reading column wants.
+      ...(img ? [Image.configure({ inline: false, allowBase64: false })] : []),
     ],
     content: opts.content || '',
     editorProps: {
       attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Body' },
+      // Paste and drop are the affordances that actually matter for writing —
+      // a screenshot goes ⌘V, not through a file picker. Returning true claims
+      // the event so ProseMirror doesn't also insert the file's name as text.
+      handlePaste: img
+        ? (_view, event) => {
+            const files = Array.from(event.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/'));
+            if (!files.length) return false;
+            event.preventDefault();
+            void insertImages(editor, files, img);
+            return true;
+          }
+        : undefined,
+      handleDrop: img
+        ? (_view, event, _slice, moved) => {
+            // `moved` means a node is being dragged WITHIN the document — that's
+            // ProseMirror's job, not ours.
+            if (moved) return false;
+            const files = Array.from((event as DragEvent).dataTransfer?.files ?? []).filter((f) =>
+              f.type.startsWith('image/'),
+            );
+            if (!files.length) return false;
+            event.preventDefault();
+            void insertImages(editor, files, img);
+            return true;
+          }
+        : undefined,
     },
   });
   const getMarkdown = () => (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
@@ -65,6 +143,41 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
     hr: () => editor.chain().focus().setHorizontalRule().run(),
     link: () => openLinkDialog(),
   };
+
+  if (img) {
+    // A throwaway input rather than markup: nothing else needs to know this
+    // exists, and `accept="image/*"` is what makes iOS offer the camera —
+    // which is the capture path a phone actually wants.
+    cmds.image = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.addEventListener('change', () => {
+        const files = Array.from(input.files ?? []);
+        if (files.length) void insertImages(editor, files, img);
+      });
+      input.click();
+    };
+
+    // "Editable after": click an image to revise its alt text. The position is
+    // resolved BEFORE awaiting the prompt — opening a <dialog> moves focus, and
+    // resolving afterwards would risk pointing at whatever is selected then.
+    // It also distinguishes two copies of the same picture, which
+    // content-addressed paths make likely rather than exotic.
+    if (img.askAlt) {
+      opts.editorEl.addEventListener('click', (e) => {
+        const el = (e.target as HTMLElement)?.closest?.('img');
+        if (!el) return;
+        const pos = editor.view.posAtDOM(el, 0);
+        if (pos < 0) return;
+        void img.askAlt!(el.getAttribute('alt') ?? '').then((next) => {
+          if (next === null) return;
+          editor.chain().focus().setNodeSelection(pos).updateAttributes('image', { alt: next }).run();
+        });
+      });
+    }
+  }
   const btns = Array.from(opts.toolbarRoot.querySelectorAll<HTMLButtonElement>('.tt-btn'));
   btns.forEach((b) => b.addEventListener('click', () => cmds[b.dataset.cmd!]?.()));
 

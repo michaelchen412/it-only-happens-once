@@ -22,7 +22,7 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Trash** | `/admin?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
 | **Song quick-editor** | slide-over, any admin page | Light: paste a Spotify track or album link → title/art/embed auto-fill; artist/album/year, subjects with **✦ Suggest with AI** (which needs the annotation — §8), and **"Why this one"** — the annotation that leads the public stanza (§6). **Publishes on save** (like quotes); unpublish via the list. |
-| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body, excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin#edit=<id>` / `#new-writing`, which auto-open the sheet. |
+| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin#edit=<id>` / `#new-writing`, which auto-open the sheet. |
 | **Constellations index** | `/admin/constellations` | Every constellation, draft + published: create (a "pile" is just a draft), publish/unpublish, reorder the sky's authored order, delete (placements cascade; fragments untouched). |
 | **The composer** | `/admin/constellations/[id]` | The composing room (design.md §13): the suite in two views over one sequence — **Compose** (dense rows; drag or Alt+↑/↓ to reorder, ✕ unplaces) and **Read** (the public stanzas verbatim, drafts included) — plus the constellation's name/slug/colour/status/description/score, the three tests as quiet gauges, Preview → the real public page (drafts render for the admin only). One **Add** button opens the fragment browser. |
 | **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite. |
@@ -175,6 +175,58 @@ piece, which is the whole shape of this site. See
   `constellationStatus` in [`_shared.ts`](../src/actions/_shared.ts). One shared
   list would have allowed "a constellation that is a note" and failed only at the
   database.
+
+## 5c. Images in essays
+
+**Until 2026-07-31 a blog post physically could not contain a picture** — the
+render path had allowlisted `img` all along, but there was no way to get one in.
+See [plan 03](plans/03-images-in-essays.md).
+
+Three ways in, all landing in the same place: the toolbar's **▣** button, a
+**paste** (which is what a screenshot actually is), and **drag-and-drop**. The
+file picker uses `accept="image/*"`, which is what makes iOS offer the camera.
+
+**What happens to a file**, in [`src/scripts/upload.ts`](../src/scripts/upload.ts):
+validated → downscaled to a 1600px long edge → hashed → uploaded with the
+**signed-in browser session** (anon key + storage RLS `is_admin()` — not a
+service-role path, and it must not become one) → the public URL is inserted as
+ordinary `![alt](url)` markdown. The About portrait uses the same helper, so
+both uploaders share one set of rules.
+
+- **Path:** `essays/{fragmentId}/{contentHash}.{ext}`. Keyed on the **id**, not
+  the slug: ids are minted client-side so this works before a piece has ever
+  been saved, renaming never moves files, and a future orphan sweep is just
+  "list the prefixes, compare to live fragment ids".
+- **Upload-then-insert, not an optimistic placeholder.** A placeholder means a
+  `blob:` URL sits in the document, and this editor autosaves 1.2s after you
+  stop typing — that save would write `![](blob:…)` to the database, where it
+  means nothing. Waiting keeps every state of the document a valid one.
+- **Alt text** is prompted on insert and editable by clicking the image. It is
+  *not* a gate: empty is a legitimate answer for a decorative image, and
+  refusing to insert without it only teaches people to type "image".
+- **Captions** have no custom node. An italic line straight after an image is
+  styled as one (`.reading img + p em:only-child`) — plain markdown, and the
+  round-trip stays intact.
+- **No SVG**, enforced twice: `upload.ts` refuses it by name, and the bucket's
+  mime allowlist refuses it server-side. An SVG can carry script, and these
+  objects get public URLs on our own origin.
+
+**Two properties of the bucket worth knowing**, both verified live on
+2026-07-31:
+
+1. **`site` is public, so an image is readable by URL even when the essay
+   embedding it is still a draft or a note.** The paths are unguessable
+   (fragment uuid + content hash) and that is the entire protection. The
+   alternative — a private bucket with signed URLs — would put an expiry on
+   every image in every published essay, so this is the right trade, but it is a
+   trade.
+2. **Deleting an image does not immediately stop it being served.** Public
+   objects come back `cache-control: public, max-age=3600` through Cloudflare;
+   a probe object still returned 200 (`cf-cache-status: HIT`) after its row was
+   gone. Up to an hour, a removed picture is still out there.
+
+**Not backed up.** The nightly dump captures `storage.objects` metadata, not the
+bytes — see [backups.md](backups.md).
 
 ## 6. Songs — what auto-fills, what doesn't
 

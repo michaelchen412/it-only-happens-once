@@ -1,0 +1,59 @@
+// Drives AltTextDialog.astro — the "what does this picture show" prompt.
+//
+// Returns a function the editor can await. Three outcomes, and they're
+// genuinely different:
+//   'Save description' → the trimmed text
+//   'Leave empty'      → '' (an explicit choice; a decorative image is alt="")
+//   Escape / backdrop  → null, meaning "don't change anything"
+// The editor relies on that distinction: null on insert means empty, but null
+// when re-editing means leave the existing description alone.
+export type AskAlt = (current: string) => Promise<string | null>;
+
+export function wireAltDialog(dialog: HTMLDialogElement): AskAlt {
+  const field = dialog.querySelector('.alt-text') as HTMLInputElement;
+  const apply = dialog.querySelector('.alt-apply') as HTMLButtonElement;
+  const skip = dialog.querySelector('.alt-skip') as HTMLButtonElement;
+  let resolveCurrent: ((v: string | null) => void) | null = null;
+
+  const close = (how: string) => {
+    dialog.returnValue = how;
+    dialog.close();
+  };
+  apply.addEventListener('click', () => close('apply'));
+  skip.addEventListener('click', () => close('skip'));
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close(); // backdrop → cancel
+  });
+  field.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      close('apply');
+    }
+  });
+  // Fires for the buttons AND for Escape, where returnValue stays '' → null.
+  dialog.addEventListener('close', () => {
+    const done = resolveCurrent;
+    resolveCurrent = null;
+    done?.(dialog.returnValue === 'apply' ? field.value.trim() : dialog.returnValue === 'skip' ? '' : null);
+  });
+
+  // One dialog element, so prompts take turns — pasting three images at once
+  // would otherwise clobber the visible text and strand the first promise.
+  // Same reasoning as confirm-dialog.ts.
+  let queue: Promise<unknown> = Promise.resolve();
+  return (current) => {
+    const run = queue.then(
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveCurrent = resolve;
+          field.value = current;
+          dialog.returnValue = '';
+          dialog.showModal();
+          field.focus();
+          field.select();
+        }),
+    );
+    queue = run.catch(() => {});
+    return run;
+  };
+}

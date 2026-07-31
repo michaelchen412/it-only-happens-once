@@ -23,6 +23,7 @@ import EditorToolbar from './EditorToolbar.astro';
 import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
 import LinkDialog from './LinkDialog.astro';
+import AltTextDialog from './AltTextDialog.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
 import BackToTop from '../BackToTop.astro';
 
@@ -95,7 +96,7 @@ const { subjects, constellations = [] } = Astro.props;
       </div>
       {/* wrapped (not given an id) so EditorToolbar stays shared-as-is */}
       <div id="ws-toolbar">
-        <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" />
+        <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" image />
       </div>
     </div>
 
@@ -140,6 +141,7 @@ const { subjects, constellations = [] } = Astro.props;
 
 <PublishDialog formId="ws-form" subjectNames={subjects} />
 <LinkDialog id="ws-link-dialog" />
+<AltTextDialog id="ws-alt-dialog" />
 
 <script>
   import '../../scripts/writing-sheet';

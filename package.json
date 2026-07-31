@@ -23,6 +23,7 @@
     "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4.3.3",
     "@tiptap/core": "^3.28.0",
+    "@tiptap/extension-image": "^3.28.0",
     "@tiptap/extension-placeholder": "^3.28.0",
     "@tiptap/starter-kit": "^3.28.0",
     "astro": "^7.1.0",

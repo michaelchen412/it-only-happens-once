@@ -1,0 +1,43 @@
+---
+/*
+  AltTextDialog — asks what a picture shows (docs/plans/03).
+
+  Its own dialog rather than `window.prompt` for the same reason the admin has
+  ConfirmDialog instead of `confirm()`: a native prompt can't be styled, can't
+  explain itself, and on iOS it steals the whole screen.
+
+  Deliberately NOT a gate. It opens on insert and again when you click an
+  image, and empty is an allowed answer — a decorative image legitimately has
+  `alt=""`, and refusing to insert until someone types something just teaches
+  them to type "image". The hint says what the field is for instead.
+
+  Class-scoped, matching LinkDialog: the script finds its controls inside the
+  element it was handed, so more than one can exist on a page.
+*/
+interface Props {
+  id: string;
+}
+const { id } = Astro.props;
+---
+
+<dialog id={id} class="modal-dialog w-full max-w-sm" aria-labelledby={`${id}-title`}>
+  <div class="flex flex-col gap-4 p-6 font-sans">
+    <div>
+      <h2 id={`${id}-title`} class="font-display text-xl">Describe this image</h2>
+      <p class="mt-1 text-sm text-base-content/60">
+        For readers using a screen reader, and for anyone whose connection drops the picture. Say what it shows, not
+        “image of”.
+      </p>
+    </div>
+    <input
+      type="text"
+      class="alt-text input input-sm input-bordered w-full"
+      placeholder="A snowy road at dusk, no tracks yet"
+      aria-label="Alt text"
+    />
+    <div class="flex items-center justify-end gap-2">
+      <button type="button" class="alt-skip btn btn-ghost btn-sm normal-case">Leave empty</button>
+      <button type="button" class="alt-apply btn btn-primary btn-sm normal-case">Save description</button>
+    </div>
+  </div>
+</dialog>

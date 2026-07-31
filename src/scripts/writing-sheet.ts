@@ -23,6 +23,8 @@
 // uses. So the words survive a crash without the public site changing under a
 // reader — and every prompt below can finally say where they went.
 import { mountRichEditor } from './rich-editor';
+import { wireAltDialog } from './alt-dialog';
+import { uploadImage } from './upload';
 import { actions } from 'astro:actions';
 import { slugify } from '../lib/slug';
 import { countWords, minutesForWords } from '../lib/reading';
@@ -46,7 +48,9 @@ const statusText = document.getElementById('ws-status-text') as HTMLElement;
 
 form.addEventListener('submit', (e) => e.preventDefault()); // no implicit submit
 
-// ---- TipTap editor (WYSIWYG → Markdown) + toolbar + link dialog ----
+// ---- TipTap editor (WYSIWYG → Markdown) + toolbar + link/alt dialogs ----
+const askAlt = wireAltDialog(document.getElementById('ws-alt-dialog') as HTMLDialogElement);
+
 const { editor, getMarkdown } = mountRichEditor({
   editorEl: document.getElementById('ws-editor')!,
   toolbarRoot: sheet.querySelector('[role="toolbar"]') as HTMLElement,
@@ -54,6 +58,19 @@ const { editor, getMarkdown } = mountRichEditor({
   placeholder: 'Start writing…',
   content: '',
   ariaLabel: 'Article body',
+  // Images (docs/plans/03). Files are keyed on the FRAGMENT ID, not the slug:
+  // ids are minted client-side before the row exists, so this works on a piece
+  // that has never been saved, and a later rename never moves the files.
+  images: {
+    upload: async (file) =>
+      (await uploadImage(file, { pathFor: (hash, ext) => `essays/${idField.value}/${hash}.${ext}` })).url,
+    askAlt,
+    onStatus: (m) => (m ? setStatusNote(m) : restStatus()),
+    onError: (m) => {
+      jsError.textContent = m;
+      jsError.hidden = false;
+    },
+  },
 });
 
 // ---- status indicator ----
@@ -142,6 +159,22 @@ let versionHeld = false;
 const isPublished = () => savedStatus === 'published';
 /** The scratch tier (docs/plans/09 Piece 2) — autosaves exactly like a draft. */
 const isNote = () => savedStatus === 'note';
+
+/**
+ * What the bar says when nothing is happening. Extracted from `populate` so an
+ * image upload can put it back: the upload borrows the line for "Uploading
+ * image…", and on failure nothing else would ever reclaim it.
+ */
+function restStatus() {
+  spinner.hidden = true;
+  statusText.classList.remove('text-error', 'text-warning');
+  statusText.textContent = isPublished()
+    ? 'Up to date'
+    : isNote()
+      ? 'A note — autosaves, never public'
+      : 'Autosaves as you write';
+  updateDirtyUI(); // a published piece mid-edit has more to say than "Up to date"
+}
 
 function reflectStatus() {
   draftActions.hidden = isPublished();
@@ -558,9 +591,7 @@ function populate(d: Loaded | null) {
   // reports back through the tab's count, including any working version left
   // behind by a crash.
   versionsPanel.setFragment(d?.id ?? null, !!d && d.status === 'published');
-  statusText.classList.remove('text-error', 'text-warning');
-  statusText.textContent = isPublished() ? 'Up to date' : isNote() ? 'A note — autosaves, never public' : 'Autosaves as you write';
-  spinner.hidden = true;
+  restStatus();
   renderCount(); // setContent above emits no update, so measure it directly
   updateViewLink(d?.slug ?? '');
   const memberIds = d?.constellationIds ?? [];

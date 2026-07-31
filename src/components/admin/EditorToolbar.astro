@@ -23,13 +23,22 @@ const TOOLS = [
 
 interface Props {
   class?: string;
+  /**
+   * Show the image button. Off by default and deliberately opt-in: the command
+   * only exists when `mountRichEditor` was given `images`, so rendering it
+   * everywhere would put a dead button in the About builder.
+   */
+  image?: boolean;
 }
-const { class: className = '' } = Astro.props;
+const { class: className = '', image = false } = Astro.props;
+const sections = image
+  ? [...TOOLS, { group: [{ cmd: 'image', label: '▣', aria: 'Insert image' }] }]
+  : [...TOOLS];
 ---
 
 <div class:list={['flex flex-wrap items-center gap-1', className]} role="toolbar" aria-label="Formatting">
   {
-    TOOLS.map((section, i) => (
+    sections.map((section, i) => (
       <>
         {i > 0 && <span class="mx-1 h-5 w-px bg-base-300" />}
         {section.group.map((t) => (

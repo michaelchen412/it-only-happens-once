@@ -358,6 +358,34 @@
     width: 3rem;
     margin: 2.5em auto;
   }
+  /* Images in essays (docs/plans/03). Sized to the reading column rather than
+     bleeding past it — this is a writing-led site, and a picture is a paragraph
+     that happens to be visual, not a hero. Extra air above and below, since an
+     image reads as a beat rather than as another line of prose. */
+  .reading img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 2.2em auto;
+    border-radius: var(--radius-box);
+  }
+  /* Alt text is what shows when the picture doesn't load; without this it
+     inherits nothing and lands as bare text against the margin. */
+  .reading img[alt] {
+    font-size: 0.9rem;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+  /* An italic line straight after an image reads as its caption. Markdown has
+     no caption primitive and we deliberately didn't invent one — this is the
+     whole feature, and it costs a rule rather than a custom node that would
+     break the Markdown round-trip. */
+  .reading img + p em:only-child {
+    display: block;
+    margin-top: -1.6em;
+    text-align: center;
+    font-size: 0.9rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
 }
 
 /* Semantic shadow color per theme (no raw `black` at call sites). */
@@ -1506,4 +1534,13 @@ html.reader-open .sky-return {
   float: left;
   height: 0;
   pointer-events: none;
+}
+/* Images in the composer render with the public `.reading img` rules, so what
+   you see is what ships. These two are editor-only affordances. */
+.tiptap-doc img {
+  cursor: pointer; /* clicking one re-opens the description prompt */
+}
+.tiptap-doc img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
