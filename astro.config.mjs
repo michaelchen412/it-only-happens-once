@@ -45,7 +45,43 @@ export default defineConfig({
       // index.js:1). Dev doesn't need the fix anyway: it runs on local Node,
       // which supports require(esm) natively. Left external in dev, bundled in
       // build, each environment gets the form it can actually execute.
-      noExternal: process.env.NODE_ENV === 'production' ? ['sanitize-html'] : [],
+      //
+      // THE WHOLE SUBTREE, not just sanitize-html. Bundling one package removes
+      // it from the graph Vercel's dependency tracer walks, so `node_modules/
+      // sanitize-html` — and everything nested under it — stops being copied
+      // into the function. Rollup meanwhile leaves any dependency NOT listed
+      // here as a bare `require()`. Listing only sanitize-html left seven such
+      // requires pointing at packages no longer shipped, and every request died
+      // on the first one: `Cannot find module 'htmlparser2'`.
+      //
+      // Regenerate this list after any sanitize-html upgrade:
+      //   node scripts/check-server-bundle.mjs --closure sanitize-html
+      // The same script runs after every build and fails it if an unresolvable
+      // require survives, so a stale list is a red build, not a 500.
+      noExternal:
+        process.env.NODE_ENV === 'production'
+          ? [
+              'sanitize-html',
+              // ESM-only, which is what started all this
+              'htmlparser2',
+              'domhandler',
+              'domutils',
+              'domelementtype',
+              'dom-serializer',
+              'entities',
+              // ordinary CJS, but they go the same way once the parent is bundled
+              'deepmerge',
+              'escape-string-regexp',
+              'is-plain-object',
+              'parse-srcset',
+              'launder',
+              'dayjs',
+              'postcss',
+              'nanoid',
+              'picocolors',
+              'source-map-js',
+            ]
+          : [],
     },
   },
   fonts: [
