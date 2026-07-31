@@ -451,6 +451,51 @@ const versionsPanel = wireVersionsPanel({
     everSaved = true; // the list underneath shows a new "edited" time
     void openEdit(idField.value);
   },
+  /**
+   * Put a version's words back in the editor. Nothing is published and the
+   * fragment is untouched — this loads text, and from here on it's an ordinary
+   * edit of a published piece, autosaving into the working version.
+   *
+   * The guard exists because editing always resumes into the ONE working
+   * version, so loading a different set of words destroys whatever that version
+   * held as soon as the debounce fires.
+   *
+   * TWO different things can be at stake, and a destructive prompt that names
+   * the wrong one is worse than no prompt. Resuming the working version can
+   * only cost the keystrokes the debounce hasn't written yet — the version
+   * itself is where these words came from. Starting from a kept variant
+   * overwrites the entire pending rewrite, including one recovered from a
+   * crash, which is the case this whole feature exists for. `dirty` is
+   * consulted separately from `hasWorking()` because edits typed inside the
+   * last debounce exist only in the editor, where the panel's list can't see
+   * them.
+   */
+  async onResume(words, fromWorking) {
+    const risk = fromWorking
+      ? dirty && {
+          title: 'Go back to the saved rewrite?',
+          message:
+            'Your most recent typing hasn’t reached this version yet. Loading it replaces what’s in the editor with the last copy the server took.',
+          confirmLabel: 'Load the saved rewrite',
+        }
+      : (dirty || versionsPanel.hasWorking()) && {
+          title: 'Replace the pending rewrite?',
+          message:
+            'Editing always resumes into a single working version, so loading these words throws away the edits it holds now. Kept variants and the published piece are unaffected.',
+          confirmLabel: 'Load these words',
+        };
+    if (risk && !(await confirmDialog({ ...risk, danger: true }))) return;
+    titleField.value = words.title;
+    excerptField.value = words.excerpt;
+    editor.commands.setContent(words.body, { emitUpdate: false });
+    renderCount(); // setContent emits no update, so the signals need telling
+    // Truthful the moment it's set, unlike the autosave path: these words were
+    // just read back OFF the server, so "kept as a version" is already the case.
+    versionHeld = true;
+    tabs.select('doc'); // before focus — the editor is hidden on the other tab
+    onEdit(); // marks dirty and arms the autosave into the working version
+    editor.commands.focus('end');
+  },
 });
 
 function setCnLabel(n: number) {

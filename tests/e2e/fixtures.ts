@@ -1,7 +1,8 @@
 // Shared helpers for the e2e specs.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import { stringify as devalueStringify } from 'devalue';
+import type { Page, Request } from '@playwright/test';
 
 export interface Fixtures {
   /** An existing unpublished essay (draft or note), or null if there is none. */
@@ -38,4 +39,46 @@ export async function blockWrites(page: Page): Promise<() => number> {
     await route.abort('failed'); // the sheet treats this as "can't reach the server"
   });
   return () => attempts;
+}
+
+/**
+ * `blockWrites` for specs that need the server to ANSWER — the composer can't
+ * be driven through a flow that starts from existing data if every request is
+ * refused.
+ *
+ * Same read-only guarantee, arrived at from the other side: nothing reaches the
+ * live project because every request is answered here. That's strictly safer
+ * than finding a real published piece in Michael's corpus and editing it, which
+ * is the only other way to exercise a flow that needs a piece with versions.
+ *
+ * A name with no handler is aborted, not passed through, so a spec can never
+ * silently start talking to the database because the composer grew a call.
+ * The returned getter lists the action names seen, in order — assert on it.
+ *
+ * Responses are devalue, not JSON: `astro:actions` parses successful bodies
+ * with `devalue.parse` (see astro/dist/actions/runtime/client.js), so a plain
+ * `JSON.stringify` here would fail to deserialize on the client.
+ */
+export async function stubActions(
+  page: Page,
+  handlers: Record<string, (req: Request) => unknown>,
+): Promise<() => string[]> {
+  const seen: string[] = [];
+  await page.route('**/_actions/**', async (route) => {
+    // `/_actions/versions.list/` — this project appends the trailing slash, and
+    // leaving it on means every handler lookup misses and every call is
+    // aborted, which looks exactly like "the composer is broken".
+    const name = decodeURIComponent(new URL(route.request().url()).pathname)
+      .replace(/^.*\/_actions\//, '')
+      .replace(/\/$/, '');
+    seen.push(name);
+    const handler = handlers[name];
+    if (!handler) return void (await route.abort('failed'));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json+devalue',
+      body: devalueStringify(handler(route.request())),
+    });
+  });
+  return () => seen;
 }

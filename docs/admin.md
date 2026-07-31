@@ -116,6 +116,18 @@ deleted (it *is* the piece now); a promoted `snapshot` stays, because history
 keeps. A version identical to what's live can't be promoted — there'd be nothing
 to change.
 
+**Resume editing** (**Edit from this**, on a kept variant) is the other way out,
+and the panel was a cul-de-sac without it: after a crash you could *read* your
+rewrite, but the only move that put it back in the editor was Promote, which
+publishes immediately. It loads a version's words into the sheet and nothing
+else happens — the fragment is untouched, nothing goes public, and from there
+it's an ordinary edit of a published piece, autosaving into the working version
+again. **It prompts when that would cost you something.** Editing always resumes
+into the single working version, so starting from a kept variant overwrites
+whatever the pending rewrite held; resuming the pending rewrite itself is the
+same words and passes without a word. The prompt also fires on unsaved edits
+sitting in the editor, which the panel's own list can't see.
+
 The **Versions** tab appears only on published pieces (a draft simply edits
 itself) and shows the markdown source in previews rather than rendered HTML —
 shipping a second sanitizer to the client to preview your own prose isn't worth

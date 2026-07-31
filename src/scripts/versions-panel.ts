@@ -42,6 +42,18 @@ interface Options {
   countEl: HTMLElement;
   /** A version became canonical — the sheet must reload from the server. */
   onPromoted(): void;
+  /**
+   * Put a version's words back in the editor — the way out of the cul-de-sac
+   * this panel used to be. Reading a version told you what you'd written;
+   * promoting it published immediately. There was no "and now keep working on
+   * it" short of copy-paste out of the preview.
+   *
+   * `fromWorking` distinguishes resuming the pending rewrite (the crash case —
+   * same words, nothing at risk) from starting out of a kept variant, which
+   * REPLACES the pending rewrite once the autosave fires. The sheet decides
+   * what to prompt: it's the side that knows whether the editor is dirty.
+   */
+  onResume(words: { title: string; excerpt: string; body: string }, fromWorking: boolean): Promise<void>;
 }
 
 function when(iso: string): string {
@@ -89,6 +101,7 @@ export function wireVersionsPanel(opts: Options): VersionsPanelHandle {
             ${v.matchesCanonical ? '<p class="admin-hint mt-1.5">Identical to what’s live.</p>' : ''}
             <div class="mt-2.5 flex flex-wrap items-center gap-1">
               <button type="button" class="btn btn-ghost btn-xs normal-case" data-act="preview">${openPreview === v.id ? 'Hide' : 'Read'}</button>
+              <button type="button" class="btn btn-ghost btn-xs normal-case" data-act="resume">${working ? 'Resume editing' : 'Edit from this'}</button>
               <button type="button" class="btn btn-xs normal-case ${promotable ? 'btn-primary' : 'btn-ghost'}" data-act="promote" ${promotable ? '' : 'disabled'}>Make this the piece</button>
               ${working ? '<button type="button" class="btn btn-ghost btn-xs normal-case" data-act="keep">Keep as a variant</button>' : ''}
               <button type="button" class="btn btn-ghost btn-xs normal-case text-error" data-act="remove">Delete</button>
@@ -153,6 +166,23 @@ export function wireVersionsPanel(opts: Options): VersionsPanelHandle {
     if (act === 'preview') {
       openPreview = openPreview === id ? null : id;
       render();
+      return;
+    }
+
+    if (act === 'resume') {
+      // Fetched here rather than in the sheet so the sheet never has to know
+      // this action exists — the same reason `preview` lives here.
+      btn.disabled = true;
+      try {
+        const { data, error } = await actions.versions.get({ id });
+        if (error) showError(formatActionError(error));
+        else await opts.onResume({ title: data.title, excerpt: data.excerpt, body: data.body }, data.kind === 'working');
+      } catch (err) {
+        showError(formatActionError(err));
+      }
+      // Unconditional: the sheet may have declined, and the button has to work
+      // again either way. A successful resume switches tabs, so this is unseen.
+      btn.disabled = false;
       return;
     }
 
