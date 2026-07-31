@@ -8,6 +8,7 @@
 */
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
+import { Icon } from 'astro-icon/components';
 
 const supabase = Astro.locals.supabase;
 
@@ -36,7 +37,21 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
     <PageHeader
       title="Library"
       subtitle="The vocabulary the workshop shares — subjects (what a piece is about; their definitions feed the AI suggester), authors and works (where it comes from). Edit in place, merge duplicates, or delete."
-    />
+    >
+      {/* The corpus export (plan 05·2) lives here rather than in the composing
+          room: it's a housekeeping tool, like everything else on this page.
+          A plain link, not a button with script — the endpoint sets
+          Content-Disposition, so the browser downloads it and never navigates. */}
+      <a
+        slot="actions"
+        href="/admin/export.json"
+        download
+        class="btn btn-ghost btn-sm normal-case"
+        title="Every fragment, subject, author, work, constellation and page as one JSON file"
+      >
+        <Icon name="ph:arrow-down" class="text-base-content/60" /> Export corpus
+      </a>
+    </PageHeader>
     <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
 
     {/* SUBJECTS */}

@@ -73,11 +73,41 @@ about it:
   row each. Re-creating the admin by hand is documented in [auth.md](auth.md)
   and remains the simpler restore path, but the rows are there.
 
-## The rest of the safety story
+## The corpus export — `GET /admin/export.json`
 
-- The **JSON fidelity export** (human-triggered, re-importable, includes
-  positions and pages) is [plan 05 Piece 2](plans/05-export-backup.md) — not
-  built yet.
+A **Export corpus** link on [`/admin/library`](../src/pages/admin/library.astro)
+downloads the whole corpus as one JSON file: all nine tables, every row,
+`select('*')` so a column added later appears without anyone remembering. Built
+2026-07-31 ([plan 05 Piece 2](plans/05-export-backup.md)). 478 KB and 538 rows
+at the time of writing.
+
+**Be clear about what it is for, because it is not disaster recovery.** That job
+is done above, and better: the nightly dump restores straight back into
+Postgres. This is the copy that survives *leaving* Postgres. `data.sql` is
+`COPY` blocks — to read it anywhere else you first write a parser, on the day
+you least want to be writing one.
+
+- **An endpoint, not an action** — it's a file you download, so it wants a real
+  URL and a `Content-Disposition`. Middleware already gates everything under
+  `/admin`, so it inherits that boundary rather than inventing one. It responds
+  `private, no-store`: the file carries drafts and private notes.
+- **Paged, then checked against the exact row count.** PostgREST caps a response
+  at 1000 rows *silently*, and a backup truncated at row 1000 looks exactly like
+  a complete one. A mismatch fails the whole request — it never hands back a
+  partial export dressed as a whole one.
+- **Tables are listed in dependency order**, so an importer can insert them top
+  to bottom without tripping a foreign key. The list is typed against the
+  generated `Database` types, so a renamed table is a compile error rather than
+  a runtime surprise inside a backup nobody was watching.
+- **Images are referenced by URL, never embedded.** The bytes are archived
+  nightly (above); base64 here would duplicate them at several times the size.
+- **Verified against live**: an admin session sees every row of all nine tables
+  (checked against the service key, which bypasses RLS — a table missing an
+  admin policy would have exported as an empty array rather than an error), the
+  file's own `counts` agree with its rows, every join row points at a row also
+  in the file, and signed out the endpoint serves nothing.
+
+## The rest of the safety story
 - The **`content/` markdown mirror** — a two-way copy of the corpus as files,
   with a `push` script to write them back — was **cancelled on 2026-07-31 and
   should not be re-proposed.** Two of its four justifications had shipped as
