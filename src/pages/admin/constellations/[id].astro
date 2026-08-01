@@ -34,6 +34,7 @@ import { TYPE_META, type FragmentType } from '../../../lib/fragments-display';
 import { excerpt, readingMinutes } from '../../../lib/markdown';
 import type { SuiteItem } from '../../../lib/constellations';
 import type { SubjectRef } from '../../../lib/blog';
+import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 import StarMark from '../../../components/StarMark.astro';
 
@@ -52,7 +53,8 @@ const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { 
     sb
       .from('fragment_constellations')
       .select(
-        'position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, status, occurred_at, updated_at, date_precision, details, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)))'
+        // `details` comes in via PAIRED_SELECT rather than being named twice.
+        `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, status, occurred_at, updated_at, date_precision, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`
       )
       .eq('constellation_id', c.id)
       .is('fragments.deleted_at', null)
@@ -124,6 +126,10 @@ const suite = (placements ?? []).map((p) => {
                 .map((fs) => fs.subjects)
                 .filter((s): s is SubjectRef => !!s)
                 .sort((a, b) => a.name.localeCompare(b.name)),
+              // Same PostArticle as the public Reader, so the pairing has to
+              // travel here too — this is the construction site plan 04's
+              // Piece 1 missed, and it is still the easy one to forget.
+              paired: pairedMediaOf(f),
             },
           };
 

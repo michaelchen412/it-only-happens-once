@@ -9,7 +9,7 @@ import { defineAction } from 'astro:actions';
 import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
-import { lookupSpotify, parseSongRef } from '../lib/spotify';
+import { lookupSong, parseSongRef, songRefUrl } from '../lib/media';
 import type { Database, Json } from '../lib/database.types';
 import { type DB, fail, fragmentStatus, requireAdmin, uniqueSlug, optText, optUrl, optInt, optUuid } from './_shared';
 
@@ -260,21 +260,27 @@ export const fragments = {
   }),
 
   /**
-   * Create or edit a `song` fragment. Title/art come from Spotify; artist is
-   * manual. `body` is the ANNOTATION — Michael's words on why this song
-   * (ADR-0009), which is what makes a song a fragment rather than a link. It
-   * is optional, always: a song may say nothing and simply play.
+   * Create or edit a `song` fragment. Title/art/artist/album come from the
+   * Spotify Web API when it's configured (docs/plans/04 Piece 4) and are
+   * editable regardless — a five-artist track joins to a mouthful nobody wants
+   * as an attribution. `body` is the ANNOTATION — Michael's words on why this
+   * song (ADR-0009), which is what makes a song a fragment rather than a link.
+   * It is optional, always: a song may say nothing and simply play.
    */
   saveSong: defineAction({
     accept: 'form',
     input: z.object({
       id: optText,
-      spotify_url: z.string().url('Paste a Spotify track or album link'),
+      spotify_url: z.string().url('Paste a Spotify or YouTube link'),
       title: z.string().min(1, 'A song title is required'),
       attribution: z.string().min(1, 'Who’s the artist?'),
       album: optText,
       body: optText,
       thumbnail_url: optText,
+      /** Web API extras, carried as hidden fields so provenance can be exact. */
+      release_year: optInt,
+      spotify_artist_ids: optText,
+      spotify_album_id: optText,
       year: z.coerce.number().int(),
       status: fragmentStatus,
       subjects: optText,
@@ -285,11 +291,21 @@ export const fragments = {
       // The URL is the single source of truth for what's being cited — the id
       // and the kind both come from it, so a stale hidden field can't disagree.
       const ref = parseSongRef(input.spotify_url);
-      if (!ref) throw fail('That doesn’t look like a Spotify track or album link', 'BAD_REQUEST');
+      if (!ref) throw fail('That doesn’t look like a Spotify track, album, or YouTube link', 'BAD_REQUEST');
       const slug = await uniqueSlug(sb, slugify(input.slug || `${input.title} ${input.attribution}`), input.id);
-      const details: Record<string, Json> = { spotify_id: ref.id };
+      // `spotify_id` stays the key for Spotify refs so existing rows keep their
+      // meaning; a YouTube citation records its own id under its own name.
+      const details: Record<string, Json> =
+        ref.provider === 'youtube' ? { youtube_id: ref.id } : { spotify_id: ref.id };
       if (input.album) details.album = input.album;
       if (input.thumbnail_url) details.thumbnail_url = input.thumbnail_url;
+      // The release year is the ALBUM's claim, kept distinct from `occurred_at`,
+      // which on a song means the year you added it (docs/plans/04 open qs).
+      if (input.release_year) details.release_year = input.release_year;
+      if (input.spotify_album_id) details.spotify_album_id = input.spotify_album_id;
+      if (input.spotify_artist_ids) {
+        details.spotify_artist_ids = input.spotify_artist_ids.split(',').map((s) => s.trim()).filter(Boolean);
+      }
       // provenance facets follow the shown fields: artist → author, album → work
       const author_id = await resolveAuthor(sb, input.attribution);
       const work_id = await resolveWork(sb, input.album, author_id);
@@ -299,7 +315,9 @@ export const fragments = {
         slug,
         body: input.body?.trim() || null,
         attribution: input.attribution,
-        source_url: input.spotify_url,
+        // Canonical, not what was pasted: Spotify's share sheet appends a `?si=`
+        // tracking token, and that token has no business on a public page.
+        source_url: songRefUrl(ref),
         details,
         author_id,
         work_id,
@@ -323,12 +341,17 @@ export const fragments = {
       const { data, error } = await ctx.locals.supabase
         .from('fragments')
         .select(
-          'id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id)',
+          'id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id), paired_song:paired_song_id(id, title, attribution, deleted_at)',
         )
         .eq('id', id)
         .single();
       if (error || !data) throw fail('That fragment no longer exists', 'NOT_FOUND');
+      // The Music tab shows what's paired without a second round trip. A
+      // soft-deleted song reads as no pairing — same rule as pairedMediaOf.
+      const song = data.paired_song as { id: string; title: string | null; attribution: string | null; deleted_at: string | null } | null;
+      const paired = song && !song.deleted_at ? { id: song.id, title: song.title ?? '(untitled)', artist: song.attribution ?? '' } : null;
       return {
+        paired,
         constellationIds: (data.fragment_constellations ?? []).map((l) => l.constellation_id),
         id: data.id,
         type: data.type,
@@ -479,14 +502,92 @@ export const fragments = {
 };
 
 export const songs = {
-  /** Resolve a pasted Spotify link to { spotifyId, title, thumbnailUrl }. */
+  /**
+   * Resolve a pasted track / album / video link to everything we can learn
+   * about it. Answers from the Spotify Web API when credentials are configured
+   * and falls back to oEmbed otherwise — `source` says which, so the sheet can
+   * explain why the artist field is still empty rather than looking broken.
+   */
   lookup: defineAction({
     input: z.object({ url: z.string().min(1).max(500) }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
-      const found = await lookupSpotify(input.url);
-      if (!found) throw fail('Couldn’t read that Spotify link', 'BAD_REQUEST');
+      const found = await lookupSong(input.url);
+      if (!found) throw fail('Couldn’t read that link — Spotify track/album or YouTube video, please', 'BAD_REQUEST');
       return found;
+    },
+  }),
+
+  /**
+   * Songs to choose from when pairing one to an essay (ADR-0009 "paired
+   * media"). Newest first with no term, so the picker opens on what you added
+   * most recently — which after the backfill is what you were just editing.
+   */
+  search: defineAction({
+    input: z.object({ q: optText }),
+    handler: async ({ q }, ctx) => {
+      requireAdmin(ctx);
+      let query = ctx.locals.supabase
+        .from('fragments')
+        .select('id, title, attribution, body')
+        .eq('type', 'song')
+        .is('deleted_at', null)
+        .order('occurred_at', { ascending: false })
+        .limit(20);
+      // PostgREST `.or()` values can't contain its own delimiters.
+      const term = (q ?? '').replace(/[%,()\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (term) query = query.or(`title.ilike.%${term}%,attribution.ilike.%${term}%`);
+      const { data, error } = await query;
+      if (error) throw fail(error.message);
+      return (data ?? []).map((s) => ({
+        id: s.id,
+        title: s.title ?? '(untitled)',
+        artist: s.attribution ?? '',
+        /** Whether it has an annotation — the picker marks the ones that speak. */
+        annotated: Boolean(s.body?.trim()),
+      }));
+    },
+  }),
+
+  /**
+   * Pair a song to an essay, or clear the pairing (`song_id` absent).
+   *
+   * Applies IMMEDIATELY, like constellation membership and for the same reason:
+   * it is a relation, not a field of the document, so it must not ride along
+   * with saveWriting's compare-and-set — pairing a song should never be able to
+   * lose a rewrite, and a draft must be pairable without a publish dialog.
+   *
+   * This is where `type = 'song'` is enforced. The FK deliberately doesn't (see
+   * the migration: a composite FK would need a generated column, which can't be
+   * nulled, which would break ON DELETE SET NULL) — so the check lives here,
+   * where it can be a sentence instead of a constraint name.
+   */
+  pair: defineAction({
+    input: z.object({ fragment_id: z.string().uuid(), song_id: optUuid }),
+    handler: async ({ fragment_id, song_id }, ctx) => {
+      const sb = ctx.locals.supabase;
+      if (song_id) {
+        if (song_id === fragment_id) throw fail('A piece can’t be paired with itself.', 'BAD_REQUEST');
+        const { data: song } = await sb
+          .from('fragments')
+          .select('id, type, deleted_at')
+          .eq('id', song_id)
+          .maybeSingle();
+        if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
+        if (song.type !== 'song') throw fail('Only a song can be paired to a piece of writing.', 'BAD_REQUEST');
+      }
+      // `.eq('type', 'writing')` so this can only ever touch an essay. RLS is
+      // still the boundary — a non-admin's update matches zero rows regardless.
+      const { data, error } = await sb
+        .from('fragments')
+        .update({ paired_song_id: song_id ?? null })
+        .eq('id', fragment_id)
+        .eq('type', 'writing')
+        .select('id')
+        .maybeSingle();
+      if (error) throw fail(error.message);
+      if (!data) throw fail('That piece no longer exists.', 'NOT_FOUND');
+      return { ok: true, songId: song_id ?? null };
     },
   }),
 };

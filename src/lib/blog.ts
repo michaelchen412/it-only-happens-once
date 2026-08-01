@@ -17,6 +17,33 @@ export interface SubjectRef {
   slug: string;
 }
 
+/**
+ * The song paired with one essay — *this song goes with this piece* (ADR-0009).
+ *
+ * NORMALISED OVER TWO SOURCES. The renderer treats them identically; only
+ * `fragmentId` records which answered, and only so a caller that needs to link
+ * back to the song can:
+ *
+ *   1. `paired_song_id` → a real `song` fragment. What the backfill promoted
+ *      the 48 citable pairings to, and what the writing sheet's picker sets.
+ *   2. `details.media` → the raw `{ provider, url }` Squarespace brought over.
+ *      Only two rows still take this path — the imported *playlists*, which
+ *      ADR-0009 forbids a song fragment from citing. It is a fallback, not a
+ *      second write path: nothing in the app writes `details.media`.
+ *
+ * The legacy path has no title and no artist, so its caption is empty and the
+ * embed speaks for itself. That is fine for a playlist, which names itself.
+ */
+export interface PairedMedia {
+  /** The song fragment's id, or null when this came from `details.media`. */
+  fragmentId: string | null;
+  /** Empty on the legacy path — render no caption rather than a fake one. */
+  title: string;
+  artist: string | null;
+  /** What to embed. Parsed by the renderer, which owns provider knowledge. */
+  url: string;
+}
+
 export interface WritingItem {
   id: string;
   slug: string;
@@ -30,6 +57,8 @@ export interface WritingItem {
   precision: 'day' | 'year';
   readMinutes: number;
   subjects: SubjectRef[];
+  /** The paired song, if this piece has one (ADR-0009). */
+  paired: PairedMedia | null;
 }
 
 export interface QuoteItem {
@@ -66,6 +95,85 @@ export interface Page<T> {
 /** PostgREST `.or()` values can't contain its delimiters; strip them from search. */
 function sanitizeQuery(q: string): string {
   return q.replace(/[%,()\\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The embed that fetches an essay's paired song, plus the legacy column.
+ *
+ * `paired_song:paired_song_id(...)` — the COLUMN-name hint, not the constraint
+ * name. `fragments!fragments_paired_song_id_fkey(...)` looks more explicit and
+ * is what you'd write from habit, but PostgREST answers it with PGRST200 for a
+ * self-referencing FK (verified against live 2026-07-31). Don't "fix" this.
+ *
+ * RLS does the security here, not the query: the embed applies the fragments
+ * policies a second time, so an anon reader whose paired song is a draft gets
+ * `paired_song: null` and the essay simply renders without one. There is no
+ * status filter below because there must not be one — the admin preview is
+ * supposed to see its own drafts (plan 01), and the boundary is the policy.
+ *
+ * THE RAW `paired_song_id` IS SELECTED TOO, and it is load-bearing. Without it,
+ * a hidden song and a never-promoted essay look identical — both arrive as
+ * `paired_song: null` — and `pairedMediaOf` would fall back to `details.media`,
+ * which every one of the 48 promoted essays still carries. Unpublishing a song
+ * would then keep playing it from the legacy URL. Found by probe, not by
+ * reading: the embed correctly returned null and the page still showed a
+ * player.
+ */
+export const PAIRED_SELECT =
+  'paired_song_id, paired_song:paired_song_id(id, title, attribution, source_url, deleted_at), details';
+
+/**
+ * Shape of what PAIRED_SELECT adds to a row. `details` is `unknown` on purpose:
+ * its four callers each have a different idea of that column's type (the
+ * generated `Json`, `Record<string, unknown>`, and PostgREST's inference), and
+ * the read below is a runtime shape check anyway. Narrowing it here would only
+ * force a cast at every call site.
+ */
+interface PairedRow {
+  paired_song_id?: string | null;
+  paired_song?: {
+    id: string;
+    title: string | null;
+    attribution: string | null;
+    source_url: string | null;
+    deleted_at: string | null;
+  } | null;
+  details?: unknown;
+}
+
+/**
+ * Normalise a row's pairing to one shape, from either source.
+ *
+ * THE ORDER OF THESE BRANCHES IS THE SECURITY PROPERTY, not a preference:
+ *
+ *   1. `paired_song_id` set → the song row is the ONLY truth. If the embed came
+ *      back null (RLS hid an unpublished song) or the row is soft-deleted, the
+ *      answer is NO PAIRING. It must not fall through.
+ *   2. `paired_song_id` null → this essay was never promoted, so the legacy
+ *      `details.media` is all there is. Two imported playlists live here.
+ *
+ * Falling through from 1 to 2 is the bug this shape exists to prevent: all 48
+ * promoted essays still carry `details.media` pointing at the same track, so
+ * unpublishing a song would have gone on playing it from the legacy URL.
+ */
+export function pairedMediaOf(row: PairedRow): PairedMedia | null {
+  if (row.paired_song_id) {
+    const song = row.paired_song;
+    // A soft-deleted song is not a pairing. The FK can't see `deleted_at`, so
+    // it still resolves — trash would otherwise keep playing on a live essay.
+    if (!song || song.deleted_at || !song.source_url) return null;
+    return {
+      fragmentId: song.id,
+      title: song.title ?? '',
+      artist: song.attribution,
+      url: song.source_url,
+    };
+  }
+  const media = (row.details as { media?: { url?: string } } | null)?.media;
+  if (media?.url) {
+    return { fragmentId: null, title: '', artist: null, url: media.url };
+  }
+  return null;
 }
 
 /** Flatten the embedded `fragment_subjects(subjects(...))` shape. With a `rank`
@@ -129,7 +237,7 @@ export async function listWriting(
   let query = supabase
     .from('fragments')
     .select(
-      'id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug))',
+      `id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`,
       { count: 'exact' }
     )
     .eq('type', 'writing')
@@ -158,6 +266,7 @@ export async function listWriting(
       precision: r.date_precision,
       readMinutes: readingMinutes(r.body),
       subjects: subjectsOf(r, opts.subjectRank),
+      paired: pairedMediaOf(r),
     };
   });
 
@@ -244,7 +353,9 @@ export async function getWritingBySlug(
 ): Promise<WritingPost | null> {
   let query = supabase
     .from('fragments')
-    .select('id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug))')
+    .select(
+      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`
+    )
     .eq('type', 'writing')
     .is('deleted_at', null)
     .eq('slug', slug);
@@ -268,6 +379,7 @@ export async function getWritingBySlug(
     precision: r.date_precision,
     readMinutes: readingMinutes(r.body),
     subjects: subjectsOf(r),
+    paired: pairedMediaOf(r),
   };
 }
 

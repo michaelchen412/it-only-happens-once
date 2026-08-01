@@ -42,6 +42,12 @@ test.describe('the admin at 390px', () => {
   // the suite stays green while the finding stays executable: fix the row and
   // Playwright will flag this as "expected to fail but passed", which is the
   // signal to delete this comment and the `test.fail()` below.
+  //
+  // Worse since 2026-07-31, measured not guessed: plan 04 Piece 3 added a
+  // fourth tab (Music) and the row went 501px → 565px in the same 389px, i.e.
+  // over by 176px rather than 112px. Recorded here because a known defect
+  // getting quietly worse is how it stops being known. When this row is finally
+  // fixed, four tabs is the number to fix it for.
   test('the writing sheet command row fits its drawer', async ({ page }) => {
     test.fail();
     await blockWrites(page);

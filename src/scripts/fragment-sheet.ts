@@ -360,6 +360,12 @@ document.addEventListener('fragment:edit', (e) => {
       setField(form, 'spotify_url', d.source_url);
       setField(form, 'thumbnail_url', d.details.thumbnail_url ?? '');
       setField(form, 'album', d.details.album ?? '');
+      // Carry the Web API provenance back in. `form.reset()` blanked these, and
+      // saveSong writes `details` wholesale — so without this, opening a song
+      // and pressing Save would quietly drop the ids the lookup had found.
+      setField(form, 'release_year', d.details.release_year != null ? String(d.details.release_year) : '');
+      setField(form, 'spotify_album_id', d.details.spotify_album_id ?? '');
+      setField(form, 'spotify_artist_ids', (d.details.spotify_artist_ids ?? []).join(','));
       song.editor.commands.setContent(d.body || '', { emitUpdate: false });
       document.getElementById('song-lookup')!.textContent = '';
       songSuggest.reset();
@@ -371,23 +377,46 @@ document.addEventListener('fragment:edit', (e) => {
   }
 });
 
-// --- Spotify lookup on paste/change ---
+// --- metadata lookup on paste/change (docs/plans/04 Piece 4) ---
+// The Web API fills artist, album and release year; oEmbed can only manage a
+// title (and, on YouTube, the channel). Either way this only ever writes into
+// an EMPTY field — merge, never replace, so a correction you typed survives
+// re-pasting the link.
 const urlField = songForm.elements.namedItem('spotify_url') as HTMLInputElement;
 const lookupNote = document.getElementById('song-lookup')!;
+/** Write `value` only if the field is currently blank. Returns what's there now. */
+function fillIfEmpty(name: string, value: string | null | undefined): string {
+  const el = songForm.elements.namedItem(name) as HTMLInputElement | null;
+  if (!el) return '';
+  if (!el.value.trim() && value) setField(songForm, name, value);
+  return el.value;
+}
 async function runLookup() {
   const url = urlField.value.trim();
   if (!url) return;
   lookupNote.textContent = 'Looking up…';
   const { data, error } = await actions.songs.lookup({ url });
   if (error || !data) {
-    lookupNote.textContent = 'Couldn’t read that link — paste a track or album, or fill the fields in by hand.';
+    lookupNote.textContent = 'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
     return;
   }
-  if (!(songForm.elements.namedItem('title') as HTMLInputElement).value) setField(songForm, 'title', data.title);
+  fillIfEmpty('title', data.title);
+  fillIfEmpty('attribution', data.artist);
+  fillIfEmpty('album', data.album);
   if (data.thumbnailUrl) setField(songForm, 'thumbnail_url', data.thumbnailUrl);
+  // Hidden provenance — always overwritten, because unlike the visible fields
+  // these are never hand-edited and a stale id is worse than none.
+  setField(songForm, 'release_year', data.releaseYear != null ? String(data.releaseYear) : '');
+  setField(songForm, 'spotify_album_id', data.albumId ?? '');
+  setField(songForm, 'spotify_artist_ids', data.artistIds.join(','));
+
   // Name the kind: an album link is easy to paste by accident, and the whole
   // record embeds rather than the one song.
-  lookupNote.textContent = `✓ ${data.title}${data.kind === 'album' ? ' — the whole album' : ''}`;
+  const kind = data.ref.kind === 'album' ? ' — the whole album' : data.ref.kind === 'video' ? ' — a YouTube video' : '';
+  // Say when we're on the thin tier, so an empty Artist field reads as a known
+  // limitation rather than a bug. This is the difference Piece 4 bought.
+  const thin = data.source === 'oembed' && !data.artist ? ' · no artist from this link — type it in' : '';
+  lookupNote.textContent = `✓ ${data.title}${kind}${thin}`;
 }
 urlField.addEventListener('change', runLookup);
 urlField.addEventListener('paste', () => setTimeout(runLookup, 50));

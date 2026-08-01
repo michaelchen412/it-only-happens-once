@@ -28,14 +28,18 @@
 */
 import type { SuiteItem } from '../lib/constellations';
 import { renderMarkdown } from '../lib/markdown';
-import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/spotify';
+import { parseSongRef, songEmbed } from '../lib/media';
 
 interface Props {
   item: SuiteItem;
 }
 const { item } = Astro.props;
 
-const embed = item.kind === 'song' && item.sourceUrl ? parseSpotifyEmbed(item.sourceUrl) : null;
+// `parseSongRef`, not `parseSpotifyEmbed`: a song may cite a YouTube video as
+// well as a Spotify track or album (docs/plans/04 Piece 3), and a placed song
+// has to render wherever it was placed.
+const ref = item.kind === 'song' && item.sourceUrl ? parseSongRef(item.sourceUrl) : null;
+const embed = ref ? songEmbed(ref) : null;
 const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
 ---
 
@@ -84,18 +88,32 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
           — {item.attribution}
         </p>
       )}
-      {embed && (
-        <iframe
-          class="mt-4 max-w-xl"
-          src={spotifyEmbedSrc(embed)}
-          width="100%"
-          height={spotifyEmbedHeight(embed.kind)}
-          loading="lazy"
-          allow="encrypted-media"
-          title={item.title}
-          style="border-radius: var(--radius-box); border: 0"
-        />
-      )}
+      {embed &&
+        (embed.height === null ? (
+          // Video has no natural row height — it's 16:9 and scales with the
+          // measure, so the box sets the ratio and the frame fills it.
+          <div class="mt-4 aspect-video max-w-xl overflow-hidden" style="border-radius: var(--radius-box)">
+            <iframe
+              class="h-full w-full"
+              src={embed.src}
+              loading="lazy"
+              allow={embed.allow}
+              title={item.title}
+              style="border: 0"
+            />
+          </div>
+        ) : (
+          <iframe
+            class="mt-4 max-w-xl"
+            src={embed.src}
+            width="100%"
+            height={embed.height}
+            loading="lazy"
+            allow={embed.allow}
+            title={item.title}
+            style="border-radius: var(--radius-box); border: 0"
+          />
+        ))}
     </div>
   )
 }

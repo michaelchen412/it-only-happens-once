@@ -12,7 +12,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
 import ContactForm from '../components/ContactForm.astro';
 import { renderMarkdown } from '../lib/markdown';
-import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/spotify';
+import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/media';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();

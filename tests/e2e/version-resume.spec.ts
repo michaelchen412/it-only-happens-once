@@ -83,6 +83,7 @@ async function openVersions(page: Page, { pendingRewrite = true } = {}) {
       updatedAt: ISO,
       subjects: '',
       constellationIds: [],
+      paired: null, // no paired song (ADR-0009) — not what these specs are about
     }),
     'versions.list': (): VersionsList => ({
       canonical: { title: 'A published piece', preview: LIVE_BODY, updatedAt: ISO },

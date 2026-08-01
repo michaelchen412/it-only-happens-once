@@ -66,7 +66,7 @@ Admin write:
 
 The admin is built in shippable slices, not all at once. Full design in [`admin.md`](admin.md).
 
-1. **Fragment list + quote/song quick-editors** — the unified list (filter/search/sort/bulk) plus the two light types. Songs auto-fill from a Spotify link (keyless oEmbed).
+1. **Fragment list + quote/song quick-editors** — the unified list (filter/search/sort/bulk) plus the two light types. Songs auto-fill from a Spotify or YouTube link (Spotify Web API, with keyless oEmbed as the fallback — see [admin.md](admin.md) §6).
 2. **Writing composer** — create / edit / publish a `writing` fragment: WYSIWYG-that-stores-Markdown, backdatable posted date, excerpt. This slice replaces Squarespace for posting *and* is the on-ramp for migrating the existing essays (§8).
 3. **Subjects** — created inline (typeahead) in every editor from slice 1 onward; a management screen comes only if the tag set needs grooming.
 4. **Constellations & placement** — create constellations, place fragments, order the suite (`position`). Deferred to ship *with the Sky*, where that UI belongs; the on-ramp toward the "synthesis instrument" in `vision.md`.

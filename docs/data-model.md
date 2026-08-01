@@ -101,7 +101,11 @@ create table fragments (
                                   -- a song's annotation, the "why" (ADR-0009)
   excerpt        text,            -- authored snippet (writing); may be derived if null
   attribution    text,            -- quote author / song artist
-  source_url     text,            -- book link / Spotify URL
+  source_url     text,            -- book link / Spotify or YouTube URL (canonical, no ?si=)
+  paired_song_id uuid references fragments(id) on delete set null,
+                                  -- an essay's paired song (ADR-0009). SET NULL,
+                                  -- never cascade: deleting a song must not take
+                                  -- the essay with it.
   details        jsonb           not null default '{}',
   status         fragment_status not null default 'draft',
   occurred_at    timestamptz     not null default now(), -- "the date": posted (writing) / added (song, quote)
@@ -179,9 +183,9 @@ Type-specific fields that don't deserve their own columns:
 
 | type | `details` shape |
 |---|---|
-| `song` | `{ "spotify_id": "…", "album": "…", "thumbnail_url": "…" }` — `spotify_id` is a **track or album** id, parsed from `source_url` (which stays the one source of truth for both id and kind) |
+| `song` | `{ "spotify_id": "…", "album": "…", "thumbnail_url": "…", "release_year": 2022, "spotify_album_id": "…", "spotify_artist_ids": ["…"] }` — `spotify_id` is a **track or album** id parsed from `source_url` (the one source of truth for both id and kind); a YouTube citation carries `youtube_id` instead. The three Web-API fields arrived with plan 04 Piece 4 and are absent on anything saved before it. `release_year` is the **album's** year and is deliberately not `occurred_at`, which on a song means the year *you added it*. |
 | `quote` | `{ "source_title": "Meditations", "source_author": "Marcus Aurelius", "work_year": 170, "page": 12 }` |
-| `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render) |
+| `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render). Also `{ "media": { "provider": "spotify", "url": "…" } }` on **2 imported rows** — the legacy paired-media shape from Squarespace, superseded by `paired_song_id`. Nothing in the app writes it; see §6 `paired_song_id`. |
 
 Kept in JSONB because the type set is small and stable, and these fields are rarely queried on. Anything that becomes a filter/sort target should graduate to a real column.
 
@@ -193,6 +197,7 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`deleted_at`** — soft delete (migration `..._soft_delete.sql`). "Delete" sets it and the fragment moves to the admin **Trash** (restorable); public reads exclude `deleted_at is not null`; the admin still sees trashed rows. A "purge" is a real `DELETE`. Keeps years of writing recoverable.
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
 - **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different constellations.
+- **`paired_song_id`** — *the song that goes with this piece* ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). A self-FK from a `writing` row to a `song` row, rendered at the head of the essay. **`ON DELETE SET NULL`** — deleting a song blanks the pairing rather than taking the essay with it. The FK deliberately does *not* enforce `type = 'song'`: a composite FK on `(id, type)` would need a generated column holding the constant, and a generated column cannot be set to null, which is precisely what SET NULL must do — so the check lives in the `songs.pair` action, where the error can be a sentence. **RLS needs no help here:** a PostgREST embed re-applies the fragments policies, so an unpublished paired song simply doesn't come back. The reader that consumes this (`pairedMediaOf`) must therefore treat "id set, embed null" as *no pairing* and never fall through to the legacy `details.media`, which all 48 promoted essays still carry.
 - **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
 ## 7. Derived data (not stored)

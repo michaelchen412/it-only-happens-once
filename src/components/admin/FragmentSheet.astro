@@ -144,21 +144,32 @@ const thisYear = new Date().getUTCFullYear();
       <input type="hidden" name="id" />
       <input type="hidden" name="thumbnail_url" />
       <input type="hidden" name="body" id="song-body" />
+      {/* Filled by the Web API lookup only (docs/plans/04 Piece 4) — the album's
+          release year, kept apart from `occurred_at` (the year YOU added it),
+          and the Spotify ids that make provenance exact instead of name-matched. */}
+      <input type="hidden" name="release_year" />
+      <input type="hidden" name="spotify_artist_ids" />
+      <input type="hidden" name="spotify_album_id" />
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Spotify link <span class="text-base-content/40">— a track or a whole album</span></span>
+        <span class="text-base-content/70">Link <span class="text-base-content/40">— a Spotify track or album, or a YouTube video</span></span>
         <input name="spotify_url" type="url" required class="input input-sm input-bordered" placeholder="https://open.spotify.com/track/…" />
         <span id="song-lookup" class="text-xs text-base-content/55" role="status"></span>
       </label>
+      {/* Artist and album auto-fill from the API but stay editable: a five-artist
+          track joins to "Miles Davis, John Coltrane, Cannonball Adderley, Bill
+          Evans", which is a credit list, not an attribution. Autofill only ever
+          writes into an EMPTY field — same merge-never-replace rule the AI
+          subject suggester follows. */}
       <label class="flex flex-col gap-1 text-sm">
         <span class="text-base-content/70">Title <span class="text-base-content/40">(auto-filled)</span></span>
         <input name="title" required class="input input-sm input-bordered" />
       </label>
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Artist</span>
+        <span class="text-base-content/70">Artist <span class="text-base-content/40">(auto-filled)</span></span>
         <input name="attribution" required class="input input-sm input-bordered" placeholder="Miles Davis" />
       </label>
       <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Album</span>
+        <span class="text-base-content/70">Album <span class="text-base-content/40">(auto-filled)</span></span>
         <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
       </label>
 

@@ -58,6 +58,13 @@ const { subjects, constellations = [] } = Astro.props;
           <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="ws-panel-cn">
             Constellations<span id="ws-cn-count" class="admin-tab__n"></span>
           </button>
+          {/* The paired song (ADR-0009). A tab for the same reason membership
+              is one: a DRAFT never opens the publish dialog, and pairing a
+              song to a piece you're still writing is the whole habit this
+              restores. */}
+          <button type="button" role="tab" class="admin-tab" data-tab="music" aria-selected="false" tabindex="-1" aria-controls="ws-panel-music">
+            Music<span id="ws-music-mark" class="admin-tab__n"></span>
+          </button>
           {/* Only published pieces have versions — a draft edits itself. */}
           <button type="button" role="tab" class="admin-tab" data-tab="versions" hidden aria-selected="false" tabindex="-1" aria-controls="ws-panel-versions">
             Versions<span id="ws-ver-count" class="admin-tab__n"></span>
@@ -120,6 +127,45 @@ const { subjects, constellations = [] } = Astro.props;
           end of that constellation's suite; reorder in the composer.
         </p>
         <ConstellationPicker scope="writing" constellations={constellations} />
+      </div>
+
+      {/* The paired song (ADR-0009 "paired media", docs/plans/04 Piece 3).
+          Applies IMMEDIATELY like constellation membership — it's a relation,
+          not a field of the document, so it must never ride along with the
+          compare-and-set save and risk a rewrite. */}
+      <div id="ws-panel-music" role="tabpanel" data-tabpanel="music" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+        <h3 class="font-display text-lg">The song that goes with this</h3>
+        <p class="admin-hint mt-1 mb-4">
+          One song, paired to this piece — it plays at the top, before the words. Changes apply immediately, no save
+          needed. This is the pairing 50 of the imported essays already carried; a constellation's score is a
+          different thing, set in the composer.
+        </p>
+        <p id="ws-music-error" hidden role="alert" class="admin-alert mb-3"></p>
+
+        {/* What's paired now (or nothing) */}
+        <div id="ws-music-current" class="mb-5 flex items-center gap-3 rounded-box border border-base-300 px-4 py-3">
+          <span id="ws-music-none" class="admin-hint italic">Nothing paired yet.</span>
+          <span id="ws-music-name" hidden class="font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]"></span>
+          <button type="button" id="ws-music-clear" hidden class="btn btn-ghost btn-xs ml-auto normal-case text-error">
+            Unpair
+          </button>
+        </div>
+
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Find a song</span>
+          <input
+            id="ws-music-q"
+            type="search"
+            autocomplete="off"
+            placeholder="Title or artist — blank for the most recent"
+            class="input input-sm input-bordered"
+          />
+        </label>
+        <ul id="ws-music-results" class="mt-3 space-y-1"></ul>
+        <p class="admin-hint mt-4">
+          Only songs already in the corpus appear here. To pair something new, add it as a song first — the
+          <strong>New song</strong> button in the Fragment Manager.
+        </p>
       </div>
 
       {/* Versions (docs/admin.md §5, plan 07). Editing a published piece writes

@@ -33,6 +33,7 @@ import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
+import { wireMusicPanel, type PairedSong } from './music-panel';
 import { wireSubjectSuggest } from './subject-suggest';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
@@ -469,8 +470,20 @@ const cnPanel = document.getElementById('ws-panel-cn') as HTMLElement;
 const picker = wireConstellationPicker(cnPanel.querySelector('.cn-picker') as HTMLElement);
 const cnCount = document.getElementById('ws-cn-count')!;
 const toolbar = document.getElementById('ws-toolbar') as HTMLElement;
-// The formatting toolbar belongs to the document; hide it on the other tab.
-const tabs = wireSheetTabs(sheet, (key) => (toolbar.hidden = key !== 'doc'));
+
+// ---- the paired song (its own tab, ADR-0009) ----
+const musicPanel = wireMusicPanel({
+  root: document.getElementById('ws-panel-music') as HTMLElement,
+  markEl: document.getElementById('ws-music-mark')!,
+});
+
+// The formatting toolbar belongs to the document; hide it on the other tabs.
+// The music panel loads its list here rather than on open — one round trip,
+// and only if you actually go looking for a song.
+const tabs = wireSheetTabs(sheet, (key) => {
+  toolbar.hidden = key !== 'doc';
+  if (key === 'music') musicPanel.refresh();
+});
 
 // ---- draft versions (its own tab, published pieces only) ----
 const versionsPanel = wireVersionsPanel({
@@ -555,6 +568,8 @@ interface Loaded {
   updatedAt: string;
   subjects: string;
   constellationIds?: string[];
+  /** The paired song (ADR-0009), or null. Comes from `fragments.get`. */
+  paired?: PairedSong | null;
 }
 
 function populate(d: Loaded | null) {
@@ -597,6 +612,9 @@ function populate(d: Loaded | null) {
   const memberIds = d?.constellationIds ?? [];
   picker.setFragment(d?.id ?? null, memberIds);
   setCnLabel(memberIds.length);
+  // A brand-new piece has no row yet, so there's nothing to point a pairing at
+  // until the first save — `pair` updates by id, which must exist.
+  musicPanel.setFragment(d?.id ?? null, d?.paired ?? null);
   tabs.select('doc'); // always open on the writing, never mid-composition
   acquireEditLock(idField.value);
 }
@@ -652,7 +670,9 @@ async function openEdit(id: string, fromHash = false) {
 function closeNow() {
   dirty = false;
   releaseEditLock();
-  const reload = everSaved || picker.changed();
+  // A pairing counts too: it applied immediately, so the feed underneath is
+  // now stale in exactly the way a membership change makes it stale.
+  const reload = everSaved || picker.changed() || musicPanel.changed();
   setHash(prevHash); // restore the underlying context (e.g. #browse) first
   sheet.close();
   if (reload) location.reload();

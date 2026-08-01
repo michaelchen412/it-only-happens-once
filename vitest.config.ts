@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // The unit-test harness. It arrived with the offline outbox (removed 2026-07-30,
@@ -8,5 +9,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/tests/**/*.test.ts'],
+  },
+  resolve: {
+    alias: {
+      // Astro's virtual modules don't exist outside an Astro build, so a lib
+      // that reads a secret was untestable until now. The stub is faithful:
+      // with no `env` schema in astro.config.mjs, the real getSecret reads the
+      // runtime environment too. Added for src/lib/media.ts (plans/04 Piece 4).
+      'astro:env/server': fileURLToPath(new URL('./src/tests/stubs/astro-env-server.ts', import.meta.url)),
+    },
   },
 });

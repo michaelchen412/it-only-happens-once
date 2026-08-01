@@ -6,6 +6,7 @@
 import type { createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, SubjectRef } from './blog';
+import { PAIRED_SELECT, pairedMediaOf } from './blog';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -83,7 +84,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   const { data: rows } = await supabase
     .from('fragment_constellations')
     .select(
-      'position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)))'
+      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`
     )
     .eq('constellation_id', c.id)
     .eq('fragments.status', 'published')
@@ -105,6 +106,15 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       updated_at: string | null;
       date_precision: 'day' | 'year';
       fragment_subjects: { subjects: SubjectRef | null }[] | null;
+      paired_song_id?: string | null;
+      paired_song?: {
+        id: string;
+        title: string | null;
+        attribution: string | null;
+        source_url: string | null;
+        deleted_at: string | null;
+      } | null;
+      details?: unknown;
     };
     if (f.type === 'quote') {
       items.push({ kind: 'quote', body: f.body ?? '', attribution: f.attribution });
@@ -128,6 +138,10 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
             .map((fs) => fs.subjects)
             .filter((s): s is SubjectRef => !!s)
             .sort((a, b) => a.name.localeCompare(b.name)),
+          // The Reader here renders through the same PostArticle the blog uses,
+          // so a paired song has to travel with the essay or it would appear on
+          // /blog and vanish inside a suite.
+          paired: pairedMediaOf(f),
         },
       });
     } else if (f.type === 'song') {

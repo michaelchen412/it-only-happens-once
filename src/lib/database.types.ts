@@ -204,6 +204,7 @@ export type Database = {
           excerpt: string | null
           id: string
           occurred_at: string
+          paired_song_id: string | null
           published_at: string | null
           slug: string
           source_url: string | null
@@ -224,6 +225,7 @@ export type Database = {
           excerpt?: string | null
           id?: string
           occurred_at?: string
+          paired_song_id?: string | null
           published_at?: string | null
           slug: string
           source_url?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           excerpt?: string | null
           id?: string
           occurred_at?: string
+          paired_song_id?: string | null
           published_at?: string | null
           slug?: string
           source_url?: string | null
@@ -259,6 +262,13 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fragments_paired_song_id_fkey"
+            columns: ["paired_song_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
             referencedColumns: ["id"]
           },
           {

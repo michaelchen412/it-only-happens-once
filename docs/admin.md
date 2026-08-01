@@ -52,7 +52,7 @@ The first four were made together with Michael on 2026-07-18. The architecturall
 
 1. **List + quick-editors + full composer.** One unified list is the spine (cross-type view, bulk actions live in one place). Light types (quote/song) edit in a slide-over so they stay fast; writing gets a dedicated page. This mirrors the plumbing gradient rather than fighting it.
 2. **WYSIWYG that stores Markdown.** The writing editor is a true WYSIWYG surface, but the file it writes is **Markdown** — because `fragments.body` is contractually Markdown ([data-model.md](data-model.md) §4, [ADR 0003](adr/0003-fragments-single-table.md)). The editor is **TipTap** (ProseMirror) with `tiptap-markdown` for Markdown in/out and a fixed, Google-Docs-style toolbar. See [ADR 0006](adr/0006-composer-editor-tiptap.md) (which superseded the original Milkdown pick in [ADR 0005](adr/0005-admin-editing-architecture.md)).
-3. **Songs auto-fetch from the Spotify link.** Paste a URL; we call Spotify's keyless **oEmbed** to fill the title, artwork, and embed, and parse the id + kind (track or album) from the URL. What oEmbed can never supply is the *reason* — that's the annotation, typed by hand. See §6 for exactly what auto-fills and what stays manual.
+3. **Songs auto-fetch from the link.** Paste a Spotify track/album or YouTube URL; the **Spotify Web API** fills title, artist, album and release year (keyless **oEmbed** is the fallback when no credential is configured), and the id + kind come from the URL. What no API can supply is the *reason* — that's the annotation, typed by hand. See §6 for exactly what auto-fills and what stays manual.
 4. **Constellation placement is deferred to the Sky phase.** Admin v1 is fragments + subjects + full CRUD/bulk. Placing fragments into constellations with composed order ([data-model.md](data-model.md) §4, `fragment_constellations.position`) ships alongside the Sky, where that UI belongs. This keeps the phase focused on getting content *in*.
 5. **Quotes & songs publish on save; only writing has a draft lifecycle** (added 2026-07-20). A quote or song is a short, finished thing — a draft-then-publish cycle is pointless friction — so their quick-editors have no status picker and save straight to `published`. The `status` column stays (it's the public-visibility gate, and the list's bulk publish/unpublish still uses it); edits preserve the current state, so a deliberately-unpublished fragment isn't force-republished. Writing keeps drafts/autosave (§5), because essays genuinely evolve over time.
 6. **Everything edits in an overlay; the writing page is retired** (2026-07-23, Michael's call). The original split — quotes/songs in a sheet, writing on its own page — broke context: clicking an essay while composing a constellation threw you out of the room. Now writing opens in a near-fullscreen sheet everywhere (with `#edit=<id>` in the hash so a refresh reopens it), and the composer adds fragments through a browser sheet that IS the Fragment Manager in miniature — one shared table implementation, not a parallel "shelf". The cost accepted knowingly: no more middle-click-to-new-tab on writing rows.
@@ -230,21 +230,45 @@ bytes — see [backups.md](backups.md).
 
 ## 6. Songs — what auto-fills, what doesn't
 
-Paste a Spotify **track or album** URL. We call `https://open.spotify.com/oembed?url=…` (**no API key, no auth**) via a server action; the id and the kind both come from the URL, which stays the single source of truth (no hidden id field to fall out of step). Playlists are deliberately *not* songs — a playlist is a constellation's `score_url` (§`constellations`, [ADR 0009](adr/0009-music-three-roles.md)).
+Paste a Spotify **track or album** URL, or a **YouTube video** URL. The id and the kind both come from the URL, which stays the single source of truth (no hidden id field to fall out of step). What we store in `source_url` is the *canonical* form, so Spotify's `?si=` share token never reaches a public page. Playlists are deliberately *not* songs — a playlist is a constellation's `score_url` (§`constellations`, [ADR 0009](adr/0009-music-three-roles.md)).
+
+**Two tiers of lookup, and the first one is new (2026-07-31, plan 04 Piece 4).**
+`src/lib/media.ts` tries the **Spotify Web API** and falls back to keyless **oEmbed**:
 
 | Field | Source |
 |---|---|
-| `title` (song) | oEmbed `title` — **auto** (the track name, or the album's) |
-| `details.spotify_id` | parsed from the URL — **auto** |
-| artwork / embed | oEmbed `thumbnail_url` / `iframe_url` — **auto** (the stanza embeds at 152px for a track, 352px for an album — Spotify's own numbers) |
-| `attribution` (artist) | **manual** — oEmbed does not return the artist |
-| `details.album` | **manual** — oEmbed does not return the album |
+| `title` (song) | **auto** — Web API `name`, or oEmbed `title` |
+| `attribution` (artist) | **auto** from the Web API (`artists[]` joined) — *was manual until Piece 4*. Still editable, and worth editing: a five-artist track joins to a credit list, not an attribution. |
+| `details.album` | **auto** from the Web API — *was manual* |
+| `details.release_year` | **auto** from the Web API — the *album's* year, kept distinct from `occurred_at` |
+| `details.spotify_artist_ids` / `spotify_album_id` | **auto** — exact ids, so provenance isn't name-string matching |
+| `details.spotify_id` / `details.youtube_id` | parsed from the URL — **auto** |
+| artwork / embed | **auto** (the stanza embeds at 152px for a track, 352px for an album — Spotify's own numbers; a YouTube video is a 16:9 box) |
 | `body` (the annotation) | **manual, and the point** — see below |
 | `occurred_at` (added) | manual; usually `year` precision (provenance — when it entered his life) |
 
+Autofill only ever writes into an **empty** field — merge, never replace — so a correction you typed survives re-pasting the link.
+
 **The annotation — "Why this one".** A song fragment's `body` is Michael's sentence (or few) on why this song ([ADR 0009](adr/0009-music-three-roles.md)): the one field Spotify has nowhere to put, and what makes a song a fragment rather than a link. It's a short-form editor (bold/italic, the same one the quote body uses — `mountMiniEditor`) and it is **optional, always**. On the public stanza the annotation **leads** and the embed **closes as citation**; an unannotated song falls back to title + artist, which is also what a reader with a content blocker sees.
 
-**The constraint, stated plainly:** oEmbed's `title` is the track name only; it carries no artist or album. Getting those automatically requires the Spotify **Web API** (client-credentials flow → a registered Spotify app + `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`). We judged that setup not worth it for a modest, hand-curated library — typing the artist is a two-second step. The Web API upgrade is listed in §10 if that ever changes.
+**What the Web API costs, stated plainly.** `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`, client-credentials (no user OAuth, no redirect — the redirect URI on the dashboard is required but never used). One token per 3600s, cached in module scope. **The app owner must hold an active Spotify Premium subscription**: Development Mode requires it since Feb 2026, and the app stops working if it lapses. That is a real, ongoing dependency — but it degrades rather than breaks: with no credential, or with Premium lapsed, `lookupSong` falls back to oEmbed and you get exactly the pre-Piece-4 behaviour (a title, and you type the artist). The lookup reports which tier answered, and the sheet says so rather than showing an empty Artist field that looks like a bug.
+
+Also priced in, and all survivable: batch endpoints are gone (single `GET /v1/tracks/{id}` only), search is capped at 10 results, and `preview_url` / audio-features are gone for post-2024 apps — **build nothing on them**.
+
+## 6a. Paired media — the song that goes with one essay
+
+An essay may point at one song fragment through `fragments.paired_song_id` ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). It renders at the **head** of the essay, below the title block and above the prose: *press play, then read* — the same invitation a constellation's score makes above its suite, but this one belongs to the piece.
+
+Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog. The tab picks from songs already in the corpus; adding a song is still the Fragment Manager's job, because a second way to write a song fragment is not worth having.
+
+**Two sources, one shape.** `pairedMediaOf` in `src/lib/blog.ts` normalises them and the renderer can't tell which answered:
+
+1. `paired_song_id` → a real song fragment. 48 of the 50 imported pairings were promoted to these on 2026-07-31 (`scripts/backfill-paired-songs.mjs`).
+2. `details.media` → the raw `{ provider, url }` Squarespace brought over. **Only two rows still take this path** — the imported *playlists*, which a song fragment may not cite. It is a fallback, not a second write path: nothing in the app writes `details.media`.
+
+**The branch order is a security property.** If `paired_song_id` is set, the song row is the only truth — if RLS hid it (the song is a draft) or it's in the trash, the answer is *no pairing*, never a fall-through to `details.media`. All 48 promoted essays still carry that legacy column pointing at the same track, so falling through would keep playing a song you had just unpublished.
+
+**Nothing loads in the feed.** Every surface but the permalink renders `PostArticle` inside a `<template>`, and template contents are inert — so a seven-essay page of `/blog` spawns zero third-party frames, and the iframe only starts when the Reader clones it. Measured, not assumed.
 
 ## 7. Quotes
 
@@ -317,7 +341,8 @@ theme toggle against it can leave the bar a shade out.
 ## 10. Deferred (not in admin v1)
 
 - ~~**Constellation placement + composed ordering**~~ — **shipped 2026-07-23** with the composing room (§2: composer + fragment browser).
-- **Spotify Web API metadata** (auto artist/album) — §6. Only if manual entry becomes a real annoyance.
+- ~~**Spotify Web API metadata** (auto artist/album)~~ — **shipped 2026-07-31** (§6). Client credentials, oEmbed kept as the fallback. It carries an ongoing dependency the other integrations don't: the app owner must keep Spotify Premium, or lookups quietly drop to the oEmbed tier.
 - **Subjects management UI** (rename/merge/delete-with-reassign) — §8.
 - ~~**Revision history / timeline**~~ — **shipped 2026-07-30** as draft versions (§5a), and it arrived by a side door: history stopped being a feature to build and became a *consequence* of how editing a published piece works. What is still deferred is a **diff view** — side-by-side preview is enough for one author.
-- **Bulk import tooling** beyond paste (e.g. batch Spotify, quote capture) — [architecture.md](architecture.md) §6.5.
+- **Bulk import tooling** beyond paste (quote capture) — [architecture.md](architecture.md) §6.5. *Batch Spotify is off the table, not deferred:* Spotify removed the batch endpoints for Development Mode apps in Feb 2026, so it's one request per track now.
+- **`/listening`** — songs have no public surface of their own (no permalink, no `/blog` view); they appear only as stanzas inside a constellation. Plan 04 Piece 5.
