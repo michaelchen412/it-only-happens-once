@@ -47,6 +47,10 @@ const TABLES = [
   // walking this list top to bottom can never trip either one.
   'interactions',
   'interaction_people',
+  // The agenda (13 · Piece 1). `task_events` carries the only foreign key, into
+  // `tasks` immediately above it. Both are pure HQ — no seam with the corpus.
+  'tasks',
+  'task_events',
   // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
   // — `works` and `fragments`, already listed far above — as well as into
   // `people`, so they land last and an importer walking top to bottom is safe.

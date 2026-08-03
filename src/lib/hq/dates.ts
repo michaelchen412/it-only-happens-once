@@ -70,6 +70,21 @@ export function fullDate(ymd: Ymd): string {
 }
 
 /**
+ * `4:30 PM` from a `HH:MM[:SS]` clock time — HQ's times are 12-hour, always
+ * (§10d). `7:30 PM`, never `19:30`.
+ *
+ * ⚠ NO ZONE CONVERSION, and none is wanted: `tasks.due_time` is a wall-clock
+ * time on a local date, not an instant. "4:30 on Tuesday" must stay 4:30
+ * wherever you happen to be standing, which is the same reason the column is a
+ * `time` beside a `date` rather than half of a `timestamptz`.
+ */
+export function clockTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const hour12 = ((h + 11) % 12) + 1;
+  return `${hour12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/**
  * The next time a month/day comes round, on or after `from`.
  *
  * A birthday is stored as month + day with no year, so **the weekday does not

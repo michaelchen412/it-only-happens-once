@@ -20,7 +20,7 @@ import BackToTop from '../components/BackToTop.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'today' | 'people' | 'fragments' | 'constellations' | 'library' | 'about';
+  active?: 'today' | 'people' | 'tasks' | 'fragments' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -31,6 +31,11 @@ const user = Astro.locals.user;
 const nav = [
   { key: 'today', label: 'Today', href: '/admin', icon: 'ph:sun-horizon', hr: false },
   { key: 'people', label: 'People', href: '/admin/people', icon: 'ph:users-three', hr: false },
+  // TASKS, NOT "AGENDA" — §9 names the room Agenda, and it will be, once
+  // 13 · Piece 4 puts a calendar in it. Naming it that today would name a room
+  // for something not in it, which is the same reading 12 · Piece 1 took of the
+  // last-contact line: a label the data cannot back up yet.
+  { key: 'tasks', label: 'Tasks', href: '/admin/tasks', icon: 'ph:check-circle', hr: false },
   { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },

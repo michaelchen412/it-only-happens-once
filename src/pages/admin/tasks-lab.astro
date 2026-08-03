@@ -1,23 +1,20 @@
 ---
 /*
-  /admin/tasks-lab — a LOCAL-ONLY bench for the task manager and goals
-  (docs/plans/13-agenda.md, Pieces 1 and 2). Dev-gated below; never linked.
-  Deleted by the pieces it informs.
+  /admin/tasks-lab — a LOCAL-ONLY bench for GOALS (docs/plans/13-agenda.md,
+  Piece 2). Dev-gated below; never linked.
 
-  This is the highest-risk surface in HQ (10-hq.md §11): recurrence with two
-  modes, effort→lead, and disposition are all mechanics that read fine in prose
-  and have never been drawn. Three of them are only judgeable by using them, so
-  they are LIVE here:
+  ⚠ HALF OF THIS LAB IS GONE. It was built for Pieces 1 and 2 together, and
+  Piece 1 shipped on 2026-08-03 — so the Tasks list and the task editor were
+  deleted with it, per the rule that a piece deletes its lab. What survives is
+  the two surfaces Piece 2 still has to build against: the goals room and one
+  goal's page. The real task list is now `/admin/tasks`, and the real editor is
+  `src/components/admin/TaskSheet.astro`.
 
-    · the lead explainer   change effort or priority and watch the date move
-    · the recurrence       pick a rule and read the next three occurrences
-    · the tick             one click, stays visible, undoes
-
-  FOUR SURFACES:
-    TASKS   /admin/tasks              the inventory, ordered by when
-    EDITOR  a sheet                   where effort→lead has to make sense
-    GOALS   /admin/goals              five, capped, no progress bars
-    GOAL    /admin/goals/[slug]       an intention with its tasks under it
+  What the deleted half caught, kept here because the lessons outlived it:
+  `:hover` beating the selected state (trap 6); "1 days late"; `anytime`
+  printed on six rows in eight; and a lead date in the past presented as a
+  future one. All four are now assertions — in `src/tests/hq-tasks.test.ts` and
+  `tests/e2e/tasks.spec.ts`.
 
   Static invented data, `data-src` on everything (10-hq.md §10g).
 */
@@ -26,31 +23,11 @@ import { Icon } from 'astro-icon/components';
 
 if (import.meta.env.PROD) return Astro.redirect('/admin', 302);
 
-function ordinal(n: number) { const r = n % 100; return r >= 11 && r <= 13 ? `${n}th` : `${n}${['th','st','nd','rd'][n % 10] ?? 'th'}`; }
 function dmd(d: Date) {
   const y = d.getFullYear() === new Date().getFullYear() ? '' : `/${String(d.getFullYear()).slice(2)}`;
   return `${d.getMonth() + 1}/${d.getDate()}${y} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
 }
-function t12(hhmm: string) { const [h, m] = hhmm.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; }
-function fullDate(d: Date) { return `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.toLocaleDateString('en-US', { month: 'long' })} ${ordinal(d.getDate())}, ${d.getFullYear()}`; }
 const day = (n: number) => new Date(new Date().setHours(0, 0, 0, 0) + n * 86400000);
-const daysBetween = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 86400000);
-
-/* §3a. EFFORT DECIDES *WHEN*, PRIORITY DECIDES *HOW LOUD*. Surfacing an
-   unimportant, large task two weeks early costs nothing; surfacing an important,
-   tiny one two weeks early is noise for thirteen days. */
-type Effort = 'quick' | 'sitting' | 'block' | 'project';
-const EFFORT: { key: Effort; label: string; hint: string; lead: number; step: number }[] = [
-  { key: 'quick',   label: 'Quick',   hint: 'under 15 minutes',   lead: 1,  step: 1 },
-  { key: 'sitting', label: 'Sitting', hint: 'about an hour',      lead: 3,  step: 2 },
-  { key: 'block',   label: 'Block',   hint: 'half a day or more', lead: 7,  step: 3 },
-  { key: 'project', label: 'Project', hint: 'several sessions',   lead: 21, step: 4 },
-];
-const eff = (k: Effort) => EFFORT.find((e) => e.key === k)!;
-type Priority = 'low' | 'normal' | 'high';
-const PRIORITIES: { key: Priority; label: string }[] = [
-  { key: 'low', label: 'Low' }, { key: 'normal', label: 'Normal' }, { key: 'high', label: 'High' },
-];
 
 interface Goal { slug: string; name: string; horizon: string; why: string; obs: string; cold?: boolean }
 const GOALS: Goal[] = [
@@ -62,47 +39,8 @@ const GOALS: Goal[] = [
     why: 'Not a number on a scale. Being able to do the Tahoe hike in September without hating it.' },
 ];
 
-interface Task {
-  id: string; title: string; due: Date | null; time?: string;
-  effort: Effort; priority: Priority; lead?: number;
-  goal?: string; done?: boolean;
-  repeat?: { mode: 'after_completion' | 'fixed'; words: string };
-  drift?: string;   // the disposition payoff line (§4)
-}
-const TASKS: Task[] = [
-  { id: 'dentist',  title: 'Rebook the dentist',     due: day(-4), effort: 'quick',   priority: 'normal' },
-  { id: 'water',    title: 'Pay the water bill',     due: day(-2), effort: 'quick',   priority: 'high' },
-  { id: 'recycle',  title: 'Take the recycling out', due: day(-1), effort: 'quick',   priority: 'low',
-    repeat: { mode: 'after_completion', words: 'every week after I do it' } },
-  { id: 'bank',     title: 'Call the bank',          due: day(0), time: '16:30', effort: 'quick', priority: 'high' },
-  { id: 'plants',   title: 'Water the plants',       due: day(0), effort: 'quick',   priority: 'low',
-    repeat: { mode: 'after_completion', words: 'every 3 days after I do it' } },
-  { id: 'rent',     title: 'Rent',                   due: day(1), effort: 'quick',   priority: 'high',
-    repeat: { mode: 'fixed', words: 'the 1st of every month' } },
-  { id: 'essay',    title: 'Draft the Sky essay',    due: day(4), effort: 'block',    priority: 'normal', goal: 'sky' },
-  { id: 'bathroom', title: 'Deep clean the bathroom', due: day(6), effort: 'sitting', priority: 'normal',
-    repeat: { mode: 'after_completion', words: 'every 2 weeks after I do it' },
-    drift: 'Skipped 4 of the last 6 — every 3 weeks instead?' },
-  { id: 'flights',  title: 'Book the Portland flights', due: day(12), effort: 'sitting', priority: 'normal', goal: 'family' },
-  { id: 'passport', title: 'Renew the passport',     due: day(42), effort: 'project',  priority: 'normal' },
-  { id: 'bike',     title: 'Sort the bike out',      due: null,    effort: 'sitting',  priority: 'normal' },
-  { id: 'shed',     title: 'Fix the shed door',      due: null,    effort: 'block',    priority: 'low' },
-];
-
-/* Grouped by WHEN, and past due is FIRST here — the opposite of Today
-   (10-hq.md §10f), and consistent rather than contradictory: both rooms order
-   by time, and arrears are chronologically first. Today is a summary you read
-   forward; this room is where triage happens. */
-const GROUPS = [
-  { key: 'past',   title: 'Past due',    of: (t: Task) => t.due !== null && daysBetween(t.due, day(0)) > 0 },
-  { key: 'today',  title: 'Today',       of: (t: Task) => t.due !== null && daysBetween(t.due, day(0)) === 0 },
-  { key: 'week',   title: 'This week',   of: (t: Task) => t.due !== null && daysBetween(day(0), t.due) > 0 && daysBetween(day(0), t.due) <= 7 },
-  { key: 'later',  title: 'Later',       of: (t: Task) => t.due !== null && daysBetween(day(0), t.due) > 7 },
-  { key: 'none',   title: 'Unscheduled', of: (t: Task) => t.due === null },
-];
-
 const SUBJECT = GOALS[0];
-const SUB_TASKS = TASKS.filter((t) => t.goal === 'sky');
+const SUB_TASKS = [{ title: 'Draft the Sky essay', due: day(4), effort: 'Block' }];
 const SUB_UNSCHED = [
   { title: 'Write the constellation copy' },
   { title: 'Decide what happens at zoom level 3' },
@@ -115,21 +53,14 @@ const SUB_DONE = [
 ];
 ---
 
-<AdminLayout title="Tasks lab">
+<AdminLayout title="Goals lab">
   <div class="sticky top-0 z-30 mb-6 border-b border-warning/40 bg-warning/10 px-4 py-3 font-sans">
     <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-      <span class="font-semibold">Tasks lab</span>
+      <span class="font-semibold">Goals lab</span>
       <span class="flex flex-wrap items-center gap-1">
         <span class="admin-hint mr-1 text-xs">Surface</span>
-        <button type="button" data-surf="tasks" class="btn btn-xs btn-neutral font-sans">Tasks</button>
-        <button type="button" data-surf="editor" class="btn btn-xs btn-ghost font-sans">New task</button>
-        <button type="button" data-surf="goals" class="btn btn-xs btn-ghost font-sans">Goals</button>
+        <button type="button" data-surf="goals" class="btn btn-xs btn-neutral font-sans">Goals</button>
         <button type="button" data-surf="goal" class="btn btn-xs btn-ghost font-sans">One goal</button>
-      </span>
-      <span class="flex items-center gap-1" data-tasks-only>
-        <span class="admin-hint mr-1 text-xs">State</span>
-        <button type="button" data-st="full" class="btn btn-xs btn-neutral font-sans">A real week</button>
-        <button type="button" data-st="empty" class="btn btn-xs btn-ghost font-sans">Empty</button>
       </span>
       <span class="flex items-center gap-1">
         <span class="admin-hint mr-1 text-xs">Width</span>
@@ -137,237 +68,18 @@ const SUB_DONE = [
         <button type="button" data-w="phone" class="btn btn-xs btn-ghost font-sans">390px</button>
       </span>
       <button type="button" id="src-btn" class="btn btn-xs btn-ghost font-sans">Show provenance</button>
-      <a href="/admin" class="admin-back ml-auto text-xs">← Observatory</a>
+      <a href="/admin/tasks" class="admin-back ml-auto text-xs">← Tasks</a>
     </div>
     <p id="blurb" class="mx-auto mt-2 max-w-5xl text-xs text-base-content/60"></p>
   </div>
 
   <div id="frame" class="lab-cq mx-auto w-full max-w-3xl px-4 pb-28">
 
-    {/* ══════════════════ SURFACE 1 · THE TASKS ══════════════════ */}
-    <div data-surface="tasks">
-      <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
-        <h1 class="font-display text-2xl font-light">Tasks</h1>
-        <button type="button" data-open-editor class="btn btn-sm gap-1 font-sans zone__cta cn-amber"><Icon name="ph:plus" /> New</button>
-      </header>
-
-      <section data-state="empty" class="hidden">
-        <div class="rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
-          <p class="font-serif text-lg">Nothing to do.</p>
-          <button type="button" data-open-editor class="btn btn-sm mt-4 gap-1 font-sans zone__cta cn-amber"><Icon name="ph:plus" /> Add the first</button>
-        </div>
-      </section>
-
-      <section data-state="full">
-        {GROUPS.map((g) => {
-          const items = TASKS.filter(g.of);
-          if (!items.length) return null;
-          const past = g.key === 'past';
-          return (
-            <section class:list={['tgroup', past && 'tgroup--past']} data-group={g.key}>
-              <h2 class="tgroup__k">
-                {past && <Icon name="ph:warning" />}
-                {g.title}
-                <span class="tgroup__n">{items.length}</span>
-              </h2>
-              <ul>
-                {items.map((t) => (
-                  <li class:list={['task', `task--${t.priority}`]} data-task={t.id} data-src="tasks ⋈ task_events">
-                    {/* One click, and it stays (10-hq.md §10f). NOT in past due:
-                        there the choice IS the interaction, and a circle beside
-                        a "Did it" chip is two paths to one outcome while saying
-                        nothing about the other one. */}
-                    {!past && (
-                      <button type="button" class="tick" data-tick aria-label={`Mark "${t.title}" done`}>
-                        <Icon name="ph:circle" class="tick__o" />
-                        <Icon name="ph:check-circle" class="tick__x" />
-                      </button>
-                    )}
-                    <span class="min-w-0 flex-1">
-                      <span class="task__t">{t.title}</span>
-                      <span class="task__m">
-                        {past && <span class="task__late">{daysBetween(t.due!, day(0))} {daysBetween(t.due!, day(0)) === 1 ? 'day' : 'days'} late</span>}
-                        {/* "anytime" earns its place ONLY in Today, where the
-                            list is time-ordered and a missing time changes where
-                            a row sits. Elsewhere the date already says it, and
-                            printing it on six of eight rows is just noise. */}
-                        {!past && t.due && g.key === 'today' && (
-                          <button type="button" class="stamp" title={fullDate(t.due)}>
-                            <Icon name="ph:clock-light" class="stamp__i" />
-                            {t.time ? t12(t.time) : <em class="task__any">anytime</em>}
-                          </button>
-                        )}
-                        {!past && t.due && g.key !== 'today' && (
-                          <button type="button" class="stamp" title={fullDate(t.due)}>
-                            <Icon name="ph:clock-light" class="stamp__i" />
-                            {dmd(t.due)}{t.time ? ` · ${t12(t.time)}` : ''}
-                          </button>
-                        )}
-                        {t.repeat && <span class="task__rep" data-src="tasks.recurrence — a RULE, never rows"><Icon name="ph:arrows-clockwise" /> {t.repeat.words}</span>}
-                        {/* EFFORT IS ORDINAL, so it is drawn as a magnitude, not
-                            a category: a four-step meter plus the word. Four
-                            identical grey pills threw the ordering away and made
-                            the field unscannable. No new hue — the ramp is the
-                            agenda's own amber at four densities, so 10-hq §10a
-                            still holds. */}
-                        <span class:list={['eff', `eff--${t.effort}`]} data-src="tasks.effort → lead_days">
-                          <span class="eff__m" aria-hidden="true">{[1,2,3,4].map((n) => <i class:list={[n <= eff(t.effort).step && 'on']} />)}</span>
-                          {eff(t.effort).label}
-                        </span>
-                        {t.goal && <span class="task__goal" data-src="tasks.goal_id"><Icon name="ph:target" /> {GOALS.find((x) => x.slug === t.goal)!.name}</span>}
-                      </span>
-                      {t.drift && <button type="button" class="chip chip--suggest mt-1.5" data-src="task_events: 4 skipped of 6">{t.drift}</button>}
-                    </span>
-                    {past && (
-                      <span class="flex shrink-0 gap-1">
-                        <button type="button" class="chip chip--act chip--did" data-tick><Icon name="ph:check" /> Did it</button>
-                        <button type="button" class="chip chip--act chip--skip"><Icon name="ph:skip-forward" /> Skipping it</button>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
-      </section>
-    </div>
-
-    {/* ══════════════════ SURFACE 2 · THE EDITOR ══════════════════
-        The sheet where the two mechanics nobody has drawn have to make sense.
-        Both are LIVE: change effort or priority and the lead sentence names a
-        real date; pick a rule and the next three occurrences appear. */}
-    <div data-surface="editor" class="hidden">
-      <div class="sheet">
-        <div class="sheet__head">
-          <h2 class="font-display text-lg font-light">New task</h2>
-          <button type="button" data-open-tasks class="zone__act" aria-label="Close"><Icon name="ph:x" /></button>
-        </div>
-
-        <div class="sheet__body">
-          <label class="f">
-            <span class="f__k">What</span>
-            <input type="text" value="Deep clean the bathroom" data-src="tasks.title" />
-          </label>
-          <label class="f mt-3">
-            <span class="f__k">Notes</span>
-            <textarea rows="2" placeholder="Optional. Markdown." data-src="tasks.notes"></textarea>
-          </label>
-
-          <div class="fs">
-            <p class="fs__k">When</p>
-            <div class="flex flex-wrap items-end gap-2">
-              <label class="f">
-                <span class="f__k">Date</span>
-                <input type="date" data-due data-src="tasks.due_on (a DATE — does not shift when you travel)" />
-              </label>
-              <label class="f">
-                <span class="f__k">Time</span>
-                <input type="time" data-time data-src="tasks.due_time — NULLABLE" />
-              </label>
-              <button type="button" class="btn btn-ghost btn-xs mb-1 font-sans" data-clear-time>Clear</button>
-              {/* Nullable time is not a shrug (§3) — but the UI says it in one
-                  word beside the field, not a paragraph under it. */}
-              <span class="f__tag" data-anytime>anytime</span>
-            </div>
-          </div>
-
-          <div class="fs">
-            <div class="flex flex-wrap gap-x-8 gap-y-3">
-              <div>
-                <p class="fs__k">Effort</p>
-                <div class="seg" data-src="tasks.effort">
-                  {EFFORT.map((e) => (
-                    <button type="button" class:list={['seg__b', e.key === 'sitting' && 'seg__b--on']} data-effort={e.key} title={e.hint}>{e.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p class="fs__k">Priority</p>
-                <div class="seg" data-src="tasks.priority">
-                  {PRIORITIES.map((p) => (
-                    <button type="button" class:list={['seg__b', p.key === 'normal' && 'seg__b--on']} data-prio={p.key}>{p.label}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* The lead rule is invisible machinery until it names a date. ONE
-                line — the date. The paragraph that used to explain which rule
-                fired was teaching, not interface. */}
-            <div class="lead" data-src="derived: effort → lead_days, +1 bucket if high, lead_days overrides">
-              <p class="lead__l"><Icon name="ph:calendar-blank" /> <span data-lead-line></span></p>
-              <label class="lead__o">
-                <input type="checkbox" data-override-on />
-                <span>Warn me</span>
-                <input type="text" inputmode="numeric" value="3" class="lead__n" data-override-n disabled />
-                <span>days ahead instead</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="fs">
-            <p class="fs__k">Repeats</p>
-            <div class="seg seg--wrap" data-src="tasks.recurrence jsonb">
-              <button type="button" class="seg__b seg__b--on" data-rep="none">Doesn't repeat</button>
-              <button type="button" class="seg__b" data-rep="after">After I do it</button>
-              <button type="button" class="seg__b" data-rep="fixed">On a schedule</button>
-            </div>
-
-            <div class="mt-3" data-rep-panel="after" hidden>
-              <div class="flex items-center gap-2">
-                <span class="admin-hint text-xs">Every</span>
-                <input type="text" inputmode="numeric" value="2" class="lead__n" data-every />
-                <span class="seg" data-unit>
-                  <button type="button" class="seg__b" data-u="days">days</button>
-                  <button type="button" class="seg__b seg__b--on" data-u="weeks">weeks</button>
-                  <button type="button" class="seg__b" data-u="months">months</button>
-                </span>
-                <span class="admin-hint text-xs">after I finish</span>
-              </div>
-              {/* This mode has no schedule to preview. One clause, not a lecture. */}
-              <p class="prev prev--none">Counted from the day you tick it.</p>
-            </div>
-
-            <div class="mt-3" data-rep-panel="fixed" hidden>
-              <select class="fsel" data-rrule data-src="RRULE (RFC 5545) — the language Google already speaks">
-                <option value="daily">Every day</option>
-                <option value="weekly" selected>Every week, on this weekday</option>
-                <option value="biweekly">Every 2 weeks, on this weekday</option>
-                <option value="monthly-date">Monthly, on this date</option>
-                <option value="monthly-nth">Monthly, on the 3rd Monday</option>
-                <option value="weekdays">Every weekday</option>
-              </select>
-              {/* You cannot verify FREQ=MONTHLY;BYDAY=3MO by reading it, so the
-                  next three occurrences are the check. The RRULE string itself
-                  is storage, not interface — it stays behind the provenance
-                  toggle with every other column name. */}
-              <p class="prev" data-prev></p>
-              <p class="rrule" data-rrule-str hidden></p>
-            </div>
-          </div>
-
-          <div class="fs">
-            <p class="fs__k">Goal</p>
-            <select class="fsel" data-src="tasks.goal_id — ON DELETE SET NULL">
-              <option>— none —</option>
-              {GOALS.map((g) => <option>{g.name}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div class="sheet__foot">
-          <button type="button" data-open-tasks class="btn btn-ghost btn-sm font-sans">Cancel</button>
-          <button type="button" data-open-tasks class="btn btn-sm font-sans zone__cta cn-amber">Add task</button>
-        </div>
-      </div>
-    </div>
-
-    {/* ══════════════════ SURFACE 3 · GOALS ══════════════════
+    {/* ══════════════════ SURFACE 1 · GOALS ══════════════════
         An intention, not a project (§4a). No progress bar, no percent, no
         subtask count — a goal is not 60% done, and saying it is would be both
         false and a guilt engine. */}
-    <div data-surface="goals" class="hidden">
+    <div data-surface="goals">
       <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
         <h1 class="font-display text-2xl font-light">Goals</h1>
         <div class="flex items-center gap-3">
@@ -398,7 +110,7 @@ const SUB_DONE = [
       </section>
     </div>
 
-    {/* ══════════════════ SURFACE 4 · ONE GOAL ══════════════════ */}
+    {/* ══════════════════ SURFACE 2 · ONE GOAL ══════════════════ */}
     <div data-surface="goal" class="hidden">
       <a href="#" data-open-goals class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Goals</a>
 
@@ -438,7 +150,7 @@ const SUB_DONE = [
                   </button>
                   <span class="min-w-0 flex-1">
                     <span class="task__t">{t.title}</span>
-                    <span class="task__m"><button type="button" class="stamp"><Icon name="ph:clock-light" class="stamp__i" />{dmd(t.due!)}</button><span class="task__eff">Block</span></span>
+                    <span class="task__m"><span class="stamp">{dmd(t.due)}</span><span class="eff eff--block">{t.effort}</span></span>
                   </span>
                 </li>
               ))}
@@ -500,115 +212,22 @@ const SUB_DONE = [
     .o-1, .o-2, .o-3 { order: 0 }
   }
 
-  /* zone primitives — the same set again; they graduate to app.css in 11·0b */
-  .zone { border: 1px solid var(--color-base-300); border-radius: var(--radius-box); background: var(--color-base-100); overflow: hidden; }
-  .zone__head { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.875rem; border-bottom: 1px solid var(--color-base-300); background: color-mix(in oklch, var(--cn) 7%, transparent); }
-  .zone__chip { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; background: color-mix(in oklch, var(--cn) 18%, transparent); color: var(--cn); font-size: 1rem; }
-  .zone__title { font-family: var(--font-sans); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklch, var(--cn) 78%, var(--color-base-content)); }
-  .zone__act { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; cursor: pointer; color: color-mix(in oklch, var(--color-base-content) 55%, transparent); }
-  .zone__act:hover { background: var(--color-base-200); color: var(--color-base-content); }
-  .zone__cta { background: var(--cn); color: var(--color-base-100); border-color: transparent; }
-  .zone__cta:hover { filter: brightness(1.08); }
-  .zone__list { padding: 0.25rem 0.875rem; }
-  .zone__count { font-family: var(--font-sans); font-size: 0.625rem; letter-spacing: 0.04em; text-transform: uppercase; color: color-mix(in oklch, var(--color-base-content) 42%, transparent); }
-  .row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; }
-  .row + .row { border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent); }
-  .row__mark { flex-shrink: 0; font-size: 0.9375rem; color: var(--cn); }
-  .chip { display: inline-flex; align-items: center; gap: 0.3125rem; padding: 0.1875rem 0.5rem; border-radius: 999px; font-family: var(--font-sans); font-size: 0.6875rem; line-height: 1.4; border: 1px solid transparent; white-space: nowrap; }
+  /* `.zone`, `.row`, `.chip`, `.stamp`, `.task`, `.tick` and `.eff` all live in
+     app.css now — the first four graduated with 11 · Piece 0b, the last three
+     with 13 · Piece 1. What is left below is the goals-only vocabulary, which
+     is what Piece 2 will decide whether to graduate. */
   .chip--soon { background: var(--color-base-200); color: color-mix(in oklch, var(--color-base-content) 62%, transparent); border-color: var(--color-base-300); }
-  .chip--act { cursor: pointer; background: var(--color-base-100); border-color: var(--color-base-300); color: color-mix(in oklch, var(--color-base-content) 70%, transparent); }
-  .chip--act:hover { background: var(--color-base-200); color: var(--color-base-content); }
-  .chip--act svg { font-size: 0.8125rem; }
-  .chip--did:hover  { background: color-mix(in oklch, var(--color-success, oklch(65% 0.13 150)) 14%, transparent); border-color: color-mix(in oklch, var(--color-success, oklch(65% 0.13 150)) 40%, transparent); color: var(--color-success, oklch(52% 0.13 150)); }
-  .chip--skip:hover { background: var(--color-base-200); color: color-mix(in oklch, var(--color-base-content) 60%, transparent); }
   .chip--suggest { cursor: pointer; background: transparent; color: color-mix(in oklch, var(--color-base-content) 62%, transparent); border: 1px dashed var(--color-base-300); }
   .chip--suggest:hover { background: var(--color-base-200); color: var(--color-base-content); }
-  .stamp { display: inline-flex; align-items: center; gap: 0.3125rem; cursor: pointer; font-variant-numeric: tabular-nums; }
-  .stamp:hover { color: var(--cn); }
-  .stamp__i { font-size: 0.8125rem; opacity: 0.65; }
 
-  /* ── the task list ──────────────────────────────────────────────────────── */
-  .tgroup { margin-bottom: 1.5rem; }
-  .tgroup__k { display: flex; align-items: center; gap: 0.4375rem; font-family: var(--font-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklch, var(--color-base-content) 48%, transparent); margin-bottom: 0.375rem; }
-  .tgroup__n { color: color-mix(in oklch, var(--color-base-content) 32%, transparent); font-weight: 400; }
-  /* URGENCY is the semantic axis and nothing else may borrow it (10-hq §10a).
-     Past due is the only thing in this room that gets it. */
-  .tgroup--past .tgroup__k { color: var(--color-error); }
-  .tgroup--past ul { border-left: 3px solid color-mix(in oklch, var(--color-error) 40%, transparent); border-radius: 0 var(--radius-box) var(--radius-box) 0; background: color-mix(in oklch, var(--color-error) 4%, transparent); padding-left: 0.75rem; }
-
-  .task { display: flex; align-items: flex-start; gap: 0.625rem; padding: 0.5rem 0; }
-  .task + .task { border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent); }
-  .task__t { display: block; font-size: 0.9375rem; line-height: 1.35; }
-  .task__m { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin-top: 0.1875rem; font-family: var(--font-sans); font-size: 0.6875rem; color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
-  .task__any { font-style: italic; }
-  .task__late { color: var(--color-error); font-weight: 700; }
-  .task__rep, .task__goal { display: inline-flex; align-items: center; gap: 0.25rem; }
-
-  /* The effort meter. Ordinal, so it reads as magnitude: four bars of rising
-     height, and the pill darkens with the same step. One hue (the agenda's
-     amber) at four densities — an intensity ramp inside the domain colour, not
-     a fifth colour meaning. */
-  .eff { display: inline-flex; align-items: center; gap: 0.3125rem; padding: 0.0625rem 0.4375rem 0.0625rem 0.3125rem; border-radius: 0.25rem; font-size: 0.625rem; letter-spacing: 0.03em; text-transform: uppercase; }
-  .eff__m { display: inline-flex; align-items: flex-end; gap: 1px; height: 0.5rem; }
-  .eff__m i { width: 2px; border-radius: 1px; background: currentColor; opacity: 0.25; }
-  .eff__m i:nth-child(1) { height: 25% } .eff__m i:nth-child(2) { height: 50% }
-  .eff__m i:nth-child(3) { height: 75% } .eff__m i:nth-child(4) { height: 100% }
-  .eff__m i.on { opacity: 1; }
-  .eff--quick   { background: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 10%, transparent); color: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 42%, var(--color-base-content)); }
-  .eff--sitting { background: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 20%, transparent); color: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 55%, var(--color-base-content)); }
-  .eff--block   { background: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 34%, transparent); color: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 68%, var(--color-base-content)); }
-  .eff--project { background: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 50%, transparent); color: color-mix(in oklch, var(--cn-amber, oklch(70% 0.12 62)) 80%, var(--color-base-content)); }
-  /* PRIORITY IS PROMINENCE, NOT COLOUR — weight and ink, so it never competes
-     with the one thing that is allowed to be red. */
-  .task--high .task__t { font-weight: 700; }
-  .task--high .tick { color: color-mix(in oklch, var(--color-base-content) 75%, transparent); }
-  .task--low .task__t { color: color-mix(in oklch, var(--color-base-content) 62%, transparent); }
-
-  .tick { position: relative; flex-shrink: 0; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; margin-top: 0.0625rem; cursor: pointer; font-size: 1.25rem; color: color-mix(in oklch, var(--color-base-content) 35%, transparent); }
-  .tick:hover { color: var(--color-base-content); }
-  .tick__x { display: none; }
-  .task--done .tick { color: var(--color-success, var(--color-info)); }
-  .task--done .tick__o { display: none; }
-  .task--done .tick__x { display: block; }
-  /* It STAYS, struck through, and the same click undoes it (10-hq §10f). */
-  .task--done .task__t { text-decoration: line-through; color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
-
-  /* ── the editor ─────────────────────────────────────────────────────────── */
-  .sheet { max-width: 36rem; margin: 0 auto; border: 1px solid var(--color-base-300); border-radius: var(--radius-box); background: var(--color-base-100); box-shadow: 0 12px 40px oklch(0% 0 0 / 0.22); overflow: hidden; }
-  .sheet__head { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-base-300); }
-  .sheet__body { padding: 1rem; }
-  .sheet__foot { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--color-base-300); background: var(--color-base-200); }
-  .fs { margin-top: 1.125rem; padding-top: 1.125rem; border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent); min-width: 0; }
-  .fs__k { font-family: var(--font-sans); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklch, var(--color-base-content) 50%, transparent); margin-bottom: 0.5rem; }
-  .f { display: block; min-width: 0; }
-  .f__k { display: block; font-family: var(--font-sans); font-size: 0.625rem; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in oklch, var(--color-base-content) 48%, transparent); margin-bottom: 0.25rem; }
-  .f__tag { margin-bottom: 0.5rem; font-family: var(--font-sans); font-size: 0.6875rem; font-style: italic; color: color-mix(in oklch, var(--color-base-content) 42%, transparent); }
-  .f input, .f textarea, .fsel { border: 1px solid var(--color-base-300); border-radius: var(--radius-field, 0.5rem); background: var(--color-base-100); padding: 0.375rem 0.625rem; font-family: var(--font-sans); font-size: 0.875rem; width: 100%; }
-  .f input:focus, .f textarea:focus, .fsel:focus { outline: none; border-color: var(--color-primary); }
-  .f textarea { resize: none; font-family: var(--font-serif, serif); }
   .seg { display: inline-flex; border: 1px solid var(--color-base-300); border-radius: var(--radius-field, 0.5rem); overflow: hidden; }
-  .seg--wrap { flex-wrap: wrap; }
   .seg__b { cursor: pointer; padding: 0.3125rem 0.6875rem; font-family: var(--font-sans); font-size: 0.8125rem; white-space: nowrap; }
   .seg__b + .seg__b { border-left: 1px solid var(--color-base-300); }
   .seg__b:hover { background: var(--color-base-200); }
-  /* AFTER :hover, and with its own hover rule. Equal specificity means source
-     order decides, so the selected segment turned pale under the cursor — which
-     reads as disabled on the one control you just clicked. */
+  /* TRAP 6: AFTER :hover, with its own hover rule. */
   .seg__b--on, .seg__b--on:hover { background: var(--color-primary); color: var(--color-primary-content); }
   .seg__b--on:hover { filter: brightness(1.08); }
-  .lead__n { width: 2.75rem !important; text-align: center; border: 1px solid var(--color-base-300); border-radius: var(--radius-field, 0.5rem); padding: 0.1875rem 0.25rem; font-family: var(--font-sans); font-size: 0.8125rem; }
 
-  .lead { margin-top: 0.875rem; border: 1px solid color-mix(in oklch, var(--color-info) 28%, transparent); border-radius: var(--radius-box); background: color-mix(in oklch, var(--color-info) 6%, transparent); padding: 0.625rem 0.75rem; }
-  .lead__l { display: flex; align-items: center; gap: 0.4375rem; font-family: var(--font-sans); font-size: 0.8125rem; color: color-mix(in oklch, var(--color-base-content) 88%, transparent); }
-  .lead__l strong { font-weight: 700; }
-  .lead__o { display: flex; align-items: center; gap: 0.375rem; margin-top: 0.5rem; cursor: pointer; font-family: var(--font-sans); font-size: 0.6875rem; color: color-mix(in oklch, var(--color-base-content) 55%, transparent); }
-  .lead__o input[type='checkbox'] { cursor: pointer; }
-
-  .prev { margin-top: 0.5rem; font-family: var(--font-sans); font-size: 0.75rem; font-variant-numeric: tabular-nums; color: color-mix(in oklch, var(--color-base-content) 72%, transparent); }
-  .prev--none { font-size: 0.6875rem; line-height: 1.5; font-style: italic; color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
-  .rrule { margin-top: 0.25rem; font-family: ui-monospace, monospace; font-size: 0.625rem; color: color-mix(in oklch, var(--color-base-content) 35%, transparent); }
-
-  /* ── goals ──────────────────────────────────────────────────────────────── */
   .ggrid { display: grid; gap: 0.75rem; grid-template-columns: 1fr; }
   @container (min-width: 34rem) { .ggrid { grid-template-columns: 1fr 1fr; } }
   .gcard { display: block; border: 1px solid var(--color-base-300); border-radius: var(--radius-box); background: var(--color-base-100); padding: 0.875rem; cursor: pointer; transition: background-color 0.12s, border-color 0.12s; }
@@ -632,160 +251,28 @@ const SUB_DONE = [
   const $$ = <T extends HTMLElement>(s: string) => Array.from(document.querySelectorAll<T>(s));
 
   const BL: Record<string, string> = {
-    full: 'A real week. Past due is FIRST here — the opposite of Today, and consistent rather than contradictory: both rooms order by time, and arrears are chronologically first.',
-    empty: 'Day one. Not a scold, and not an onboarding checklist.',
-    editor: 'The two mechanics nobody has drawn. Change effort or priority and watch the lead date move; pick a schedule and read the next three occurrences.',
     goals: 'Intentions, not projects. Five is the cap. No progress bars anywhere — a direction cannot be 60% travelled.',
     goal: 'One goal, with the tasks under it and the only number it gets: what actually happened in the last 30 days.',
   };
 
-  /* §3a. Effort decides WHEN; priority only bumps it up one bucket, and never
-     down — hiding a warning is not a kindness. */
-  const LEAD: Record<string, number> = { quick: 1, sitting: 3, block: 7, project: 21 };
-  const ORDER = ['quick', 'sitting', 'block', 'project'];
-  const DAYNAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  let surface = 'tasks';
-  let state = 'full';
-  let effort = 'sitting';
-  let prio = 'normal';
-  let rep = 'none';
-
-  function ordinal(n: number) { const r = n % 100; return r >= 11 && r <= 13 ? `${n}th` : `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`; }
-  function pretty(d: Date) { return `${DAYNAME[d.getDay()].slice(0, 3)}, ${d.toLocaleDateString('en-US', { month: 'short' })} ${ordinal(d.getDate())}`; }
-  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-  function dueDate(): Date {
-    const v = $<HTMLInputElement>('[data-due]').value;
-    const [y, m, d] = v.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-
-  /* The whole point of the explainer: the rule is invisible machinery until it
-     names a real date, and an invisible rule is one you fight instead of use. */
-  function paintLead() {
-    const base = LEAD[effort];
-    const bumped = prio === 'high' ? LEAD[ORDER[Math.min(3, ORDER.indexOf(effort) + 1)]] : base;
-    const override = $<HTMLInputElement>('[data-override-on]').checked;
-    const n = Math.max(0, Number($<HTMLInputElement>('[data-override-n]').value) || 0);
-    const lead = override ? n : bumped;
-
-    const from = new Date(dueDate().getTime() - lead * 86400000);
-    const today = new Date(new Date().setHours(0, 0, 0, 0));
-    const days = `${lead} day${lead === 1 ? '' : 's'} ahead`;
-    /* A lead that reaches back past today is the common case for a project, and
-       naming a date that has already gone by reads as a bug. Say what is true
-       instead: it is on Today already. */
-    $('[data-lead-line]').innerHTML = from <= today
-      ? `<strong>Already on Today</strong> — ${days}`
-      : `On Today from <strong>${pretty(from)}</strong> — ${days}`;
-  }
-
-  /* You cannot verify FREQ=MONTHLY;BYDAY=3MO by reading it, so every schedule
-     shows the next three dates it actually produces. That is the check. */
-  function occurrences(kind: string, from: Date, n = 3): Date[] {
-    const out: Date[] = [];
-    const d = new Date(from);
-    const push = (x: Date) => out.push(new Date(x));
-    if (kind === 'daily') { for (let i = 0; i < n; i++) { push(d); d.setDate(d.getDate() + 1); } }
-    else if (kind === 'weekly' || kind === 'biweekly') {
-      const step = kind === 'weekly' ? 7 : 14;
-      for (let i = 0; i < n; i++) { push(d); d.setDate(d.getDate() + step); }
-    } else if (kind === 'weekdays') {
-      while (out.length < n) { if (d.getDay() !== 0 && d.getDay() !== 6) push(d); d.setDate(d.getDate() + 1); }
-    } else if (kind === 'monthly-date') {
-      for (let i = 0; i < n; i++) { push(d); d.setMonth(d.getMonth() + 1); }
-    } else if (kind === 'monthly-nth') {
-      // the 3rd Monday of each month, starting with the month `from` is in
-      let y = from.getFullYear(), m = from.getMonth();
-      while (out.length < n) {
-        const first = new Date(y, m, 1);
-        const shift = (1 - first.getDay() + 7) % 7;          // to the first Monday
-        const third = new Date(y, m, 1 + shift + 14);
-        if (third >= from) push(third);
-        m++; if (m > 11) { m = 0; y++; }
-      }
-    }
-    return out;
-  }
-  const RRULE: Record<string, (d: Date) => string> = {
-    daily: () => 'FREQ=DAILY',
-    weekly: (d) => `FREQ=WEEKLY;BYDAY=${['SU','MO','TU','WE','TH','FR','SA'][d.getDay()]}`,
-    biweekly: (d) => `FREQ=WEEKLY;INTERVAL=2;BYDAY=${['SU','MO','TU','WE','TH','FR','SA'][d.getDay()]}`,
-    'monthly-date': (d) => `FREQ=MONTHLY;BYMONTHDAY=${d.getDate()}`,
-    'monthly-nth': () => 'FREQ=MONTHLY;BYDAY=3MO',
-    weekdays: () => 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
-  };
-  function paintRepeat() {
-    $$('[data-rep-panel]').forEach((p) => (p.hidden = p.dataset.repPanel !== rep));
-    if (rep !== 'fixed') return;
-    const kind = $<HTMLSelectElement>('[data-rrule]').value;
-    const d = dueDate();
-    $('[data-prev]').textContent = 'Next: ' + occurrences(kind, d).map(pretty).join('  ·  ');
-    const rr = $<HTMLElement>('[data-rrule-str]');
-    rr.textContent = RRULE[kind](d);
-    rr.hidden = !document.body.classList.contains('show-src');
-  }
+  let surface = 'goals';
 
   function paint() {
     $$('[data-surface]').forEach((s) => s.classList.toggle('hidden', s.dataset.surface !== surface));
-    $$('[data-state]').forEach((s) => s.classList.toggle('hidden', s.dataset.state !== state));
-    $$<HTMLElement>('[data-tasks-only]').forEach((s) => (s.hidden = surface !== 'tasks'));
-    $('#blurb').textContent = surface === 'tasks' ? BL[state] : BL[surface];
+    $('#blurb').textContent = BL[surface];
     $$<HTMLButtonElement>('[data-surf]').forEach((b) => {
       const hit = b.dataset.surf === surface;
-      b.classList.toggle('btn-neutral', hit); b.classList.toggle('btn-ghost', !hit);
-    });
-    $$<HTMLButtonElement>('[data-st]').forEach((b) => {
-      const hit = b.dataset.st === state;
       b.classList.toggle('btn-neutral', hit); b.classList.toggle('btn-ghost', !hit);
     });
   }
 
   $$<HTMLButtonElement>('[data-surf]').forEach((b) => b.addEventListener('click', () => { surface = b.dataset.surf!; paint(); }));
-  $$<HTMLButtonElement>('[data-st]').forEach((b) => b.addEventListener('click', () => { state = b.dataset.st!; paint(); }));
-  $$<HTMLElement>('[data-open-editor]').forEach((b) => b.addEventListener('click', () => { surface = 'editor'; paint(); window.scrollTo(0, 0); }));
-  $$<HTMLElement>('[data-open-tasks]').forEach((b) => b.addEventListener('click', () => { surface = 'tasks'; paint(); window.scrollTo(0, 0); }));
   $$<HTMLElement>('[data-open-goals]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); surface = 'goals'; paint(); window.scrollTo(0, 0); }));
   $$<HTMLElement>('[data-open-goal]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); surface = 'goal'; paint(); window.scrollTo(0, 0); }));
 
-  // One click ticks it off; it stays visible, struck through; the same click undoes.
   $$<HTMLButtonElement>('[data-tick]').forEach((b) => b.addEventListener('click', () => {
     b.closest('.task')!.classList.toggle('task--done');
   }));
-
-  $$<HTMLButtonElement>('[data-effort]').forEach((b) => b.addEventListener('click', () => {
-    effort = b.dataset.effort!;
-    $$('[data-effort]').forEach((o) => o.classList.toggle('seg__b--on', o === b));
-    paintLead();
-  }));
-  $$<HTMLButtonElement>('[data-prio]').forEach((b) => b.addEventListener('click', () => {
-    prio = b.dataset.prio!;
-    $$('[data-prio]').forEach((o) => o.classList.toggle('seg__b--on', o === b));
-    paintLead();
-  }));
-  $<HTMLInputElement>('[data-override-on]').addEventListener('change', (e) => {
-    $<HTMLInputElement>('[data-override-n]').disabled = !(e.target as HTMLInputElement).checked;
-    paintLead();
-  });
-  $<HTMLInputElement>('[data-override-n]').addEventListener('input', paintLead);
-
-  $$<HTMLButtonElement>('[data-rep]').forEach((b) => b.addEventListener('click', () => {
-    rep = b.dataset.rep!;
-    $$('[data-rep]').forEach((o) => o.classList.toggle('seg__b--on', o === b));
-    paintRepeat();
-  }));
-  $$<HTMLButtonElement>('[data-u]').forEach((b) => b.addEventListener('click', () => {
-    $$('[data-u]').forEach((o) => o.classList.toggle('seg__b--on', o === b));
-  }));
-  $<HTMLSelectElement>('[data-rrule]').addEventListener('change', paintRepeat);
-
-  const time = $<HTMLInputElement>('[data-time]');
-  const anytime = $<HTMLElement>('[data-anytime]');
-  const syncTime = () => (anytime.hidden = !!time.value);
-  time.addEventListener('input', syncTime);
-  $<HTMLButtonElement>('[data-clear-time]').addEventListener('click', () => { time.value = ''; syncTime(); });
-  $<HTMLInputElement>('[data-due]').addEventListener('input', () => { paintLead(); paintRepeat(); });
 
   $$<HTMLButtonElement>('[data-w]').forEach((b) => b.addEventListener('click', () => {
     const phone = b.dataset.w === 'phone';
@@ -804,13 +291,7 @@ const SUB_DONE = [
     const active = document.body.classList.toggle('show-src');
     srcBtn.textContent = active ? 'Hide provenance' : 'Show provenance';
     srcBtn.classList.toggle('btn-neutral', active); srcBtn.classList.toggle('btn-ghost', !active);
-    paintRepeat();
   });
 
-  // The editor opens on a real date so every derived line has something to say.
-  $<HTMLInputElement>('[data-due]').value = iso(new Date(Date.now() + 6 * 86400000));
-  syncTime();
-  paintLead();
-  paintRepeat();
   paint();
 </script>

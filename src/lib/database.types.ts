@@ -604,6 +604,95 @@ export type Database = {
         }
         Relationships: []
       }
+      task_events: {
+        Row: {
+          created_at: string
+          for_due_on: string | null
+          id: string
+          occurred_on: string
+          outcome: Database["public"]["Enums"]["task_outcome"]
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          for_due_on?: string | null
+          id?: string
+          occurred_on: string
+          outcome: Database["public"]["Enums"]["task_outcome"]
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          for_due_on?: string | null
+          id?: string
+          occurred_on?: string
+          outcome?: Database["public"]["Enums"]["task_outcome"]
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          due_on: string | null
+          due_time: string | null
+          effort: Database["public"]["Enums"]["task_effort"]
+          id: string
+          lead_days: number | null
+          notes: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          recur_every: number | null
+          recur_mode: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule: string | null
+          recur_unit: Database["public"]["Enums"]["recurrence_unit"] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          due_on?: string | null
+          due_time?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
+          id?: string
+          lead_days?: number | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recur_every?: number | null
+          recur_mode?: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule?: string | null
+          recur_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          due_on?: string | null
+          due_time?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
+          id?: string
+          lead_days?: number | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recur_every?: number | null
+          recur_mode?: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule?: string | null
+          recur_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       works: {
         Row: {
           author_id: string | null
@@ -678,7 +767,12 @@ export type Database = {
         | "shared"
         | "note"
       person_circle: "family" | "friends" | "professional"
+      recurrence_mode: "after_completion" | "fixed"
+      recurrence_unit: "days" | "weeks" | "months"
       sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
+      task_effort: "quick" | "sitting" | "block" | "project"
+      task_outcome: "done" | "skipped"
+      task_priority: "low" | "normal" | "high"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -820,7 +914,12 @@ export const Constants = {
         "note",
       ],
       person_circle: ["family", "friends", "professional"],
+      recurrence_mode: ["after_completion", "fixed"],
+      recurrence_unit: ["days", "weeks", "months"],
       sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
+      task_effort: ["quick", "sitting", "block", "project"],
+      task_outcome: ["done", "skipped"],
+      task_priority: ["low", "normal", "high"],
     },
   },
 } as const

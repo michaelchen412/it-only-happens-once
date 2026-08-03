@@ -8,7 +8,7 @@
 
 `design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: private, seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
 
-**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · Fragments · Constellations · Library · About**. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
+**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Tasks · Fragments · Constellations · Library · About**. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
 
 So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
 
@@ -485,3 +485,34 @@ It shows in exactly three places, and never as arrears:
 ### What is still not rendered
 
 **The brief** — §2a's four labelled lines you read before seeing somebody tonight — hangs off a people-tagged **event**, and there is no events table. It joins Today's People zone when the agenda lands. Until then that zone is birthdays and drift, which is a correct, quiet page rather than a placeholder for one.
+
+---
+
+## 13. Tasks — the agenda's first room
+
+*The third HQ room. Schema in [data-model.md](data-model.md) §6b; the principle it is built to enforce in [ADR 0013](adr/0013-absence-never-accumulates.md).*
+
+**`/admin/tasks`**, with a `<dialog>` sheet for writing one down. **Personal only** — work lives on the company's platform, which is what removes the pressure that turns a personal task list into project management. Deliberately excluded, and each is where one goes to die: sub-tasks, dependencies, tags, time-blocking, contexts, energy levels.
+
+**The list is grouped by when: `Past due · Today · This week · Later · Unscheduled`.** Past due is **first here — the opposite of Today**. That looks like an inconsistency and is not one: both rooms order by time, and arrears are chronologically first. Today is a summary you read forward, so meeting them last is right there; this room is where triage happens, so meeting them first is right here.
+
+**Nothing on the page counts what is owed.** The number beside a heading says how big a list is; *"6 overdue"* would be a verdict about a person, on a page that can be opened at 7am on a bad morning.
+
+**Effort is drawn as a magnitude, not a category** — a four-step meter plus the word, filled to the step, because effort is *ordered* and four identical chips throw that away. The ramp is the agenda's own amber at four densities: an intensity ramp **inside** the domain colour, so no fifth colour meaning enters the system and red still means only one thing. **Priority is prominence, and prominence is not colour**: `high` sets the title in bold, `low` mutes it, and neither ever borrows the urgency axis.
+
+### Answering for something
+
+**A task ticks off in place and stays.** One click, no menu, no dialog; it sits there struck through until midnight and the same click undoes it. A task that vanishes gives no sense of progress and no way back from a mis-tap.
+
+**A past-due row carries the choice instead of a circle:** **Did it** / **Skipping it**, with icons rather than two same-shaped text chips, because this is the one control that has to be answerable at a glance. There are two honest answers to something that has gone past its date, and a tick beside a *Did it* chip is two paths to one outcome while saying nothing about the other.
+
+**Both answers are recorded and both advance the schedule.** A skip is an answer, never inferred from silence — a day the app was not opened must stay distinguishable from a day a chore was deliberately let go. Answering twice on the same day is refused, so a double-tap on a slow connection cannot advance a fortnightly chore by a month.
+
+### The two live mechanics in the sheet
+
+Both exist because the rules they express are invisible until weeks later, and an invisible rule is one you fight instead of use.
+
+- **The lead sentence** — *"On Today from **Fri, Aug 7th** — 7 days ahead"*, live as you change effort or priority. It names a **date**, because a date is what you can judge; and when the lead reaches back past today it says **"Already on Today"** rather than printing a date that has gone by. A `project` is 21 days, so that is the common case, not an edge one. One line, and only the outcome: a second line naming which rule fired was drafted and cut for teaching the mechanic instead of stating the result.
+- **The next three occurrences** — the only available verification of a recurrence. You cannot read a rule and know it means what you meant, and one that is subtly wrong stays invisible until months of chores have been scheduled against it. Schedules are picked **by name** (*every Monday · every other Monday · monthly on the 3rd Monday · every weekday…*), and the names are rebuilt from the date, because "every Monday" is only true while the date is a Monday. **`After I do it` previews nothing and says so in one clause** — *"Counted from the day you tick it."* Showing three dates for both modes would have been a lie.
+
+**A lead and a recurrence are both functions of a date, so neither section exists until there is one.** Not a disabled control beside a sentence explaining why it is disabled.

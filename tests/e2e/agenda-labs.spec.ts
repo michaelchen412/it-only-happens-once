@@ -1,10 +1,18 @@
 // Paired with src/pages/admin/tasks-lab.astro and calendar-lab.astro — delete
-// each with the piece it informs (docs/plans/13-agenda.md, Pieces 1/2 and 4).
+// each with the piece it informs (docs/plans/13-agenda.md, Pieces 2 and 4).
 //
-// These two labs carry more live logic than the others: a lead date computed
-// from two enums, a recurrence preview, and a four-source grid where the whole
-// point is which rows are writable. Arithmetic and authority are exactly what a
-// screenshot cannot check, so that is what is asserted here.
+// ⚠ THE TASKS HALF OF THIS FILE IS GONE, with the lab surfaces it drove:
+// 13 · Piece 1 shipped on 2026-08-03, and the rule is that a piece deletes its
+// lab's specs in the same commit. The assertions did not vanish, they moved to
+// where the real thing lives — `tests/e2e/tasks.spec.ts` and
+// `tests/e2e/tasks.mobile.spec.ts` for the list, the editor, the lead sentence,
+// the recurrence preview and trap 6; `src/tests/hq-tasks.test.ts` and
+// `hq-recurrence.test.ts` for the arithmetic under them.
+//
+// What is left drives the two surfaces still unbuilt: GOALS (Piece 2) and the
+// calendar (Piece 4). Both carry live logic a screenshot cannot check — a
+// four-source grid whose whole point is which rows are writable, and a goals
+// room whose whole point is what it refuses to display.
 //
 // Static pages, no actions — nothing here can touch the corpus.
 import { test, expect } from '@playwright/test';
@@ -12,156 +20,7 @@ import { test, expect } from '@playwright/test';
 const TASKS = '/admin/tasks-lab';
 const CAL = '/admin/calendar-lab';
 
-test.describe('tasks lab', () => {
-  test('the list orders by time, and arrears come first here', async ({ page }) => {
-    await page.goto(TASKS);
-
-    // Past due is FIRST in this room and LAST on Today. Both order by time;
-    // arrears are chronologically first, and this room is where triage happens.
-    const groups = await page.locator('[data-group]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.group));
-    expect(groups).toEqual(['past', 'today', 'week', 'later', 'none']);
-
-    // A past-due row offers the CHOICE, not a circle. A tick beside "Did it"
-    // is two paths to one outcome and says nothing about the other.
-    const late = page.locator('[data-group="past"] .task').first();
-    await expect(late.locator('.tick')).toHaveCount(0);
-    await expect(late.getByRole('button', { name: 'Did it' })).toBeVisible();
-    await expect(late.getByRole('button', { name: 'Skipping it' })).toBeVisible();
-
-    // Days are pluralised. "1 days late" is the kind of thing that ships.
-    await expect(page.locator('.task__late', { hasText: /^1 day late$/ })).toBeVisible();
-    await expect(page.getByText(/\b1 days\b/)).toHaveCount(0);
-  });
-
-  test('disposition carries icons, and effort reads as a magnitude', async ({ page }) => {
-    await page.goto(TASKS);
-    const late = page.locator('[data-group="past"] .task').first();
-    await expect(late.getByRole('button', { name: 'Did it' }).locator('svg')).toBeVisible();
-    await expect(late.getByRole('button', { name: 'Skipping it' }).locator('svg')).toBeVisible();
-
-    // Effort is ORDINAL, so it is drawn as a magnitude: four rising bars, filled
-    // to the step, plus the word. Four identical grey pills threw the ordering
-    // away and made the field unscannable (Michael 2026-08-01).
-    for (const [key, step] of [['quick', 1], ['sitting', 2], ['block', 3], ['project', 4]] as const) {
-      const pill = page.locator(`.eff--${key}`).first();
-      await expect(pill.locator('.eff__m i.on')).toHaveCount(step);
-    }
-
-    // And the ramp is ONE hue at four densities, not four colours — so no new
-    // colour meaning enters the system (10-hq.md §10a). Distinct, and ordered.
-    const alphas = await page.evaluate(() =>
-      ['quick', 'sitting', 'block', 'project'].map((k) => {
-        const el = document.querySelector(`.eff--${k}`)!;
-        const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g)!.map(Number);
-        return { rgb: m.slice(0, 3).join(','), a: m[3] ?? 1 };
-      }),
-    );
-    expect(new Set(alphas.map((x) => x.rgb)).size).toBe(1); // one hue
-    for (let i = 1; i < alphas.length; i++) expect(alphas[i].a).toBeGreaterThan(alphas[i - 1].a);
-  });
-
-  test('"anytime" appears only where a missing time changes anything', async ({ page }) => {
-    await page.goto(TASKS);
-
-    // In Today the list is time-ordered, so a missing time moves the row.
-    await expect(page.locator('[data-group="today"] .task__any')).toHaveCount(1);
-    // Elsewhere the date already carries it, and printing it on most rows is noise.
-    await expect(page.locator('[data-group="week"] .task__any')).toHaveCount(0);
-    await expect(page.locator('[data-group="later"] .task__any')).toHaveCount(0);
-  });
-
-  test('a task ticks off in place, stays visible, and undoes', async ({ page }) => {
-    await page.goto(TASKS);
-    const row = page.locator('.task', { hasText: 'Draft the Sky essay' }).first();
-
-    await row.locator('[data-tick]').click();
-    await expect(row).toHaveClass(/task--done/);
-    await expect(row).toBeVisible();
-    await row.locator('[data-tick]').click();
-    await expect(row).not.toHaveClass(/task--done/);
-  });
-
-  test('effort sets the lead, priority bumps it one bucket and never shortens it', async ({ page }) => {
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'New task' }).click();
-    const line = page.locator('[data-lead-line]');
-
-    // quick=1 · sitting=3 · block=7 · project=21 (13-agenda.md §3a)
-    for (const [effort, days] of [['quick', 1], ['sitting', 3], ['block', 7], ['project', 21]] as const) {
-      await page.locator(`[data-effort="${effort}"]`).click();
-      await expect(line).toContainText(`${days} day${days === 1 ? '' : 's'} ahead`);
-    }
-
-    // Low never reduces the lead — hiding a warning is not a kindness.
-    await page.locator('[data-effort="sitting"]').click();
-    await page.locator('[data-prio="low"]').click();
-    await expect(line).toContainText('3 days ahead');
-
-    // High bumps ONE bucket: sitting(3) → block(7), not to some new number.
-    await page.locator('[data-prio="high"]').click();
-    await expect(line).toContainText('7 days ahead');
-
-    // And the override wins over both.
-    await page.locator('[data-override-on]').check();
-    await page.locator('[data-override-n]').fill('2');
-    await expect(line).toContainText('2 days ahead');
-
-    // ONE line. The paragraph explaining which rule fired was teaching, not
-    // interface (Michael 2026-08-01: "too much backend logic shoehorned in").
-    await expect(page.locator('[data-lead-why]')).toHaveCount(0);
-  });
-
-  test('a lead reaching past today says so instead of naming a date that has gone', async ({ page }) => {
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'New task' }).click();
-    // The sheet opens on a date 6 days out; a project's 21-day lead started
-    // two weeks ago. Naming that date would read as a bug.
-    await page.locator('[data-effort="project"]').click();
-    await expect(page.locator('[data-lead-line]')).toContainText('Already on Today');
-  });
-
-  test('a schedule shows the dates it produces; after-completion admits it cannot', async ({ page }) => {
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'New task' }).click();
-
-    await page.locator('[data-rep="fixed"]').click();
-    // You cannot verify FREQ=MONTHLY;BYDAY=3MO by reading it, so the next three
-    // occurrences are the check — and they must be three real, ascending dates.
-    await page.locator('[data-rrule]').selectOption('monthly-nth');
-    // The RRULE string is storage, not interface: it rides the provenance toggle.
-    await expect(page.locator('[data-rrule-str]')).toBeHidden();
-    const prev = (await page.locator('[data-prev]').textContent())!;
-    const dates = prev.replace('Next: ', '').split('·').map((s) => Date.parse(`${s.trim()} 2026`.replace(/(\d+)(st|nd|rd|th)/, '$1')));
-    expect(dates).toHaveLength(3);
-    for (const d of dates) expect(Number.isNaN(d)).toBe(false);
-    // Every one is a Monday, and they ascend.
-    for (const d of dates) expect(new Date(d).getDay()).toBe(1);
-    expect(dates[1]).toBeGreaterThan(dates[0]);
-    expect(dates[2]).toBeGreaterThan(dates[1]);
-
-    // The honest asymmetry: this mode has no schedule, so it previews nothing
-    // rather than inventing dates.
-    await page.locator('[data-rep="after"]').click();
-    await expect(page.locator('.prev--none')).toHaveText('Counted from the day you tick it.');
-  });
-
-  test('a selected segment stays selected under the cursor', async ({ page }) => {
-    // `.seg__b:hover` and `.seg__b--on` have equal specificity, so source order
-    // decided it — and the button you just clicked went pale, which reads as
-    // disabled. Caught in a screenshot only because the mouse happened to rest.
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'New task' }).click();
-    const block = page.locator('[data-effort="block"]');
-    await block.click();
-    await block.hover();
-    const [bg, plain] = await block.evaluate((el) => {
-      const s = getComputedStyle(el);
-      const off = getComputedStyle(document.querySelector('[data-effort="quick"]')!);
-      return [s.backgroundColor, off.backgroundColor];
-    });
-    expect(bg).not.toBe(plain);
-  });
-
+test.describe('goals lab', () => {
   test('goals are intentions: capped, observed, and never scored', async ({ page }) => {
     await page.goto(TASKS);
     await page.getByRole('button', { name: 'Goals', exact: true }).click();

@@ -1,0 +1,169 @@
+---
+/*
+  TaskSheet — write a task down, or change one (docs/plans/13-agenda.md §3, §3a,
+  §4).
+
+  A SHEET, NOT A PAGE, and a native <dialog> like every other editor in here:
+  focus-trapping, Escape and scroll-lock for free.
+
+  ⚠ AND THE TOP LAYER IS WHY THERE IS NO ANCHORED PICKER ANYWHERE IN IT (trap 7,
+  12-people.md §10). A popover anchored inside a `.zone` is either covered by the
+  sticky header or clipped by the zone's `overflow: hidden` — inert either way,
+  and invisible to typecheck, build and a screenshot. Everything that opens here
+  is either the dialog itself or a native control (`<input type="date">`,
+  `<select>`), all of which the browser renders above everything.
+
+  ⚠ ONE SHEET, MANY TASKS — unlike PersonSheet, whose page holds exactly one
+  person and can therefore server-render its values. The room lists dozens, so
+  the row carries its own JSON and `task-sheet.ts` fills the form on open. That
+  is one more place the form and the row could disagree, which is why the row
+  serialises the COLUMNS rather than what it happens to be displaying.
+
+  TWO SECTIONS EXIST ONLY ONCE THERE IS A DATE. A lead is "N days before…"
+  and a recurrence is "…and again", so both are meaningless without one. They
+  appear when you pick a date rather than sitting there disabled beside a
+  sentence explaining why (10-hq.md §10i).
+*/
+import { Icon } from 'astro-icon/components';
+import { EFFORTS, PRIORITIES } from '../../lib/hq/tasks';
+import { PRESETS, presetLabel } from '../../lib/hq/recurrence';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  /** Today in the configured home zone — the lead sentence measures against it. */
+  today: Ymd;
+}
+const { today } = Astro.props;
+---
+
+<dialog id="task-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="task-sheet-title">
+  <form id="task-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
+    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+      <h2 id="task-sheet-title" class="font-display text-xl">New task</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <p id="task-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <label class="f">
+        <span class="f__k">What <em>required</em></span>
+        <input type="text" name="title" required maxlength="300" placeholder="Deep clean the bathroom" />
+      </label>
+
+      <label class="f mt-4">
+        <span class="f__k">Notes</span>
+        <textarea name="notes" rows="2" placeholder="Optional. Markdown."></textarea>
+      </label>
+
+      <fieldset class="fs mt-4">
+        <legend class="fs__k">When</legend>
+        <div class="flex flex-wrap items-end gap-2">
+          <label class="f">
+            <span class="f__k">Date</span>
+            <input type="date" name="dueOn" class="f--narrow" data-due />
+          </label>
+          <label class="f">
+            <span class="f__k">Time</span>
+            <input type="time" name="dueTime" class="f--narrow" data-time />
+          </label>
+          <button type="button" class="btn btn-ghost btn-xs mb-1 font-sans" data-clear-time>Clear</button>
+          {/* Nullable time is not a shrug (§3) — but it is ONE WORD beside the
+              field rather than a paragraph under it (§10i). */}
+          <span class="f__h mb-1" data-anytime>anytime</span>
+        </div>
+      </fieldset>
+
+      <fieldset class="fs">
+        <div class="flex flex-wrap gap-x-6 gap-y-3">
+          <div class="min-w-0 flex-1">
+            <p class="f__k">Effort</p>
+            <div class="pseg" role="group" aria-label="Effort">
+              {
+                EFFORTS.map((e) => (
+                  <button type="button" class="pseg__b" data-effort={e.key} title={e.hint} aria-pressed={e.key === 'sitting'}>
+                    {e.label}
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="f__k">Priority</p>
+            <div class="pseg" role="group" aria-label="Priority">
+              {
+                PRIORITIES.map((p) => (
+                  <button type="button" class="pseg__b" data-prio={p.key} aria-pressed={p.key === 'normal'}>
+                    {p.label}
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+        </div>
+
+        {/* The lead rule is invisible machinery until it names a date. ONE line,
+            and only the outcome — a second line naming which rule fired taught
+            the mechanic instead of stating the result. */}
+        <div class="lead" data-dated hidden>
+          <p class="lead__l"><Icon name="ph:calendar-blank" /> <span data-lead-line></span></p>
+          <label class="lead__o">
+            <input type="checkbox" data-override-on />
+            <span>Warn me</span>
+            <input type="text" inputmode="numeric" class="f--n" value="3" data-override-n disabled aria-label="Days ahead" />
+            <span>days ahead instead</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="fs" data-dated hidden>
+        <legend class="fs__k">Repeats</legend>
+        <div class="pseg pseg--wrap" role="group" aria-label="Repeats">
+          <button type="button" class="pseg__b" data-rep="none" aria-pressed="true">Doesn’t repeat</button>
+          <button type="button" class="pseg__b" data-rep="after" aria-pressed="false">After I do it</button>
+          <button type="button" class="pseg__b" data-rep="fixed" aria-pressed="false">On a schedule</button>
+        </div>
+
+        <div class="mt-3" data-rep-panel="after" hidden>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="admin-hint text-xs">Every</span>
+            <input type="text" inputmode="numeric" class="f--n" value="2" data-every aria-label="How many" />
+            <div class="pseg" role="group" aria-label="Unit">
+              <button type="button" class="pseg__b" data-unit="days" aria-pressed="false">days</button>
+              <button type="button" class="pseg__b" data-unit="weeks" aria-pressed="true">weeks</button>
+              <button type="button" class="pseg__b" data-unit="months" aria-pressed="false">months</button>
+            </div>
+            <span class="admin-hint text-xs">after I finish</span>
+          </div>
+          {/* This mode HAS no schedule, so it previews nothing. One clause. */}
+          <p class="prev prev--none">Counted from the day you tick it.</p>
+        </div>
+
+        <div class="mt-3" data-rep-panel="fixed" hidden>
+          {/* Nobody hand-writes RRULE (§4), so the schedule is picked by name —
+              and the names are rebuilt from the date, because "every Monday" is
+              only true while the date is a Monday. The rule string itself is
+              storage, not interface, and never appears. */}
+          <div class="f">
+            <select name="preset" data-preset aria-label="Schedule">
+              {PRESETS.map((p) => <option value={p}>{presetLabel(p, today)}</option>)}
+            </select>
+          </div>
+          <p class="prev" data-prev></p>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
+      <button type="button" class="btn btn-ghost btn-sm gap-1 font-sans text-error" data-delete hidden>
+        <Icon name="ph:trash" /> Delete
+      </button>
+      <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
+      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>Add task</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import '../../scripts/task-sheet';
+</script>
