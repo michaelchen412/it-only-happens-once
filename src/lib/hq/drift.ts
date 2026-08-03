@@ -19,13 +19,13 @@
 //     on the day somebody is added, so a naive `now - last > cadence` flags the
 //     ENTIRE ROSTER on creation day — the exact wall §3 forbids, on day one.
 //     A person with no entries is NEW, not neglected.
-//  2. ⚠ ANYONE WITH AN EVENT TODAY IS NEVER DRIFTING. **NOT ENFORCED.** It
-//     needs an events table, which is plan 13's, and there is nothing here to
-//     ask. So the morning you are seeing somebody for the first time in a year,
-//     they will still be listed under "Been a while" until you log it. That is
-//     a real hole and it is named rather than quietly skipped; it closes with
-//     13 by filtering this list against today's people-tagged events, which is
-//     one more clause in `driftFor` and no change to anything that calls it.
+//  2. ⚠ ANYONE WITH AN EVENT TODAY IS NEVER DRIFTING. **Enforced since
+//     2026-08-03**, with the `events` table that 13 · Piece 4 brought. It was
+//     carried on the board as an open hole for a day and a half rather than
+//     quietly skipped, and it closed exactly as predicted: one more clause
+//     below, and `seenToday` optional so no existing caller had to change.
+//     The morning you are finally seeing somebody again, they no longer sit
+//     under "Been a while" accusing you of it while you are on your way out.
 import { daysBetween, type Person } from './people';
 import type { LastContact } from './interactions';
 import type { Ymd } from './time';
@@ -49,10 +49,25 @@ export interface Drift {
  * `null` means no — and it means no for five different reasons, all of which
  * are the feature working rather than an edge case being swallowed.
  */
-export function driftFor(person: Person, last: LastContact | undefined, today: Ymd): Drift | null {
+export function driftFor(
+  person: Person,
+  last: LastContact | undefined,
+  today: Ymd,
+  /**
+   * Everybody tagged on an event dated today. Optional: a caller with no
+   * calendar to ask simply behaves as it did before this existed.
+   */
+  seenToday?: ReadonlySet<string>,
+): Drift | null {
   // Archived: they left the roster deliberately (§3). Archiving is the release
   // valve for this indicator, so it would be perverse for it to keep firing.
   if (person.archived_at) return null;
+
+  // GUARD 2. You are seeing them TODAY. The interaction will not be logged
+  // until tonight at the earliest, so without this the panel spends the whole
+  // of the one day it is wrong on telling you that you have neglected somebody
+  // you are about to have dinner with.
+  if (seenToday?.has(person.id)) return null;
 
   // GUARD 1. New, not neglected. See the header.
   if (!last) return null;
@@ -76,9 +91,14 @@ export function driftFor(person: Person, last: LastContact | undefined, today: Y
  * though the second number is bigger. Sorting by raw days would quietly
  * override every cadence you had set by hand.
  */
-export function driftList(people: Person[], map: Map<string, LastContact>, today: Ymd): Drift[] {
+export function driftList(
+  people: Person[],
+  map: Map<string, LastContact>,
+  today: Ymd,
+  seenToday?: ReadonlySet<string>,
+): Drift[] {
   return people
-    .map((p) => driftFor(p, map.get(p.id), today))
+    .map((p) => driftFor(p, map.get(p.id), today, seenToday))
     .filter((d): d is Drift => d !== null)
     .sort((a, b) => b.over - a.over);
 }

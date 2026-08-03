@@ -35,7 +35,7 @@ async function overflowingChildren(container: Locator): Promise<string[]> {
 }
 
 const openEditor = async (page: Page) => {
-  await page.goto('/admin/tasks');
+  await page.goto('/admin/agenda/tasks');
   // `.first()`, not a role query: the empty room carries BOTH "New" and "Add
   // the first", and a strict-mode match would pass only while there are tasks.
   await page.locator('[data-open-task-sheet]').first().click();
@@ -43,7 +43,7 @@ const openEditor = async (page: Page) => {
 };
 
 test('the room does not scroll sideways', async ({ page }) => {
-  await page.goto('/admin/tasks');
+  await page.goto('/admin/agenda/tasks');
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
@@ -79,7 +79,7 @@ test('⚠ every control you press without looking clears 44px', async ({ page })
 });
 
 test('⚠ the tick and both disposition chips clear 44px too', async ({ page }) => {
-  await page.goto('/admin/tasks');
+  await page.goto('/admin/agenda/tasks');
   const tick = page.locator('.tick').first();
   if ((await tick.count()) > 0) {
     const box = await tick.boundingBox();
@@ -95,7 +95,7 @@ test('⚠ the tick and both disposition chips clear 44px too', async ({ page }) 
 });
 
 test('a task row wraps rather than shearing its meta line', async ({ page }) => {
-  await page.goto('/admin/tasks');
+  await page.goto('/admin/agenda/tasks');
   const row = page.locator('[data-task]').first();
   test.skip((await row.count()) === 0, 'no tasks yet');
   // Four facts on one line — the date, the repeat, the effort meter and its

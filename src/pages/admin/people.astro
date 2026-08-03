@@ -37,6 +37,7 @@ import {
 } from '../../lib/hq/people';
 import { byLastContact, lastContactMap, since } from '../../lib/hq/interactions';
 import { driftFor, driftList } from '../../lib/hq/drift';
+import { seenOn } from '../../lib/hq/calendar';
 import BeenAWhile from '../../components/admin/BeenAWhile.astro';
 
 const supabase = Astro.locals.supabase;
@@ -49,6 +50,11 @@ const everyone: Person[] = data ?? [];
 // so the `max()` happens in Postgres over an indexed join rather than by
 // pulling every interaction into this page.
 const lastContact = await lastContactMap(supabase);
+
+// GUARD 2, live since 13 · Piece 4 (§8): anyone with an event today is never
+// drifting. It applies to the card marker as well as the panel, so the roster
+// cannot mark somebody you are seeing this evening.
+const seenToday = await seenOn(supabase, todayYmd);
 
 // Archived people are OUT OF THE ROSTER AND OUT OF SEARCH (§3) — they live in
 // their own section at the bottom. Archiving is the only way somebody leaves,
@@ -84,7 +90,7 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
 // panel and the cards can never disagree about who is drifting. The roster
 // holds the WHOLE list — Today caps it at three, because Today is a nudge and
 // this is the room where the full picture lives (§8).
-const drifting = driftList(roster, lastContact, todayYmd);
+const drifting = driftList(roster, lastContact, todayYmd, seenToday);
 ---
 
 <AdminLayout title="People" active="people">
@@ -159,7 +165,7 @@ const drifting = driftList(roster, lastContact, todayYmd);
                   // already named once in the panel above; this exists so that
                   // SCANNING a section still tells you, not so drift is
                   // announced twice.
-                  const adrift = !!driftFor(person, last, todayYmd);
+                  const adrift = !!driftFor(person, last, todayYmd, seenToday);
                   return (
                     <a
                       href={`/admin/people/${person.slug}`}

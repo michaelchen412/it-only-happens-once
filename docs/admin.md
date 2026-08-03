@@ -8,7 +8,7 @@
 
 `design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: private, seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
 
-**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Tasks · Fragments · Constellations · Library · About** (Goals sits behind Tasks). The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
+**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Agenda · Fragments · Constellations · Library · About**. The Agenda holds three surfaces — Calendar, Tasks and Goals — which is what §9's name was always waiting for. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
 
 So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
 
@@ -488,11 +488,11 @@ It shows in exactly three places, and never as arrears:
 
 ---
 
-## 13. Tasks — the agenda's first room
+## 13. Tasks — the agenda's first surface
 
-*The third HQ room. Schema in [data-model.md](data-model.md) §6b; the principle it is built to enforce in [ADR 0013](adr/0013-absence-never-accumulates.md).*
+*Schema in [data-model.md](data-model.md) §6b; the principle it is built to enforce in [ADR 0013](adr/0013-absence-never-accumulates.md).*
 
-**`/admin/tasks`**, with a `<dialog>` sheet for writing one down. **Personal only** — work lives on the company's platform, which is what removes the pressure that turns a personal task list into project management. Deliberately excluded, and each is where one goes to die: sub-tasks, dependencies, tags, time-blocking, contexts, energy levels.
+**`/admin/agenda/tasks`**, with a `<dialog>` sheet for writing one down. **Personal only** — work lives on the company's platform, which is what removes the pressure that turns a personal task list into project management. Deliberately excluded, and each is where one goes to die: sub-tasks, dependencies, tags, time-blocking, contexts, energy levels.
 
 **The list is grouped by when: `Past due · Today · This week · Later · Unscheduled`.** Past due is **first here — the opposite of Today**. That looks like an inconsistency and is not one: both rooms order by time, and arrears are chronologically first. Today is a summary you read forward, so meeting them last is right there; this room is where triage happens, so meeting them first is right here.
 
@@ -521,7 +521,7 @@ Both exist because the rules they express are invisible until weeks later, and a
 
 ## 14. Goals — intentions, not projects
 
-*Reached from Tasks rather than from the sidebar: goals are visited monthly, and the sidebar is for the rooms opened every morning. Schema in [data-model.md](data-model.md) §6b.*
+*`/admin/agenda/goals`. Goals are visited monthly, so they are a surface of the Agenda room rather than a room of their own. Schema in [data-model.md](data-model.md) §6b.*
 
 **A goal is a direction, not a scoped deliverable.** *Get back in shape. Finish the Sky.* That framing is the whole reason this exists without becoming project management, and it is visible mostly in what the two surfaces refuse to draw: **no progress bar, no percentage, no subtask count, no "3 of 7 done"** — and no paragraph explaining the absence of any of them.
 
@@ -534,3 +534,40 @@ Both exist because the rules they express are invisible until weeks later, and a
 **The goal page is three sections:** *Scheduled*, *Not scheduled yet*, and *Done toward this*. The third is **a list of what happened**, dated, never a count with a bar beside it — that is the difference between a goal and a project, made visible. The second is why undated tasks have a home at all: a task with a goal and no date is not a graveyard item, it is *part of something I care about, not scheduled yet*. Each of its rows offers **Give it a date**, and that affordance is the entire explanation of what the section is for.
 
 **The horizon is a segmented control, not a text field** — *this season · this year · the next few years*. Three buttons cannot say "March 3rd", which is the vagueness rule enforced by shape rather than by discipline: the moment a goal has a deadline it is a task.
+
+---
+
+## 15. The calendar — four sources, two of them writable
+
+*`/admin/agenda`, the Agenda room's front door. Schema in [data-model.md](data-model.md) §6b; the one-way rule it sits behind in [13-agenda.md] §2.*
+
+A month grid by default — the mental model most people already have, and with one calendar it is not too dense to read. **Week is the same union with room for detail, never a second data model.** Both are **six week rows, always**: a grid that changes height between months makes the page jump and moves the row under the cursor.
+
+### Fill means writable
+
+The contents are a union of four sources, and only two of them can be changed here. Rendering has to make that obvious *without* a label — Today already cut *"Google · read-only"* as chrome nobody would act on — so authority is carried by the shape:
+
+| | Treatment | Because |
+|---|---|---|
+| **HQ event** | solid fill | yours, and the most present thing on the grid |
+| **Task** | lighter fill + `○` | yours, but not an event — it ticks off |
+| **Google mirror** | hairline, no fill | a copy of something that lives elsewhere |
+| **Birthday** | no body at all, a cake and a name | not a row anywhere |
+
+**The first draft got this wrong in a way worth recording:** tasks were given an outline ring, which put them in the same visual class as the Google rows — so the loudest distinction on the grid became *event vs everything else* rather than **yours vs not yours**, which is the one the whole treatment exists to make. Fill is now the writable signal and nothing else uses it.
+
+Two reinforcements, neither a word: read-only rows **do not lift on hover** and **reveal a small lock** when the cursor reaches them. That second one is mouse-only — on a phone there is no hover, which is exactly why fill has to carry it alone.
+
+**The legend is the one piece of chrome that earns itself** — four sources on one grid is genuinely ambiguous, and a four-word key is a fixed cost. It lists **only the sources actually present**: a key for something with nothing in it names a feature that does not exist, so until the Google mirror lands nothing says anything is mirrored.
+
+### The day panel is where read-only is explained
+
+Clicking any item opens the day, and **the affordance is the whole explanation**. An HQ event offers *Edit*; a task offers *Did it*; a mirrored row offers only **`+ Tag someone`**, the one write HQ has against Google's copy; a birthday offers nothing at all, because there is no row to open. **No footer, no per-row note, no summary line** — all three were drafted and cut, and the summary earned its removal twice.
+
+**Every control on this page is a real link.** The month steps, the view switches and the day opens through `?date=` / `?view=` / `?day=`, all rendered server-side, so the page works before a byte of JavaScript runs — and so the day panel survives a reload and a back button. It is also how the whole grid avoids the trap that bit the Today prototype: a calendar built with `createElement` silently gets none of its scoped hover, cursor or focus rules.
+
+### Tagging, and the guard it closes
+
+**Who was there is the point.** An event's people are what make the People zone's brief possible, and tagging is additive by construction — it never has to live inside Google's copy, so it cannot create a conflict.
+
+It also closes something: *anyone with an event today is never drifting*. That guard was named in [§12](#12-people--the-roster) and unenforceable for a day and a half, because it needs an events table. The interaction will not be logged until the evening at the earliest, so without it the "Been a while" panel spends the whole of the one day it is wrong telling you that you have neglected somebody you are about to have dinner with.

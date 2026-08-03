@@ -1,0 +1,39 @@
+---
+/*
+  AgendaTabs — the three surfaces of one room (docs/plans/10-hq.md §9).
+
+  §9 named the rooms Today · Fragments · People · **Agenda**, and until
+  2026-08-03 the agenda did not exist to be named. Tasks shipped first and took
+  a sidebar entry of its own; goals hung off it; a calendar would have made
+  three top-level entries for one domain. So the room is Agenda and these are
+  its surfaces — which is also what keeps the sidebar at seven entries rather
+  than nine.
+
+  NOT A NAV BAR AND NOT BREADCRUMBS: three peers, and the one you are on is
+  stated rather than implied. `aria-current="page"` does the work a colour would
+  otherwise have to.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  active: 'calendar' | 'tasks' | 'goals';
+}
+const { active } = Astro.props;
+
+const TABS = [
+  { key: 'calendar', label: 'Calendar', href: '/admin/agenda', icon: 'ph:calendar-blank' },
+  { key: 'tasks', label: 'Tasks', href: '/admin/agenda/tasks', icon: 'ph:check-circle' },
+  { key: 'goals', label: 'Goals', href: '/admin/agenda/goals', icon: 'ph:target' },
+] as const;
+---
+
+<nav class="atabs" aria-label="Agenda">
+  {
+    TABS.map((t) => (
+      <a href={t.href} class="atabs__t" aria-current={active === t.key ? 'page' : undefined}>
+        <Icon name={t.icon} />
+        {t.label}
+      </a>
+    ))
+  }
+</nav>

@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { stubActions } from './fixtures';
 
 const openEditor = async (page: Page) => {
-  await page.goto('/admin/tasks');
+  await page.goto('/admin/agenda/tasks');
   // `.first()`, not a role query: the empty room carries BOTH "New" and "Add
   // the first", and a strict-mode match would pass only while there are tasks.
   await page.locator('[data-open-task-sheet]').first().click();
@@ -170,7 +170,7 @@ test.describe('the editor — where the two invisible rules become checkable', (
 
 test.describe('the room', () => {
   test('renders the groups in triage order — arrears FIRST here', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     const groups = await page
       .locator('[data-group]')
       .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.group));
@@ -181,7 +181,7 @@ test.describe('the room', () => {
   });
 
   test('⚠ never counts what is owed, anywhere on the page', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     // The counts beside the headings say how big a list is. "6 overdue" would
     // be a verdict about a person, and 10-hq.md §3 is a design constraint with
     // stakes: this page can be opened at 7am on a bad morning.
@@ -191,7 +191,7 @@ test.describe('the room', () => {
   });
 
   test('the empty room is one line and one button, not an onboarding checklist', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     test.skip((await page.locator('[data-task]').count()) > 0, 'the room has tasks in it');
     await expect(page.getByText('Nothing to do.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add the first' })).toBeVisible();
@@ -199,7 +199,7 @@ test.describe('the room', () => {
   });
 
   test('a past-due row offers the CHOICE, and no tick', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     const late = page.locator('[data-group="past"] [data-task]').first();
     test.skip((await late.count()) === 0, 'nothing is past due');
     // A circle beside a "Did it" chip is two paths to one outcome while saying
@@ -214,7 +214,7 @@ test.describe('the room', () => {
   });
 
   test('⚠ a tick STAYS, struck through, and the same click undoes it', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     const row = page.locator('[data-group="today"] [data-task], [data-group="week"] [data-task]').first();
     test.skip((await row.count()) === 0, 'nothing scheduled to tick');
     await stubActions(page, {
@@ -233,7 +233,7 @@ test.describe('the room', () => {
   });
 
   test('a failed disposition says so and leaves the row alone', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     const row = page.locator('[data-group="today"] [data-task], [data-group="week"] [data-task]').first();
     test.skip((await row.count()) === 0, 'nothing scheduled to tick');
     await stubActions(page, {});
@@ -246,7 +246,7 @@ test.describe('the room', () => {
   });
 
   test('effort reads as a magnitude, in one hue at four densities', async ({ page }) => {
-    await page.goto('/admin/tasks');
+    await page.goto('/admin/agenda/tasks');
     const pills = page.locator('.eff');
     test.skip((await pills.count()) === 0, 'no tasks yet');
 

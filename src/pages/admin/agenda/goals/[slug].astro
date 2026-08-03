@@ -19,16 +19,17 @@
   visible, dignified move rather than a hidden menu item.
 */
 import { Icon } from 'astro-icon/components';
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import GoalSheet from '../../../components/admin/GoalSheet.astro';
-import TaskSheet from '../../../components/admin/TaskSheet.astro';
-import { today as hqToday, shiftYmd } from '../../../lib/hq/time';
-import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
-import { OBSERVATION_DAYS, STATUSES, horizonLabel, observationFor } from '../../../lib/hq/goals';
-import { byWhen, effortMeta, recurrenceWords } from '../../../lib/hq/tasks';
-import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
-import { renderMarkdown } from '../../../lib/markdown';
-import type { Tables } from '../../../lib/database.types';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import AgendaTabs from '../../../../components/admin/AgendaTabs.astro';
+import GoalSheet from '../../../../components/admin/GoalSheet.astro';
+import TaskSheet from '../../../../components/admin/TaskSheet.astro';
+import { today as hqToday, shiftYmd } from '../../../../lib/hq/time';
+import { clockTime, dmd, fullDate } from '../../../../lib/hq/dates';
+import { OBSERVATION_DAYS, STATUSES, horizonLabel, observationFor } from '../../../../lib/hq/goals';
+import { byWhen, effortMeta, recurrenceWords } from '../../../../lib/hq/tasks';
+import { presetLabel, presetOf } from '../../../../lib/hq/recurrence';
+import { renderMarkdown } from '../../../../lib/markdown';
+import type { Tables } from '../../../../lib/database.types';
 
 type Task = Tables<'tasks'>;
 
@@ -36,7 +37,7 @@ const { slug } = Astro.params;
 const supabase = Astro.locals.supabase;
 
 const { data: goal } = await supabase.from('goals').select('*').eq('slug', slug!).maybeSingle();
-if (!goal) return Astro.redirect('/admin/goals', 302);
+if (!goal) return Astro.redirect('/admin/agenda/goals', 302);
 
 const { ymd: todayYmd } = await hqToday(supabase);
 const since = shiftYmd(todayYmd, -OBSERVATION_DAYS);
@@ -102,9 +103,11 @@ const payload = (t: Task) =>
   });
 ---
 
-<AdminLayout title={goal.name} active="tasks">
+<AdminLayout title={goal.name} active="agenda">
   <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
-    <a href="/admin/goals" class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Goals</a>
+    <AgendaTabs active="goals" />
+
+    <a href="/admin/agenda/goals" class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Goals</a>
 
     <header class="ghead">
       <div class="min-w-0 flex-1">
@@ -252,6 +255,6 @@ const payload = (t: Task) =>
   <TaskSheet today={todayYmd} goals={pickable} />
 
   <script>
-    import '../../../scripts/task-list';
+    import '../../../../scripts/task-list';
   </script>
 </AdminLayout>

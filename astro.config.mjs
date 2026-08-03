@@ -6,6 +6,14 @@ import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
+  // The two routes 13 · Pieces 1 and 2 shipped at, before Piece 4 gathered all
+  // three surfaces into the Agenda room (10-hq.md §9). They existed for half a
+  // day, which is long enough for a bookmark.
+  redirects: {
+    '/admin/tasks': '/admin/agenda/tasks',
+    '/admin/goals': '/admin/agenda/goals',
+    '/admin/goals/[slug]': '/admin/agenda/goals/[slug]',
+  },
   // SSR + edge caching for DB-backed content; the admin renders on demand.
   // See docs/adr/0001. Static pages opt back in with `export const prerender = true`.
   output: 'server',

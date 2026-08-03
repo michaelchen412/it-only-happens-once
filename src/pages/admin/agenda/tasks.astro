@@ -22,10 +22,11 @@
   answered for.
 */
 import { Icon } from 'astro-icon/components';
-import AdminLayout from '../../layouts/AdminLayout.astro';
-import TaskSheet from '../../components/admin/TaskSheet.astro';
-import { today as hqToday, type Ymd } from '../../lib/hq/time';
-import { clockTime, dmd, fullDate } from '../../lib/hq/dates';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
+import TaskSheet from '../../../components/admin/TaskSheet.astro';
+import { today as hqToday, type Ymd } from '../../../lib/hq/time';
+import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
 import {
   GROUPS,
   byWhen,
@@ -34,9 +35,9 @@ import {
   lateBy,
   recurrenceWords,
   type GroupKey,
-} from '../../lib/hq/tasks';
-import { presetLabel, presetOf } from '../../lib/hq/recurrence';
-import type { Tables } from '../../lib/database.types';
+} from '../../../lib/hq/tasks';
+import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
+import type { Tables } from '../../../lib/database.types';
 
 type Task = Tables<'tasks'>;
 
@@ -116,21 +117,15 @@ const payload = (t: Task) =>
   });
 ---
 
-<AdminLayout title="Tasks" active="tasks">
+<AdminLayout title="Tasks" active="agenda">
   <div class="mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
+    <AgendaTabs active="tasks" />
+
     <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
       <h1 class="font-display text-2xl font-light">Tasks</h1>
-      <div class="flex items-center gap-2">
-        {/* Goals live behind Tasks rather than in the sidebar (settled
-            2026-08-03): they are visited monthly, and the sidebar is for the
-            rooms opened every morning. */}
-        <a href="/admin/goals" class="btn btn-ghost btn-sm gap-1 font-sans">
-          <Icon name="ph:target" /> Goals
-        </a>
-        <button type="button" data-open-task-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
-          <Icon name="ph:plus" /> New
-        </button>
-      </div>
+      <button type="button" data-open-task-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
+        <Icon name="ph:plus" /> New
+      </button>
     </header>
 
     {(error || eventError) && (
@@ -269,6 +264,6 @@ const payload = (t: Task) =>
   <TaskSheet today={todayYmd} goals={goals} />
 
   <script>
-    import '../../scripts/task-list';
+    import '../../../scripts/task-list';
   </script>
 </AdminLayout>

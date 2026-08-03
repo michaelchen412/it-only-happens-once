@@ -15,16 +15,18 @@
   goal written this morning is new, not neglected, and the naive version greets
   it with "nothing in 6 weeks".
 
-  Reached from Tasks rather than from the sidebar (settled 2026-08-03): goals
-  are visited monthly, and the sidebar is for the rooms opened every morning.
+  One of the Agenda room's three surfaces (10-hq.md §9), beside the calendar
+  and the tasks it gathers. Goals are visited monthly, so they were never going
+  to earn a sidebar entry of their own.
 */
 import { Icon } from 'astro-icon/components';
-import AdminLayout from '../../layouts/AdminLayout.astro';
-import GoalSheet from '../../components/admin/GoalSheet.astro';
-import { today as hqToday } from '../../lib/hq/time';
-import { shiftYmd } from '../../lib/hq/time';
-import { ACTIVE_CAP, OBSERVATION_DAYS, horizonLabel, observationFor, statusLabel } from '../../lib/hq/goals';
-import type { Tables } from '../../lib/database.types';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
+import GoalSheet from '../../../components/admin/GoalSheet.astro';
+import { today as hqToday } from '../../../lib/hq/time';
+import { shiftYmd } from '../../../lib/hq/time';
+import { ACTIVE_CAP, OBSERVATION_DAYS, horizonLabel, observationFor, statusLabel } from '../../../lib/hq/goals';
+import type { Tables } from '../../../lib/database.types';
 
 type Goal = Tables<'goals'>;
 
@@ -64,9 +66,9 @@ const active = all.filter((g) => g.status === 'active');
 const inactive = all.filter((g) => g.status !== 'active');
 ---
 
-<AdminLayout title="Goals" active="tasks">
+<AdminLayout title="Goals" active="agenda">
   <div class="hq-cq mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
-    <a href="/admin/tasks" class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Tasks</a>
+    <AgendaTabs active="goals" />
 
     <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <h1 class="font-display text-2xl font-light">Goals</h1>
@@ -96,7 +98,7 @@ const inactive = all.filter((g) => g.status !== 'active');
             {active.map((g) => {
               const obs = observe(g);
               return (
-                <a href={`/admin/goals/${g.slug}`} class="gcard">
+                <a href={`/admin/agenda/goals/${g.slug}`} class="gcard">
                   <span class="gcard__k"><Icon name="ph:target" /> {horizonLabel(g.horizon)}</span>
                   <span class="gcard__n">{g.name}</span>
                   {/* Nothing here at all when there is nothing to observe. */}
@@ -115,7 +117,7 @@ const inactive = all.filter((g) => g.status !== 'active');
                 {inactive.map((g) => (
                   <li class="row">
                     <span class="row__mark"><Icon name="ph:target" /></span>
-                    <a href={`/admin/goals/${g.slug}`} class="min-w-0 flex-1 text-sm hover:underline">{g.name}</a>
+                    <a href={`/admin/agenda/goals/${g.slug}`} class="min-w-0 flex-1 text-sm hover:underline">{g.name}</a>
                     {/* THE TALLY IS THE POINT, and it replaces a sentence.
                         §4a asked for a line stating that nothing was deleted
                         and the tasks done toward it stay done — but a visible

@@ -3486,6 +3486,361 @@ html.reader-open .sky-return {
   color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
 }
 
+/* ══ THE CALENDAR (13 · Piece 4, §5) ═══════════════════════════════════════
+   Graduated from the lab. Everything below encodes ONE distinction, and it is
+   the distinction the whole section exists to make:
+
+     FILL MEANS WRITABLE, AND NOTHING ELSE USES FILL.
+
+       yours      solid fill          you own it
+       task       lighter fill + ○    yours, but not an event — it ticks off
+       mirrored   hairline, no fill   a copy of something that lives elsewhere
+       birthday   no body at all      not a row anywhere
+
+   ⚠ The first draft gave tasks an OUTLINE RING, which put them in the same
+   visual class as the Google rows — so the loudest distinction on the grid
+   became "event vs everything else" rather than "yours vs not yours". Caught by
+   the lab, and it is why fill is the primary signal rather than the border.
+
+   NONE OF IT BORROWS THE URGENCY AXIS (§10a). Hue here would say nothing: all
+   four sources are the agenda. What differs is AUTHORITY. */
+
+/* ── the legend: the one piece of chrome that earns itself ────────────────
+   Four sources on one grid is genuinely ambiguous, and a four-word key is a
+   FIXED cost — unlike a label repeated on every row, which is what got cut from
+   Today. It lists only the sources actually present (see `legendFor`). */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-bottom: 0.625rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.lg__m {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 0.1875rem;
+}
+.lg__m--event { background: color-mix(in oklch, var(--cn-amber) 70%, transparent); }
+.lg__m--task { background: color-mix(in oklch, var(--cn-amber) 28%, transparent); }
+.lg__m--mirror {
+  background: transparent;
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 35%, transparent);
+}
+.lg__m--birthday {
+  background: transparent;
+  border: 1px dashed color-mix(in oklch, var(--cn-rose) 60%, transparent);
+}
+
+/* ── the month grid ──────────────────────────────────────────────────────── */
+.cal {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  overflow: hidden;
+  background: var(--color-base-100);
+}
+.cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--color-base-300);
+  background: var(--color-base-200);
+}
+.cal__dow span {
+  padding: 0.375rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+/* ⚠ SIX ROWS, ALWAYS — 42 cells whatever the month. A grid that changes height
+   makes the page jump and moves the row under your cursor while you step. */
+.cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(6.25rem, auto);
+}
+.cell {
+  min-width: 0;
+  padding: 0.25rem;
+  border-right: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.cell:nth-child(7n) { border-right: 0; }
+.cell--out { background: color-mix(in oklch, var(--color-base-200) 55%, transparent); }
+.cell--out .cell__n { opacity: 0.35; }
+.cell--open { background: color-mix(in oklch, var(--color-primary) 6%, transparent); }
+.cell__n {
+  align-self: flex-start;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  padding: 0.0625rem 0.1875rem;
+  border-radius: 999px;
+}
+.cell__n:hover { background: var(--color-base-200); }
+.cell--today .cell__n,
+.cell--today .cell__n:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  font-weight: 700;
+  padding: 0.0625rem 0.375rem;
+}
+.cell__more {
+  align-self: flex-start;
+  padding: 0.0625rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
+.cell__more:hover { text-decoration: underline; }
+
+.ev {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.125rem 0.3125rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  text-align: left;
+}
+.ev__x {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ev__t {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.ev__i {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  opacity: 0.75;
+}
+.ev__lock {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  opacity: 0;
+}
+
+.ev--event {
+  background: color-mix(in oklch, var(--cn-amber) 20%, transparent);
+  color: color-mix(in oklch, var(--cn-amber) 55%, var(--color-base-content));
+}
+.ev--event:hover { background: color-mix(in oklch, var(--cn-amber) 32%, transparent); }
+.ev--task {
+  background: color-mix(in oklch, var(--cn-amber) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--cn-amber) 32%, transparent);
+  color: color-mix(in oklch, var(--cn-amber) 55%, var(--color-base-content));
+}
+.ev--task:hover { background: color-mix(in oklch, var(--cn-amber) 20%, transparent); }
+.ev--mirror {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  color: color-mix(in oklch, var(--color-base-content) 68%, transparent);
+}
+.ev--birthday {
+  background: transparent;
+  color: color-mix(in oklch, var(--cn-rose) 55%, var(--color-base-content));
+}
+
+/* The read-only signal, said twice and neither of them a word: no lift on
+   hover, and a lock that appears when you reach for it. ⚠ THE LOCK IS
+   MOUSE-ONLY — on a phone there is no hover, which is exactly why fill has to
+   carry the distinction on its own. */
+.ev--ro:hover { background: color-mix(in oklch, var(--color-base-content) 6%, transparent); }
+.ev--ro:hover .ev__lock { opacity: 0.5; }
+
+/* ── the week: the same union with room for detail, never a second model ─── */
+.wk {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+@media (max-width: 60rem) {
+  .wk { grid-template-columns: repeat(2, 1fr); }
+}
+.wkcol {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  overflow: hidden;
+}
+.wkcol--today { border-color: color-mix(in oklch, var(--color-primary) 55%, transparent); }
+.wkcol__h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--color-base-300);
+  background: var(--color-base-200);
+}
+.wkcol--today .wkcol__h { background: color-mix(in oklch, var(--color-primary) 12%, transparent); }
+.wkcol__d {
+  font-family: var(--font-sans);
+  font-size: 0.5625rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+.wkcol__n {
+  font-family: var(--font-display, serif);
+  font-size: 1rem;
+}
+.wkcol__b {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.375rem;
+  min-height: 6rem;
+}
+.wkcol__e { font-size: 0.75rem; color: color-mix(in oklch, var(--color-base-content) 22%, transparent); }
+.wev {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.3125rem;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+.wev__t {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+.wev__x {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+/* ── the day panel: where read-only is explained ─────────────────────────
+   ⚠ AND IT IS EXPLAINED BY THE AFFORDANCE, NOT BY WORDS. Each row offers
+   exactly what HQ can do to it: an event offers Edit, a task offers Did it, a
+   mirrored row offers only the annotation HQ can actually make, and a birthday
+   offers nothing because there is no row to open. No footer, no per-row note,
+   no summary line — all three were drafted and cut (§10i). */
+.day {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  overflow: hidden;
+}
+.day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.day__list { padding: 0.25rem 1rem 0.75rem; }
+.drow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.625rem 0;
+}
+.drow + .drow { border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent); }
+.drow__t {
+  flex: 0 0 5.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+}
+.drow__e {
+  display: block;
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+.drow__x {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.9375rem;
+}
+.drow__l {
+  display: block;
+  margin-top: 0.0625rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+/* A left rule, carrying the same authority language as the grid — and the
+   background is cleared, because in the panel the fill would fight the text. */
+.drow.ev--event,
+.drow.ev--task,
+.drow.ev--mirror,
+.drow.ev--birthday {
+  background: transparent;
+  color: inherit;
+  padding-left: 0.75rem;
+}
+.drow.ev--event { box-shadow: inset 3px 0 0 color-mix(in oklch, var(--cn-amber) 55%, transparent); }
+.drow.ev--task { box-shadow: inset 3px 0 0 color-mix(in oklch, var(--cn-amber) 30%, transparent); }
+.drow.ev--mirror { box-shadow: inset 3px 0 0 color-mix(in oklch, var(--color-base-content) 18%, transparent); }
+.drow.ev--birthday { box-shadow: inset 3px 0 0 color-mix(in oklch, var(--cn-rose) 40%, transparent); }
+/* A task answered today stays on the day, struck through — the same promise the
+   tasks room makes (§10f). `task--done` is what the shared script sets. */
+.drow--done .drow__x,
+.drow.task--done .drow__x {
+  text-decoration: line-through;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+
+/* ── the agenda's three surfaces (10-hq.md §9) ───────────────────────────── */
+.atabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.atabs__t {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.atabs__t:hover { color: var(--color-base-content); }
+/* AFTER :hover, and with its own hover rule — trap 6 applies to anything with a
+   selected state, not just to segmented controls. */
+.atabs__t[aria-current='page'],
+.atabs__t[aria-current='page']:hover {
+  color: var(--color-base-content);
+  border-bottom-color: var(--cn-amber);
+  font-weight: 500;
+}
+
 /* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`. Every
    custom control on these pages needs the pointer put back. */
 .pseg__b,
@@ -3497,6 +3852,10 @@ html.reader-open .sky-return {
 .picker__row,
 .shelf__x,
 .gcard,
+.ev,
+.wev,
+.cell__n,
+.cell__more,
 .tick,
 .task__t,
 .chip--act,

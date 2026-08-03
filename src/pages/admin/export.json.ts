@@ -55,6 +55,10 @@ const TABLES = [
   'goals',
   'tasks',
   'task_events',
+  // 13 · Piece 4. `event_people` carries a key into BOTH `events` above and
+  // `people` far above, so it lands after each of them.
+  'events',
+  'event_people',
   // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
   // — `works` and `fragments`, already listed far above — as well as into
   // `people`, so they land last and an importer walking top to bottom is safe.

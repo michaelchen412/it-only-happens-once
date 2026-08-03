@@ -25,6 +25,7 @@ import { links } from './links';
 import { drift } from './drift';
 import { tasks } from './tasks';
 import { goals } from './goals';
+import { events } from './events';
 
 export const server = {
   fragments,
@@ -50,4 +51,8 @@ export const server = {
   // existence. `goals` holds the five-active cap, which the schema cannot.
   tasks,
   goals,
+  // The calendar's writable half (13 · Piece 4). `tag` is the ONE write HQ has
+  // against a mirrored row, and it is additive by construction, so it can never
+  // create a conflict with Google (ADR-0014, in draft).
+  events,
 };

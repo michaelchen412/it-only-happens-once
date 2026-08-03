@@ -14,19 +14,20 @@ import { test, expect, type Page } from '@playwright/test';
 import { stubActions } from './fixtures';
 
 const room = async (page: Page) => {
-  await page.goto('/admin/goals');
+  await page.goto('/admin/agenda/goals');
 };
 
 /** The visible words only — a percentage in daisyUI's CSS is not a score. */
 const visibleText = async (page: Page) => (await page.locator('body').innerText()).replace(/\s+/g, ' ');
 
 test.describe('the goals room', () => {
-  test('is reachable from Tasks, which is where it lives', async ({ page }) => {
-    // Settled 2026-08-03: goals are visited monthly, and the sidebar is for the
-    // rooms opened every morning.
-    await page.goto('/admin/tasks');
-    await page.getByRole('link', { name: 'Goals' }).click();
-    await expect(page).toHaveURL(/\/admin\/goals$/);
+  test('is one of the Agenda room’s three surfaces', async ({ page }) => {
+    // Goals are visited monthly, so they were never going to earn a sidebar
+    // entry — they are a tab in the room that holds the tasks they gather
+    // (10-hq.md §9).
+    await page.goto('/admin/agenda/tasks');
+    await page.getByRole('link', { name: 'Goals', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/agenda\/goals$/);
     await expect(page.getByRole('heading', { name: 'Goals' })).toBeVisible();
   });
 

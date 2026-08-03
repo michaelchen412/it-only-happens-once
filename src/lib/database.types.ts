@@ -142,6 +142,78 @@ export type Database = {
         }
         Relationships: []
       }
+      event_people: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          external_id: string | null
+          person_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          person_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_people_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          starts_at: string | null
+          starts_on: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          starts_on: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          starts_on?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fragment_constellations: {
         Row: {
           constellation_id: string

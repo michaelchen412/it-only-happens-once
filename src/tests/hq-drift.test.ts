@@ -14,6 +14,10 @@
 //    days silently overrides every cadence set by hand.
 //  · A MUTE MUST OUTLIVE THE CLICK. Counting "another year" from the last
 //    contact instead of from today expires the moment you press it.
+//  · AND SINCE 13 · PIECE 4: SEEING SOMEBODY TODAY IS NOT NEGLECT. The
+//    interaction will not be logged until tonight at the earliest, so without
+//    the guard the panel spends the whole of the one day it is wrong telling
+//    you that you have neglected somebody you are about to have dinner with.
 import { describe, expect, it } from 'vitest';
 import { driftFor, driftList, mutedUntil } from '../lib/hq/drift';
 import type { LastContact } from '../lib/hq/interactions';
@@ -101,5 +105,36 @@ describe('mutedUntil', () => {
 
   it('crosses a year boundary without arithmetic drift', () => {
     expect(mutedUntil({ cadence_days: 30 }, '2026-12-20')).toBe('2027-01-19');
+  });
+});
+
+describe('guard 2 — anyone with an event today is never drifting', () => {
+  // Carried on the board as an open hole from 2026-08-02 until the `events`
+  // table existed, rather than quietly skipped.
+  const cold = () => person({ cadence_days: 30 });
+
+  it('⚠ says nothing about somebody you are seeing today', () => {
+    const p = cold();
+    expect(driftFor(p, on('2026-06-04'), TODAY)).not.toBeNull();
+    expect(driftFor(p, on('2026-06-04'), TODAY, new Set([p.id]))).toBeNull();
+  });
+
+  it('keeps flagging everybody else on the same page', () => {
+    const seeing = cold();
+    const not = person({ id: '00000000-0000-4000-8000-00000000beef', cadence_days: 30 });
+    const map = new Map([
+      [seeing.id, on('2026-06-04')],
+      [not.id, on('2026-06-04')],
+    ]);
+    const list = driftList([seeing, not], map, TODAY, new Set([seeing.id]));
+    expect(list.map((d) => d.person.id)).toEqual([not.id]);
+  });
+
+  it('behaves exactly as before when a caller has no calendar to ask', () => {
+    // The guard is optional so that nothing which called this before had to
+    // change — including anything written before the events table existed.
+    const p = cold();
+    expect(driftFor(p, on('2026-06-04'), TODAY, undefined)).not.toBeNull();
+    expect(driftFor(p, on('2026-06-04'), TODAY, new Set())).not.toBeNull();
   });
 });

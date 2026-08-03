@@ -71,7 +71,7 @@ if (sheet && form) {
       // A new goal goes to its own page; an edit reloads the one you are on.
       // Both re-derive the observation line rather than patching it, since it
       // is a function of rows this form did not touch.
-      if (!form.dataset.id && data) location.href = `/admin/goals/${data.slug}`;
+      if (!form.dataset.id && data) location.href = `/admin/agenda/goals/${data.slug}`;
       else location.reload();
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
@@ -98,7 +98,7 @@ if (sheet && form) {
     try {
       const { error } = await actions.goals.remove({ id });
       if (error) throw new Error(error.message);
-      location.href = '/admin/goals';
+      location.href = '/admin/agenda/goals';
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Couldn’t delete that — check your connection.');
     }

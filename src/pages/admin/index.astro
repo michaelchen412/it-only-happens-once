@@ -49,6 +49,7 @@ import PeopleZone from '../../components/admin/PeopleZone.astro';
 import { signPhotos, upcomingBirthday, type Person } from '../../lib/hq/people';
 import { lastContactMap } from '../../lib/hq/interactions';
 import { driftList, type Drift } from '../../lib/hq/drift';
+import { seenOn } from '../../lib/hq/calendar';
 
 const supabase = Astro.locals.supabase;
 const { tz, ymd: todayYmd } = await hqToday(supabase);
@@ -119,7 +120,13 @@ if (!offToday) {
   const roster: Person[] = everyone ?? [];
   if (roster.length) {
     const lastContact = await lastContactMap(supabase);
-    drifting = driftList(roster, lastContact, todayYmd);
+    // GUARD 2, live since 13 · Piece 4 (12-people.md §8): anyone with an event
+    // today is never drifting. The interaction will not be logged until tonight
+    // at the earliest, so without this the panel spends the whole of the one
+    // day it is wrong telling you that you have neglected somebody you are
+    // about to have dinner with.
+    const seenToday = await seenOn(supabase, todayYmd);
+    drifting = driftList(roster, lastContact, todayYmd, seenToday);
     birthdays = roster
       .map((person) => ({ person, birthday: upcomingBirthday(person, todayYmd) }))
       .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday)
