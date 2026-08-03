@@ -1,0 +1,271 @@
+---
+/*
+  /admin/capture-lab — a LOCAL-ONLY bench for the quick-capture box
+  (docs/plans/10-hq.md §8, workstream 14). Dev-gated below; never linked.
+
+  THE QUESTION THIS EXISTS TO ANSWER, and the only one:
+    Should quick capture write to the EXISTING `note` tier (plan 09 Piece 2,
+    built 2026-07-30) — or does scratch ("call the dentist") sitting beside
+    essay seeds feel wrong enough to justify a separate HQ store?
+
+  It writes REAL notes, via the REAL action, so the Recent list below shows
+  scratch intermingled with whatever notes already exist. That intermingling
+  IS the experiment: dump into it for a few days, then look at the list and at
+  /admin/fragments?view=notes and say whether it reads as one pile or two.
+
+  Deliberately NOT built here: triage (note → task), AI parsing, phone layout.
+  Once the call is made this page is deleted and the winner is built properly.
+
+  Zero new server code: `fragments.saveWriting` already accepts a client-minted
+  id, allows an empty title, derives a slug from the body's first words, and
+  takes `status: 'note'`.
+*/
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
+
+if (import.meta.env.PROD) return Astro.redirect('/admin', 302);
+
+const supabase = Astro.locals.supabase;
+
+const { data: recent } = await supabase
+  .from('fragments')
+  .select('id, title, body, updated_at')
+  .eq('status', 'note')
+  .is('deleted_at', null)
+  .order('updated_at', { ascending: false })
+  .limit(20);
+
+const notes = (recent ?? []).map((n) => ({
+  id: n.id,
+  preview: (n.title?.trim() || n.body?.split('\n').find((l) => l.trim())?.trim() || '(empty)').slice(0, 90),
+  updatedAt: n.updated_at,
+}));
+---
+
+<AdminLayout title="Capture lab">
+  <PageHeader
+    title="Capture lab"
+    back={{ href: '/admin', label: 'Observatory' }}
+    subtitle="A prototype. Real notes — everything you type here lands in the notes room."
+  >
+    <a slot="actions" href="/admin/fragments?view=notes" class="btn btn-ghost btn-sm font-sans">Notes room →</a>
+  </PageHeader>
+
+  <div class="mx-auto w-full max-w-2xl px-4 pb-24">
+    <div class="admin-alert mb-6 text-sm">
+      <p>
+        <strong>What to judge.</strong> Dump into this for a few days — ideas, errands, half-thoughts, anything.
+        Then look at the list below and ask: does scratch sitting next to real writing read as
+        <em>one pile</em> (fine — reuse the note tier) or <em>two things jammed together</em> (build a separate store)?
+      </p>
+    </div>
+
+    <!-- the box -->
+    <div class="rounded-box border border-base-300 bg-base-100 shadow-sm">
+      <textarea
+        id="cap-box"
+        class="w-full resize-none rounded-box bg-transparent p-5 font-serif text-lg leading-relaxed outline-none"
+        rows="5"
+        placeholder="Dump it here…"
+        autofocus></textarea>
+
+      <div class="flex items-center justify-between gap-3 border-t border-base-300 px-4 py-2">
+        <span
+          id="cap-status"
+          class="admin-hint text-xs opacity-0 transition-opacity duration-300"
+          aria-live="polite"></span>
+        <button id="cap-new" type="button" class="btn btn-sm font-sans" title="Park this and start a new one (⌘/Ctrl + Enter)">
+          ＋ New
+        </button>
+      </div>
+    </div>
+
+    <p class="admin-hint mt-2 text-xs">
+      No save button — it saves itself as you type. <kbd class="kbd kbd-xs">⌘</kbd>/<kbd class="kbd kbd-xs">Ctrl</kbd>
+      + <kbd class="kbd kbd-xs">↵</kbd> parks this one and starts the next. An empty box is never saved.
+    </p>
+
+    <!-- the pile -->
+    <h2 class="admin-label mt-10 mb-2">Recent notes</h2>
+    <ul id="cap-recent" class="divide-y divide-base-300 border-y border-base-300">
+      {notes.map((n) => (
+        <li data-id={n.id} data-updated={n.updatedAt}>
+          <button type="button" class="flex w-full items-baseline gap-3 px-1 py-2.5 text-left hover:bg-base-200/60" data-open={n.id}>
+            <span class="min-w-0 flex-1 truncate text-sm">{n.preview}</span>
+            <time class="admin-hint shrink-0 text-xs" datetime={n.updatedAt}>{n.updatedAt}</time>
+          </button>
+        </li>
+      ))}
+    </ul>
+    {notes.length === 0 && <p class="admin-hint py-4 text-sm">No notes yet — type something above.</p>}
+  </div>
+</AdminLayout>
+
+<script>
+  import { actions } from 'astro:actions';
+
+  const box = document.getElementById('cap-box') as HTMLTextAreaElement;
+  const statusEl = document.getElementById('cap-status') as HTMLElement;
+  const newBtn = document.getElementById('cap-new') as HTMLButtonElement;
+  const recent = document.getElementById('cap-recent') as HTMLUListElement;
+
+  // Deliberately shorter than the writing sheet's 1200ms. That sheet is a
+  // document you sit in; this is a dump box, where the pause before "Saved"
+  // is the entire reassurance that you can walk away.
+  const DEBOUNCE_MS = 700;
+
+  let currentId: string | null = null; // null = nothing typed yet this round
+  let baseUpdatedAt = ''; // optimistic-concurrency token from the last save
+  let timer: number | undefined;
+  let lock: Promise<unknown> = Promise.resolve(); // serialize: New must not race autosave
+  let lastSaved = '';
+
+  let fadeTimer: number | undefined;
+
+  /**
+   * The status line is EMPTY until there is something true to say, and empties
+   * again after. It used to ship with "Saved" already in the markup at
+   * opacity-0 — which lied to screen readers (aria-live had nothing to
+   * announce, but the text was readable) and, in the first e2e run, satisfied
+   * an assertion for a save that had not happened yet.
+   */
+  function flash(text: string, sticky = false) {
+    window.clearTimeout(fadeTimer);
+    statusEl.textContent = text;
+    statusEl.style.opacity = '1';
+    if (sticky) return;
+    fadeTimer = window.setTimeout(() => {
+      statusEl.style.opacity = '0';
+      window.setTimeout(() => {
+        if (statusEl.style.opacity === '0') statusEl.textContent = '';
+      }, 300); // matches the CSS transition, so the words go with the fade
+    }, 1400);
+  }
+
+  function autoGrow() {
+    box.style.height = 'auto';
+    box.style.height = `${Math.max(box.scrollHeight, 120)}px`;
+  }
+
+  function ago(iso: string): string {
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+
+  function previewOf(text: string): string {
+    return (text.split('\n').find((l) => l.trim())?.trim() || '(empty)').slice(0, 90);
+  }
+
+  /** Put a row at the top of the pile, or update it where it already sits. */
+  function upsertRow(id: string, text: string, updatedAt: string) {
+    const existing = recent.querySelector<HTMLLIElement>(`li[data-id="${id}"]`);
+    const li = existing ?? document.createElement('li');
+    li.dataset.id = id;
+    li.dataset.updated = updatedAt;
+    li.innerHTML = `
+      <button type="button" class="flex w-full items-baseline gap-3 px-1 py-2.5 text-left hover:bg-base-200/60" data-open="${id}">
+        <span class="min-w-0 flex-1 truncate text-sm"></span>
+        <time class="admin-hint shrink-0 text-xs" datetime="${updatedAt}">${ago(updatedAt)}</time>
+      </button>`;
+    li.querySelector('span')!.textContent = previewOf(text); // textContent: never parse user text as HTML
+    recent.prepend(li);
+    document.querySelector('#cap-recent + p')?.remove(); // drop the empty-state line
+  }
+
+  /**
+   * One save. Quiet on failure, like the writing sheet's autosave: a banner
+   * every 700ms during a bad connection is noise, and the words are still on
+   * screen. `serialize` keeps New from racing an in-flight write.
+   */
+  async function persist(): Promise<void> {
+    const text = box.value;
+    if (!text.trim()) return; // an empty box is never a row
+    if (text === lastSaved) return;
+
+    const id = currentId ?? crypto.randomUUID();
+    const fd = new FormData();
+    fd.set('id', id);
+    fd.set('body', text);
+    fd.set('status', 'note');
+    if (baseUpdatedAt) fd.set('base_updated_at', baseUpdatedAt);
+
+    try {
+      const { data, error } = await actions.fragments.saveWriting(fd);
+      if (error || !data) {
+        flash(error?.code === 'CONFLICT' ? 'Changed elsewhere — reload' : 'Not saved', true);
+        return;
+      }
+      currentId = data.id;
+      baseUpdatedAt = data.updated_at;
+      lastSaved = text;
+      upsertRow(data.id, text, data.updated_at);
+      flash('Saved');
+    } catch {
+      flash('Not saved', true); // offline / server down — the text is still here
+    }
+  }
+
+  const save = () => {
+    lock = lock.then(persist).catch(() => {});
+    return lock;
+  };
+
+  box.addEventListener('input', () => {
+    autoGrow();
+    window.clearTimeout(timer);
+    timer = window.setTimeout(save, DEBOUNCE_MS);
+  });
+
+  /** Park the current thought and hand over a blank one. */
+  async function startNew() {
+    window.clearTimeout(timer);
+    await save(); // flush whatever is pending first
+    currentId = null;
+    baseUpdatedAt = '';
+    lastSaved = '';
+    box.value = '';
+    autoGrow();
+    box.focus();
+  }
+
+  newBtn.addEventListener('click', () => void startNew());
+  box.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      void startNew();
+    }
+  });
+
+  /** Reopen a note from the pile — full body from the server, never a truncated preview. */
+  recent.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest<HTMLElement>('[data-open]');
+    if (!btn) return;
+    window.clearTimeout(timer);
+    await save(); // don't lose what's in the box
+    try {
+      const { data, error } = await actions.fragments.get({ id: btn.dataset.open! });
+      if (error || !data) return flash('Could not open that', true);
+      currentId = data.id;
+      baseUpdatedAt = data.updatedAt;
+      box.value = data.body;
+      lastSaved = data.body;
+      autoGrow();
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+    } catch {
+      flash('Could not open that', true);
+    }
+  });
+
+  // Anything still pending when the tab goes away.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void save();
+  });
+
+  // Server-rendered timestamps are raw ISO; humanize them once on load.
+  recent.querySelectorAll<HTMLTimeElement>('time').forEach((t) => (t.textContent = ago(t.dateTime)));
+  autoGrow();
+</script>
