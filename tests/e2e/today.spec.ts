@@ -282,9 +282,11 @@ test.describe('what Today does not claim', () => {
 
   test('no control on the page does nothing when pressed', async ({ page }) => {
     await page.goto('/admin');
-    // The check-in's Start/Skip and the global capture ✚ are deliberately
-    // absent until the pieces that wire them, rather than present and inert.
-    await expect(page.getByRole('button', { name: /^(Start|Skip)$/ })).toHaveCount(0);
+    // The global capture ✚ is deliberately ABSENT until the piece that wires
+    // it, rather than present and inert — a button that does nothing when
+    // pressed is the invented affordance the prototypes existed to catch.
+    // (Start/Skip were in this assertion until the check-in shipped and made
+    // them real; they are covered by checkin.spec.ts now.)
     await expect(page.locator('.fab')).toHaveCount(0);
   });
 
