@@ -1,4 +1,4 @@
-// Host logic for the Fragment Manager (src/pages/admin/index.astro). The
+// Host logic for the Fragment Manager (src/pages/admin/fragments.astro). The
 // table/toolbar mechanics live in fragment-panel.ts (shared with the composer's
 // browser sheet); this file adds what's unique to the page: the bulk-action
 // bar, trash actions, the Add ▾ menu, and routing row-opens to the editor
@@ -19,7 +19,7 @@ const showBulkError = (msg: string) => {
 };
 
 const panel = wireFragmentPanel(root, {
-  historyBase: '/admin',
+  historyBase: '/admin/fragments',
   onOpen(row) {
     if (row.dataset.writing) {
       document.dispatchEvent(new CustomEvent('writing:edit', { detail: row.dataset.writing }));

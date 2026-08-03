@@ -34,7 +34,7 @@ const item = slug ? await getWritingBySlug(Astro.locals.supabase, slug, { includ
 // Anything not published is a preview — drafts and notes alike. One rule, so a
 // tier added later can't quietly fall through to the public cache branch.
 const preview =
-  item && item.status !== 'published' ? { status: item.status, editHref: `/admin#edit=${item.id}` } : null;
+  item && item.status !== 'published' ? { status: item.status, editHref: `/admin/fragments#edit=${item.id}` } : null;
 
 if (!item) {
   Astro.response.status = 404;

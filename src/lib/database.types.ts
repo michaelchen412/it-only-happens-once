@@ -82,6 +82,66 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_checkins: {
+        Row: {
+          arousal: number | null
+          awakenings: Database["public"]["Enums"]["awakenings"] | null
+          bed_at: string | null
+          created_at: string
+          dream_body: string | null
+          dream_intensity: number | null
+          dream_recall: Database["public"]["Enums"]["dream_recall"] | null
+          id: string
+          log_date: string
+          note: string | null
+          restedness: number | null
+          skipped: boolean
+          sleep_latency: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality: number | null
+          updated_at: string
+          valence: number | null
+          woke_at: string | null
+        }
+        Insert: {
+          arousal?: number | null
+          awakenings?: Database["public"]["Enums"]["awakenings"] | null
+          bed_at?: string | null
+          created_at?: string
+          dream_body?: string | null
+          dream_intensity?: number | null
+          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          id?: string
+          log_date: string
+          note?: string | null
+          restedness?: number | null
+          skipped?: boolean
+          sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality?: number | null
+          updated_at?: string
+          valence?: number | null
+          woke_at?: string | null
+        }
+        Update: {
+          arousal?: number | null
+          awakenings?: Database["public"]["Enums"]["awakenings"] | null
+          bed_at?: string | null
+          created_at?: string
+          dream_body?: string | null
+          dream_intensity?: number | null
+          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          id?: string
+          log_date?: string
+          note?: string | null
+          restedness?: number | null
+          skipped?: boolean
+          sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality?: number | null
+          updated_at?: string
+          valence?: number | null
+          woke_at?: string | null
+        }
+        Relationships: []
+      }
       fragment_constellations: {
         Row: {
           constellation_id: string
@@ -298,6 +358,27 @@ export type Database = {
         }
         Relationships: []
       }
+      settings: {
+        Row: {
+          created_at: string
+          home_timezone: string
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          home_timezone?: string
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          home_timezone?: string
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subjects: {
         Row: {
           created_at: string
@@ -368,9 +449,12 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
+      awakenings: "none" | "few" | "many"
       date_precision: "day" | "year"
+      dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
+      sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -498,9 +582,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      awakenings: ["none", "few", "many"],
       date_precision: ["day", "year"],
+      dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
+      sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
     },
   },
 } as const

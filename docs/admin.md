@@ -1,14 +1,18 @@
 # The admin
 
-*The private workshop where Michael creates and edits content. Companion to [`architecture.md`](architecture.md) (rendering/data flow), [`data-model.md`](data-model.md) (the fragment schema), and [`auth.md`](auth.md) (who gets in). The editing-architecture decision is recorded in [ADR 0005](adr/0005-admin-editing-architecture.md).*
+*The private half of the site, where Michael creates and edits content. Companion to [`architecture.md`](architecture.md) (rendering/data flow), [`data-model.md`](data-model.md) (the fragment schema), and [`auth.md`](auth.md) (who gets in). The editing-architecture decision is recorded in [ADR 0005](adr/0005-admin-editing-architecture.md); what lives at the root, and why the building has a name, in [ADR 0015](adr/0015-admin-root-becomes-today.md).*
 
 ---
 
 ## 1. The third room
 
-`design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: a private workshop seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
+`design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: private, seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
 
-So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. We deliberately do not over-invest in visual polish for a room only one person enters. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
+**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · Fragments · Constellations · Library · About**. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
+
+So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
+
+**The standard is legibility at a glance, not decoration** — and that replaces an earlier rule (*"we deliberately do not over-invest in visual polish for a room only one person enters"*), which was written when this was a publishing form used weekly. Today is opened first thing every morning, and a daily driver earns the investment a form did not. Legibility is the test, so the spend goes on knowing where you are before reading a word: bordered zones with hue-tinted headers, one colour axis for *domain* and a separate one for *urgency* that never mean each other, and a domain with nothing to say rendering quiet rather than as an empty skeleton.
 
 Everything under `/admin` is `prerender = false` and auth-gated by [`middleware.ts`](../src/middleware.ts) (must be the admin role). Nothing here is ever cached or public.
 
@@ -18,14 +22,15 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 
 | Surface | Route | What it is |
 |---|---|---|
-| **Fragment list** | `/admin` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
-| **Trash** | `/admin?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
+| **Today** | `/admin` | The front door, and the daily one ([ADR 0015](adr/0015-admin-root-becomes-today.md)). The date bar *is* the control — `‹ ›` step a day, the date opens a month calendar, `↩ Today` returns, and the route is `/admin?date=YYYY-MM-DD`. Below it, one bordered zone per domain. Today is the private half's landing page; the corpus rooms are one click away in the sidebar. |
+| **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
+| **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
 | **Song quick-editor** | slide-over, any admin page | Light: paste a Spotify track or album link → title/art/embed auto-fill; artist/album/year, subjects with **✦ Suggest with AI** (which needs the annotation — §8), and **"Why this one"** — the annotation that leads the public stanza (§6). **Publishes on save** (like quotes); unpublish via the list. |
-| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin#edit=<id>` / `#new-writing`, which auto-open the sheet. |
+| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin/fragments#edit=<id>` / `#new-writing`, which auto-open the sheet. A hash never reaches the server, so those links are updated at every *producer* rather than redirected; `/admin` keeps a client-side bounce for old ones. |
 | **Constellations index** | `/admin/constellations` | Every constellation, draft + published: create (a "pile" is just a draft), publish/unpublish, reorder the sky's authored order, delete (placements cascade; fragments untouched). |
 | **The composer** | `/admin/constellations/[id]` | The composing room (design.md §13): the suite in two views over one sequence — **Compose** (dense rows; drag or Alt+↑/↓ to reorder, ✕ unplaces) and **Read** (the public stanzas verbatim, drafts included) — plus the constellation's name/slug/colour/status/description/score, the three tests as quiet gauges, Preview → the real public page (drafts render for the admin only). One **Add** button opens the fragment browser. |
-| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite. |
+| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin/fragments` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite. |
 
 **The fragment → constellation view** (added 2026-07-24). The composer answers *what is in this constellation*; these answer *where does this fragment live* — the same join read from the other end:
 
@@ -44,7 +49,7 @@ Adding from this side **appends** to the end of that suite — composed order st
 
 **Shared chrome.** The pieces every surface repeats have exactly one implementation: [`PageHeader`](../src/components/admin/PageHeader.astro) (back link + title + right-aligned actions + one-line explanation), [`TypeMark`](../src/components/admin/TypeMark.astro) (the ▤ ” ♪ mark in its type color, from `TYPE_META`), [`TypeCount`](../src/components/admin/TypeCount.astro) ("▤ 5 writing" badges), [`StatusChip`](../src/components/admin/StatusChip.astro), and the `.admin-*` utilities in `app.css` (`admin-alert`, `admin-label`, `admin-hint`, `admin-back`, `admin-stat`, `admin-chip`). Added 2026-07-23 after four pages had each hand-rolled their own chips, labels, and error banners — and drifted apart. **Type color is not decoration**: it's the same coding the public site uses (design.md §7), so a quote reads as a quote in the manager, the composer, and the browser alike. Navigation is never deeper than one level, so surfaces get a **back link, not a breadcrumb trail**.
 
-**Every fragment edits in an overlay** — clicking a row anywhere (manager, browser, suite) opens the matching sheet; the page underneath never navigates away. One table implementation serves both the page and the browser: `FragmentListPanel` (class-scoped, wired per-instance by `fragment-panel.ts`) rendered by `/admin` directly and by the **`/admin/fragments-panel` partial** for in-place refreshes and the browser (auth-gated by the same middleware).
+**Every fragment edits in an overlay** — clicking a row anywhere (manager, browser, suite) opens the matching sheet; the page underneath never navigates away. One table implementation serves both the page and the browser: `FragmentListPanel` (class-scoped, wired per-instance by `fragment-panel.ts`) rendered by `/admin/fragments` directly and by the **`/admin/fragments-panel` partial** for in-place refreshes and the browser (auth-gated by the same middleware).
 
 ## 3. The shape decisions
 
@@ -156,7 +161,7 @@ piece, which is the whole shape of this site. See
   by anon with no policy edit and no way to leak by omission. Verified against
   live PostgREST with the real anon key on 2026-07-30 — 0 rows by id, by slug,
   by status, and through the constellation join.
-- **Its own room, not a filter.** Notes live at `/admin?view=notes`, reached
+- **Its own room, not a filter.** Notes live at `/admin/fragments?view=notes`, reached
   from a button beside Trash. A view can't be accidentally cleared into showing
   scratch work beside finished pieces, and the view's scope is shared by the
   rows *and* the type-count badges, so the numbers can never disagree with the
@@ -296,9 +301,9 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 
 **Always an explicit press, never automatic** — it's a paid call, and the publish dialog's contract is instruments that never act on their own. **When it fails, the reason is the reason:** the action used to report every failure as "couldn't reach the model", including a 400 whose body said the account was out of credit. It now surfaces the API's own message (admin-only, so that's safe) and logs the rest.
 
-## 9. Installing the Workshop (phone & iPad) — and why it's not optional
+## 9. Installing the Observatory (phone & iPad) — and why it's not optional
 
-**The Workshop is installable to the home screen; the public site is not.** Only
+**The Observatory is installable to the home screen; the public site is not.** Only
 [`AdminLayout`](../src/layouts/AdminLayout.astro) carries a manifest
 ([`public/workshop.webmanifest`](../public/workshop.webmanifest)), so readers are
 never offered an "install" they'd have no use for.
@@ -309,7 +314,7 @@ visit**, and home-screen web apps are exempt, so installing was what kept the
 writing sheet's offline outbox alive between sessions. **That outbox was removed
 the following day** ([ADR 0010](adr/0010-online-first-writing.md)) — there is no
 local storage left to protect, and the install is now simply a convenience: its
-own icon, its own window, opening straight into the workshop instead of the
+own icon, its own window, opening straight into Today instead of the
 homepage. Kept because it costs nothing and reads better than a browser tab.
 
 **How, on iOS:** open `/admin` in **Safari** (not another browser) → Share →
@@ -319,7 +324,7 @@ would forfeit the storage exemption. On Android/desktop Chrome, the install
 prompt appears in the address bar.
 
 **Install from `/admin`, not from the homepage** — nothing public links into the
-Workshop, so an app that lands anywhere else means typing the URL every time.
+Observatory, so an app that lands anywhere else means typing the URL every time.
 The manifest's `start_url` says `/admin` for the same reason; `scope` is `/` so
 tapping **Site ↗** stays inside the app instead of bouncing you to Safari.
 
@@ -346,3 +351,36 @@ theme toggle against it can leave the bar a shade out.
 - ~~**Revision history / timeline**~~ — **shipped 2026-07-30** as draft versions (§5a), and it arrived by a side door: history stopped being a feature to build and became a *consequence* of how editing a published piece works. What is still deferred is a **diff view** — side-by-side preview is enough for one author.
 - **Bulk import tooling** beyond paste (quote capture) — [architecture.md](architecture.md) §6.5. *Batch Spotify is off the table, not deferred:* Spotify removed the batch endpoints for Development Mode apps in Feb 2026, so it's one request per track now.
 - **`/listening`** — songs have no public surface of their own (no permalink, no `/blog` view); they appear only as stanzas inside a constellation. Plan 04 Piece 5.
+
+## 11. The morning check-in
+
+*The first HQ surface. Schema in [data-model.md](data-model.md) §6b; the boundary it sits behind in [ADR 0012](adr/0012-hq-is-a-private-second-domain.md).*
+
+It is the **Morning zone on Today**, pinned first and always present — answered or not. It is deliberately **not a modal and not a wall**: it is a card that dismisses, so the day behind it is reachable in one tap.
+
+**It is not a form you submit.** One row per local date, upserted as you go. A tap saves immediately; typing debounces and flushes on blur. There is no Save button, because the thing a Save button implies — that the answers are provisional until you press it — is false. "Done" only closes the card.
+
+**Four states, all rendered from the same row:**
+
+| State | What it is |
+|---|---|
+| **ask** | The prompt. One tap to start, one to skip. |
+| **fill** | The form, prefilled from the row — or, on today only, from your recent medians. |
+| **done** | A compact summary with a pencil back into the form. |
+| **skipped** | Explicit, recorded, and reversible. Skipping never wipes answers already given. |
+
+**What it records, and why those shapes**, is in [data-model.md](data-model.md) §6b — the two star scales that must not be merged, the two affect axes that must not become one, and the buckets that are honest where a number would be a guess.
+
+**The field order is dream first.** Dream recall decays within minutes of waking, while the times and the ratings are just as answerable at 9am — so the perishable field goes where you are most likely to still have it. The ordering is done with flex `order`, not source order.
+
+**Every scale carries a word for its current value** (`low`, `restless`, `wrung out`), right-aligned. Half-awake, a bare position on a track means nothing, and the word is also how a mis-tap is noticed without re-reading the scale. **Stars get no word** — five stars are self-evident. The words are kept short because at 390px the column has about 66px: the intensity scale's honest top value was *"overwhelming"*, which widened the card and was then sheared off by the zone's `overflow: hidden`, silently.
+
+**The one thing it gives back on day one** is a derived line under the times — time in bed, then an estimate of actual sleep and an efficiency once both buckets are answered. It grows as you answer, and it claims nothing before its inputs exist.
+
+**Backfill is three days**, reachable only by navigating to a past date deliberately, and **enforced in the action** rather than only in the form. Prefill is switched **off** for a past day: a plausible suggested time on a day you are reconstructing gets confirmed without ever being recalled. Outside the window a date is readable and not editable.
+
+**Times on screen are never UTC.** A project rule, not a detail of this surface: pages render on a server whose clock is UTC, so any date formatted there is UTC unless something says otherwise — and *"Saved 12:41 AM"* in UTC is not a time anybody was awake for. It looks like a real time, which is what makes it worth a mechanism. Every stamp renders a real `<time datetime>` whose server-side fallback is already in the **configured home zone**, and [`src/scripts/local-time.ts`](../src/scripts/local-time.ts) — mounted from the layout, so no page has to remember to opt in — rewrites it into whatever zone the reader's device is in.
+
+⚠ **That is display only, and the distinction is load-bearing.** The browser may say what o'clock it was; it never says what *day* it was. The day boundary stays server-side on the configured zone, because scheduled work has no browser and a laptop with a stale clock must not be able to move it ([data-model.md](data-model.md) §6b).
+
+**Phone-first**, and that is not a variant — it is the constraint the design was drawn against: under 60 seconds, one screen, thumb-reachable, done half-awake in bad light. Native `<input type="time">` is used deliberately; anything hand-rolled is slower and worse on iOS. The free-text fields sit behind a tap because they are the ones that summon a keyboard.

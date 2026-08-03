@@ -1544,3 +1544,770 @@ html.reader-open .sky-return {
   outline: 2px solid var(--color-primary);
   outline-offset: 3px;
 }
+
+/* ===========================================================================
+   HQ — the Observatory's private half (docs/admin.md §1, ADR-0012/0015).
+
+   These are HQ's primitives, not Today's. The evidence they belong here rather
+   than in a page: the people prototype rebuilt an entire profile out of
+   `.zone` / `.row` / `.chip` / `.stamp` without adding one. A new HQ surface
+   that needs a NEW zone primitive should be treated as a smell first and a
+   requirement second.
+
+   TWO COLOUR AXES, AND THEY NEVER MEAN EACH OTHER.
+
+     domain   which part of life this is   the `--cn-*` constellation ramp
+     urgency  how pressing this is         semantic only (error/warning/muted)
+
+   That separation is what makes the page readable at a glance: red always
+   means pressing and never means "belongs to the agenda". A zone carries a
+   domain hue via `.cn-*`; a chip carries a semantic tone via `.u-*`. Reusing
+   the constellation ramp means HQ adds no second palette and is theme-aware in
+   dusk and paper for free — safe because HQ surfaces and constellation
+   surfaces never appear on the same page.
+
+   FOUR TRAPS ARE FIXED BELOW, each of which failed silently in the prototypes
+   and was caught by none of typecheck, build, or a screenshot. They are marked
+   TRAP n. Do not "tidy" one away.
+   ======================================================================== */
+
+/* ── layout ───────────────────────────────────────────────────────────────
+   TRAP 2: a container cannot query itself. `container-type` goes on the
+   WRAPPER, never on `.hq-grid` whose own layout the query is meant to change.
+   TRAP 1: `grid-column: 2` conjures an implicit column and puts every item on
+   its own row. These are real flex column wrappers instead, going
+   `display: contents` when narrow so the zones collapse into one stack and
+   `order` can resequence them (People outranks Coming up on a phone). */
+.hq-cq {
+  container-type: inline-size;
+}
+.hq-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.col-main,
+.col-rail {
+  display: contents;
+}
+.o-1 { order: 1; }
+.o-2 { order: 2; }
+.o-3 { order: 3; }
+.o-4 { order: 4; }
+.o-5 { order: 5; }
+@container (min-width: 46rem) {
+  .hq-grid {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .col-main,
+  .col-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+  .col-main { flex: 1.5 1 0; }
+  .col-rail { flex: 1 1 0; }
+  .o-1, .o-2, .o-3, .o-4, .o-5 { order: 0; }
+}
+
+/* ── zones: the DOMAIN axis ────────────────────────────────────────────────
+   A bordered card with a hue-tinted header — icon chip, small uppercase title,
+   its actions. You know where you are before reading a word. A domain with
+   nothing to say renders `.zone__empty`; a domain that does not EXIST yet
+   renders nothing at all, replaced by one plain sentence, because on day one a
+   row of "no data" boxes reads as a broken app *and* as a list of things you
+   have already failed to do. */
+.zone {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  overflow: hidden;
+}
+.zone--ghost {
+  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
+}
+.zone__head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--color-base-300);
+  background: color-mix(in oklch, var(--cn) 7%, transparent);
+}
+.zone__chip {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: color-mix(in oklch, var(--cn) 18%, transparent);
+  color: var(--cn);
+  font-size: 1rem;
+}
+.zone__chip--warn {
+  background: color-mix(in oklch, var(--color-error) 15%, transparent);
+  color: var(--color-error);
+}
+.zone__title {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--cn) 78%, var(--color-base-content));
+}
+.zone__act {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.zone__act:hover {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.zone__cta {
+  background: var(--cn);
+  color: var(--color-base-100);
+  border-color: transparent;
+}
+.zone__cta:hover {
+  filter: brightness(1.08);
+}
+.zone__body { padding: 0.875rem; }
+.zone__list { padding: 0.25rem 0.875rem; }
+.zone__empty {
+  padding: 0.875rem;
+  font-size: 0.875rem;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
+/* Same-day progress, never a streak: it resets nightly and counts what you
+   did, not what you owe. */
+.zone__count {
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+}
+
+/* ── rows ──────────────────────────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+.row + .row {
+  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
+}
+.row__time {
+  width: 4.75rem;
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.row__time--none {
+  font-style: italic;
+  opacity: 0.75;
+}
+.row__time--wide { width: 5rem; }
+
+/* ── chips: the URGENCY axis (semantic only, never a domain hue) ────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.u-now {
+  background: color-mix(in oklch, var(--color-error) 16%, transparent);
+  color: var(--color-error);
+  border-color: color-mix(in oklch, var(--color-error) 35%, transparent);
+}
+.u-warn {
+  background: color-mix(in oklch, var(--color-warning) 16%, transparent);
+  color: var(--color-warning);
+  border-color: color-mix(in oklch, var(--color-warning) 32%, transparent);
+}
+.u-info {
+  background: color-mix(in oklch, var(--color-info) 14%, transparent);
+  color: var(--color-info);
+  border-color: color-mix(in oklch, var(--color-info) 30%, transparent);
+}
+.u-none {
+  background: var(--color-base-200);
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  border-color: var(--color-base-300);
+}
+
+/* The blog's date affordance in HQ's register: clock + compact label, with the
+   full truth one press away. `Timestamp.astro` does the popover version; this
+   is the same interaction at a smaller size. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-variant-numeric: tabular-nums;
+}
+.stamp:hover { color: var(--cn); }
+.stamp__i {
+  font-size: 0.8125rem;
+  opacity: 0.65;
+}
+
+/* ── the date bar: the header IS the control ───────────────────────────────
+   `‹ ›` step a day and stay quiet until hover; the date opens a month
+   calendar; off today a `↩ Today` chip appears, because being on another day
+   must never be ambiguous. Every one of them is a real link to
+   `?date=YYYY-MM-DD`, so the page works before a byte of JS runs. */
+.datebar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+.datebar__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-field, 0.5rem);
+  padding: 0.125rem 0.5rem;
+  font-family: var(--font-display, serif);
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.25;
+  list-style: none; /* it is a <summary>; the marker is the caret below */
+}
+.datebar__date::-webkit-details-marker { display: none; }
+.datebar__date:hover { background: var(--color-base-200); }
+.datebar__caret {
+  font-size: 0.875rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.datebar:hover .datebar__caret,
+.datebar__date:focus-visible .datebar__caret,
+.cal-wrap[open] .datebar__caret {
+  opacity: 0.45;
+}
+.datebar__step {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+.datebar__step:hover {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.datebar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-base-300);
+  padding: 0.125rem 0.625rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+}
+.datebar__back:hover { background: var(--color-base-200); }
+
+.cal {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  margin-top: 0.375rem;
+  width: 16rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  padding: 0.625rem;
+  box-shadow: 0 10px 30px var(--shadow-color, oklch(0% 0 0 / 0.25));
+}
+.cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+}
+.cal__dow,
+.cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal__dow {
+  margin-top: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+}
+.cal__dow span { text-align: center; }
+/* TRAP 3, now moot and worth keeping moot: Astro's scoped styles reach only
+   elements that exist in the template, so a grid built with `createElement`
+   silently loses every hover, cursor and focus rule. These 42 cells are
+   rendered server-side as real links, which sidesteps the whole class of bug —
+   keep it that way rather than reaching for `is:global`. */
+.cal__grid a {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 0.1s,
+    color 0.1s;
+}
+.cal__grid a:hover {
+  background: color-mix(in oklch, var(--color-primary) 30%, transparent);
+}
+.cal__grid a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.cal__grid .is-out { opacity: 0.35; }
+.cal__grid .is-today {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-primary) 70%, transparent);
+  font-weight: 600;
+}
+/* TRAP 6: `:hover` beats the selected state at equal specificity, so source
+   order decides — and a selected cell going pale under the cursor reads as
+   disabled, on the one control you are using. The `--on` rules come AFTER
+   `:hover` and carry their own hover. Applies to every toggle group in HQ. */
+.cal__grid .is-sel,
+.cal__grid .is-sel:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+}
+
+/* ── global capture (wired by the capture piece) ─────────────────────────── */
+.fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 20;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  box-shadow: 0 6px 20px var(--shadow-color, oklch(0% 0 0 / 0.28));
+}
+.fab:hover { filter: brightness(1.06); }
+
+/* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`, so every
+   custom control needs the pointer put back or the page feels inert under the
+   mouse. Anything new in HQ must join this list. */
+.datebar button,
+.datebar summary,
+.zone__act,
+.row__tick,
+.stamp,
+.fab {
+  cursor: pointer;
+}
+
+/* TRAP 5: a <fieldset> will not shrink. The UA stylesheet gives it
+   `min-width: min-content`, so one long value label widens the fieldset past
+   its parent instead of wrapping — and at 390px the zone's `overflow: hidden`
+   then shears the label off with nothing reporting an overflow. Three
+   plausible assertions all miss it. This is the fix, applied to every fieldset
+   inside a zone rather than per-form; value labels also need
+   `flex: 1 1 0; min-width: 0` so they take what is left rather than sizing the
+   row. */
+.zone fieldset {
+  min-width: 0;
+}
+
+/* ── the morning check-in (11 · Piece 1) ───────────────────────────────────
+   THE CONSTRAINT IS THE DESIGN: under 60 seconds, one screen, thumb-reachable,
+   done half-awake in bad light. A check-in skipped on the worst mornings loses
+   exactly the data the whole feature exists to collect — so tap targets come
+   before density here, which is the reverse of every other HQ surface.
+
+   It lives INSIDE the Morning zone, never as a modal. A blocking dialog on a
+   despair morning is the single worst thing this could become. */
+.ck {
+  display: flex;
+  flex-direction: column;
+}
+/* Ordered by flex `order`, not by source, so the fieldsets can be resequenced
+   without moving markup. DREAM IS FIRST, deliberately: recall decays within
+   minutes of waking, while the times and the ratings are just as answerable at
+   9am — so the perishable field goes where you are most likely to still have
+   it. Michael's call, 2026-08-02. */
+.ck [data-bf] { order: 0; }
+.ck [data-fs='dream'] { order: 1; }
+.ck [data-fs='sleep'] { order: 2; }
+.ck [data-fs='waking'] { order: 3; }
+.ck__foot { order: 9; }
+
+/* TRAP 5 again, and this is the form that found it: the UA stylesheet gives a
+   fieldset `min-width: min-content`, so it refuses to shrink and one long value
+   word widens the card instead of wrapping. `.zone fieldset` already sets this;
+   repeated here because `.fs` is the thing being reasoned about. */
+.fs {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.fs + .fs {
+  margin-top: 1.125rem;
+  padding-top: 1.125rem;
+  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+}
+.fs__k {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--cn) 72%, var(--color-base-content));
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+.fs__sub {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  margin-bottom: 0.3125rem;
+}
+
+/* 2.75rem is the 44px floor. Used one-handed, in the dark, half-awake. */
+.opts {
+  display: grid;
+  gap: 0.375rem;
+}
+.opts--2 { grid-template-columns: 1fr 1fr; }
+.opts--3 { grid-template-columns: repeat(3, 1fr); }
+.opts--4 { grid-template-columns: repeat(4, 1fr); }
+.opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.375rem;
+  cursor: pointer;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  background: var(--color-base-100);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  text-align: center;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+.opt--sm {
+  min-height: 2.5rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.opt__i {
+  font-size: 0.9375rem;
+  opacity: 0.55;
+}
+/* TRAP 6: `:hover` beats the selected state at equal specificity, so the
+   selected rules come AFTER and carry their own hover. Get this backwards and
+   the option you just tapped goes pale under the cursor, which reads as
+   disabled — on the one control you are using. */
+.opt:hover { background: var(--color-base-200); }
+.opt[aria-pressed='true'],
+.opt[aria-pressed='true']:hover {
+  background: color-mix(in oklch, var(--cn) 14%, transparent);
+  border-color: color-mix(in oklch, var(--cn) 55%, transparent);
+  color: color-mix(in oklch, var(--cn) 80%, var(--color-base-content));
+  font-weight: 700;
+}
+.opt[aria-pressed='true'] .opt__i { opacity: 1; }
+/* The dream answer is the ONE place a rest-zone element borrows the urgency
+   axis, and it earns it: a distressing night is the signal the whole instrument
+   exists to catch, so it must not read as violet like everything around it. */
+.opt--none[aria-pressed='true'],
+.opt--none[aria-pressed='true']:hover {
+  background: var(--color-base-200);
+  border-color: var(--color-base-300);
+  color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+}
+.opt--neutral[aria-pressed='true'],
+.opt--neutral[aria-pressed='true']:hover {
+  background: color-mix(in oklch, var(--color-info) 14%, transparent);
+  border-color: color-mix(in oklch, var(--color-info) 40%, transparent);
+  color: var(--color-info);
+}
+.opt--anxious[aria-pressed='true'],
+.opt--anxious[aria-pressed='true']:hover {
+  background: color-mix(in oklch, var(--color-warning) 16%, transparent);
+  border-color: color-mix(in oklch, var(--color-warning) 45%, transparent);
+  color: var(--color-warning);
+}
+.opt--distressing[aria-pressed='true'],
+.opt--distressing[aria-pressed='true']:hover {
+  background: color-mix(in oklch, var(--color-error) 16%, transparent);
+  border-color: color-mix(in oklch, var(--color-error) 45%, transparent);
+  color: var(--color-error);
+}
+
+/* Native <input type="time"> on purpose: it is the correct control on iOS, and
+   anything hand-rolled is slower and worse at 7am. In an en-US locale it
+   renders 12-hour, which is what HQ's date register requires anyway. */
+.times {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.tm {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tm__k {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  margin-bottom: 0.25rem;
+}
+.tm__arrow {
+  padding-bottom: 0.6rem;
+  color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
+}
+.times input {
+  width: 100%;
+  min-height: 2.5rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  background: var(--color-base-100);
+  padding: 0.25rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.times input:focus {
+  outline: none;
+  border-color: var(--cn);
+}
+.prefill {
+  margin-top: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+}
+/* The live payback. The trend view is held until there is data to shape it
+   against, so on day one this line is the ONLY thing the check-in gives back —
+   and it grows as you answer, which is the point. */
+.derived {
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--cn) 80%, var(--color-base-content));
+  min-height: 1.1rem;
+}
+
+/* The row is a COMPACT CLUSTER, not a full-width bar. `.mark` does not stretch:
+   at desktop widths a row that filled the card threw the value word out to the
+   far edge, half a card away from the marks it describes, and the eye had to
+   travel to connect them (Michael, 2026-08-02).
+
+   The word still may NOT size the row — `flex-basis` plus `min-width: 0` and an
+   ellipsis is what keeps that true. It gets a fixed column so the words line up
+   down the card, and it shrinks rather than pushing at 390px, where the budget
+   is about 66px and every word was chosen to fit it. */
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.1875rem 0;
+  max-width: 24rem;
+}
+.mark__k {
+  flex: 0 0 3.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+.mark__w {
+  flex: 0 1 5rem;
+  min-width: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+}
+
+/* Stars where more is genuinely better — sleep quality, restedness. */
+.stars {
+  display: flex;
+  gap: 0.125rem;
+}
+.st {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  cursor: pointer;
+  font-size: 1.125rem;
+  color: color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  transition:
+    color 0.1s,
+    transform 0.1s;
+}
+.st:hover { transform: scale(1.12); }
+.st--on { color: var(--cn); }
+
+/* A POSITION ON A TRACK for the bipolar scales, never stars: stars would claim
+   "activated" beats "calm", which is false. */
+.trackbtns {
+  display: flex;
+  gap: 0.125rem;
+}
+.tb {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  cursor: pointer;
+}
+.tb i {
+  display: block;
+  width: 1.125rem;
+  height: 0.3125rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-base-content) 18%, transparent);
+  transition:
+    background-color 0.1s,
+    height 0.1s;
+}
+.tb:hover i { background: color-mix(in oklch, var(--cn) 40%, transparent); }
+.tb--on i,
+.tb--on:hover i {
+  background: var(--cn);
+  height: 0.625rem;
+}
+
+/* The free-text fields summon a keyboard, so they sit behind a tap. Optional,
+   and skipping them is the normal case. */
+.addline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-height: 2.25rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--cn) 78%, var(--color-base-content));
+}
+.addline:hover { text-decoration: underline; }
+.ta {
+  display: block;
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-200);
+  padding: 0.5rem 0.625rem;
+  font-family: var(--font-serif, serif);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.ta:focus {
+  outline: none;
+  border-color: var(--cn);
+}
+
+.ck__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1.125rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+}
+
+/* The backfill banner. Filling in a past day must never feel like filling in
+   today — that is the entire reason prefill is switched off down here. */
+.bf {
+  border: 1px solid color-mix(in oklch, var(--cn) 30%, transparent);
+  border-left-width: 3px;
+  border-radius: var(--radius-box);
+  background: color-mix(in oklch, var(--cn) 6%, transparent);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+.bf__k {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: color-mix(in oklch, var(--cn) 82%, var(--color-base-content));
+}
+
+/* ── the summary the form collapses into ─────────────────────────────────── */
+.rate {
+  display: flex;
+  gap: 0.125rem;
+}
+.rate__label {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 48%, transparent);
+}
+.rate__s {
+  font-size: 0.875rem;
+  color: color-mix(in oklch, var(--color-base-content) 28%, transparent);
+}
+.rate__s--on { color: var(--cn); }
+.track {
+  display: flex;
+  gap: 0.1875rem;
+  align-items: center;
+}
+.track__t {
+  width: 0.75rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-base-content) 18%, transparent);
+}
+.track__t--on { background: var(--cn); }

@@ -1,7 +1,7 @@
 ---
 /*
   FragmentListPanel — the Fragment Manager's toolbar + table, shared verbatim by
-  /admin (mode="manage") and the fragments-panel partial the composer's browser
+  /admin/fragments (mode="manage") and the fragments-panel partial the composer's browser
   sheet fetches (mode="pick"). Everything inside is CLASS-scoped (no ids) so two
   panels can never collide, and src/scripts/fragment-panel.ts wires any instance
   from its root element. Keep it script-free: partials strip component scripts.
@@ -32,7 +32,7 @@ const COLUMNS = [
 
 <div class="fpanel" data-mode={mode} data-view={view} data-constellation={p.constellation ?? undefined}>
   {/* Toolbar */}
-  <form method="GET" action="/admin" class="fpanel-filters flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+  <form method="GET" action="/admin/fragments" class="fpanel-filters flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
     <input type="hidden" name="sort" class="fpanel-sort" value={`${p.sortField}_${p.sortDir}`} />
     <input type="hidden" name="type" class="fpanel-type" value={p.type ?? ''} />
     <input type="hidden" name="view" value={view === 'list' ? '' : view} />

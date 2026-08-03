@@ -200,10 +200,36 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`paired_song_id`** — *the song that goes with this piece* ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). A self-FK from a `writing` row to a `song` row, rendered at the head of the essay. **`ON DELETE SET NULL`** — deleting a song blanks the pairing rather than taking the essay with it. The FK deliberately does *not* enforce `type = 'song'`: a composite FK on `(id, type)` would need a generated column holding the constant, and a generated column cannot be set to null, which is precisely what SET NULL must do — so the check lives in the `songs.pair` action, where the error can be a sentence. **RLS needs no help here:** a PostgREST embed re-applies the fragments policies, so an unpublished paired song simply doesn't come back. The reader that consumes this (`pairedMediaOf`) must therefore treat "id set, embed null" as *no pairing* and never fall through to the legacy `details.media`, which all 48 promoted essays still carry.
 - **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
+## 6b. HQ — the private second domain
+
+**HQ tables are not fragments and never become them** ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)). The corpus is authored to be *published*, so its RLS is an allowlist on `status = 'published'`; HQ is authored to be *never seen*, and its safety comes from a different property entirely — **the absence of any `anon` policy at all**, the pattern `fragment_versions` already uses (§6). Every HQ table is `is_admin()` for all four verbs, with no `anon` grant, so no public route can read one even by accident.
+
+**`settings`** — one row, enforced by `id boolean primary key check (id)`. It holds `home_timezone`, an **IANA name** (`America/Los_Angeles`), never an offset: DST is then Postgres's problem and `Intl`'s rather than ours, and a hard-coded `-08:00` is wrong for half of every year. It lives in the database rather than in env so that moving cities is one `UPDATE` and not a redeploy — and so that server-side work with no browser agrees with what the screen says. [`src/lib/hq/time.ts`](../src/lib/hq/time.ts) is the only thing that reads it, and `localToday()` is the only way anything computes "today".
+
+**`daily_checkins`** — one upserted row per local wake date ([admin.md](admin.md) §11).
+
+| Column | Shape | Why |
+|---|---|---|
+| `log_date` | `date`, **unique** | The local date you woke up on. Going to bed at 1am and waking at 8am the same morning is **one** record. Postgres has no notion of "today", so this column is the only thing that does — never derive it from `created_at`. |
+| `bed_at` / `woke_at` | `timestamptz` | Full instants, not times, so the cross-midnight case is unambiguous rather than inferred. A bed time later on the clock than the wake time belongs to the day before. |
+| `sleep_latency` | enum bucket | A minute count is a guess at 7am; a bucket is honest and just as useful for a trend. |
+| `awakenings` | enum bucket | Same reason — nobody knows the count. |
+| `sleep_quality` · `restedness` | two `smallint` 1–5 | **Two fields on purpose, and they must not be merged.** Physical rest and mental rest come apart, and one combined score erases exactly the case worth noticing. |
+| `valence` · `arousal` | two `smallint` 1–5 | **Two axes, not one mood score.** A single scale cannot distinguish *calm but hollow* from *wired and afraid*. |
+| `dream_recall` | enum, 4 values | `none` is one tap and is **real data**, not a hole. |
+| `dream_intensity` · `dream_body` | 1–5, Markdown | Guarded by a CHECK: they cannot outlive the dream they describe. |
+| `note` | text | One optional line of anything. |
+| `skipped` | `boolean not null` | **Recorded, never inferred.** A row with `skipped = true` means "not today"; no row at all means nothing was said. Neither is ever counted, and there are no streaks anywhere in HQ. |
+
+**Every field except `log_date` is nullable, and that is the design.** The check-in is not a form that gets submitted: the phone captures times and ratings on waking, a desktop appends the longer text later, and both are the same row. An unfinished check-in is a check-in — there is no completeness meter and there must not be one.
+
+Writes are bounded to a **three-day backfill window**, enforced in [`src/actions/checkin.ts`](../src/actions/checkin.ts) rather than only in the form. That is a data-quality limit, not a convenience one: affect recalled a week later is invention, and an invented row is worse than an absent one because a trend cannot tell them apart.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
 - **Reading time** — from `body` word count if not stored in `details`.
+- **Time in bed, estimated sleep, sleep efficiency** — from `daily_checkins.bed_at` / `woke_at` and the two buckets, computed at render by [`src/lib/hq/checkin.ts`](../src/lib/hq/checkin.ts). Efficiency in particular is the number that actually moves under CBT-I, which makes a stale stored copy of it worse than none. The estimate stays null until *both* buckets are answered — an efficiency that silently assumed "asleep instantly, never woke" would be a number the person never gave.
 
 ## 8. Domain → schema mapping
 
@@ -218,6 +244,8 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 | Subject (tag) | `subjects` + `fragment_subjects` |
 | Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` (facets; display stays in `attribution` / `details`) |
 | Emergent links between constellations | shared membership (no table) |
+| The morning check-in | `daily_checkins`, keyed by local `log_date` (§6b) |
+| The configured home timezone | `settings.home_timezone` (§6b) |
 | The blog / index | queries over `fragments` by `type` + `occurred_at` |
 
 ## 9. Deferred (not in v1)

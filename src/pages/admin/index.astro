@@ -1,167 +1,228 @@
 ---
 /*
-  /admin — the Fragment Manager (docs/admin.md §2). A flat, sortable table over
-  ALL fragments (admin sees everything via RLS), rendered by the shared
-  FragmentListPanel (also served as the fragments-panel partial to the
-  composer's browser sheet). Filtering/sorting swap the table in place
-  (fragment-panel.ts) — no full reload. Every fragment edits in an overlay:
-  quotes/songs in the FragmentSheet, writing in the WritingSheet — the page
-  underneath never navigates away.
+  /admin — TODAY. The Observatory's front door (ADR-0015, docs/admin.md §2).
+
+  The Fragment Manager lived here until 2026-08-02 and now lives at
+  `/admin/fragments`. This is the daily surface: the one page opened every
+  morning, which is why it took the root from a surface used weekly.
+
+  WHAT IS AND IS NOT HERE YET. Today is a hub with four contributors — the
+  morning check-in, the agenda, people, and writing signals. The check-in is
+  live; the other three are not, so the page renders the date bar, the Morning
+  zone, and one plain sentence naming what is missing. It does NOT render an
+  empty slot per unbuilt feature: on day one a row of "no data" boxes reads as a
+  broken app *and* as a list of things you have already failed to do
+  (docs/admin.md §1, "a domain with nothing to say renders quiet").
+
+  THE CAPTURE ✚ IS DELIBERATELY ABSENT rather than inert. Its CSS is in
+  `app.css` and the capture piece wires it; a button that does nothing when
+  pressed is the same invented affordance the prototypes existed to catch.
+
+  NO WritingSheet, NO TipTap. The sheets are imported by `/admin/fragments` and
+  the composer, never by the layout, so the page opened on a phone at 7am stays
+  free of an editor bundle it will not use.
+
+  THE DATE BAR IS SERVER-DRIVEN. Every control is a real link to
+  `?date=YYYY-MM-DD`, the month grid is 42 rendered anchors, and the popover is
+  a <details>. No JS builds any of it — which sidesteps trap 3 (Astro's scoped
+  styles never reach runtime-created DOM) and means the page works before a
+  byte of script runs.
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import PageHeader from '../../components/admin/PageHeader.astro';
-import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
-import TypeMark from '../../components/admin/TypeMark.astro';
-import StarMark from '../../components/StarMark.astro';
-import FragmentSheet from '../../components/admin/FragmentSheet.astro';
-import WritingSheet from '../../components/admin/WritingSheet.astro';
-import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
+import CheckinZone from '../../components/admin/CheckinZone.astro';
+import { today as hqToday, parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
+import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
+import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
 
 const supabase = Astro.locals.supabase;
-const params = parseListParams(Astro.url.searchParams);
-params.constellation = null; // pick-mode concern; never used here
-const data = await queryFragmentList(supabase, params);
-const view = params.view;
-const subjectNames = data.allSubjects.map((s) => s.name);
+const { tz, ymd: todayYmd } = await hqToday(supabase);
 
-const TITLES = { list: 'Fragments', notes: 'Notes', trash: 'Trash' } as const;
-const SUBTITLES = {
-  list: undefined,
-  notes:
-    'The scratch tier: thoughts before they are drafts. Never public — the site only ever reads published rows. Promote one to a draft when it starts becoming a piece.',
-  trash:
-    'Deleted fragments wait here until you empty them. Anything placed in a constellation leaves that suite while it sits in the trash.',
-} as const;
+// Navigating is free; EDITING is not — the 3-day backfill limit belongs to the
+// check-in, not to the ability to look at a date. So no clamp here.
+const selected: Ymd = parseYmd(Astro.url.searchParams.get('date')) ?? todayYmd;
+const offToday = selected !== todayYmd;
+
+// The same window the action enforces. Stated once, in the module both read.
+const writable = selected <= todayYmd && selected >= shiftYmd(todayYmd, -BACKFILL_DAYS);
+
+const { data: checkin } = await supabase
+  .from('daily_checkins')
+  .select('*')
+  .eq('log_date', selected)
+  .maybeSingle<Checkin>();
+
+// Back out of UTC into wall-clock times, because that is what the pickers and
+// the summary both speak. The instants stay canonical in the database.
+const times = {
+  bed: checkin?.bed_at ? utcToZonedTime(checkin.bed_at, tz) : null,
+  woke: checkin?.woke_at ? utcToZonedTime(checkin.woke_at, tz) : null,
+};
+
+/**
+ * The median of recent bed and wake times — what keeps this under a minute,
+ * because it usually turns two pickers into one tap each to confirm.
+ *
+ * Only fetched when it could be used: a backfill deliberately gets no prefill
+ * (a plausible suggested time on a day you are reconstructing gets confirmed
+ * without being recalled), and a row that already has times has no use for one.
+ */
+let prefill: { bed: string; woke: string } | null = null;
+if (selected === todayYmd && !times.bed && !times.woke) {
+  const { data: recent } = await supabase
+    .from('daily_checkins')
+    .select('bed_at, woke_at')
+    .not('bed_at', 'is', null)
+    .not('woke_at', 'is', null)
+    .order('log_date', { ascending: false })
+    .limit(14);
+
+  const rows = recent ?? [];
+  // Three rows is the floor: a "usual time" from one night is not a usual time,
+  // and offering it as one would be the interface inventing a habit.
+  if (rows.length >= 3) {
+    // Bed times straddle midnight, so their median is taken on a clock rotated
+    // by twelve hours — see `medianClock`. Waking times do not, so they are not.
+    const bed = medianClock(rows.map((r) => utcToZonedTime(r.bed_at!, tz)), 12);
+    const woke = medianClock(rows.map((r) => utcToZonedTime(r.woke_at!, tz)), 0);
+    if (bed && woke) prefill = { bed, woke };
+  }
+  prefill ??= DEFAULT_TIMES;
+}
+
+// `?cal=` is the month the popover is showing, and its presence is what keeps
+// the popover open across a month step. Stepping months is a real navigation
+// rather than a script, which is the price of rendering the grid server-side —
+// and on a page this small it is a price worth paying.
+const calAnchor = parseYmd(Astro.url.searchParams.get('cal'));
+const calOpen = calAnchor !== null;
+const anchor = calAnchor ?? selected;
+const cells = monthGrid(anchor);
+
+const at = (date: Ymd, cal?: Ymd) => `/admin?date=${date}${cal ? `&cal=${cal}` : ''}`;
+const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 ---
 
-<AdminLayout title={TITLES[view]} active="fragments">
-  <div class="mx-auto max-w-5xl px-6 py-8">
-    <PageHeader
-      title={TITLES[view]}
-      back={view === 'list' ? undefined : { href: '/admin', label: 'Fragments' }}
-      subtitle={SUBTITLES[view]}
-    >
-      <Fragment slot="actions">
-        {
-          view === 'trash' ? (
-            <button id="empty-trash" class="btn btn-outline btn-sm gap-1.5 font-sans text-error" disabled={data.rows.length === 0}>
-              <Icon name="ph:trash" class="text-base" /> Empty trash
-            </button>
-          ) : (
-            <>
-              {view === 'list' && (
-                <>
-                  {/* Notes get their own room rather than a filter on this one:
-                      scratch work shouldn't sit beside finished pieces, and a
-                      view can't be accidentally cleared into showing them. */}
-                  <a href="/admin?view=notes" class="btn btn-ghost btn-sm gap-1.5 font-sans">
-                    <Icon name="ph:note" />
-                    Notes
-                    <span class="rounded-full bg-base-300 px-1.5 text-xs text-base-content/70 empty:hidden">{data.noteCount || ''}</span>
-                  </a>
-                  <a href="/admin?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
-                    <Icon name="ph:trash" />
-                    Trash
-                    <span id="trash-count" class="rounded-full bg-base-300 px-1.5 text-xs text-base-content/70 empty:hidden">{data.trashCount || ''}</span>
-                  </a>
-                </>
-              )}
-              <div class="relative">
-                <button id="add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
-                  <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
-                </button>
-                <div id="add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
-                  <button data-new-note role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><Icon name="ph:note" class="text-base-content/50" /> Note</button>
-                  <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
-                  <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
-                  <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
-                </div>
-              </div>
-            </>
-          )
-        }
-      </Fragment>
-    </PageHeader>
+<AdminLayout title="Today" active="today">
+  {/* Deep links from before the move, and from muscle memory. A hash never
+      reaches the server, so this cannot be a redirect — every *producer* was
+      updated instead (the retired writing page's 302, the blog's edit link,
+      the manager's history base), and this catches what is already in a
+      browser's history or an old note. `is:inline` so it runs while the
+      document parses rather than after paint; `replace` so Back does not
+      bounce you here again. */}
+  <script is:inline>
+    (function () {
+      var h = location.hash;
+      if (/^#edit=[0-9a-f][0-9a-f-]{30,40}$/i.test(h) || h === '#new-writing' || h === '#new-note') {
+        location.replace('/admin/fragments' + h);
+      }
+    })();
+  </script>
 
-    <FragmentListPanel data={data} params={params} mode="manage" />
-  </div>
+  <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
+    {/* ── the date bar: the header IS the control ─────────────────────── */}
+    <header class="datebar mb-6 pt-1">
+      <a class="datebar__step" href={at(shiftYmd(selected, -1))} aria-label="Previous day">
+        <Icon name="ph:caret-left" />
+      </a>
 
-  {/* Floating bulk-action bar (buttons rendered per view) */}
-  <div id="bulkbar" class="bulkbar font-sans text-sm" data-view={view}>
-    <span id="bulkcount" class="text-base-content/70">0 selected</span>
-    <div class="flex gap-1">
+      <details class="cal-wrap" open={calOpen}>
+        <summary class="datebar__date" aria-label="Choose a date">
+          <span data-header-date>{headerDate(selected)}</span>
+          <Icon name="ph:caret-down" class="datebar__caret" />
+        </summary>
+        <div class="cal">
+          <div class="cal__head">
+            <a class="datebar__step" href={at(selected, shiftMonth(anchor, -1))} aria-label="Previous month">
+              <Icon name="ph:caret-left" />
+            </a>
+            <span>{monthTitle(anchor)}</span>
+            <a class="datebar__step" href={at(selected, shiftMonth(anchor, 1))} aria-label="Next month">
+              <Icon name="ph:caret-right" />
+            </a>
+          </div>
+          <div class="cal__dow">{DOW.map((d) => <span>{d}</span>)}</div>
+          {/* 42 cells always, never 35 or 28 — a grid that changes height
+              between months makes the page jump under the cursor. */}
+          <div class="cal__grid">
+            {
+              cells.map((c) => (
+                <a
+                  href={at(c.ymd)}
+                  class:list={[c.outside && 'is-out', c.ymd === todayYmd && 'is-today', c.ymd === selected && 'is-sel']}
+                  aria-current={c.ymd === selected ? 'date' : undefined}
+                >
+                  {c.day}
+                </a>
+              ))
+            }
+          </div>
+        </div>
+      </details>
+
+      <a class="datebar__step" href={at(shiftYmd(selected, 1))} aria-label="Next day">
+        <Icon name="ph:caret-right" />
+      </a>
+
+      {/* Being on another day must never be ambiguous. */}
       {
-        view === 'trash' ? (
-          <>
-            <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">Restore</button>
-            <button data-bulk="purge" class="btn btn-xs btn-ghost normal-case text-error">Delete forever</button>
-          </>
-        ) : view === 'notes' ? (
-          <>
-            {/* Promotion, the one motion this tier exists for: a note becomes a
-                draft and joins the working list. */}
-            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">Make drafts</button>
-            <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
-          </>
-        ) : (
-          <>
-            {/* Elevate a selection into the sky — the bulk half of the
-                fragment→constellation view (docs/admin.md §2). */}
-            <div class="relative">
-              <button id="bulk-cn-btn" class="btn btn-xs btn-ghost gap-1 normal-case" aria-haspopup="menu" aria-expanded="false">
-                <span class="text-primary"><StarMark /></span> Constellation <span aria-hidden="true">▾</span>
-              </button>
-              <div
-                id="bulk-cn-menu"
-                hidden
-                role="menu"
-                aria-label="Add to or remove from a constellation"
-                class="absolute bottom-full left-0 z-40 mb-1 max-h-96 w-96 overflow-y-auto rounded-box border border-base-300 bg-base-100 py-1 shadow-lg"
-              >
-                {/* The full description (4-line cap): you're about to elevate a
-                    whole selection, so "what is this constellation for" should
-                    be readable here, not hidden behind a hover. */}
-                <p class="admin-label px-3 pt-1.5">Add to</p>
-                {data.allConstellations.map((c) => (
-                  <button role="menuitem" class="add-item block w-full px-3 py-2 text-left" data-cn-add={c.id}>
-                    <span class="block truncate text-sm leading-snug">{c.name}</span>
-                    {c.description && (
-                      <span class="mt-0.5 block line-clamp-4 text-xs leading-snug text-base-content/55">{c.description}</span>
-                    )}
-                  </button>
-                ))}
-                <p id="bulk-cn-remove-label" class="admin-label mt-1 border-t border-base-300 px-3 pt-2" hidden>Remove from</p>
-                {data.allConstellations.map((c) => (
-                  <button role="menuitem" hidden class="add-item block w-full truncate px-3 py-1.5 text-left text-sm text-error/80" data-cn-remove={c.id}>
-                    {c.name}
-                  </button>
-                ))}
-                {data.allConstellations.length === 0 && (
-                  <p class="admin-hint px-3 py-2">No constellations yet.</p>
-                )}
-              </div>
-            </div>
-            <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
-            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
-            <button data-bulk="note" class="btn btn-xs btn-ghost normal-case">Make notes</button>
-            <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
-          </>
+        offToday && (
+          <a class="datebar__back" href="/admin">
+            <Icon name="ph:arrow-up" class="rotate-90" /> Today
+          </a>
         )
       }
-    </div>
-  </div>
-  <p id="bulk-error" hidden role="alert" class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
+    </header>
 
-  <FragmentSheet
-    subjects={subjectNames}
-    authors={data.allAuthors.map((a) => ({ id: a.id, name: a.name }))}
-    works={data.allWorks.map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
-    constellations={data.allConstellations}
-  />
-  <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
+    {/* The configured zone always wins; a device somewhere else gets a quiet
+        note and nothing more. A silent switch mid-trip corrupts the sleep
+        series exactly at the boundary — doubling or skipping a day — and does
+        it invisibly (docs/plans/11-checkin.md §2). */}
+    <p id="tz-note" hidden class="admin-hint mb-4 text-xs" data-tz={tz}></p>
+
+    <div class="hq-grid">
+      <div class="col-main">
+        {/* ══ MORNING ══ pinned first, always, answered or not. Every field is
+            a real column on `daily_checkins`. ══ */}
+        <CheckinZone logDate={selected} today={todayYmd} row={checkin ?? null} times={times} prefill={prefill} writable={writable} tz={tz} />
+      </div>
+    </div>
+
+    <p class="admin-hint mt-5 text-sm">
+      People and the agenda aren’t built yet. This page grows as they land.
+    </p>
+  </div>
 
   <script>
-    import '../../scripts/admin-list';
+    import '../../scripts/checkin';
+
+    // The travel note (docs/plans/11-checkin.md §2). Client-side because the
+    // server has no business asking what the device thinks the zone is — and
+    // this is the ONLY thing on the page the browser's zone is allowed to
+    // influence: a sentence. It never moves the day.
+    import { deviceZoneNote } from '../../lib/hq/time';
+
+    const el = document.getElementById('tz-note');
+    const configured = el?.dataset.tz;
+    if (el && configured) {
+      const device = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const note = deviceZoneNote(configured, device);
+      if (note) {
+        el.textContent = note;
+        el.hidden = false;
+      }
+    }
+
+    // A <details> closes on Escape and on a click outside, like every other
+    // popover in here. Progressive enhancement only: without this it still
+    // opens, closes and navigates.
+    const cal = document.querySelector<HTMLDetailsElement>('.cal-wrap');
+    document.addEventListener('click', (e) => {
+      if (cal?.open && !(e.target as Element).closest('.cal-wrap')) cal.open = false;
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && cal?.open) cal.open = false;
+    });
   </script>
 </AdminLayout>

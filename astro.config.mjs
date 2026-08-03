@@ -17,8 +17,16 @@ export default defineConfig({
   integrations: [
     icon({
       include: {
-        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up', 'arrow-up-right', 'arrow-down', 'funnel', 'trash', 'plus', 'pencil-simple', 'sun', 'moon', 'moon-stars', 'list', 'stack', 'books', 'user-circle', 'image', 'note', 'eye'],
-        'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel'],
+        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up', 'arrow-up-right', 'arrow-down', 'funnel', 'trash', 'plus', 'pencil-simple', 'sun', 'moon', 'moon-stars', 'list', 'stack', 'books', 'user-circle', 'image', 'note', 'eye',
+          // HQ (docs/plans/10-hq.md). Zone marks + the check-in's own controls.
+          // `sun-horizon` is the Today room in the sidebar — deliberately not
+          // `sun`, which the theme toggle already owns two blocks below it.
+          'sun-horizon', 'star', 'star-fill', 'warning', 'calendar-blank', 'users-three', 'pen-nib', 'cake', 'check-circle', 'circle', 'chat-circle', 'phone', 'lock-simple', 'target',
+          // The agenda (13): a recurrence rule, disposition, and the effort meter.
+          'arrows-clockwise', 'dots-three', 'check', 'skip-forward'],
+        'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel',
+          // HQ: marks a mirrored calendar event as Google's, without a word of chrome.
+          'google'],
       },
     }),
   ],

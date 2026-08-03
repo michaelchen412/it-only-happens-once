@@ -1,8 +1,8 @@
 {
   "id": "/admin",
-  "name": "Workshop — It Only Happens Once",
-  "short_name": "Workshop",
-  "description": "Where the writing happens: drafts, quotes, songs, and the sky.",
+  "name": "Observatory — It Only Happens Once",
+  "short_name": "Observatory",
+  "description": "The private half: today, the corpus, and the sky.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",

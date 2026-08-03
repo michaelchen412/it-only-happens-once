@@ -52,7 +52,7 @@ async function stubEverything(page: Page): Promise<Uploaded> {
 }
 
 async function openComposer(page: Page) {
-  await page.goto('/admin#new-writing');
+  await page.goto('/admin/fragments#new-writing');
   await expect(page.locator('#wsheet')).toBeVisible();
   await expect(page.locator('#ws-editor .tiptap-doc')).toBeVisible();
 }

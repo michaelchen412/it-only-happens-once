@@ -20,7 +20,13 @@ import type { APIRoute } from 'astro';
  * Dependency order: an importer can insert these top to bottom without ever
  * tripping a foreign key. Subjects/authors/constellations own nothing; works
  * point at authors; fragments point at authors and works; the join tables and
- * versions point at fragments.
+ * versions point at fragments. HQ's tables follow, in their own order.
+ *
+ * ⚠ STANDING RULE (ADR-0012): **any piece that creates an HQ table appends it
+ * here, in the same commit, in foreign-key order.** A piece is not done until
+ * its tables are in this array. Doing it per-piece is what keeps the export
+ * permanently right rather than wrong until somebody remembers — and it is
+ * mechanical, because the list is already ordered for exactly this reason.
  */
 const TABLES = [
   'subjects',
@@ -32,6 +38,9 @@ const TABLES = [
   'fragment_subjects',
   'fragment_constellations',
   'fragment_versions',
+  // --- HQ (private; never public, at any grain) ---------------------------
+  'settings',
+  'daily_checkins',
 ] as const;
 
 /**
@@ -88,8 +97,13 @@ export const GET: APIRoute = async ({ locals, url }) => {
 
   const counts = Object.fromEntries(TABLES.map((t) => [t, tables[t].length]));
   const payload = {
-    format: 'it-only-happens-once/corpus',
-    version: 1,
+    // `personal`, not `corpus`, since 2026-08-02: the file stopped being the
+    // publishable half of the site the moment HQ tables joined it (ADR-0012).
+    // The rename is the point — an importer that keys off `format` should fail
+    // loudly on the change rather than quietly treat a private export as a
+    // corpus one, and the version bump says the shape widened.
+    format: 'it-only-happens-once/personal',
+    version: 2,
     exportedAt: new Date().toISOString(),
     source: url.origin,
     // Images are referenced by URL, never embedded. They live in the `site`
@@ -104,8 +118,11 @@ export const GET: APIRoute = async ({ locals, url }) => {
   return new Response(JSON.stringify(payload, null, 2), {
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'content-disposition': `attachment; filename="it-only-happens-once-${date}.json"`,
-      // The corpus, drafts and private notes included. Never store this.
+      // `-personal-` in the filename, deliberately: this is the most sensitive
+      // artefact the app can emit, and the name is the only part of it visible
+      // in a downloads folder six months later.
+      'content-disposition': `attachment; filename="it-only-happens-once-personal-${date}.json"`,
+      // The corpus, drafts, private notes and every HQ table. Never store this.
       'cache-control': 'private, no-store',
     },
   });

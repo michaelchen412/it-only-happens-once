@@ -11,7 +11,7 @@ const PARTIAL = '/admin/fragments-panel';
 export interface PanelOpts {
   /** Params pinned to every fetch (e.g. { mode: 'pick', constellation: id }). */
   extraParams?: Record<string, string>;
-  /** Mirror the filter state onto this URL via replaceState ('/admin'); null = don't. */
+  /** Mirror the filter state onto this URL via replaceState ('/admin/fragments'); null = don't. */
   historyBase?: string | null;
   /** Whole-row / title click (never fires in trash view or on [data-noedit]). */
   onOpen?: (row: HTMLElement, e: MouseEvent) => void;

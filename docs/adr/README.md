@@ -32,3 +32,11 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted |
 | [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |
 | [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Accepted |
+| [0012](0012-hq-is-a-private-second-domain.md) | HQ is a private second domain in the same app — its own tables, no `anon` policy | Accepted |
+| [0015](0015-admin-root-becomes-today.md) | `/admin` becomes Today; the Fragment Manager moves to `/admin/fragments`; the building is the Observatory | Accepted |
+
+**0013 and 0014 are reserved**, not missing: they were drafted alongside 0012
+and 0015 and graduate with the work that makes them real — 0013 (*absence never
+accumulates*) with the task model, 0014 (*the calendar is one-way*) with the
+Google mirror. An ADR is written when the decision is made and published when
+the decision is load-bearing; the numbers were allocated at the first.

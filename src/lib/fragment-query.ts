@@ -1,4 +1,4 @@
-// The Fragment Manager's list query, extracted from /admin so the same table
+// The Fragment Manager's list query, extracted from /admin/fragments so the same table
 // can be served two ways: the full page and the fragments-panel partial the
 // composer's browser sheet fetches. One implementation, one truth.
 import type { SupabaseClient } from '@supabase/supabase-js';
