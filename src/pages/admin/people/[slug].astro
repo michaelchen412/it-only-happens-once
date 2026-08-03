@@ -31,6 +31,8 @@ import { renderMarkdown } from '../../../lib/markdown';
 import { today as hqToday } from '../../../lib/hq/time';
 import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
 import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
+import TimelineZone, { type TimelineEntry } from '../../../components/admin/TimelineZone.astro';
+import { since } from '../../../lib/hq/interactions';
 
 const { slug } = Astro.params;
 const supabase = Astro.locals.supabase;
@@ -43,6 +45,60 @@ const { data: person } = await supabase.from('people').select('*').eq('slug', sl
 if (!person) Astro.response.status = 404;
 
 const { ymd: todayYmd } = await hqToday(supabase);
+
+/**
+ * The timeline, in two queries rather than one clever embed.
+ *
+ * The first asks which interactions this person was at; the second fetches them
+ * WITH ALL their participants, which is the part a single `!inner` join cannot
+ * give you — filtering by `person_id` would also filter the participant list
+ * down to this person, so every entry would report that nobody else was there.
+ */
+let entries: TimelineEntry[] = [];
+let roster: Pick<Person, 'id' | 'display_name' | 'photo_path'>[] = [];
+
+if (person) {
+  const { data: mine } = await supabase
+    .from('interaction_people')
+    .select('interaction_id')
+    .eq('person_id', person.id);
+
+  const ids = (mine ?? []).map((r) => r.interaction_id);
+  if (ids.length) {
+    const { data: rows } = await supabase
+      .from('interactions')
+      .select('id, occurred_on, kind, body, created_at, updated_at, interaction_people(person_id, people(id, display_name, slug))')
+      .in('id', ids)
+      // Newest first, and `created_at` breaks the tie: two entries logged on the
+      // same day would otherwise come back in whatever order Postgres chose,
+      // and the order would change between renders.
+      .order('occurred_on', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    entries = (rows ?? []).map((row) => {
+      const links = (row.interaction_people ?? []) as { person_id: string; people: { id: string; display_name: string; slug: string } | null }[];
+      return {
+        ...(row as unknown as TimelineEntry),
+        others: links.map((l) => l.people).filter((p): p is NonNullable<typeof p> => !!p && p.id !== person.id),
+      };
+    });
+  }
+
+  // Everyone else who could have been there. Archived people are excluded: they
+  // are out of the roster and out of search (§3), and a picker is search.
+  const { data: others } = await supabase
+    .from('people')
+    .select('id, display_name, photo_path')
+    .is('archived_at', null)
+    .neq('id', person.id)
+    .order('display_name');
+  roster = others ?? [];
+}
+
+// DERIVED, never stored — `max(occurred_on)` over this person's entries. It is
+// computed from what is already on the page rather than re-queried, so the
+// header and the timeline below it cannot disagree.
+const lastContact = entries.length ? entries[0].occurred_on : null;
 const photos = person ? await signPhotos(supabase, [person.photo_path]) : new Map<string, string>();
 const photoUrl = person?.photo_path ? (photos.get(person.photo_path) ?? null) : null;
 
@@ -99,7 +155,11 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
             </div>
             {person.epithet && <p class="mt-1 font-serif text-base text-base-content/70">{person.epithet}</p>}
 
-            {(birthdayYmd || known || person.location) && (
+            {/* `lastContact` belongs in this condition, not just in the strip.
+                It was left out at first and a person whose only fact was a
+                logged entry rendered NO fact strip at all — the derived one
+                cannot depend on a stored one being present. */}
+            {(birthdayYmd || known || person.location || lastContact) && (
               <dl class="phead__facts">
                 {birthdayYmd && (
                   <div>
@@ -124,6 +184,23 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
                     <dd>{person.location}</dd>
                   </div>
                 )}
+                {/* A DERIVED fact in the same strip as the stored ones, on
+                    purpose: the two look identical to a reader, so filing them
+                    apart would be an implementation detail leaking into the
+                    layout (§4). It reads as a DURATION — "3 weeks ago" answers
+                    the question, "7/20 Sat" does not — with the exact date one
+                    tap away on the stamp. */}
+                {lastContact && (
+                  <div>
+                    <dt>Last contact</dt>
+                    <dd>
+                      <button type="button" class="stamp" title={fullDate(lastContact)}>
+                        <Icon name="ph:clock-light" class="stamp__i" />
+                        {since(lastContact, todayYmd)}
+                      </button>
+                    </dd>
+                  </div>
+                )}
               </dl>
             )}
           </div>
@@ -136,6 +213,19 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
           </button>
         </header>
 
+        {/* §4's layout: the TIMELINE takes the main column because it is the
+            only part that changes weekly and the part you scroll; About takes
+            the rail. On a phone the order INVERTS — About first, then the
+            timeline — because you open a profile on a phone to remember who
+            somebody is, not to scroll a year of entries. That is what the
+            `o-*` classes do; on desktop they all go `order: 0` and the real
+            column wrappers take over (traps 1 and 2 in app.css). */}
+        <div class="hq-grid mt-6">
+        <div class="col-main">
+        <div class="o-2"><TimelineZone person={person} entries={entries} roster={roster} today={todayYmd} /></div>
+        </div>
+
+        <div class="col-rail">
         {/* 2 · ABOUT — "who they are", hand-authored, changes maybe twice a
             year. Set in the serif, because it is writing.
 
@@ -146,7 +236,7 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
             §2). Pulling the whole composer bundle onto every profile for a
             field edited twice a year is the wrong trade. It stores Markdown
             either way, so a later change of mind costs nothing. */}
-        <section class="zone cn-azure mt-6">
+        <section class="zone cn-azure o-1">
           <div class="zone__head">
             <span class="zone__chip">
               <Icon name="ph:user-circle" />
@@ -186,11 +276,13 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
             </div>
           </form>
         </section>
+        </div>
+        </div>
 
-        {/* One plain sentence, not a row of empty zones. On day one a stack of
-            "no data" boxes reads as a broken app *and* as a list of things you
-            have already failed to do (10-hq.md §10b). */}
-        <p class="admin-hint mt-5 text-sm">Log entries and shared books aren’t built yet. This page grows as they land.</p>
+        {/* One plain sentence, not an empty zone. Shared (person_works /
+            person_fragments) is Piece 3's tables, and a domain that does not
+            exist yet renders nothing at all (10-hq.md §10b). */}
+        <p class="admin-hint mt-5 text-sm">Books and songs they’ve shared aren’t built yet.</p>
 
         {/* Archiving is EXPLICIT and never automatic, however long the silence —
             and it is reversible. Down here rather than beside the pencil,

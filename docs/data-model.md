@@ -248,12 +248,28 @@ Writes are bounded to a **three-day backfill window**, enforced in [`src/actions
 
 **No indexes beyond the primary key and the unique slug.** At a ceiling of 50 rows Postgres will sequential-scan whatever we build, and an unused index is a thing that has to be maintained and explained.
 
+**`interactions` + `interaction_people`** — the log ([admin.md](admin.md) §12).
+
+> **⚠ An interaction has PARTICIPANTS, not an owner.** One dinner with three friends is **one row appearing on three profiles**. A `person_id` column on `interactions` would force writing it three times or losing two of the three records — and it would destroy the group dimension, which the join gives for free: who you actually see together, and who you only ever see through somebody else.
+
+| Column | Shape | Why |
+|---|---|---|
+| `occurred_on` | **`date`**, not null, **no default** | A local date, because every consumer asks a local-date question — "3 weeks ago", `now - last_contact > cadence_days`, the brief's *Last contact*. A `timestamptz` would make every reader redo a zone conversion, which is where the cross-midnight bug class starts. **And no default:** `current_date` evaluates on a server whose clock is UTC, so an entry logged at 5pm in California would silently be dated tomorrow. The action supplies it through `localToday()`. |
+| `kind` | enum, 6 values | `hangout · call · message · gift · shared · note`. `gift` prevents repeat presents and informs the next one; `shared` covers a recommendation that never became a fragment. Entry kinds, not separate tables. |
+| `body` | `text not null`, non-blank | An entry with no words is not an entry — it is a row that will mean nothing to you in three years, which is the span this table exists to survive. |
+
+**No `title`, and no `location`.** A title is a second decision before you have written the first word, and the whole design target is fifteen seconds. Where you were is either irrelevant or part of the story, and then it belongs in the words — a structured field would be empty on most rows and would invite filtering by something nobody filters by.
+
+**`person_last_contact` is a VIEW, not a column** — `max(occurred_on)` and a count, grouped by person. A stored copy would drift every time an entry was edited, deleted or backdated.
+
+> **⚠ `security_invoker = true` on that view is load-bearing.** A Postgres view runs with its **owner's** privileges by default, so without it the view would read `interactions` as the owner and hand the results to whoever asked — bypassing every policy above and turning the one derived surface into a leak. With it, the view sees exactly what the caller may see; for `anon`, nothing. Verified against live PostgREST as a genuinely signed-out client.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
 - **Reading time** — from `body` word count if not stored in `details`.
 - **Time in bed, estimated sleep, sleep efficiency** — from `daily_checkins.bed_at` / `woke_at` and the two buckets, computed at render by [`src/lib/hq/checkin.ts`](../src/lib/hq/checkin.ts). Efficiency in particular is the number that actually moves under CBT-I, which makes a stale stored copy of it worse than none. The estimate stays null until *both* buckets are answered — an efficiency that silently assumed "asleep instantly, never woke" would be a number the person never gave.
-- **`last_contact_at`** — `max(occurred_at)` over a person's interactions. Not a column, so it can never disagree with the entries it summarises. Its two guards belong here too, because both were found by prototyping the *query* rather than the pixels: **drift requires at least one logged interaction** (`last_contact_at` is null the day somebody is added, and the naive rule would flag the whole roster on creation day), and **anyone with an event today is never drifting**, however long since the last log.
+- **Last contact** — `max(occurred_on)` over a person's interactions, served by the `person_last_contact` view. Not a column, so it can never disagree with the entries it summarises. Note what it is derived *from*: interactions only. `people.updated_at` is deliberately excluded — fixing a typo in somebody's record is not evidence you were in touch with them, and letting it silence a one-year notice would defeat the feature by the most trivial possible action. Its two guards belong here too, because both were found by prototyping the *query* rather than the pixels: **drift requires at least one logged interaction** (last contact is null the day somebody is added, and the naive rule would flag the whole roster on creation day), and **anyone with an event today is never drifting**, however long since the last log.
 - **A person's next birthday** — `nextOccurrence(birth_month, birth_day)` in [`src/lib/hq/dates.ts`](../src/lib/hq/dates.ts). A month/day pair has **no weekday until the occurrence is resolved**, and it rolls to next year the day after it passes. 29 February falls back to 1 March in a common year: celebrating early is wrong, and skipping drops the person off the page three years out of four.
 
 ## 8. Domain → schema mapping

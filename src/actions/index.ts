@@ -20,6 +20,7 @@ import { constellations } from './constellations';
 import { pages, contact } from './site';
 import { checkin } from './checkin';
 import { people } from './people';
+import { interactions } from './interactions';
 
 export const server = {
   fragments,
@@ -34,4 +35,5 @@ export const server = {
   // HQ (ADR-0012). Private tables, same write path.
   checkin,
   people,
+  interactions,
 };

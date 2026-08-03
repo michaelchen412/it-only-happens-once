@@ -23,7 +23,12 @@ export default defineConfig({
           // `sun`, which the theme toggle already owns two blocks below it.
           'sun-horizon', 'star', 'star-fill', 'warning', 'calendar-blank', 'users-three', 'pen-nib', 'cake', 'check-circle', 'circle', 'chat-circle', 'phone', 'lock-simple', 'target',
           // The agenda (13): a recurrence rule, disposition, and the effort meter.
-          'arrows-clockwise', 'dots-three', 'check', 'skip-forward'],
+          'arrows-clockwise', 'dots-three', 'check', 'skip-forward',
+          // People (12 · Piece 2): the interaction kinds. `gift` is its own mark
+          // rather than reusing `cake` — a cake already means a birthday on the
+          // roster, and one glyph meaning two things is how a timeline stops
+          // being scannable.
+          'gift'],
         'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel',
           // HQ: marks a mirrored calendar event as Google's, without a word of chrome.
           'google'],

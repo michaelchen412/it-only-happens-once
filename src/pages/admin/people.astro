@@ -44,6 +44,7 @@ import {
   upcomingBirthday,
   type Person,
 } from '../../lib/hq/people';
+import { byLastContact, lastContactMap, since } from '../../lib/hq/interactions';
 
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = await hqToday(supabase);
@@ -51,11 +52,23 @@ const { ymd: todayYmd } = await hqToday(supabase);
 const { data, error } = await supabase.from('people').select('*');
 const everyone: Person[] = data ?? [];
 
+// One round trip for the whole roster, through the `person_last_contact` view —
+// so the `max()` happens in Postgres over an indexed join rather than by
+// pulling every interaction into this page.
+const lastContact = await lastContactMap(supabase);
+
 // Archived people are OUT OF THE ROSTER AND OUT OF SEARCH (§3) — they live in
 // their own section at the bottom. Archiving is the only way somebody leaves,
 // it is always an explicit click, and it is reversible: putting a photo in a
 // drawer, not a judgement.
-const roster = everyone.filter((p) => !p.archived_at).sort(rosterOrder);
+//
+// SORTED BY LAST INTERACTION, DESCENDING (§3) — this is what Piece 1 left as
+// alphabetical because it had no interactions to sort by. People you are
+// actually in touch with float up and drift sinks on its own: the same fact a
+// red badge would deliver, delivered kindly. The archived section keeps the
+// alphabetical order, since "how recently" is not the question you are asking
+// of a drawer.
+const roster = everyone.filter((p) => !p.archived_at).sort(byLastContact(lastContact));
 const archived = everyone.filter((p) => p.archived_at).sort(rosterOrder);
 
 // One round trip for every face on the page. These URLs expire, which is why
@@ -139,6 +152,7 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
                 {section.members.map((person) => {
                   const birthday = upcomingBirthday(person, todayYmd);
                   const photo = person.photo_path ? photos.get(person.photo_path) : null;
+                  const last = lastContact.get(person.id);
                   return (
                     <a
                       href={`/admin/people/${person.slug}`}
@@ -152,17 +166,30 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
                       <span class="min-w-0 flex-1">
                         <span class="pc__name">{person.display_name}</span>
                         {person.epithet && <span class="pc__epi">{person.epithet}</span>}
-                        {/* A cake ONLY inside the lead window — otherwise it is
-                            noise for 340 days a year. Nothing else sits on this
-                            line until Piece 2 gives it a last contact. */}
-                        {birthday && (
-                          <span class="pc__meta">
-                            <span class="pc__bday">
-                              <Icon name="ph:cake" />
-                            </span>
-                            {birthday.days === 0 ? 'today' : dmd(birthday.ymd, todayYmd)}
-                          </span>
-                        )}
+                        {/* THE SINGLE MOST DECISION-RELEVANT FACT ON THE CARD
+                            (§3), and a DURATION rather than a date: "3 weeks
+                            ago" answers the question the roster is asking, and
+                            a compact `M/D Ddd` carries no year — which is how
+                            the lab's two-year-old contact read as last month.
+
+                            "No entries yet" is a statement of fact, not a gap:
+                            nobody drifts here, because a person with no
+                            interactions is NEW rather than neglected (§8).
+
+                            A cake joins it ONLY inside the lead window —
+                            otherwise it is noise for 340 days a year. */}
+                        <span class="pc__meta">
+                          <Icon name="ph:clock-light" class="pc__clock" />
+                          {last ? since(last.on, todayYmd) : 'No entries yet'}
+                          {birthday && (
+                            <>
+                              <span class="pc__bday">
+                                <Icon name="ph:cake" />
+                              </span>
+                              {birthday.days === 0 ? 'today' : dmd(birthday.ymd, todayYmd)}
+                            </>
+                          )}
+                        </span>
                       </span>
                     </a>
                   );

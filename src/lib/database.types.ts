@@ -340,6 +340,63 @@ export type Database = {
           },
         ]
       }
+      interaction_people: {
+        Row: {
+          interaction_id: string
+          person_id: string
+        }
+        Insert: {
+          interaction_id: string
+          person_id: string
+        }
+        Update: {
+          interaction_id?: string
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_people_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interaction_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interactions: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pages: {
         Row: {
           content: Json
@@ -512,7 +569,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      person_last_contact: {
+        Row: {
+          interaction_count: number | null
+          last_contact_on: string | null
+          person_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
@@ -523,6 +595,13 @@ export type Database = {
       dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
+      interaction_kind:
+        | "hangout"
+        | "call"
+        | "message"
+        | "gift"
+        | "shared"
+        | "note"
       person_circle: "family" | "friends" | "professional"
       sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
     }
@@ -657,6 +736,14 @@ export const Constants = {
       dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
+      interaction_kind: [
+        "hangout",
+        "call",
+        "message",
+        "gift",
+        "shared",
+        "note",
+      ],
       person_circle: ["family", "friends", "professional"],
       sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
     },

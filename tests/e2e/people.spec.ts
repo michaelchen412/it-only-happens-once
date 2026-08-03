@@ -37,12 +37,17 @@ test.describe('the roster', () => {
     await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
   });
 
-  test('never shows a last-contact line — Piece 2 owns that table', async ({ page }) => {
+  // ⚠ REWRITTEN BY 12 · PIECE 2. This used to assert that NO card carried a
+  // last-contact line, because `interactions` did not exist and the words would
+  // have been an invented affordance. Piece 2 gave them a source, so the
+  // assertion inverts — and the half that still holds is the drift half, which
+  // is Piece 4's and has no table behind it yet.
+  test('shows drift nowhere — Piece 4 owns that', async ({ page }) => {
     await page.goto('/admin/people');
-    // The words the card would use if somebody had wired it to a table that
-    // does not exist yet. Their absence is the assertion.
-    await expect(page.getByText('No entries yet')).toHaveCount(0);
     await expect(page.getByText('Been a while')).toHaveCount(0);
+    // No badge, no count, no "overdue" — drift is a weight shift when it
+    // arrives, never an announcement.
+    await expect(page.getByText('overdue', { exact: false })).toHaveCount(0);
   });
 
   test('shows one line and one button when nobody is here, or cards when they are', async ({ page }) => {

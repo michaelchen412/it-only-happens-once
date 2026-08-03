@@ -41,10 +41,16 @@ const TABLES = [
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
   'daily_checkins',
-  // `people` owns nothing yet — the join tables that point at it (interactions,
-  // person_works, person_fragments) arrive with Pieces 2 and 3 and belong AFTER
-  // it, since they carry its foreign key.
   'people',
+  // `interactions` owns nothing; `interaction_people` carries BOTH foreign keys,
+  // so it must come after `people` and after `interactions` — an importer
+  // walking this list top to bottom can never trip either one.
+  'interactions',
+  'interaction_people',
+  // ⚠ NOT `person_last_contact`. It is a VIEW, derived from the two rows above,
+  // and exporting it would put a stored copy of a computed value into the
+  // artefact people restore from — the exact drift data-model.md §7 forbids.
+  // The type union below would reject it anyway, which is the check working.
 ] as const;
 
 /**

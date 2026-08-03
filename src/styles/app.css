@@ -2472,10 +2472,15 @@ html.reader-open .sky-return {
   font-size: 0.625rem;
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
 }
+.pc__clock {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
 /* A cake only inside the lead window. Otherwise it is noise for 340 days. */
 .pc__bday {
   color: var(--cn);
   opacity: 0.9;
+  margin-left: 0.25rem;
 }
 
 /* ── the profile header: the fixed facts ────────────────────────────────── */
@@ -2640,11 +2645,246 @@ html.reader-open .sky-return {
 }
 .photowell--set { border-style: solid; }
 
+/* ── the log (12 · Piece 2) ────────────────────────────────────────────────
+   Graduated from `/admin/log-lab`, which this piece deletes.
+
+   THE CONSTRAINT IS THE DESIGN, and it is §6's: "if logging always costs
+   opening a document editor, the 15-second jots never happen — and the
+   15-second jots are most of what makes the brief good." So the box is one line
+   tall, always open at the head of the timeline, and everything it needs is
+   already defaulted. A dialog you must open first is a dialog you don't open at
+   fifteen seconds' notice. */
+.logbox {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-200);
+  transition: border-color 0.12s;
+}
+.logbox:focus-within {
+  border-color: color-mix(in oklch, var(--cn) 55%, transparent);
+}
+.logbox textarea {
+  display: block;
+  width: 100%;
+  resize: none;
+  overflow: hidden; /* the height is set from scrollHeight, so never scroll */
+  background: none;
+  outline: none;
+  padding: 0.625rem 0.75rem;
+  font-family: var(--font-serif, serif);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  cursor: text;
+}
+.logbox__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--color-base-300);
+  padding: 0.3125rem 0.5rem 0.3125rem 0.625rem;
+}
+.logbox__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3125rem;
+  min-width: 0;
+}
+.logbox__acts {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* A quiet chip that is also a control. NOT `.chip` — that one is the urgency
+   axis and carries semantic colour; these carry none, because a kind and a date
+   are facts rather than pressures. */
+.lchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-height: 1.875rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 58%, transparent);
+  white-space: nowrap;
+}
+.lchip:hover,
+.lchip--on {
+  background: var(--color-base-100);
+  border-color: var(--color-base-300);
+  color: var(--color-base-content);
+}
+.lchip__caret {
+  font-size: 0.625rem;
+  opacity: 0.5;
+}
+.lchip__i {
+  display: inline-grid;
+  place-items: center;
+}
+
+/* ⚠ TRAP 7 — A POPOVER ANCHORED INSIDE A `.zone` MUST USE THE TOP LAYER.
+   Found by the log lab on its first run, and it is general: every HQ picker
+   from here on hits it.
+
+   The pickers were first written the obvious way — an absolutely positioned div
+   opening upward from the chip. Every row landed underneath the sticky header
+   and could not be clicked AT ALL. Not degraded: inert. And opening downward
+   instead would have been no better, because `.zone` is `overflow: hidden`, so
+   the picker would have been silently CLIPPED rather than covered — worst in
+   the empty state, where the zone is shortest.
+
+   Neither failure is visible to typecheck, build, or a screenshot.
+
+   `popover` puts the element in the top layer, which escapes every ancestor's
+   overflow and every z-index on the page. `auto` additionally hands
+   light-dismiss, Escape and one-open-at-a-time to the browser rather than to a
+   click handler somebody has to maintain. Position is set from the trigger's
+   rect (see scripts/log-box.ts) because CSS anchor positioning is not safe to
+   rely on yet. */
+.pop {
+  position: fixed;
+  margin: 0;
+  inset: auto;
+  min-width: 10rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  padding: 0.25rem;
+  box-shadow: 0 10px 30px var(--shadow-color, oklch(0% 0 0 / 0.25));
+  overflow: visible;
+}
+.pop--wide {
+  min-width: 13rem;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+.pop__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  text-align: left;
+}
+.pop__row:hover {
+  background: var(--color-base-200);
+}
+/* After `:hover`, and carrying its own — trap 6. */
+.pop__row.is-on,
+.pop__row.is-on:hover {
+  background: color-mix(in oklch, var(--cn) 14%, transparent);
+  font-weight: 600;
+}
+.pop__tick {
+  margin-left: auto;
+  font-size: 0.875rem;
+  opacity: 0;
+}
+.pop__row.is-on .pop__tick {
+  opacity: 0.8;
+}
+.pop__date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  border-top: 1px solid var(--color-base-300);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.pop__date input {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  background: var(--color-base-100);
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+}
+
+/* ── timeline rows ───────────────────────────────────────────────────────── */
+.tl {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+.tl + .tl {
+  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
+}
+.tl__mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--cn);
+  background: color-mix(in oklch, var(--cn) 14%, transparent);
+}
+.tl__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+}
+.tl__kind {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.5625rem;
+}
+/* The words, verbatim. §2a is explicit that nothing generates or condenses
+   this — a brief in your own sentences is more useful than a paraphrase, and
+   the interface must not imply otherwise. */
+.tl__body {
+  margin-top: 0.3125rem;
+  font-family: var(--font-serif, serif);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: color-mix(in oklch, var(--color-base-content) 88%, transparent);
+}
+.tl__body > :first-child { margin-top: 0; }
+.tl__body > :last-child { margin-bottom: 0; }
+/* Persistent, never hover-revealed: there is no hover on a phone, and an
+   affordance that only exists with a mouse does not exist on the surface this
+   is used from. */
+.tl__acts {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.125rem;
+  align-self: flex-start;
+}
+.tl__acts .zone__act {
+  margin-left: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.8125rem;
+}
+
 /* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`. Every
    custom control on these pages needs the pointer put back. */
 .pseg__b,
 .photowell,
 .pc,
-.rail__item {
+.rail__item,
+.lchip,
+.pop__row {
   cursor: pointer;
 }
