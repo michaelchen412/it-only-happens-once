@@ -340,6 +340,39 @@ export type Database = {
           },
         ]
       }
+      goals: {
+        Row: {
+          created_at: string
+          horizon: Database["public"]["Enums"]["goal_horizon"]
+          id: string
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["goal_status"]
+          updated_at: string
+          why: string | null
+        }
+        Insert: {
+          created_at?: string
+          horizon?: Database["public"]["Enums"]["goal_horizon"]
+          id?: string
+          name: string
+          slug: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          updated_at?: string
+          why?: string | null
+        }
+        Update: {
+          created_at?: string
+          horizon?: Database["public"]["Enums"]["goal_horizon"]
+          id?: string
+          name?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          updated_at?: string
+          why?: string | null
+        }
+        Relationships: []
+      }
       interaction_people: {
         Row: {
           interaction_id: string
@@ -646,6 +679,7 @@ export type Database = {
           due_on: string | null
           due_time: string | null
           effort: Database["public"]["Enums"]["task_effort"]
+          goal_id: string | null
           id: string
           lead_days: number | null
           notes: string | null
@@ -663,6 +697,7 @@ export type Database = {
           due_on?: string | null
           due_time?: string | null
           effort?: Database["public"]["Enums"]["task_effort"]
+          goal_id?: string | null
           id?: string
           lead_days?: number | null
           notes?: string | null
@@ -680,6 +715,7 @@ export type Database = {
           due_on?: string | null
           due_time?: string | null
           effort?: Database["public"]["Enums"]["task_effort"]
+          goal_id?: string | null
           id?: string
           lead_days?: number | null
           notes?: string | null
@@ -691,7 +727,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       works: {
         Row: {
@@ -733,6 +777,22 @@ export type Database = {
       }
     }
     Views: {
+      goal_last_done: {
+        Row: {
+          done_total: number | null
+          goal_id: string | null
+          last_done_on: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       person_last_contact: {
         Row: {
           interaction_count: number | null
@@ -759,6 +819,8 @@ export type Database = {
       dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
+      goal_horizon: "this_season" | "this_year" | "next_few_years"
+      goal_status: "active" | "paused" | "achieved" | "let_go"
       interaction_kind:
         | "hangout"
         | "call"
@@ -905,6 +967,8 @@ export const Constants = {
       dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
+      goal_horizon: ["this_season", "this_year", "next_few_years"],
+      goal_status: ["active", "paused", "achieved", "let_go"],
       interaction_kind: [
         "hangout",
         "call",

@@ -24,6 +24,7 @@ import { interactions } from './interactions';
 import { links } from './links';
 import { drift } from './drift';
 import { tasks } from './tasks';
+import { goals } from './goals';
 
 export const server = {
   fragments,
@@ -44,7 +45,9 @@ export const server = {
   links,
   // The two drift dismissals, together because they are one control (§8).
   drift,
-  // The agenda (13 · Piece 1). `dispose` is where ADR-0013 lives: one row and
-  // one date per answer, so a queue of arrears cannot come into existence.
+  // The agenda (13 · Pieces 1 and 2). `tasks.dispose` is where ADR-0013 lives:
+  // one row and one date per answer, so a queue of arrears cannot come into
+  // existence. `goals` holds the five-active cap, which the schema cannot.
   tasks,
+  goals,
 };

@@ -47,8 +47,12 @@ const TABLES = [
   // walking this list top to bottom can never trip either one.
   'interactions',
   'interaction_people',
-  // The agenda (13 · Piece 1). `task_events` carries the only foreign key, into
-  // `tasks` immediately above it. Both are pure HQ — no seam with the corpus.
+  // The agenda (13 · Pieces 1 and 2). FK order: `goals` first, because
+  // `tasks.goal_id` points at it; then `task_events`, which points at `tasks`.
+  // An importer walking this list top to bottom can never trip either one.
+  // ⚠ NOT `goal_last_done` — a VIEW, and exporting a derived value would put a
+  // stored copy of a computation into the artefact you restore from.
+  'goals',
   'tasks',
   'task_events',
   // The one seam with the corpus. Both carry a foreign key into the PUBLIC half

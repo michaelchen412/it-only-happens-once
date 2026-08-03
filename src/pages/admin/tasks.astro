@@ -43,13 +43,19 @@ type Task = Tables<'tasks'>;
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = await hqToday(supabase);
 
-const [{ data: liveData, error }, { data: eventData, error: eventError }] = await Promise.all([
+const [{ data: liveData, error }, { data: eventData, error: eventError }, { data: goalData }] = await Promise.all([
   supabase.from('tasks').select('*').is('archived_at', null),
   // The embedded task row rather than a second lookup: a one-off answered this
   // morning is already archived, so it is NOT in the query above — and it still
   // has to stay on screen until midnight.
   supabase.from('task_events').select('for_due_on, outcome, tasks(*)').eq('occurred_on', todayYmd),
+  // Only ACTIVE goals are offered: filing a task under something you paused or
+  // let go is how a goal quietly becomes a folder again (§4a).
+  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
 ]);
+
+const goals = goalData ?? [];
+const goalNames = new Map(goals.map((g) => [g.id, g.name]));
 
 const answered = new Map(
   (eventData ?? [])
@@ -106,6 +112,7 @@ const payload = (t: Task) =>
     preset: presetFor(t),
     recur_every: t.recur_every,
     recur_unit: t.recur_unit,
+    goal_id: t.goal_id,
   });
 ---
 
@@ -113,9 +120,17 @@ const payload = (t: Task) =>
   <div class="mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
     <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
       <h1 class="font-display text-2xl font-light">Tasks</h1>
-      <button type="button" data-open-task-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
-        <Icon name="ph:plus" /> New
-      </button>
+      <div class="flex items-center gap-2">
+        {/* Goals live behind Tasks rather than in the sidebar (settled
+            2026-08-03): they are visited monthly, and the sidebar is for the
+            rooms opened every morning. */}
+        <a href="/admin/goals" class="btn btn-ghost btn-sm gap-1 font-sans">
+          <Icon name="ph:target" /> Goals
+        </a>
+        <button type="button" data-open-task-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
+          <Icon name="ph:plus" /> New
+        </button>
+      </div>
     </header>
 
     {(error || eventError) && (
@@ -207,6 +222,11 @@ const payload = (t: Task) =>
                                 line-through — that would read as "did it", and
                                 the whole argument for recording skips is that
                                 they are a different answer. */}
+                            {t.goal_id && goalNames.has(t.goal_id) && (
+                              <span class="task__rep">
+                                <Icon name="ph:target" /> {goalNames.get(t.goal_id)}
+                              </span>
+                            )}
                             <span class="task__skip">skipped</span>
                             <span class:list={['eff', `eff--${t.effort}`]}>
                               <span class="eff__m" aria-hidden="true">
@@ -246,7 +266,7 @@ const payload = (t: Task) =>
     }
   </div>
 
-  <TaskSheet today={todayYmd} />
+  <TaskSheet today={todayYmd} goals={goals} />
 
   <script>
     import '../../scripts/task-list';

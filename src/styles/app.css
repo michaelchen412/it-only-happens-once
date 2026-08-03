@@ -3403,6 +3403,89 @@ html.reader-open .sky-return {
 .pseg--wrap { flex-wrap: wrap; }
 .pseg--wrap .pseg__b { flex: 1 1 auto; }
 
+/* ── goals: intentions, not projects (13 · Piece 2, §4a) ───────────────────
+   Graduated from the lab unchanged. What matters here is what is ABSENT: there
+   is no bar, no percent, no ring, and nothing that could be mistaken for one.
+   A direction cannot be 60% travelled, and a surface that says it can is a
+   guilt engine (ADR-0013). */
+.ggrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+@container (min-width: 34rem) {
+  .ggrid { grid-template-columns: 1fr 1fr; }
+}
+.gcard {
+  display: block;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  padding: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.gcard:hover {
+  background: var(--color-base-200);
+  border-color: color-mix(in oklch, var(--cn-amber) 40%, var(--color-base-300));
+}
+.gcard__k {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+}
+.gcard__n {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-display, serif);
+  font-size: 1.25rem;
+  line-height: 1.25;
+  font-weight: 300;
+}
+.gcard__o {
+  display: block;
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 58%, transparent);
+}
+/* ⚠ A COLD GOAL READS QUIETER, NEVER REDDER. It is an observation, not a
+   verdict — and the moment it turns amber it becomes a debt, which is the one
+   thing §4a will not let a goal be. */
+.gcard__o--cold {
+  font-style: italic;
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+}
+
+.ghead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.ghead__k {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+  margin-bottom: 0.25rem;
+}
+.ghead__o {
+  margin-top: 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+}
+
 /* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`. Every
    custom control on these pages needs the pointer put back. */
 .pseg__b,
@@ -3413,6 +3496,7 @@ html.reader-open .sky-return {
 .pop__row,
 .picker__row,
 .shelf__x,
+.gcard,
 .tick,
 .task__t,
 .chip--act,

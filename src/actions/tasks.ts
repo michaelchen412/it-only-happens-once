@@ -49,6 +49,8 @@ const input = z.object({
   unit: z.enum(['days', 'weeks', 'months']).optional(),
   /** `fixed` only — a preset key, never a rule string. */
   preset: z.enum(PRESETS as unknown as [string, ...string[]]).optional(),
+  /** Optional, and blank is a real answer — "belongs to no goal" (§4a). */
+  goalId: z.preprocess(blankToUndef, z.string().uuid().optional()),
 });
 
 type Input = z.infer<typeof input>;
@@ -128,6 +130,7 @@ export const tasks = {
         priority: v.priority,
         effort: v.effort,
         lead_days: v.leadDays ?? null,
+        goal_id: v.goalId ?? null,
         ...recurrenceOf(v, dueOn),
       };
 

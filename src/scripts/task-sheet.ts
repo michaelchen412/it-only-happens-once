@@ -41,6 +41,8 @@ if (sheet && form) {
   const presetSel = form.querySelector<HTMLSelectElement>('[data-preset]')!;
   const leadLineEl = form.querySelector<HTMLElement>('[data-lead-line]')!;
   const prevEl = form.querySelector<HTMLElement>('[data-prev]')!;
+  /** Absent until goals exist — 13 · Piece 1 shipped with no goal field at all. */
+  const goalSel = form.querySelector<HTMLSelectElement>('[data-goal-id]');
 
   /** The row's JSON — every column, so the form and the row cannot disagree. */
   interface TaskRow {
@@ -57,6 +59,7 @@ if (sheet && form) {
     preset: Preset | null;
     recur_every: number | null;
     recur_unit: 'days' | 'weeks' | 'months' | null;
+    goal_id?: string | null;
   }
 
   let editing: string | null = null;
@@ -157,6 +160,7 @@ if (sheet && form) {
     overrideN.value = '3';
     everyInput.value = '2';
     presetSel.selectedIndex = 0;
+    if (goalSel) goalSel.value = '';
     heading.textContent = 'New task';
     submitBtn.textContent = 'Add task';
     deleteBtn.hidden = true;
@@ -188,6 +192,7 @@ if (sheet && form) {
       // guessing at what the rule meant.
       if (row.preset) presetSel.value = row.preset;
     }
+    if (goalSel) goalSel.value = row.goal_id ?? '';
     heading.textContent = 'Edit task';
     submitBtn.textContent = 'Save';
     deleteBtn.hidden = false;
@@ -203,7 +208,13 @@ if (sheet && form) {
   };
 
   document.querySelectorAll<HTMLElement>('[data-open-task-sheet]').forEach((btn) =>
-    btn.addEventListener('click', () => open()),
+    btn.addEventListener('click', () => {
+      open();
+      // On a goal's page, a new task belongs to that goal until you say
+      // otherwise: it is the only reason you would press New from there.
+      const preset = btn.dataset.openTaskSheet;
+      if (preset && goalSel) goalSel.value = preset;
+    }),
   );
   // Delegated: the rows are re-rendered by a reload, and a listener per row
   // would need re-binding every time.
@@ -259,6 +270,7 @@ if (sheet && form) {
         every: repeat === 'after' ? everyInput.value : '',
         unit: repeat === 'after' ? (picked('unit', 'weeks') as 'days' | 'weeks' | 'months') : undefined,
         preset: repeat === 'fixed' ? (presetSel.value as (typeof PRESETS)[number]) : undefined,
+        goalId: goalSel?.value ?? '',
       });
       if (error) throw new Error(error.message);
       // Reload rather than patching: which GROUP a task belongs to, how late it

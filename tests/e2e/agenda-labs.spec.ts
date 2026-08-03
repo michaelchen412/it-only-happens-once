@@ -1,66 +1,22 @@
-// Paired with src/pages/admin/tasks-lab.astro and calendar-lab.astro — delete
-// each with the piece it informs (docs/plans/13-agenda.md, Pieces 2 and 4).
+// Paired with src/pages/admin/calendar-lab.astro — delete it with the piece it
+// informs (docs/plans/13-agenda.md, Piece 4).
 //
-// ⚠ THE TASKS HALF OF THIS FILE IS GONE, with the lab surfaces it drove:
-// 13 · Piece 1 shipped on 2026-08-03, and the rule is that a piece deletes its
-// lab's specs in the same commit. The assertions did not vanish, they moved to
-// where the real thing lives — `tests/e2e/tasks.spec.ts` and
-// `tests/e2e/tasks.mobile.spec.ts` for the list, the editor, the lead sentence,
-// the recurrence preview and trap 6; `src/tests/hq-tasks.test.ts` and
-// `hq-recurrence.test.ts` for the arithmetic under them.
+// ⚠ THE TASKS LAB IS GONE ENTIRELY. Its tasks and editor surfaces went with
+// 13 · Piece 1 and its goals surfaces with Piece 2, both on 2026-08-03, per the
+// rule that a piece deletes its lab and that lab's specs in the same commit.
+// The assertions did not vanish, they moved to where the real things live:
+// `tests/e2e/tasks.spec.ts`, `tests/e2e/tasks.mobile.spec.ts` and
+// `tests/e2e/goals.spec.ts`, with the arithmetic under them in
+// `src/tests/hq-tasks.test.ts`, `hq-recurrence.test.ts` and `hq-goals.test.ts`.
 //
-// What is left drives the two surfaces still unbuilt: GOALS (Piece 2) and the
-// calendar (Piece 4). Both carry live logic a screenshot cannot check — a
-// four-source grid whose whole point is which rows are writable, and a goals
-// room whose whole point is what it refuses to display.
+// What is left drives the one agenda surface still unbuilt: the calendar
+// (Piece 4), whose live logic a screenshot cannot check — a four-source grid
+// where the whole point is which rows are writable.
 //
-// Static pages, no actions — nothing here can touch the corpus.
+// A static page, no actions — nothing here can touch the corpus.
 import { test, expect } from '@playwright/test';
 
-const TASKS = '/admin/tasks-lab';
 const CAL = '/admin/calendar-lab';
-
-test.describe('goals lab', () => {
-  test('goals are intentions: capped, observed, and never scored', async ({ page }) => {
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'Goals', exact: true }).click();
-    // Scoped to the surface: the lab's own explanatory copy talks ABOUT
-    // percentages, and an unscoped search matches the argument for not having
-    // one as though it were one.
-    const goals = page.locator('[data-surface="goals"]');
-
-    await expect(goals.getByText('3 of 5 active')).toBeVisible();
-    // No progress bar, no percent, no "n of m" completion anywhere.
-    await expect(goals.locator('progress, [role="progressbar"]')).toHaveCount(0);
-    await expect(goals.getByText(/\d+%/)).toHaveCount(0);
-    // And no paragraph arguing for their absence, either.
-    await expect(goals.getByText(/cap|deleted|cascade/i)).toHaveCount(0);
-
-    // A cold goal is an observation, not a verdict — quieter, never red.
-    const cold = goals.locator('.gcard__o--cold');
-    await expect(cold).toHaveText('nothing in 6 weeks');
-    const colour = await cold.evaluate((el) => getComputedStyle(el).color);
-    expect(colour).not.toMatch(/rgb\(2[0-9]{2}, [0-9]{1,2}, [0-9]{1,2}\)/);
-
-    // Letting go is a status beside the others, not a delete.
-    await expect(goals.getByText('Let go · March')).toBeVisible();
-  });
-
-  test('the goal page separates scheduled from unscheduled, and says why', async ({ page }) => {
-    await page.goto(TASKS);
-    await page.getByRole('button', { name: 'One goal' }).click();
-    const goal = page.locator('[data-surface="goal"]');
-
-    await expect(goal.getByRole('heading', { name: 'Finish the Sky' })).toBeVisible();
-    await expect(goal.locator('.ghead__o')).toHaveText('4 tasks done in the last 30 days');
-    await expect(goal.locator('progress, [role="progressbar"]')).toHaveCount(0);
-    await expect(goal.getByText(/never appear on Today|No bar and no percentage/)).toHaveCount(0);
-    // The status set includes letting go, with dignity, beside the others.
-    for (const s of ['Active', 'Paused', 'Achieved', 'Let go']) {
-      await expect(goal.getByRole('button', { name: s, exact: true })).toBeVisible();
-    }
-  });
-});
 
 test.describe('calendar lab', () => {
   test('six week rows always, so the page never jumps between months', async ({ page }) => {

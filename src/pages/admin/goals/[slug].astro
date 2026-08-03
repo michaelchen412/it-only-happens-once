@@ -1,0 +1,257 @@
+---
+/*
+  /admin/goals/[slug] — ONE INTENTION (docs/plans/13-agenda.md §4a).
+
+  Header, then three sections: **Scheduled**, **Not scheduled yet**, and **Done
+  toward this**.
+
+  ⚠ THE THIRD ONE IS A LIST OF WHAT HAPPENED, NEVER A COUNT WITH A BAR BESIDE
+  IT. That is the difference between a goal and a project, made visible: you
+  read what you actually did, in its own words and dated, rather than being
+  scored against a target nobody set.
+
+  **Not scheduled yet is not a graveyard**, which is the whole reason undated
+  tasks have a home here (§4a): a task with a goal and no date is *part of
+  something I care about, not scheduled yet.* Each row offers **Give it a date**
+  — the affordance says what the section is for, so no sentence has to.
+
+  Status is a four-way segmented control in the header, so letting go is a
+  visible, dignified move rather than a hidden menu item.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import GoalSheet from '../../../components/admin/GoalSheet.astro';
+import TaskSheet from '../../../components/admin/TaskSheet.astro';
+import { today as hqToday, shiftYmd } from '../../../lib/hq/time';
+import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
+import { OBSERVATION_DAYS, STATUSES, horizonLabel, observationFor } from '../../../lib/hq/goals';
+import { byWhen, effortMeta, recurrenceWords } from '../../../lib/hq/tasks';
+import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
+import { renderMarkdown } from '../../../lib/markdown';
+import type { Tables } from '../../../lib/database.types';
+
+type Task = Tables<'tasks'>;
+
+const { slug } = Astro.params;
+const supabase = Astro.locals.supabase;
+
+const { data: goal } = await supabase.from('goals').select('*').eq('slug', slug!).maybeSingle();
+if (!goal) return Astro.redirect('/admin/goals', 302);
+
+const { ymd: todayYmd } = await hqToday(supabase);
+const since = shiftYmd(todayYmd, -OBSERVATION_DAYS);
+
+const [{ data: taskData }, { data: doneData }, { data: recent }, { data: activeGoals }] = await Promise.all([
+  supabase.from('tasks').select('*').eq('goal_id', goal.id).is('archived_at', null),
+  // What actually happened, most recent first — the section that is a list.
+  supabase
+    .from('task_events')
+    .select('id, occurred_on, tasks!inner(id, title, goal_id)')
+    .eq('outcome', 'done')
+    .eq('tasks.goal_id', goal.id)
+    .order('occurred_on', { ascending: false })
+    .limit(30),
+  supabase
+    .from('task_events')
+    .select('id, tasks!inner(goal_id)')
+    .eq('outcome', 'done')
+    .eq('tasks.goal_id', goal.id)
+    .gte('occurred_on', since),
+  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
+]);
+
+// This goal is always offered, even when it is paused or let go: you are
+// standing on its page, and a picker that cannot express "this one" would file
+// every task you add here under nothing.
+const pickable = (activeGoals ?? []).some((g) => g.id === goal.id)
+  ? (activeGoals ?? [])
+  : [{ id: goal.id, name: goal.name }, ...(activeGoals ?? [])];
+
+const tasks: Task[] = taskData ?? [];
+const scheduled = tasks
+  .filter((t) => t.due_on)
+  .sort((a, b) => byWhen({ due_on: a.due_on, due_time: a.due_time, title: a.title }, { due_on: b.due_on, due_time: b.due_time, title: b.title }));
+const unscheduled = tasks.filter((t) => !t.due_on).sort((a, b) => a.title.localeCompare(b.title));
+
+const done = (doneData ?? []).filter((e): e is typeof e & { tasks: { id: string; title: string } } => !!e.tasks);
+const lastDoneOn = done[0]?.occurred_on ?? null;
+const observation = observationFor((recent ?? []).length, lastDoneOn, todayYmd);
+
+const why = renderMarkdown(goal.why);
+
+const presetFor = (t: Task) => (t.recur_rrule && t.due_on ? presetOf(t.recur_rrule, t.due_on) : null);
+const repeatWords = (t: Task) => {
+  const p = presetFor(t);
+  return recurrenceWords(t, p && t.due_on ? presetLabel(p, t.due_on) : null);
+};
+const payload = (t: Task) =>
+  JSON.stringify({
+    id: t.id,
+    title: t.title,
+    notes: t.notes,
+    due_on: t.due_on,
+    due_time: t.due_time,
+    priority: t.priority,
+    effort: t.effort,
+    lead_days: t.lead_days,
+    recur_mode: t.recur_mode,
+    preset: presetFor(t),
+    recur_every: t.recur_every,
+    recur_unit: t.recur_unit,
+    goal_id: t.goal_id,
+  });
+---
+
+<AdminLayout title={goal.name} active="tasks">
+  <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
+    <a href="/admin/goals" class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Goals</a>
+
+    <header class="ghead">
+      <div class="min-w-0 flex-1">
+        <p class="ghead__k"><Icon name="ph:target" /> {horizonLabel(goal.horizon)}</p>
+        <h1 class="font-display text-3xl font-light">{goal.name}</h1>
+        {why && <div class="reading mt-2 max-w-xl font-serif text-base leading-relaxed text-base-content/80" set:html={why} />}
+        {/* The one number a goal gets, and only when there is something to
+            observe. No bar, no percent, no "3 of 7". */}
+        {observation && <p class:list={['ghead__o', observation.cold && 'gcard__o--cold']}>{observation.text}</p>}
+      </div>
+      <div class="flex shrink-0 items-center gap-1" data-goal={goal.id}>
+        {/* Four ways for a goal to stand, and letting go is one of them —
+            beside the others, not hidden behind a delete. One tap, no dialog:
+            it is reversible and it destroys nothing. */}
+        <div class="pseg" role="group" aria-label="Status">
+          {
+            STATUSES.map((s) => (
+              <button type="button" class="pseg__b" data-status={s.key} aria-pressed={goal.status === s.key}>
+                {s.label}
+              </button>
+            ))
+          }
+        </div>
+        <button type="button" class="zone__act" data-edit-goal aria-label="Edit this goal">
+          <Icon name="ph:pencil-simple" />
+        </button>
+      </div>
+    </header>
+
+    <p hidden role="alert" class="admin-alert mt-4" data-goal-error></p>
+    <p hidden role="alert" class="admin-alert mt-4" data-task-error></p>
+
+    <div class="hq-grid mt-6" data-task-list>
+      <div class="col-main">
+        <section class="zone cn-amber o-1">
+          <div class="zone__head">
+            <span class="zone__chip"><Icon name="ph:calendar-blank" /></span>
+            <h2 class="zone__title">Scheduled</h2>
+            <span class="zone__count ml-auto">{scheduled.length}</span>
+          </div>
+          {
+            scheduled.length === 0 ? (
+              <p class="zone__empty">Nothing with a date on it.</p>
+            ) : (
+              <ul class="zone__list pb-2">
+                {scheduled.map((t) => (
+                  <li class:list={['task', `task--${t.priority}`]} data-task={payload(t)} data-id={t.id}>
+                    <button type="button" class="tick" data-dispose="done" aria-label={`Mark “${t.title}” done`}>
+                      <Icon name="ph:circle" class="tick__o" />
+                      <Icon name="ph:check-circle" class="tick__x" />
+                    </button>
+                    <span class="min-w-0 flex-1">
+                      <button type="button" class="task__t" data-edit-task>{t.title}</button>
+                      <span class="task__m">
+                        <span class="stamp" title={fullDate(t.due_on!)}>
+                          <Icon name="ph:clock-light" class="stamp__i" />
+                          {dmd(t.due_on!, todayYmd)}
+                          {t.due_time ? ` · ${clockTime(t.due_time)}` : ''}
+                        </span>
+                        {repeatWords(t) && (
+                          <span class="task__rep">
+                            <Icon name="ph:arrows-clockwise" /> {repeatWords(t)}
+                          </span>
+                        )}
+                        <span class="task__skip">skipped</span>
+                        <span class:list={['eff', `eff--${t.effort}`]}>
+                          <span class="eff__m" aria-hidden="true">
+                            {[1, 2, 3, 4].map((n) => <i class:list={[n <= effortMeta(t.effort).step && 'on']} />)}
+                          </span>
+                          {effortMeta(t.effort).label}
+                        </span>
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </section>
+
+        <section class="zone cn-sand o-2">
+          <div class="zone__head">
+            <span class="zone__chip"><Icon name="ph:dots-three" /></span>
+            <h2 class="zone__title">Not scheduled yet</h2>
+            <span class="zone__count ml-auto">{unscheduled.length}</span>
+            {/* The value is this goal's id: a task added from here belongs to
+                it until you say otherwise. */}
+            <button type="button" class="zone__act ml-1" data-open-task-sheet={goal.id} aria-label="Add a task to this goal">
+              <Icon name="ph:plus" />
+            </button>
+          </div>
+          {
+            unscheduled.length === 0 ? (
+              <p class="zone__empty">Nothing waiting.</p>
+            ) : (
+              <ul class="zone__list pb-2">
+                {unscheduled.map((t) => (
+                  <li class:list={['task', `task--${t.priority}`]} data-task={payload(t)} data-id={t.id}>
+                    <button type="button" class="tick" data-dispose="done" aria-label={`Mark “${t.title}” done`}>
+                      <Icon name="ph:circle" class="tick__o" />
+                      <Icon name="ph:check-circle" class="tick__x" />
+                    </button>
+                    <span class="min-w-0 flex-1">
+                      <button type="button" class="task__t" data-edit-task>{t.title}</button>
+                    </span>
+                    {/* The affordance says what this section is for. */}
+                    <button type="button" class="chip chip--act shrink-0" data-edit-task>Give it a date</button>
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </section>
+      </div>
+
+      <div class="col-rail">
+        <section class="zone cn-ice o-3">
+          <div class="zone__head">
+            <span class="zone__chip"><Icon name="ph:check-circle" /></span>
+            <h2 class="zone__title">Done toward this</h2>
+          </div>
+          {
+            done.length === 0 ? (
+              <p class="zone__empty">Nothing yet.</p>
+            ) : (
+              <ul class="zone__list pb-2">
+                {done.map((e) => (
+                  <li class="row">
+                    <span class="row__mark"><Icon name="ph:check-circle" /></span>
+                    <span class="min-w-0 flex-1 text-sm opacity-80">{e.tasks.title}</span>
+                    <span class="stamp admin-hint shrink-0 text-xs" title={fullDate(e.occurred_on)}>
+                      {dmd(e.occurred_on, todayYmd)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <GoalSheet goal={goal} />
+  <TaskSheet today={todayYmd} goals={pickable} />
+
+  <script>
+    import '../../../scripts/task-list';
+  </script>
+</AdminLayout>

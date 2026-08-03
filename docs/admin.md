@@ -8,7 +8,7 @@
 
 `design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: private, seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
 
-**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Tasks · Fragments · Constellations · Library · About**. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
+**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Tasks · Fragments · Constellations · Library · About** (Goals sits behind Tasks). The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
 
 So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
 
@@ -516,3 +516,21 @@ Both exist because the rules they express are invisible until weeks later, and a
 - **The next three occurrences** — the only available verification of a recurrence. You cannot read a rule and know it means what you meant, and one that is subtly wrong stays invisible until months of chores have been scheduled against it. Schedules are picked **by name** (*every Monday · every other Monday · monthly on the 3rd Monday · every weekday…*), and the names are rebuilt from the date, because "every Monday" is only true while the date is a Monday. **`After I do it` previews nothing and says so in one clause** — *"Counted from the day you tick it."* Showing three dates for both modes would have been a lie.
 
 **A lead and a recurrence are both functions of a date, so neither section exists until there is one.** Not a disabled control beside a sentence explaining why it is disabled.
+
+---
+
+## 14. Goals — intentions, not projects
+
+*Reached from Tasks rather than from the sidebar: goals are visited monthly, and the sidebar is for the rooms opened every morning. Schema in [data-model.md](data-model.md) §6b.*
+
+**A goal is a direction, not a scoped deliverable.** *Get back in shape. Finish the Sky.* That framing is the whole reason this exists without becoming project management, and it is visible mostly in what the two surfaces refuse to draw: **no progress bar, no percentage, no subtask count, no "3 of 7 done"** — and no paragraph explaining the absence of any of them.
+
+**Five active goals, and the cap is a fact you can see** (`3 of 5 active` beside the New button) rather than an error you hit. Goals are capped harder than constellations because they are about attention, and attention is scarcer than taxonomy. The sixth is refused in a sentence — and so is re-activating a paused one when five are already active, which is the same overflow arriving through a control that looks like a toggle.
+
+**Four statuses, side by side in the goal's header, and one of them is Let go.** Not hidden behind a delete: abandoning a goal should be a dignified act you take, not a row you erase. One tap, no confirm — it is reversible and it destroys nothing, and a confirm would dress a dignified decision as a dangerous one. Deleting a goal outright *does* confirm, because that one cannot be undone; the sentence names what survives, which is the actual question.
+
+**The one number a goal gets is an observation over the last 30 days** — *"4 tasks done"*, or *"nothing in 6 weeks"* set in italic grey. **A cold goal reads quieter, never redder:** the moment it turns amber it becomes a debt. And **a goal with nothing to observe says nothing at all** — a goal written this morning is new, not neglected, and the naive version would greet it with "nothing in 6 weeks" before lunch.
+
+**The goal page is three sections:** *Scheduled*, *Not scheduled yet*, and *Done toward this*. The third is **a list of what happened**, dated, never a count with a bar beside it — that is the difference between a goal and a project, made visible. The second is why undated tasks have a home at all: a task with a goal and no date is not a graveyard item, it is *part of something I care about, not scheduled yet*. Each of its rows offers **Give it a date**, and that affordance is the entire explanation of what the section is for.
+
+**The horizon is a segmented control, not a text field** — *this season · this year · the next few years*. Three buttons cannot say "March 3rd", which is the vagueness rule enforced by shape rather than by discipline: the moment a goal has a deadline it is a task.

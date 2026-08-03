@@ -28,12 +28,20 @@ import { Icon } from 'astro-icon/components';
 import { EFFORTS, PRIORITIES } from '../../lib/hq/tasks';
 import { PRESETS, presetLabel } from '../../lib/hq/recurrence';
 import type { Ymd } from '../../lib/hq/time';
+import type { Tables } from '../../lib/database.types';
 
 interface Props {
   /** Today in the configured home zone — the lead sentence measures against it. */
   today: Ymd;
+  /**
+   * The active goals, for the picker. **Omitted or empty means no Goal field at
+   * all** — 13 · Piece 1 shipped without one for exactly this reason, and the
+   * rule outlives it: a select whose only option is "none" is a control that
+   * asks a question with no answers (10-hq.md §10b).
+   */
+  goals?: Pick<Tables<'goals'>, 'id' | 'name'>[];
 }
-const { today } = Astro.props;
+const { today, goals = [] } = Astro.props;
 ---
 
 <dialog id="task-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="task-sheet-title">
@@ -152,6 +160,23 @@ const { today } = Astro.props;
           <p class="prev" data-prev></p>
         </div>
       </fieldset>
+
+      {
+        goals.length > 0 && (
+          <fieldset class="fs">
+            <legend class="fs__k">Goal</legend>
+            {/* A task with a goal and no date is not a graveyard item — it is
+                part of something you care about, not scheduled yet (§4a), and
+                it lives on the goal's page. */}
+            <div class="f">
+              <select name="goalId" data-goal-id aria-label="Goal">
+                <option value="">— none —</option>
+                {goals.map((g) => <option value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+          </fieldset>
+        )
+      }
     </div>
 
     <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">

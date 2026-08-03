@@ -1,0 +1,106 @@
+---
+/*
+  GoalSheet — name an intention, or change what it says (13-agenda.md §4a).
+
+  Four fields and no more, and the shortness is the design: a goal that needs a
+  form is a project. **Name is the only required one** — you can write down
+  *"be a better friend to the people I've drifted from"* and close the sheet.
+
+  ⚠ THE HORIZON IS A SEGMENTED CONTROL, NOT A TEXT FIELD, and that is the rule
+  made structural (settled 2026-08-03). §4a: *the horizon is deliberately vague
+  — never a date. The moment a goal has a deadline it is a task.* A text field
+  would leave that to discipline; three buttons cannot express March 3rd.
+
+  THE VALUES ARE SERVER-RENDERED and the same component does both jobs: pass a
+  `goal` and it is the edit sheet, omit it and it is the New sheet. The goal
+  page has exactly one goal on it, and the room only ever creates — so unlike
+  TaskSheet there is nothing to switch between and no prefill step.
+
+  NO PROGRESS FIELD, NO TARGET, NO DEADLINE. Nothing here can be rendered as a
+  bar, because a direction cannot be 60% travelled.
+*/
+import { Icon } from 'astro-icon/components';
+import { HORIZONS, STATUSES } from '../../lib/hq/goals';
+import type { Tables } from '../../lib/database.types';
+
+interface Props {
+  /** Omitted = the New sheet. Present = the edit sheet for that goal. */
+  goal?: Tables<'goals'>;
+}
+const { goal } = Astro.props;
+const editing = !!goal;
+---
+
+<dialog id="goal-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="goal-sheet-title">
+  <form id="goal-form" class="flex h-full flex-col overflow-hidden font-sans" data-id={goal?.id}>
+    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+      <h2 id="goal-sheet-title" class="font-display text-xl">{editing ? 'Edit goal' : 'New goal'}</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <p id="goal-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <label class="f">
+        <span class="f__k">The goal <em>required</em></span>
+        <input type="text" name="name" required maxlength="200" placeholder="Get back in shape" value={goal?.name} />
+      </label>
+
+      <div class="f mt-4">
+        <span class="f__k">Horizon</span>
+        <div class="pseg" role="group" aria-label="Horizon">
+          {
+            HORIZONS.map((h) => (
+              <button
+                type="button"
+                class="pseg__b"
+                data-horizon={h.key}
+                aria-pressed={(goal?.horizon ?? 'this_year') === h.key}
+              >
+                {h.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <label class="f mt-4">
+        <span class="f__k">Why</span>
+        <textarea name="why" rows="4" placeholder="Not a number on a scale. Being able to do the Tahoe hike in September without hating it.">{goal?.why}</textarea>
+      </label>
+
+      {
+        editing && (
+          <div class="f mt-4">
+            <span class="f__k">Status</span>
+            <div class="pseg" role="group" aria-label="Status">
+              {STATUSES.map((s) => (
+                <button type="button" class="pseg__b" data-goal-status={s.key} aria-pressed={goal!.status === s.key}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
+      {
+        editing && (
+          <button type="button" class="btn btn-ghost btn-sm gap-1 font-sans text-error" data-delete-goal>
+            <Icon name="ph:trash" /> Delete
+          </button>
+        )
+      }
+      <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
+      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>
+        {editing ? 'Save' : 'Add goal'}
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import '../../scripts/goal-sheet';
+</script>
