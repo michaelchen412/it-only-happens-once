@@ -1,0 +1,297 @@
+---
+/*
+  /admin/people/[slug] — THE PROFILE (docs/plans/12-people.md §4, ADR-0012).
+
+  A FULL PAGE, NOT A SHEET, and that is a deliberate departure from admin.md
+  §3.6, which retired the standalone writing page in favour of overlays
+  everywhere. That decision was about *editing context*: clicking an essay while
+  composing a constellation threw you out of the room you were working in. A
+  profile has no analogous host — it is a reading destination you navigate to on
+  purpose, and it is long and multi-sectioned in a way a sheet would cramp. The
+  things you *do* here are still overlays: adding and editing are PersonSheet.
+
+  ⚠ NO PRONOUNS IN ANY SYSTEM-AUTHORED LABEL (§4, 10-hq.md §10e). The prototype
+  shipped headings reading "Who he is" and "From him", which quietly assumed HQ
+  knows everybody's gender and would need a pronoun column to keep the promise.
+  It does not get one. Every label here is neutral — About, Where, Known since —
+  and pronouns appear only inside Michael's own prose, where he is the author.
+  This is cheap to hold now and expensive to retrofit.
+
+  WHAT PIECE 1 DELIBERATELY DOES NOT RENDER: the timeline, the log box, and
+  Shared. §10 is explicit — "ship the profile with the timeline zone absent; do
+  not build a 'no interactions yet' skeleton that Piece 2 immediately replaces".
+  Same for `person_works`/`person_fragments`, which are Piece 3's tables. A
+  profile that is only facts is still useful, and that is the state this page is
+  built for.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PersonSheet from '../../../components/admin/PersonSheet.astro';
+import { renderMarkdown } from '../../../lib/markdown';
+import { today as hqToday } from '../../../lib/hq/time';
+import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
+import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
+
+const { slug } = Astro.params;
+const supabase = Astro.locals.supabase;
+
+const { data: person } = await supabase.from('people').select('*').eq('slug', slug!).maybeSingle<Person>();
+
+// The blog's pattern rather than a redirect: a real 404 status with a page that
+// says so. A redirect to the roster would lose the fact that the address was
+// wrong, and this is exactly where a stale bookmark lands.
+if (!person) Astro.response.status = 404;
+
+const { ymd: todayYmd } = await hqToday(supabase);
+const photos = person ? await signPhotos(supabase, [person.photo_path]) : new Map<string, string>();
+const photoUrl = person?.photo_path ? (photos.get(person.photo_path) ?? null) : null;
+
+const circleLabel = person ? (CIRCLES.find((c) => c.key === person.circle)?.label ?? person.circle) : '';
+const known = person ? knownFor(person.known_since_year, todayYmd) : null;
+const bio = renderMarkdown(person?.bio);
+
+// The birthday always shows on the profile, unlike the card's cake — here you
+// came to look somebody up, so the fact is the point rather than an
+// interruption. The next occurrence is resolved so it carries a weekday: a
+// month/day has no weekday until you say which year (10-hq.md §10d).
+const birthdayYmd =
+  person && person.birth_month != null && person.birth_day != null
+    ? nextOccurrence(person.birth_month, person.birth_day, todayYmd)
+    : null;
+const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
+---
+
+<AdminLayout title={person?.display_name ?? 'Not found'} active="people">
+  {
+    !person ? (
+      <div class="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+        <a href="/admin/people" class="admin-back mb-4 inline-flex">
+          <span aria-hidden="true">←</span> People
+        </a>
+        <p class="font-serif text-lg">Nobody here by that name.</p>
+      </div>
+    ) : (
+      <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6" data-person-id={person.id}>
+        <a href="/admin/people" class="admin-back mb-4 inline-flex">
+          <span aria-hidden="true">←</span> People
+        </a>
+
+        {person.archived_at && (
+          <p class="admin-hint mb-4 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-xs">
+            Archived — not in the roster or in search.
+          </p>
+        )}
+
+        {/* 1 · THE FIXED FACTS. A compact dt/dd strip rather than a stacked
+            list: four short facts read faster side by side and wrap cleanly on
+            a phone. Last contact joins this row in Piece 2 — a derived fact and
+            a stored one look identical to a reader, so filing them apart would
+            be an implementation detail leaking into the layout. */}
+        <header class="phead">
+          <span class:list={['face face--lg', hueFor(person.id)]} aria-hidden="true">
+            {photoUrl ? <img src={photoUrl} alt="" /> : monogram(person.display_name)}
+          </span>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 class="font-display text-3xl font-light">{person.display_name}</h1>
+              <span class="chip u-none">{circleLabel}</span>
+            </div>
+            {person.epithet && <p class="mt-1 font-serif text-base text-base-content/70">{person.epithet}</p>}
+
+            {(birthdayYmd || known || person.location) && (
+              <dl class="phead__facts">
+                {birthdayYmd && (
+                  <div>
+                    <dt>Birthday</dt>
+                    <dd>
+                      <Icon name="ph:cake" class:list={[birthdaySoon ? 'text-primary' : 'opacity-50']} />
+                      <button type="button" class="stamp" title={fullDate(birthdayYmd)}>
+                        {dmd(birthdayYmd, todayYmd)}
+                      </button>
+                    </dd>
+                  </div>
+                )}
+                {known && (
+                  <div>
+                    <dt>Known since</dt>
+                    <dd>{known}</dd>
+                  </div>
+                )}
+                {person.location && (
+                  <div>
+                    <dt>Where</dt>
+                    <dd>{person.location}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </div>
+
+          {/* Just a pencil, on the block it edits (Michael, 2026-08-01: it
+              should be "more intuitively placed"). Not a stacked pair of
+              buttons in a corner away from the thing they act on. */}
+          <button type="button" data-open-person-sheet class="zone__act shrink-0" aria-label="Edit details">
+            <Icon name="ph:pencil-simple" />
+          </button>
+        </header>
+
+        {/* 2 · ABOUT — "who they are", hand-authored, changes maybe twice a
+            year. Set in the serif, because it is writing.
+
+            A PLAIN TEXTAREA, NOT TIPTAP, and that is a reading of §4's "full
+            editor" rather than a shortcut: this is one optional prose field on
+            a page that otherwise ships almost no JavaScript, and the admin
+            already splits minimal-editor fields from full-sheet ones (admin.md
+            §2). Pulling the whole composer bundle onto every profile for a
+            field edited twice a year is the wrong trade. It stores Markdown
+            either way, so a later change of mind costs nothing. */}
+        <section class="zone cn-azure mt-6">
+          <div class="zone__head">
+            <span class="zone__chip">
+              <Icon name="ph:user-circle" />
+            </span>
+            <h2 class="zone__title">About</h2>
+            <button type="button" class="zone__act" data-bio-edit aria-label="Edit description">
+              <Icon name="ph:pencil-simple" />
+            </button>
+          </div>
+
+          <div class="zone__body" data-bio-view>
+            {bio ? (
+              <div class="reading font-serif text-sm leading-relaxed text-base-content/80" set:html={bio} />
+            ) : (
+              <p class="admin-hint text-sm">Nothing written yet.</p>
+            )}
+          </div>
+
+          <form class="zone__body" data-bio-form hidden>
+            <label class="f">
+              <span class="sr-only">About {person.display_name}</span>
+              {/* On ONE line, deliberately: a textarea's value is its child
+                  text, so breaking this across lines would prepend the
+                  template's own indentation to everything Michael has written
+                  — and it would do it silently, growing by a few spaces every
+                  time the file was reformatted. */}
+              <textarea name="bio" rows="8" placeholder="What you’d say if someone asked about them." set:text={person.bio ?? ''} />
+            </label>
+            <p data-bio-error hidden role="alert" class="admin-alert mt-3" />
+            <div class="mt-3 flex justify-end gap-2">
+              <button type="button" class="btn btn-ghost btn-sm font-sans" data-bio-cancel>
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-sm font-sans zone__cta cn-azure" data-bio-save>
+                Save
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {/* One plain sentence, not a row of empty zones. On day one a stack of
+            "no data" boxes reads as a broken app *and* as a list of things you
+            have already failed to do (10-hq.md §10b). */}
+        <p class="admin-hint mt-5 text-sm">Log entries and shared books aren’t built yet. This page grows as they land.</p>
+
+        {/* Archiving is EXPLICIT and never automatic, however long the silence —
+            and it is reversible. Down here rather than beside the pencil,
+            because it is a deliberate act and should take a deliberate scroll. */}
+        <div class="mt-10 border-t border-base-300 pt-4">
+          <button
+            type="button"
+            class="admin-hint text-xs hover:text-base-content hover:underline"
+            data-archive={person.archived_at ? 'restore' : 'archive'}
+            data-person-name={person.display_name}
+          >
+            {person.archived_at ? 'Put back in the roster' : 'Archive — keeps everything, removes them from the roster'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  {person && <PersonSheet person={person} photoUrl={photoUrl} />}
+
+  <script>
+    import { actions } from 'astro:actions';
+    import { confirmDialog } from '../../../scripts/confirm-dialog';
+
+    const personId = document.querySelector<HTMLElement>('[data-person-id]')?.dataset.personId;
+
+    // ── the About block, edited in place ────────────────────────────────────
+    const view = document.querySelector<HTMLElement>('[data-bio-view]');
+    const form = document.querySelector<HTMLFormElement>('[data-bio-form]');
+    const errorEl = document.querySelector<HTMLElement>('[data-bio-error]');
+
+    const showForm = (editing: boolean) => {
+      if (view) view.hidden = editing;
+      if (form) form.hidden = !editing;
+      if (editing) form?.querySelector('textarea')?.focus();
+    };
+
+    document.querySelector('[data-bio-edit]')?.addEventListener('click', () => showForm(true));
+    document.querySelector('[data-bio-cancel]')?.addEventListener('click', () => {
+      // Reset to what the server rendered, so cancelling really does discard.
+      const ta = form?.querySelector<HTMLTextAreaElement>('textarea');
+      if (ta) ta.value = ta.defaultValue;
+      if (errorEl) errorEl.hidden = true;
+      showForm(false);
+    });
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const save = form.querySelector<HTMLButtonElement>('[data-bio-save]')!;
+      const bio = form.querySelector<HTMLTextAreaElement>('textarea')!.value;
+      save.disabled = true;
+      save.textContent = 'Saving…';
+      try {
+        if (!personId) throw new Error('Missing person id.');
+        const { error } = await actions.people.saveBio({ id: personId, bio });
+        if (error) throw new Error(error.message);
+        // Reload so the prose comes back through the same Markdown renderer the
+        // server uses — rendering it a second way in the browser is how the
+        // saved text and the shown text start to disagree.
+        location.reload();
+      } catch (err) {
+        // `astro:actions` THROWS on a dead network rather than returning
+        // `{ error }`, so a catch is not optional here.
+        if (errorEl) {
+          errorEl.textContent = err instanceof Error ? err.message : 'Could not save — check your connection.';
+          errorEl.hidden = false;
+        }
+        save.disabled = false;
+        save.textContent = 'Save';
+      }
+    });
+
+    // ── archive / restore ───────────────────────────────────────────────────
+    const archiveBtn = document.querySelector<HTMLButtonElement>('[data-archive]');
+    archiveBtn?.addEventListener('click', async () => {
+      const archiving = archiveBtn.dataset.archive === 'archive';
+      const name = archiveBtn.dataset.personName ?? 'this person';
+      const ok = await confirmDialog(
+        archiving
+          ? {
+              title: `Archive ${name}?`,
+              message: 'Everything is kept. They leave the roster and search, and you can put them back any time.',
+              confirmLabel: 'Archive',
+            }
+          : {
+              title: `Put ${name} back?`,
+              message: 'They return to the roster and to search.',
+              confirmLabel: 'Put back',
+            },
+      );
+      if (!ok || !personId) return;
+
+      const { error } = await actions.people.setArchived({ id: personId, archived: archiving });
+      if (error) {
+        if (errorEl) {
+          errorEl.textContent = error.message;
+          errorEl.hidden = false;
+        }
+        return;
+      }
+      location.href = archiving ? '/admin/people' : location.pathname;
+    });
+  </script>
+</AdminLayout>

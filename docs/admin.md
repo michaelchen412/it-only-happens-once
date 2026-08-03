@@ -23,6 +23,9 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | Surface | Route | What it is |
 |---|---|---|
 | **Today** | `/admin` | The front door, and the daily one ([ADR 0015](adr/0015-admin-root-becomes-today.md)). The date bar *is* the control — `‹ ›` step a day, the date opens a month calendar, `↩ Today` returns, and the route is `/admin?date=YYYY-MM-DD`. Below it, one bordered zone per domain. Today is the private half's landing page; the corpus rooms are one click away in the sidebar. |
+| **People** | `/admin/people` | The roster (§12), grouped by circle with a coming-up rail above it. Search appears only past six people and filters in place. Archived people sit in a section of their own, out of the roster and out of search. |
+| **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, a standing description, and a pencil on the block it edits. |
+| **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
@@ -384,3 +387,43 @@ It is the **Morning zone on Today**, pinned first and always present — answere
 ⚠ **That is display only, and the distinction is load-bearing.** The browser may say what o'clock it was; it never says what *day* it was. The day boundary stays server-side on the configured zone, because scheduled work has no browser and a laptop with a stale clock must not be able to move it ([data-model.md](data-model.md) §6b).
 
 **Phone-first**, and that is not a variant — it is the constraint the design was drawn against: under 60 seconds, one screen, thumb-reachable, done half-awake in bad light. Native `<input type="time">` is used deliberately; anything hand-rolled is slower and worse on iOS. The free-text fields sit behind a tap because they are the ones that summon a keyboard.
+
+## 12. People — the roster
+
+*The second HQ room. Schema in [data-model.md](data-model.md) §6b; the boundary it sits behind in [ADR 0012](adr/0012-hq-is-a-private-second-domain.md).*
+
+Two surfaces: **`/admin/people`**, the roster, and **`/admin/people/[slug]`**, one person's profile. Adding and editing happen in a shared sheet.
+
+**The roster is grouped by circle.** Not alphabetical, which is a contacts app answering a question he does not have; and **not drift-first**, which would greet him with mild accusation every time he opened the room. That would violate HQ's own principle — *absence never accumulates*, and an observation is never a verdict. Above the sections sits a **coming-up rail** carrying what is actually actionable in the next weeks, which is the reason to open the room at all.
+
+**Search appears only above six people.** A search box over four faces is furniture: it takes space and implies the list is too long to read. Past six it filters the cards already on the page rather than asking the server — the roster's ceiling is 50 rows and they are all present, so a keystroke is a DOM pass. A section whose every member is filtered out hides its heading too, because a heading over an empty grid reads as a rendering bug.
+
+**The card is a horizontal photo-beside-text row**, three across on desktop and one on a phone. A vertical photo-above-name tile is the contacts-app shape and leaves the epithet nowhere to live — and the epithet is what makes a roster feel like people. The photo is generous because faces are recognised far faster than names, falling back to a **monogram on a hue wash** taken from the constellation ramp, keyed on the person's id so it is stable and so adding somebody does not repaint the roster. Deliberately left off the card: interaction counts and any cadence progress bar, which turn people into metrics.
+
+**Archiving is the only way somebody leaves the roster**, it is always an explicit click, and it is reversible. Archived people are out of the roster *and* out of search, in a section of their own at the bottom. Nothing is ever archived automatically, however long the silence.
+
+### The profile is a full page, and that is a departure from §3.6
+
+§3.6 retired the standalone writing page in favour of overlays everywhere. **That decision was about editing context** — clicking an essay while composing a constellation threw you out of the room you were working in. A profile has no analogous host: it is a **reading destination** you navigate to on purpose, and it is long and multi-sectioned in a way a sheet would cramp. The rule still holds for the things you *do* here: adding and editing are overlays.
+
+The header is a compact `dt`/`dd` **fact strip** rather than a form-like stacked list — four short facts read faster side by side and wrap cleanly on a phone. **Editing is a pencil on the block it edits**, not a row of buttons in a corner away from them.
+
+### ⚠ No pronouns in any system-authored label
+
+The prototype shipped headings reading *"Who he is"* and *"From him"*, which quietly assumed HQ knows everybody's gender — and would need a pronoun column to keep that promise. **It does not get one.** Every label is neutral: **About**, **Where**, **Known since**, **Last contact**. Pronouns appear only inside Michael's own prose, where he is the author. This is cheap to hold now and expensive to retrofit, since a pronoun column would exist to serve labels that should never have needed it.
+
+### Photos live in a private bucket, and that changes the mechanics
+
+Person photos **cannot** go in the `site` bucket. `site` is `public = true`; listing was closed off later, but objects stay readable by anyone holding the URL, and the unguessable path is the entire protection. That trade is right for an essay's photographs, which are published anyway. It is not right for a friend's face.
+
+So there is a second bucket, **`hq`**, private, `is_admin()` on all four verbs and **no public-read policy at all** — that omission is the point. It excludes GIF on top of `site`'s no-SVG rule, which also means every object in it has been through the downscale path (a canvas keeps one frame of a GIF, so GIF is the one format the uploader passes through untouched).
+
+Three consequences worth knowing:
+
+- **URLs are signed and they expire.** Sign at request time and never bake one into anything cached or persisted. `people.photo_path` stores the object **path**, never a URL.
+- **The upload happens after the row exists**, because the path is keyed on the person's id so a rename never orphans a face. Add sheet order is therefore save → upload → point the row at it, and a failed upload leaves you with a created person and a sentence rather than a lost form.
+- ⚠ **The nightly archive does not cover this bucket**, and copying the existing step would not fix it. That workflow fetches each object's bytes from its **public URL**; a private bucket has no such URL, so the copied step would archive nothing and the failure would look exactly like an empty bucket. See [backups.md](backups.md).
+
+### What Piece 1 deliberately does not render
+
+The timeline, the log box, "last contact" and the "Been a while" panel are all functions of `interactions`, a table that does not exist yet. Rendering them now could only produce the same sentence on every card, saying nothing except that a feature is unbuilt — so **a domain that does not exist yet renders nothing at all**, replaced by one plain sentence. The birthday rail *does* render, because birthdays are real data today.

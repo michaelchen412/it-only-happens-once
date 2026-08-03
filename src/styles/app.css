@@ -2311,3 +2311,340 @@ html.reader-open .sky-return {
   background: color-mix(in oklch, var(--color-base-content) 18%, transparent);
 }
 .track__t--on { background: var(--cn); }
+
+/* ── people (12 · Piece 1) ─────────────────────────────────────────────────
+   Graduated from `/admin/people-lab`, which this piece deletes. The lab's whole
+   argument for these living here rather than in a page: it rebuilt an entire
+   profile out of `.zone` / `.row` / `.chip` / `.stamp` without adding one, and
+   what IS below is the roster's own furniture — a face, a card, a fact strip.
+
+   The domain hue is `cn-azure` (§10a); the monogram washes cycle the full ramp
+   by person, which is the one place HQ uses a domain colour to mean identity
+   rather than domain. It is decoration on a face, not a claim about a category,
+   and nothing else on the page carries a hue that could be confused with it. */
+
+/* The face, at three sizes. A monogram on a hue wash is the fallback, and it
+   has to be good enough that an unphotographed roster is not ugly — otherwise
+   the photos never get added and §7's whole reason for existing is lost. */
+.face {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-family: var(--font-display, serif);
+  color: color-mix(in oklch, var(--cn) 30%, var(--color-base-content));
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklch, var(--cn) 42%, transparent),
+    color-mix(in oklch, var(--cn) 14%, transparent)
+  );
+}
+.face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.face--sm {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+}
+.face--card {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.625rem;
+  font-size: 1.125rem;
+}
+.face--lg {
+  width: 7rem;
+  height: 7rem;
+  border-radius: 1rem;
+  font-size: 2.5rem;
+}
+
+/* Search appears above six people and not before: a box over four faces is
+   furniture that implies the list is too long to read. */
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  padding: 0.25rem 0.625rem;
+  background: var(--color-base-100);
+}
+.search input {
+  background: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  width: 9rem;
+}
+
+/* The coming-up rail — what is actually actionable in the next weeks, and the
+   reason to open the room at all. */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  border: 1px solid color-mix(in oklch, var(--cn) 28%, transparent);
+  border-radius: var(--radius-box);
+  background: color-mix(in oklch, var(--cn) 6%, transparent);
+  padding: 0.5rem 0.875rem;
+}
+.rail__k {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--cn) 80%, var(--color-base-content));
+}
+.rail__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  font-size: 0.8125rem;
+}
+.rail__item:hover .rail__name { color: var(--cn); }
+
+/* The card is a HORIZONTAL photo-beside-text row. A vertical photo-above-name
+   tile is the contacts-app shape and leaves the epithet nowhere to live — and
+   the epithet is what makes a roster feel like people. */
+.pgrid {
+  display: grid;
+  gap: 0.625rem;
+  grid-template-columns: 1fr;
+}
+@container (min-width: 30rem) {
+  .pgrid { grid-template-columns: 1fr 1fr; }
+}
+@container (min-width: 52rem) {
+  .pgrid { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+.pc {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+  padding: 0.625rem;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+.pc:hover {
+  background: var(--color-base-200);
+  border-color: color-mix(in oklch, var(--cn) 45%, var(--color-base-300));
+}
+.pc__name {
+  display: block;
+  font-family: var(--font-display, serif);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+/* Two lines, then it stops. This is an epithet, not a bio. */
+.pc__epi {
+  margin-top: 0.0625rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.pc__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+/* A cake only inside the lead window. Otherwise it is noise for 340 days. */
+.pc__bday {
+  color: var(--cn);
+  opacity: 0.9;
+}
+
+/* ── the profile header: the fixed facts ────────────────────────────────── */
+.phead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+/* A COMPACT dt/dd STRIP, not a form-like stacked list: four to six short facts
+   read faster side by side, and the strip wraps cleanly on a phone. Last
+   contact will join this row in Piece 2 — a derived fact and a stored one look
+   identical to a reader, so filing them apart would be an implementation
+   detail leaking into the layout. */
+.phead__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1.5rem;
+  margin-top: 0.875rem;
+}
+.phead__facts dt {
+  font-family: var(--font-sans);
+  font-size: 0.5625rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+}
+.phead__facts dd {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin-top: 0.0625rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── forms: the add sheet and the two edit sheets ───────────────────────── */
+.f { display: block; }
+.f__k {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 48%, transparent);
+  margin-bottom: 0.25rem;
+}
+.f__k em {
+  font-style: normal;
+  color: color-mix(in oklch, var(--color-error) 80%, transparent);
+  margin-left: 0.25rem;
+}
+.f__h {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+}
+.f input,
+.f select,
+.f textarea {
+  width: 100%;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  background: var(--color-base-100);
+  padding: 0.375rem 0.625rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+.f textarea {
+  font-family: var(--font-serif, serif);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+.f input:focus,
+.f select:focus,
+.f textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.f input[size],
+.f input.f--narrow { width: auto; }
+.fgrid {
+  display: grid;
+  gap: 0.875rem;
+}
+@container (min-width: 26rem) {
+  .fgrid { grid-template-columns: 1fr 1fr; }
+}
+
+/* A three-way SEGMENTED CONTROL, not a dropdown: three options that are the
+   shape of the whole roster should be visible without a click.
+
+   ⚠ `pseg`, NOT `seg`, and the prefix is load-bearing. `.seg` is already taken
+   by the fragment-manager type filter and the composer's suite toggle (line
+   ~1338) — a second `.seg` later in this file silently overrode their
+   `display: inline-flex` and added an `overflow: hidden`, and `.seg__b` would
+   have restyled the tasks lab's own buttons too. Nothing failed; the two
+   components just quietly changed shape. Don't rename this back. */
+.pseg {
+  display: flex;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field, 0.5rem);
+  overflow: hidden;
+}
+.pseg__b {
+  flex: 1 1 0;
+  /* 2.75rem is the 44px floor, the same one the check-in's `.opt` holds. It is
+     here rather than left at the ~36px the padding gave because these are THREE
+     ADJACENT targets on the one sheet that has to work from a phone standing up
+     — a mis-tap files somebody in the wrong circle and nothing says so. Caught
+     by people.mobile.spec.ts on its first run, not by review. */
+  min-height: 2.75rem;
+  min-width: 0;
+  padding: 0.4375rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pseg__b + .pseg__b { border-left: 1px solid var(--color-base-300); }
+.pseg__b:hover { background: var(--color-base-200); }
+/* TRAP 6 again. These come AFTER `:hover` and carry their own, or the segment
+   you just tapped goes pale under the cursor and reads as disabled. */
+.pseg__b[aria-pressed='true'],
+.pseg__b[aria-pressed='true']:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+}
+.pseg__b[aria-pressed='true']:hover { filter: brightness(1.08); }
+
+/* The photo well in the add and edit sheets. Dashed until there is a face. */
+.photowell {
+  position: relative;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+  border: 1px dashed var(--color-base-300);
+  border-radius: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+}
+.photowell:hover {
+  border-color: var(--color-primary);
+  color: var(--color-base-content);
+}
+.photowell svg { font-size: 1.25rem; }
+.photowell img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photowell--set { border-style: solid; }
+
+/* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`. Every
+   custom control on these pages needs the pointer put back. */
+.pseg__b,
+.photowell,
+.pc,
+.rail__item {
+  cursor: pointer;
+}

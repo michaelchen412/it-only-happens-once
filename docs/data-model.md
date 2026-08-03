@@ -225,11 +225,36 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 
 Writes are bounded to a **three-day backfill window**, enforced in [`src/actions/checkin.ts`](../src/actions/checkin.ts) rather than only in the form. That is a data-quality limit, not a convenience one: affect recalled a week later is invention, and an invented row is worse than an absent one because a trend cannot tell them apart.
 
+**`people`** — the roster ([admin.md](admin.md) §12). A person is a **first-class entity**: its own table, its own room and its own full page, not a tag over fragments. The roster's working size is ~25 with a ceiling of 50, and several decisions below only make sense at that size.
+
+> **⚠ This table is deliberately bounded in what it may hold**, and the bound is a design constraint rather than a habit: *"I only write nice things about people and have no business putting deeply personal or sensitive info about anyone."* That is what makes the nightly backup and the widened `/admin/export.json` safe with no exclusion and no separate encryption — anything that would make a leak genuinely harmful is out of scope **by design**. It only stays true if it is defended at the schema, so: **no health field, no "concerns", no conflict log, no ratings, no sentiment.** A later migration that adds their opposite has broken something it cannot see.
+
+| Column | Shape | Why |
+|---|---|---|
+| `slug` | `text`, **unique** | The profile URL. **Minted once and never re-minted** — a rename ("Kate" becomes "Mum", a surname changes) must not move a page that is already in browser history. |
+| `display_name` | `text not null` | What he *calls* them, which is the name in every heading. `full_name` and `sort_name` exist beside it for the formal name and for ordering. |
+| `circle` | enum, 3 values | `family · friends · professional`. **One field, not two.** Relationship kind and closeness are genuinely different axes, and splitting them at 25 people is structure that never gets used. There is **no `acquaintances`** value, and its absence is a statement rather than a simplification: it would be the only bucket defined by neglect. Someone who has genuinely fallen out of your life is archived, not demoted. |
+| `epithet` | `text` | The one hand-written line on the card — *"college roommate, now in Seattle"*. Not a bio; that is `bio`. |
+| `birth_month` · `birth_day` · `birth_year` | three `smallint`, the year **nullable** | Never a `date` with a sentinel year. The year is frequently unknown; the "next 30 days" question is a month/day computation anyway (mind the December→January wrap); and a sentinel year is the kind of thing that silently becomes somebody's age on a screen. Three CHECKs enforce that month and day travel together, that a lone year is refused, and that **31 April cannot be stored** — while 29 February can, because a leap-day birthday is real. |
+| `birthday_lead_days` | `int`, default **30** | Per person. Thirty, not seven: *"happy birthday on time"* for the people who matter means weeks of warning, because choosing and shipping a gift takes them. A week is enough to send a message and nothing else. |
+| `cadence_days` | `int`, default **365** | Drift is **on by default for everyone**. A year is long enough that being told is a favour rather than a scold; the same design would not be defensible at 30 days. Entered in the UI in *months* — the conversion is 365.25/12 so that 12 ⇄ 365 round-trips exactly and saving an untouched form cannot move it. |
+| `drift_muted_until` | `date` | *"This is fine"* — some relationships genuinely are annual. |
+| `photo_path` | `text` | An object path in the **private `hq` bucket**, never a URL: the only URLs that bucket has are signed and they expire (§7c of the HQ plan). Sign at render, never persist. |
+| `archived_at` | `timestamptz` | **Explicit only, never automatic**, however long the silence. It removes somebody from the roster and from search while keeping every row. Since there is no `acquaintances` tier, this is the *only* way somebody leaves the roster. |
+
+`last_contact_at` is **derived, never stored** (§7) — and note what it is derived *from*: interactions only. `people.updated_at` is deliberately not part of it, because fixing a typo in someone's record is not evidence you were in touch with them, and letting it silence a one-year notice would defeat the feature by the most trivial possible action.
+
+**No `contacts` column, and its absence is a decision.** Phone and email already live on his phone, backed up elsewhere. A second copy buys one saved tap and guarantees it goes stale — and a stale number is worse than no number, because you act on it.
+
+**No indexes beyond the primary key and the unique slug.** At a ceiling of 50 rows Postgres will sequential-scan whatever we build, and an unused index is a thing that has to be maintained and explained.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
 - **Reading time** — from `body` word count if not stored in `details`.
 - **Time in bed, estimated sleep, sleep efficiency** — from `daily_checkins.bed_at` / `woke_at` and the two buckets, computed at render by [`src/lib/hq/checkin.ts`](../src/lib/hq/checkin.ts). Efficiency in particular is the number that actually moves under CBT-I, which makes a stale stored copy of it worse than none. The estimate stays null until *both* buckets are answered — an efficiency that silently assumed "asleep instantly, never woke" would be a number the person never gave.
+- **`last_contact_at`** — `max(occurred_at)` over a person's interactions. Not a column, so it can never disagree with the entries it summarises. Its two guards belong here too, because both were found by prototyping the *query* rather than the pixels: **drift requires at least one logged interaction** (`last_contact_at` is null the day somebody is added, and the naive rule would flag the whole roster on creation day), and **anyone with an event today is never drifting**, however long since the last log.
+- **A person's next birthday** — `nextOccurrence(birth_month, birth_day)` in [`src/lib/hq/dates.ts`](../src/lib/hq/dates.ts). A month/day pair has **no weekday until the occurrence is resolved**, and it rolls to next year the day after it passes. 29 February falls back to 1 March in a common year: celebrating early is wrong, and skipping drops the person off the page three years out of four.
 
 ## 8. Domain → schema mapping
 

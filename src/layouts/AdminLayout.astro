@@ -8,8 +8,8 @@
 
   ONE BUILDING, PLAIN ROOMS (ADR-0015). "Workshop" named both the whole and one
   of its parts once /admin stopped being the fragment table, so the building is
-  the Observatory and the rooms keep nouns: Today · Fragments · Constellations ·
-  Library · About. People and Agenda join when 12 and 13 ship.
+  the Observatory and the rooms keep nouns: Today · People · Fragments ·
+  Constellations · Library · About. Agenda joins when 13 ships.
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
@@ -20,7 +20,7 @@ import BackToTop from '../components/BackToTop.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'today' | 'fragments' | 'constellations' | 'library' | 'about';
+  active?: 'today' | 'people' | 'fragments' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -30,6 +30,7 @@ const user = Astro.locals.user;
 // visible. `hr` draws it above that entry.
 const nav = [
   { key: 'today', label: 'Today', href: '/admin', icon: 'ph:sun-horizon', hr: false },
+  { key: 'people', label: 'People', href: '/admin/people', icon: 'ph:users-three', hr: false },
   { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },

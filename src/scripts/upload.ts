@@ -91,6 +91,12 @@ export interface UploadImageOptions {
   pathFor(hash: string, ext: string): string;
   upsert?: boolean;
   maxEdge?: number;
+  /**
+   * Accept only these MIME types, overriding the default list. The `hq` bucket
+   * excludes GIF at the storage layer, and passing that same list here is what
+   * turns a server-side 400 into a sentence before anything is uploaded.
+   */
+  accept?: string[];
 }
 
 export interface UploadedImage {
@@ -100,13 +106,23 @@ export interface UploadedImage {
   url: string;
 }
 
-/** Validate → downscale → upload. Throws `UploadError` carrying a sentence to show. */
-export async function uploadImage(file: File, opts: UploadImageOptions): Promise<UploadedImage> {
-  if (!EXT_FOR[file.type]) {
+/**
+ * Validate → downscale → upload, into whichever bucket. Throws `UploadError`
+ * carrying a sentence to show.
+ *
+ * Private because the two exported wrappers below differ in exactly one way
+ * that matters at the call site — whether there is a public URL at the end of
+ * it — and a `bucket` parameter would have made that a thing you look up rather
+ * than a thing you read.
+ */
+async function put(file: File, bucket: 'site' | 'hq', opts: UploadImageOptions): Promise<string> {
+  const accepted = opts.accept ?? Object.keys(EXT_FOR);
+  if (!EXT_FOR[file.type] || !accepted.includes(file.type)) {
+    const names = accepted.map((t) => (EXT_FOR[t] ?? t).toUpperCase()).join(', ');
     throw new UploadError(
       file.type === 'image/svg+xml'
         ? 'SVG images aren’t accepted — use a PNG or WebP.'
-        : `That’s not an image this accepts (${file.type || 'unknown type'}). Try JPEG, PNG, WebP, GIF or AVIF.`,
+        : `That’s not an image this accepts (${file.type || 'unknown type'}). Try ${names}.`,
     );
   }
   if (file.size > MAX_INPUT_BYTES) {
@@ -121,11 +137,32 @@ export async function uploadImage(file: File, opts: UploadImageOptions): Promise
   const ext = EXT_FOR[contentType] ?? EXT_FOR[file.type];
   const path = opts.pathFor(await shortHash(blob), ext);
 
-  const sb = supabase();
-  const { error } = await sb.storage.from('site').upload(path, blob, { upsert: opts.upsert ?? true, contentType });
+  const { error } = await supabase()
+    .storage.from(bucket)
+    .upload(path, blob, { upsert: opts.upsert ?? true, contentType });
   // A content-addressed path that already exists is the SAME image — re-pasting
   // one is not an error, it's a cache hit. Only surface anything else.
   if (error && !/exists/i.test(error.message)) throw new UploadError(`Upload failed: ${error.message}`);
 
-  return { path, url: sb.storage.from('site').getPublicUrl(path).data.publicUrl };
+  return path;
+}
+
+/** Upload to the PUBLIC `site` bucket, for reader-facing images. */
+export async function uploadImage(file: File, opts: UploadImageOptions): Promise<UploadedImage> {
+  const path = await put(file, 'site', opts);
+  return { path, url: supabase().storage.from('site').getPublicUrl(path).data.publicUrl };
+}
+
+/**
+ * Upload to the PRIVATE `hq` bucket, and return only the object path.
+ *
+ * NO URL COMES BACK, and that is the point of the function existing. `hq`
+ * objects have no public URL at all — `getPublicUrl` would still cheerfully
+ * build one, because the client never asks the server, and it would 400 for
+ * everyone. These are reached through a signed URL minted at render time
+ * (`signPhotos` in lib/hq/people.ts), which expires, so the path is the only
+ * thing worth persisting (12-people.md §7).
+ */
+export async function uploadPrivateImage(file: File, opts: UploadImageOptions): Promise<string> {
+  return put(file, 'hq', opts);
 }

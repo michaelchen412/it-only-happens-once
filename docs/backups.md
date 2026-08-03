@@ -61,6 +61,31 @@ bucket had no off-site copy *and* no record it had ever held a file.
 ran green, downloaded the object on a GitHub runner, and the bytes fetched back
 out of the repo are md5-identical to the bucket's etag.
 
+### ⚠ The `hq` bucket is NOT archived (2026-08-03)
+
+A second bucket exists as of `12 · Piece 1`: **`hq`**, private, holding person
+photos ([admin.md](admin.md) §12). **The workflow above does not touch it, and
+copying the `site` step verbatim would not fix it.**
+
+The reason is the third bullet above. That step fetches each object's bytes from
+the bucket's **public URL** — *"the same one a reader uses"*. A private bucket
+has no such URL. So a copied step would download nothing, write an empty tree,
+and report success; **the failure would look exactly like an empty bucket**,
+which is precisely what a bucket nobody has put a photo in yet also looks like.
+That is the kind of thing discovered a year later, when the photos are wanted.
+
+What it actually needs, when somebody builds it:
+
+- **A different fetch path** — a service-role download, or a signed URL minted
+  per object. The service-role key is already a secret on that workflow.
+- **A non-zero manifest check**, so "archived nothing" fails the job instead of
+  passing it. This is the part that makes the difference; without it the two
+  failure modes stay indistinguishable.
+
+Until then: **person photos have no off-site copy.** The database rows do —
+`people` is in the nightly `data.sql` and in `/admin/export.json` — so what is
+at risk is the images alone.
+
 ## What the dump does not cover
 
 **Nothing, currently** — and both entries that used to sit here were wrong.

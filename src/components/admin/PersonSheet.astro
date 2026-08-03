@@ -1,0 +1,178 @@
+---
+/*
+  PersonSheet — add somebody, or edit the fixed facts (docs/plans/12-people.md
+  §10 and §4).
+
+  A SHEET, NOT A PAGE. The profile is a place you *read*; adding is a thing you
+  *do*, and admin.md §3.6's overlay rule covers editors. Native <dialog> gives
+  focus-trapping, Escape and scroll-lock for free, the same as every other
+  editor in here.
+
+  ONE RULE SHAPES IT: NAME + CIRCLE IS ENOUGH TO CREATE. Everything else is
+  optional and fillable later from the profile, because a form that demands nine
+  fields to add a friend is a form you avoid — and an avoided form means an empty
+  roster, which is the failure this whole workstream is written against.
+
+  THE VALUES ARE SERVER-RENDERED, and the same component does both jobs: pass a
+  `person` and it is the edit sheet, omit it and it is the add sheet. That means
+  no client-side prefill step, which is one fewer place for the form and the row
+  to disagree — the profile page has exactly one person on it, so there is
+  nothing to switch between.
+
+  NO PHONE, NO EMAIL, and the one line at the bottom says so. That is product
+  copy stating a deliberate absence, which §10i keeps; the half explaining WHY
+  ("a second copy only goes stale") was my reasoning and belongs in the plan.
+*/
+import { Icon } from 'astro-icon/components';
+import { CIRCLES, MONTHS, daysToMonths, type Person } from '../../lib/hq/people';
+
+interface Props {
+  /** Omitted = the add sheet. Present = the edit sheet for that person. */
+  person?: Person;
+  /** A signed URL for the existing photo, if there is one. */
+  photoUrl?: string | null;
+}
+const { person, photoUrl = null } = Astro.props;
+const editing = !!person;
+
+const title = editing ? 'Edit details' : 'Add someone';
+const submitLabel = editing ? 'Save' : 'Add';
+const circle = person?.circle ?? 'friends';
+const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
+---
+
+<dialog id="person-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="person-sheet-title">
+  <form
+    id="person-form"
+    class="flex h-full flex-col overflow-hidden font-sans"
+    data-mode={editing ? 'edit' : 'add'}
+    data-id={person?.id}
+  >
+    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+      <h2 id="person-sheet-title" class="font-display text-xl">{title}</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <p id="person-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <div class="flex items-start gap-4">
+        {/* The camera-roll path, and it has to work from a phone on day one:
+            a roster of monograms is a roster that never gets its photos.
+            `accept="image/*"` is what makes iOS offer Photo Library / Take
+            Photo / Choose File — the whole mobile path, from one attribute. */}
+        <label class:list={['photowell', photoUrl && 'photowell--set']} data-photowell>
+          <img src={photoUrl ?? undefined} hidden={!photoUrl} alt="" data-photo-preview />
+          <span class="grid place-items-center gap-1" hidden={!!photoUrl} data-photo-empty>
+            <Icon name="ph:image" />
+            <span>Photo</span>
+          </span>
+          <input type="file" accept="image/*" class="sr-only" data-photo-input />
+        </label>
+
+        <div class="min-w-0 flex-1 space-y-3">
+          <label class="f">
+            <span class="f__k">Name <em>required</em></span>
+            <input type="text" name="displayName" required maxlength="120" placeholder="What you call them" value={person?.display_name} />
+          </label>
+
+          {/* A three-way segmented control, not a dropdown: three options that
+              are the shape of the whole roster should be visible without a
+              click. The hidden input is what actually submits. */}
+          <div class="f">
+            <span class="f__k">Circle <em>required</em></span>
+            <div class="pseg" role="group" aria-label="Circle">
+              {
+                CIRCLES.map((c) => (
+                  <button type="button" class="pseg__b" data-circle={c.key} aria-pressed={c.key === circle}>
+                    {c.label}
+                  </button>
+                ))
+              }
+            </div>
+            <input type="hidden" name="circle" value={circle} data-circle-value />
+          </div>
+        </div>
+      </div>
+
+      <label class="f mt-4">
+        <span class="f__k">In a line</span>
+        <input type="text" name="epithet" maxlength="280" placeholder="college roommate, now in Seattle" value={person?.epithet ?? ''} />
+        <span class="f__h">Shows on their card.</span>
+      </label>
+
+      <div class="fgrid mt-4">
+        <div class="f">
+          <span class="f__k">Birthday</span>
+          <div class="flex gap-2">
+            <select name="birthMonth" data-birth-month aria-label="Birth month">
+              <option value="">—</option>
+              {
+                MONTHS.map((m, i) => (
+                  <option value={i + 1} selected={person?.birth_month === i + 1}>
+                    {m}
+                  </option>
+                ))
+              }
+            </select>
+            <select name="birthDay" data-birth-day aria-label="Birth day">
+              <option value="">—</option>
+              {
+                Array.from({ length: 31 }, (_, i) => (
+                  <option value={i + 1} selected={person?.birth_day === i + 1}>
+                    {i + 1}
+                  </option>
+                ))
+              }
+            </select>
+            <input
+              type="text"
+              inputmode="numeric"
+              name="birthYear"
+              class="f--narrow w-20"
+              placeholder="year"
+              value={person?.birth_year ?? ''}
+              aria-label="Birth year"
+            />
+          </div>
+          <span class="f__h">
+            Year optional · told {person?.birthday_lead_days ?? 30} days ahead
+          </span>
+        </div>
+
+        <label class="f">
+          <span class="f__k">Known since</span>
+          <input type="text" inputmode="numeric" name="knownSinceYear" placeholder="2013" value={person?.known_since_year ?? ''} />
+        </label>
+
+        <label class="f">
+          <span class="f__k">Where</span>
+          <input type="text" name="location" maxlength="120" placeholder="Seattle" value={person?.location ?? ''} />
+        </label>
+
+        {/* In MONTHS, because nobody thinks in days (§10). The conversion is
+            365.25/12 so 12 ⇄ 365 round-trips exactly — see `monthsToDays`. */}
+        <label class="f">
+          <span class="f__k">Nudge me after</span>
+          <span class="flex items-center gap-2">
+            <input type="text" inputmode="numeric" name="cadenceMonths" class="f--narrow w-16" value={cadenceMonths} />
+            <span class="admin-hint text-xs">months of no contact</span>
+          </span>
+        </label>
+      </div>
+
+      <input type="hidden" name="birthdayLeadDays" value={person?.birthday_lead_days ?? 30} />
+
+      <p class="admin-hint mt-5 text-xs">No phone or email — those live on your phone.</p>
+    </div>
+
+    <div class="flex shrink-0 justify-end gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
+      <button type="button" data-close class="btn btn-ghost btn-sm font-sans">Cancel</button>
+      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-azure" data-submit>{submitLabel}</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import '../../scripts/person-sheet';
+</script>

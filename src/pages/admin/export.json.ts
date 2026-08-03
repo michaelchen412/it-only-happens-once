@@ -41,6 +41,10 @@ const TABLES = [
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
   'daily_checkins',
+  // `people` owns nothing yet — the join tables that point at it (interactions,
+  // person_works, person_fragments) arrive with Pieces 2 and 3 and belong AFTER
+  // it, since they carry its foreign key.
+  'people',
 ] as const;
 
 /**

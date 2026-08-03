@@ -358,6 +358,75 @@ export type Database = {
         }
         Relationships: []
       }
+      people: {
+        Row: {
+          archived_at: string | null
+          bio: string | null
+          birth_day: number | null
+          birth_month: number | null
+          birth_year: number | null
+          birthday_lead_days: number
+          cadence_days: number
+          circle: Database["public"]["Enums"]["person_circle"]
+          created_at: string
+          display_name: string
+          drift_muted_until: string | null
+          epithet: string | null
+          full_name: string | null
+          id: string
+          known_since_year: number | null
+          location: string | null
+          photo_path: string | null
+          slug: string
+          sort_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          bio?: string | null
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          birthday_lead_days?: number
+          cadence_days?: number
+          circle?: Database["public"]["Enums"]["person_circle"]
+          created_at?: string
+          display_name: string
+          drift_muted_until?: string | null
+          epithet?: string | null
+          full_name?: string | null
+          id?: string
+          known_since_year?: number | null
+          location?: string | null
+          photo_path?: string | null
+          slug: string
+          sort_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          bio?: string | null
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          birthday_lead_days?: number
+          cadence_days?: number
+          circle?: Database["public"]["Enums"]["person_circle"]
+          created_at?: string
+          display_name?: string
+          drift_muted_until?: string | null
+          epithet?: string | null
+          full_name?: string | null
+          id?: string
+          known_since_year?: number | null
+          location?: string | null
+          photo_path?: string | null
+          slug?: string
+          sort_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string
@@ -454,6 +523,7 @@ export type Database = {
       dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
+      person_circle: "family" | "friends" | "professional"
       sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
     }
     CompositeTypes: {
@@ -587,6 +657,7 @@ export const Constants = {
       dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
+      person_circle: ["family", "friends", "professional"],
       sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
     },
   },
