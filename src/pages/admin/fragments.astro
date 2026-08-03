@@ -22,6 +22,7 @@ import StarMark from '../../components/StarMark.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
+import { allFragmentPeople } from '../../lib/hq/links';
 
 const supabase = Astro.locals.supabase;
 const params = parseListParams(Astro.url.searchParams);
@@ -29,6 +30,28 @@ params.constellation = null; // pick-mode concern; never used here
 const data = await queryFragmentList(supabase, params);
 const view = params.view;
 const subjectNames = data.allSubjects.map((s) => s.name);
+
+/*
+  THE SEAM (12 · Piece 3, §5). This room is corpus-side, and these two reads
+  are the only HQ data on it — the roster for "Shared by", and the existing
+  edges so opening a sheet needs no round trip.
+
+  `?person=<slug>&new=quote` is the arrival from a profile's "Add a quote": the
+  quote sheet opens already attributed to them, so a quote somebody said out
+  loud enters the corpus AND attaches in one move. An unknown slug is ignored
+  rather than 404ing — you came here to write a quote, and the worst outcome of
+  a stale link should be an unattributed one, not a dead end.
+*/
+const [people, sharedBy] = await Promise.all([
+  supabase.from('people').select('id, display_name').order('display_name'),
+  allFragmentPeople(supabase),
+]);
+
+const personSlug = Astro.url.searchParams.get('person');
+const linkPerson = personSlug
+  ? (await supabase.from('people').select('id').eq('slug', personSlug).maybeSingle()).data
+  : null;
+const autoNew = linkPerson && Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
 
 const TITLES = { list: 'Fragments', notes: 'Notes', trash: 'Trash' } as const;
 const SUBTITLES = {
@@ -163,6 +186,10 @@ const SUBTITLES = {
     authors={data.allAuthors.map((a) => ({ id: a.id, name: a.name }))}
     works={data.allWorks.map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
     constellations={data.allConstellations}
+    people={people.data ?? []}
+    sharedBy={sharedBy}
+    linkPersonId={linkPerson?.id ?? null}
+    autoNew={autoNew}
   />
   <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
 

@@ -7,12 +7,23 @@
   morning, which is why it took the root from a surface used weekly.
 
   WHAT IS AND IS NOT HERE YET. Today is a hub with four contributors — the
-  morning check-in, the agenda, people, and writing signals. The check-in is
-  live; the other three are not, so the page renders the date bar, the Morning
-  zone, and one plain sentence naming what is missing. It does NOT render an
-  empty slot per unbuilt feature: on day one a row of "no data" boxes reads as a
-  broken app *and* as a list of things you have already failed to do
-  (docs/admin.md §1, "a domain with nothing to say renders quiet").
+  morning check-in, the agenda, people, and writing signals. The check-in and
+  People are live; the agenda and writing signals are not, so the page renders
+  the date bar, those two zones, and one plain sentence naming what is missing.
+  It does NOT render an empty slot per unbuilt feature: on day one a row of "no
+  data" boxes reads as a broken app *and* as a list of things you have already
+  failed to do (docs/admin.md §1, "a domain with nothing to say renders quiet").
+
+  ⚠ THE PEOPLE ZONE IS NOT THE BRIEF. §2a's four labelled lines hang off a
+  people-tagged EVENT and there is no events table — that is plan 13. What is
+  here is what has a source today: birthdays inside their own lead, and drift
+  capped at three. See PeopleZone.astro.
+
+  ⚠ AND IT ONLY RENDERS ON TODAY. Drift is a statement about NOW, the same way
+  Past due is (10-hq.md §10f): rendering "been a while" while you are looking at
+  a day last March would be the page asserting something untrue, and offering
+  its dismissals there would write an interaction dated today from a page that
+  is not about today.
 
   THE CAPTURE ✚ IS DELIBERATELY ABSENT rather than inert. Its CSS is in
   `app.css` and the capture piece wires it; a button that does nothing when
@@ -34,6 +45,10 @@ import CheckinZone from '../../components/admin/CheckinZone.astro';
 import { today as hqToday, parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
 import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
 import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
+import PeopleZone from '../../components/admin/PeopleZone.astro';
+import { signPhotos, upcomingBirthday, type Person } from '../../lib/hq/people';
+import { lastContactMap } from '../../lib/hq/interactions';
+import { driftList, type Drift } from '../../lib/hq/drift';
 
 const supabase = Astro.locals.supabase;
 const { tz, ymd: todayYmd } = await hqToday(supabase);
@@ -88,6 +103,33 @@ if (selected === todayYmd && !times.bed && !times.woke) {
     if (bed && woke) prefill = { bed, woke };
   }
   prefill ??= DEFAULT_TIMES;
+}
+
+/*
+  PEOPLE (12 · Piece 4). Only on today — see the header. Archived people are
+  excluded here as well as by `driftFor`, so a birthday cannot bring somebody
+  back onto a page they were deliberately removed from.
+*/
+let birthdays: { person: Person; birthday: NonNullable<ReturnType<typeof upcomingBirthday>> }[] = [];
+let drifting: Drift[] = [];
+let peoplePhotos = new Map<string, string>();
+
+if (!offToday) {
+  const { data: everyone } = await supabase.from('people').select('*').is('archived_at', null);
+  const roster: Person[] = everyone ?? [];
+  if (roster.length) {
+    const lastContact = await lastContactMap(supabase);
+    drifting = driftList(roster, lastContact, todayYmd);
+    birthdays = roster
+      .map((person) => ({ person, birthday: upcomingBirthday(person, todayYmd) }))
+      .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday)
+      .sort((a, b) => a.birthday.days - b.birthday.days);
+
+    // One round trip for every face the zone can show, and no more: signing the
+    // whole roster would mint URLs for people who are not on this page.
+    const shown = [...birthdays.map((b) => b.person), ...drifting.map((d) => d.person)];
+    peoplePhotos = await signPhotos(supabase, shown.map((p) => p.photo_path));
+  }
 }
 
 // `?cal=` is the month the popover is showing, and its presence is what keeps
@@ -187,10 +229,17 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
             a real column on `daily_checkins`. ══ */}
         <CheckinZone logDate={selected} today={todayYmd} row={checkin ?? null} times={times} prefill={prefill} writable={writable} tz={tz} />
       </div>
+
+      {/* ══ PEOPLE ══ birthdays inside their lead, then drift capped at three.
+          The rail rather than the main column: the check-in is the thing you
+          came to do, and this is the thing you came to notice. ══ */}
+      <div class="col-rail">
+        <PeopleZone birthdays={birthdays} drifting={drifting} today={todayYmd} photos={peoplePhotos} />
+      </div>
     </div>
 
     <p class="admin-hint mt-5 text-sm">
-      People and the agenda aren’t built yet. This page grows as they land.
+      The agenda isn’t built yet. This page grows as it lands.
     </p>
   </div>
 

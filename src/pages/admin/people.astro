@@ -7,22 +7,13 @@
   accusation every single time he opens the room — a direct violation of
   10-hq.md §3, where absence is an observation and never a verdict.
 
-  WHAT IS DELIBERATELY NOT HERE YET, and why its absence is correct rather than
-  unfinished:
-
-    · NO "last contact" LINE, on the card or anywhere else. It is derived from
-      `interactions`, a table Piece 2 creates, so today it could only ever read
-      "No entries yet" — the same sentence on every card, saying nothing except
-      that a feature is unbuilt. 10-hq.md §10b: a domain that does not exist yet
-      renders nothing at all.
-    · NO "Been a while" PANEL. Drift requires at least one logged interaction
-      (§8, and it is the bug the people lab caught: `last_contact_at` is null on
-      the day somebody is added, so the naive rule flags the entire roster on
-      creation day). With no interactions table there is no drift, and a panel
-      that can never have a row is furniture.
-
-  Both arrive with the pieces that give them a source. The birthday rail DOES
-  render, because `people.birth_month/day` is real data today.
+  THE RAIL, THEN THE NOTICE, THEN THE SECTIONS. "Been a while" (12 · Piece 4)
+  sits above the circles and is deliberately NOT card-shaped — it is an
+  observation about the roster, not part of it, and the moment it looks like a
+  section it becomes a list of people you have failed (10-hq.md §3). It only
+  ever holds people with at least one logged interaction: somebody with none is
+  NEW, not neglected, and treating null as ancient would flag the whole roster
+  on the day it was filled in.
 
   THE ROSTER IS SMALL BY DESIGN — ~25 people, ceiling 50 — so everyone is on the
   page at once: no pagination, no infinite scroll, and search only above six,
@@ -45,6 +36,8 @@ import {
   type Person,
 } from '../../lib/hq/people';
 import { byLastContact, lastContactMap, since } from '../../lib/hq/interactions';
+import { driftFor, driftList } from '../../lib/hq/drift';
+import BeenAWhile from '../../components/admin/BeenAWhile.astro';
 
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = await hqToday(supabase);
@@ -86,6 +79,12 @@ const soon = roster
 const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.circle === c.key) })).filter(
   (s) => s.members.length > 0,
 );
+
+// Drift, derived in full here and per-card below from the same function, so the
+// panel and the cards can never disagree about who is drifting. The roster
+// holds the WHOLE list — Today caps it at three, because Today is a nudge and
+// this is the room where the full picture lives (§8).
+const drifting = driftList(roster, lastContact, todayYmd);
 ---
 
 <AdminLayout title="People" active="people">
@@ -143,6 +142,8 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
             </div>
           )}
 
+          <BeenAWhile drifting={drifting} today={todayYmd} photos={photos} class="mb-6" />
+
           {sections.map((section) => (
             <section class="mb-6" data-section data-roster-part>
               <h2 class="admin-label mb-2">
@@ -153,6 +154,12 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
                   const birthday = upcomingBirthday(person, todayYmd);
                   const photo = person.photo_path ? photos.get(person.photo_path) : null;
                   const last = lastContact.get(person.id);
+                  // Past cadence the line shifts weight and darkens — nothing
+                  // else changes (§3). No badge, no count, no red. They are
+                  // already named once in the panel above; this exists so that
+                  // SCANNING a section still tells you, not so drift is
+                  // announced twice.
+                  const adrift = !!driftFor(person, last, todayYmd);
                   return (
                     <a
                       href={`/admin/people/${person.slug}`}
@@ -178,7 +185,7 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
 
                             A cake joins it ONLY inside the lead window —
                             otherwise it is noise for 340 days a year. */}
-                        <span class="pc__meta">
+                        <span class:list={['pc__meta', adrift && 'is-drifting']}>
                           <Icon name="ph:clock-light" class="pc__clock" />
                           {last ? since(last.on, todayYmd) : 'No entries yet'}
                           {birthday && (
@@ -257,10 +264,14 @@ const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.cir
         if (count) count.textContent = String(visible.length);
       });
 
-      // The rail is about dates, not about who you are looking for, so it goes
-      // while a search is running rather than sitting there unfiltered.
-      const rail = document.querySelector<HTMLElement>('.rail');
-      if (rail) rail.hidden = q.length > 0;
+      // The rail and the drift notice are both statements about the WHOLE
+      // roster, not about who you are looking for — so they go while a search
+      // is running rather than sitting there unfiltered. Leaving the notice up
+      // would be worse than leaving the rail: it would look like the answer to
+      // the name you just typed.
+      document.querySelectorAll<HTMLElement>('.rail, [data-been-a-while]').forEach((el) => {
+        el.hidden = q.length > 0;
+      });
 
       if (noMatch) noMatch.hidden = shown > 0 || !q;
     });

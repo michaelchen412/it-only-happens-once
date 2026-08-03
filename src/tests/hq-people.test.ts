@@ -24,35 +24,10 @@ import {
   rosterOrder,
   searchText,
   upcomingBirthday,
-  type Person,
 } from '../lib/hq/people';
+// Shared, so a new column breaks one builder rather than four fixtures.
+import { person } from './stubs/person';
 
-/** A row with the table's real defaults, so a test never asserts against a shape the database cannot produce. */
-function person(over: Partial<Person> = {}): Person {
-  return {
-    id: '11111111-1111-4111-8111-111111111111',
-    slug: 'someone',
-    display_name: 'Someone',
-    full_name: null,
-    sort_name: null,
-    circle: 'friends',
-    epithet: null,
-    bio: null,
-    photo_path: null,
-    birth_month: null,
-    birth_day: null,
-    birth_year: null,
-    birthday_lead_days: 30,
-    known_since_year: null,
-    location: null,
-    cadence_days: 365,
-    drift_muted_until: null,
-    archived_at: null,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-    ...over,
-  };
-}
 
 describe('upcomingBirthday', () => {
   it('shows a birthday inside the lead window', () => {

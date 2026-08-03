@@ -17,6 +17,7 @@ import TagInput from '../TagInput.astro';
 import SubjectsField from './SubjectsField.astro';
 import EntityCombo from './EntityCombo.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
+import SharedByField from './SharedByField.astro';
 import BackToTop from '../BackToTop.astro';
 
 interface Props {
@@ -25,14 +26,42 @@ interface Props {
   works?: { id: string; title: string; authorId: string | null }[];
   /** Every constellation — the membership picker (docs/admin.md §2). */
   constellations?: { id: string; name: string; slug: string }[];
+  /** The roster, for "Shared by" (12 · Piece 3). Empty = the field renders nothing. */
+  people?: { id: string; display_name: string }[];
+  /** `fragment_id → person_id[]`, rendered once so opening a sheet needs no round trip. */
+  sharedBy?: Record<string, string[]>;
+  /**
+   * Arriving from a profile's "Add a quote" (§5). The new-quote sheet opens
+   * with this person already ticked in Shared by — which is the whole flow:
+   * a quote they said out loud enters the corpus AND attaches, in one move.
+   */
+  linkPersonId?: string | null;
+  /** Open this editor on load, for the same arrival. */
+  autoNew?: 'quote' | null;
 }
-const { subjects, authors = [], works = [], constellations = [] } = Astro.props;
+const {
+  subjects,
+  authors = [],
+  works = [],
+  constellations = [],
+  people = [],
+  sharedBy = {},
+  linkPersonId = null,
+  autoNew = null,
+} = Astro.props;
 const authorOptions = authors.map((a) => ({ id: a.id, name: a.name }));
 const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
 const thisYear = new Date().getUTCFullYear();
 ---
 
-<dialog id="sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="sheet-title">
+<dialog
+  id="sheet"
+  class="drawer-dialog w-full max-w-md"
+  aria-labelledby="sheet-title"
+  data-shared-by={JSON.stringify(sharedBy)}
+  data-link-person={linkPersonId ?? undefined}
+  data-auto-new={autoNew ?? undefined}
+>
   <div class="flex h-full flex-col overflow-y-auto overscroll-contain">
     <header class="flex items-center justify-between border-b border-base-300 px-6 py-4">
       <h2 id="sheet-title" class="font-display text-xl">New quote</h2>
@@ -116,6 +145,12 @@ const thisYear = new Date().getUTCFullYear();
         </div>
       </details>
 
+      {/* Beside the provenance facets, because that is what it is: Author and
+          Work say where the words came from, this says who put them in front
+          of you. A tick applies immediately (§5) — it never rides along with
+          the save below. */}
+      <SharedByField scope="quote" people={people} />
+
       <SubjectsField id="quote-subjects">
         <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="stoicism, acceptance" />
       </SubjectsField>
@@ -192,6 +227,9 @@ const thisYear = new Date().getUTCFullYear();
         <span class="text-base-content/70">Added (year)</span>
         <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
       </label>
+      {/* A song is the clearest case §5 has: "a specific song she sent". */}
+      <SharedByField scope="song" people={people} />
+
       {/* Placeholder deliberately not "jazz": a song's subjects here are what it
           is ABOUT, not what genre it is — and the example is the first thing
           that teaches which. Same reason the AI button demands the annotation. */}

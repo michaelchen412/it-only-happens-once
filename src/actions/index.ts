@@ -21,6 +21,8 @@ import { pages, contact } from './site';
 import { checkin } from './checkin';
 import { people } from './people';
 import { interactions } from './interactions';
+import { links } from './links';
+import { drift } from './drift';
 
 export const server = {
   fragments,
@@ -36,4 +38,9 @@ export const server = {
   checkin,
   people,
   interactions,
+  // The one namespace that writes rows referencing the PUBLIC half (§5). It
+  // reads `works`/`fragments` and never updates them — linking is not editing.
+  links,
+  // The two drift dismissals, together because they are one control (§8).
+  drift,
 };

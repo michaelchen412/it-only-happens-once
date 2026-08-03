@@ -1,0 +1,94 @@
+---
+/*
+  BeenAWhile — the drift notice (docs/plans/12-people.md §3 and §8).
+
+  ⚠ NOT CARD-SHAPED, AND THAT IS THE DESIGN. §3 settles it: one warm notice
+  panel with rows and a left rule, so it can never read as a second section of
+  the directory. It is an observation ABOUT the roster, not part of it — and the
+  moment it looks like the cards below it, it becomes a list of people you have
+  failed to see, which is precisely what 10-hq.md §3 forbids.
+
+  WARM, NOT RED, because it PERSISTS until acted on. A marker that never goes
+  away stops being information and becomes wallpaper you resent.
+
+  IT IS *CONTACT*, NEVER "SEEN" (settled 2026-08-01). A call and a text count,
+  and nobody is physically seeing 25 people.
+
+  AND IT RENDERS AS A DURATION, NOT A DATE. "over a year ago" answers the
+  question this panel is asking; "7/20 Sat" does not, and a compact `M/D Ddd`
+  carries no year — which is how the lab's two-year-old contact read as last
+  month. The exact date stays one tap away on the stamp.
+
+  BOTH DISMISSALS SIT ON THE ROW (§3). A notice you cannot clear from where you
+  are reading it is a notice you learn to scroll past.
+*/
+import { Icon } from 'astro-icon/components';
+import type { Drift } from '../../lib/hq/drift';
+import { since } from '../../lib/hq/interactions';
+import { hueFor, monogram } from '../../lib/hq/people';
+import { fullDate } from '../../lib/hq/dates';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  drifting: Drift[];
+  today: Ymd;
+  /** Signed photo URLs by object path — the roster already has them. */
+  photos?: Map<string, string>;
+  class?: string;
+}
+const { drifting, today, photos = new Map(), class: className = '' } = Astro.props;
+---
+
+{
+  drifting.length > 0 && (
+    <div class:list={['bw', className]} data-been-a-while data-roster-part>
+      <span class="bw__k">
+        <Icon name="ph:clock-light" /> Been a while
+      </span>
+
+      {drifting.map(({ person, lastOn }) => (
+        <div class="bw__row" data-drift={person.id}>
+          <a href={`/admin/people/${person.slug}`} class="flex min-w-0 items-center gap-2">
+            <span class:list={['face face--sm', hueFor(person.id)]} aria-hidden="true">
+              {person.photo_path && photos.get(person.photo_path) ? (
+                <img src={photos.get(person.photo_path)} alt="" />
+              ) : (
+                monogram(person.display_name)
+              )}
+            </span>
+            <span class="bw__name">{person.display_name}</span>
+          </a>
+
+          {/* The epithet, because a name alone does not tell you who this is
+              when it has genuinely been two years. It is what the card already
+              carries, so nothing new is being invented for this row. */}
+          {person.epithet && <span class="bw__why">{person.epithet}</span>}
+
+          <button type="button" class="stamp" title={fullDate(lastOn)}>
+            {since(lastOn, today)}
+          </button>
+
+          <span class="bw__acts">
+            {/* Writes a real interaction dated today. The words are the
+                system's — the honest cost of a one-tap dismissal — and the
+                entry is editable like any other. */}
+            <button type="button" class="bw__b" data-reached-out={person.id} data-name={person.display_name}>
+              Reached out
+            </button>
+            {/* Mutes for another cadence. Some relationships genuinely ARE
+                annual, and saying so is not the same as ignoring it. */}
+            <button type="button" class="bw__b" data-mute={person.id} data-name={person.display_name}>
+              That’s fine
+            </button>
+          </span>
+        </div>
+      ))}
+
+      <p data-drift-error hidden role="alert" class="admin-alert mt-2" />
+    </div>
+  )
+}
+
+<script>
+  import '../../scripts/drift';
+</script>

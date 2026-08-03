@@ -428,6 +428,7 @@ export type Database = {
           created_at: string
           display_name: string
           drift_muted_until: string | null
+          drift_mutes: number
           epithet: string | null
           full_name: string | null
           id: string
@@ -450,6 +451,7 @@ export type Database = {
           created_at?: string
           display_name: string
           drift_muted_until?: string | null
+          drift_mutes?: number
           epithet?: string | null
           full_name?: string | null
           id?: string
@@ -472,6 +474,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           drift_muted_until?: string | null
+          drift_mutes?: number
           epithet?: string | null
           full_name?: string | null
           id?: string
@@ -483,6 +486,78 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      person_fragments: {
+        Row: {
+          created_at: string
+          fragment_id: string
+          note: string | null
+          person_id: string
+        }
+        Insert: {
+          created_at?: string
+          fragment_id: string
+          note?: string | null
+          person_id: string
+        }
+        Update: {
+          created_at?: string
+          fragment_id?: string
+          note?: string | null
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_fragments_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_fragments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_works: {
+        Row: {
+          created_at: string
+          note: string | null
+          person_id: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          person_id: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          person_id?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_works_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_works_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {

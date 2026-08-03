@@ -37,17 +37,22 @@ test.describe('the roster', () => {
     await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
   });
 
-  // ⚠ REWRITTEN BY 12 · PIECE 2. This used to assert that NO card carried a
-  // last-contact line, because `interactions` did not exist and the words would
-  // have been an invented affordance. Piece 2 gave them a source, so the
-  // assertion inverts — and the half that still holds is the drift half, which
-  // is Piece 4's and has no table behind it yet.
-  test('shows drift nowhere — Piece 4 owns that', async ({ page }) => {
+  // ⚠ REWRITTEN TWICE, and the history is the point. It first asserted that no
+  // card carried a last-contact line (Piece 2 gave that a source), then that
+  // drift appeared nowhere (Piece 4 gave THAT a source). What survives both
+  // rewrites is the half that was never about a table: however drift is shown,
+  // it is never ANNOUNCED. A spec that encodes "not built yet" has an expiry
+  // date; this one no longer does.
+  test('never announces drift, however it shows it', async ({ page }) => {
     await page.goto('/admin/people');
-    await expect(page.getByText('Been a while')).toHaveCount(0);
-    // No badge, no count, no "overdue" — drift is a weight shift when it
-    // arrives, never an announcement.
+    // No badge, no count, no "overdue", no red. Drift is a weight shift on a
+    // line you were already reading, and one warm panel — never a score.
     await expect(page.getByText('overdue', { exact: false })).toHaveCount(0);
+    await expect(page.locator('.u-now')).toHaveCount(0);
+    await expect(page.locator('[data-person] .chip')).toHaveCount(0);
+    // The notice, when there is one, is NOT card-shaped — it is an observation
+    // about the roster, not a second section of it (§3).
+    await expect(page.locator('[data-been-a-while].pc, [data-been-a-while] .pgrid')).toHaveCount(0);
   });
 
   test('shows one line and one button when nobody is here, or cards when they are', async ({ page }) => {

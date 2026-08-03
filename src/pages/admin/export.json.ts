@@ -47,6 +47,11 @@ const TABLES = [
   // walking this list top to bottom can never trip either one.
   'interactions',
   'interaction_people',
+  // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
+  // — `works` and `fragments`, already listed far above — as well as into
+  // `people`, so they land last and an importer walking top to bottom is safe.
+  'person_works',
+  'person_fragments',
   // ⚠ NOT `person_last_contact`. It is a VIEW, derived from the two rows above,
   // and exporting it would put a stored copy of a computed value into the
   // artefact people restore from — the exact drift data-model.md §7 forbids.

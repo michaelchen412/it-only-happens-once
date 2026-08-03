@@ -28,7 +28,11 @@ export default defineConfig({
           // rather than reusing `cake` — a cake already means a birthday on the
           // roster, and one glyph meaning two things is how a timeline stops
           // being scannable.
-          'gift'],
+          'gift',
+          // People (12 · Piece 3): the Shared shelf, where the glyph carries
+          // what KIND of corpus row this is — the same job TypeMark does in the
+          // fragment manager, done with icons because the shelf is a rail.
+          'book-open', 'quotes', 'music-notes', 'article'],
         'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel',
           // HQ: marks a mirrored calendar event as Google's, without a word of chrome.
           'google'],

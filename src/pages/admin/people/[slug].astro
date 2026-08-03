@@ -17,12 +17,11 @@
   and pronouns appear only inside Michael's own prose, where he is the author.
   This is cheap to hold now and expensive to retrofit.
 
-  WHAT PIECE 1 DELIBERATELY DOES NOT RENDER: the timeline, the log box, and
-  Shared. §10 is explicit — "ship the profile with the timeline zone absent; do
-  not build a 'no interactions yet' skeleton that Piece 2 immediately replaces".
-  Same for `person_works`/`person_fragments`, which are Piece 3's tables. A
-  profile that is only facts is still useful, and that is the state this page is
-  built for.
+  FOUR LAYERS, ORDERED BY HOW OFTEN THEY CHANGE (§4): the fixed facts across
+  the top, then the timeline in the main column — the only part that changes
+  weekly and the part you scroll — with About and Shared in the rail. On a
+  phone the order inverts: you open a profile on a phone to remember who
+  somebody is, not to scroll a year of entries.
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
@@ -32,7 +31,10 @@ import { today as hqToday } from '../../../lib/hq/time';
 import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
 import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
 import TimelineZone, { type TimelineEntry } from '../../../components/admin/TimelineZone.astro';
+import SharedZone from '../../../components/admin/SharedZone.astro';
+import LinkSheet from '../../../components/admin/LinkSheet.astro';
 import { since } from '../../../lib/hq/interactions';
+import { pickerOptions, sharedFor, type Shared } from '../../../lib/hq/links';
 
 const { slug } = Astro.params;
 const supabase = Astro.locals.supabase;
@@ -56,6 +58,8 @@ const { ymd: todayYmd } = await hqToday(supabase);
  */
 let entries: TimelineEntry[] = [];
 let roster: Pick<Person, 'id' | 'display_name' | 'photo_path'>[] = [];
+let shared: Shared = { works: [], fragments: [], count: 0 };
+let options: Awaited<ReturnType<typeof pickerOptions>> = { works: [], fragments: [] };
 
 if (person) {
   const { data: mine } = await supabase
@@ -93,6 +97,10 @@ if (person) {
     .neq('id', person.id)
     .order('display_name');
   roster = others ?? [];
+
+  // The shelf, and what the link picker may choose from. Two round trips that
+  // only happen on a real profile — the 404 path does none of this.
+  [shared, options] = await Promise.all([sharedFor(supabase, person.id), pickerOptions(supabase)]);
 }
 
 // DERIVED, never stored — `max(occurred_on)` over this person's entries. It is
@@ -276,13 +284,15 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
             </div>
           </form>
         </section>
-        </div>
-        </div>
 
-        {/* One plain sentence, not an empty zone. Shared (person_works /
-            person_fragments) is Piece 3's tables, and a domain that does not
-            exist yet renders nothing at all (10-hq.md §10b). */}
-        <p class="admin-hint mt-5 text-sm">Books and songs they’ve shared aren’t built yet.</p>
+        {/* 3 · SHARED — what they've given him (§5). The one seam with the
+            corpus, and it sits BELOW About because About changes twice a year
+            while this grows every time you link something. */}
+        <div class="o-3">
+          <SharedZone person={person} shared={shared} />
+        </div>
+        </div>
+        </div>
 
         {/* Archiving is EXPLICIT and never automatic, however long the silence —
             and it is reversible. Down here rather than beside the pencil,
@@ -302,6 +312,18 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
   }
 
   {person && <PersonSheet person={person} photoUrl={photoUrl} />}
+  {
+    person && (
+      <LinkSheet
+        personName={person.display_name}
+        personSlug={person.slug}
+        works={options.works}
+        fragments={options.fragments}
+        linkedWorks={shared.works.map((w) => w.id)}
+        linkedFragments={shared.fragments.map((f) => f.id)}
+      />
+    )
+  }
 
   <script>
     import { actions } from 'astro:actions';

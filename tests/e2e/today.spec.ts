@@ -269,15 +269,36 @@ test.describe("the date bar is the page's control", () => {
 });
 
 test.describe('what Today does not claim', () => {
+  // ⚠ NARROWED BY 12 · PIECE 4. This used to name People among the unbuilt
+  // domains, which was true until People had a source. The rule it guards is
+  // unchanged and is the reason it was worth keeping rather than deleting: a
+  // domain that does not exist yet renders NOTHING — never a "no data" box —
+  // because on day one a grid of empty cards reads as a broken app *and* as a
+  // list of things you have already failed to do (10-hq.md §10b).
   test('unbuilt domains render one sentence, never a row of empty boxes', async ({ page }) => {
     await page.goto('/admin');
 
-    // On day one a grid of "no data" cards reads as a broken app AND as a list
-    // of things you have already failed to do.
-    for (const zone of ['Today', 'Coming up', 'People', 'Practice', 'Past due']) {
+    for (const zone of ['Today', 'Coming up', 'Practice', 'Past due']) {
       await expect(page.getByRole('heading', { name: zone, exact: true })).toHaveCount(0);
     }
-    await expect(page.getByText(/aren’t built yet/)).toBeVisible();
+    await expect(page.getByText(/isn’t built yet/)).toBeVisible();
+  });
+
+  test('People renders only when it has something to say, and quietly when it does', async ({ page }) => {
+    await page.goto('/admin');
+    const zone = page.locator('[data-people-zone]');
+
+    // The same rule from the other side: People has a source now, so it is
+    // allowed on the page — but a birthday-less, drift-less morning still gets
+    // no zone at all rather than an empty one.
+    if ((await zone.count()) === 0) {
+      await expect(page.getByRole('heading', { name: 'People', exact: true })).toHaveCount(0);
+    } else {
+      await expect(zone.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
+      // And what it says is never arrears: no badge, no count, no red.
+      await expect(zone.locator('.u-now')).toHaveCount(0);
+      await expect(zone.getByText('overdue', { exact: false })).toHaveCount(0);
+    }
   });
 
   test('no control on the page does nothing when pressed', async ({ page }) => {

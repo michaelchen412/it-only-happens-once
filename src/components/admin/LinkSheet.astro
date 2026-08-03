@@ -1,0 +1,155 @@
+---
+/*
+  LinkSheet — attach a work or a fragment to somebody (docs/plans/12-people.md §5).
+
+  A DRAWER, NOT A POPOVER, and not because of trap 7 — the native top layer
+  would have solved that just as well. It is a drawer because of what is being
+  picked: one row out of a few hundred, which needs a search field, a scrolling
+  list and a note beside it. A popover sized for six interaction kinds is the
+  wrong container for the corpus.
+
+  TWO MODES, ONE SHEET, because they are the same motion with a different
+  target and §5 treats them as one feature. The distinction that matters is
+  explained by what each one DOES, not by a paragraph:
+
+    · A WORK is the link that keeps paying. Every fragment carrying that
+      `work_id` appears on the profile — including ones added years later.
+    · A FRAGMENT is the direct edge, for what that path cannot reach: a song
+      somebody sent, a line they said out loud that never came from a book.
+
+  THE OPTIONS ARE SERVER-RENDERED AND FILTERED IN THE BROWSER, like the roster
+  and unlike the fragment manager. The corpus is in the low hundreds, it is
+  already one round trip, and a keystroke that has to ask the server is slower
+  and no more correct. The manager pages because it sorts and filters across
+  facets this sheet does not have.
+*/
+import { Icon } from 'astro-icon/components';
+import type { FragmentOption, WorkOption } from '../../lib/hq/links';
+
+interface Props {
+  personName: string;
+  personSlug: string;
+  works: WorkOption[];
+  fragments: FragmentOption[];
+  /** Ids already linked — offered but marked, so a second link isn't a surprise. */
+  linkedWorks: string[];
+  linkedFragments: string[];
+}
+const { personName, personSlug, works, fragments, linkedWorks, linkedFragments } = Astro.props;
+
+const linkedW = new Set(linkedWorks);
+const linkedF = new Set(linkedFragments);
+const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const;
+---
+
+<dialog id="link-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="link-sheet-title">
+  <div class="flex h-full flex-col overflow-hidden font-sans">
+    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+      <h2 id="link-sheet-title" class="font-display text-xl">Shared by {personName}</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <p id="link-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      {/* The same segmented control as the circle picker, and it carries the
+          same 44px floor for the same reason: this sheet is opened from a
+          phone. TRAP 6 is handled in `.pseg__b` — the selected segment keeps
+          its fill under the cursor. */}
+      <div class="pseg mb-4" role="group" aria-label="What to link">
+        <button type="button" class="pseg__b cn-gold" data-mode="work" aria-pressed={true}>
+          <Icon name="ph:book-open" /> A work
+        </button>
+        <button type="button" class="pseg__b cn-gold" data-mode="fragment" aria-pressed={false}>
+          <Icon name="ph:quotes" /> One piece
+        </button>
+      </div>
+
+      <label class="search search--w mb-3">
+        <Icon name="ph:magnifying-glass" class="opacity-45" />
+        <input type="search" data-link-search placeholder="Search the corpus…" aria-label="Search the corpus" />
+      </label>
+
+      <div class="picker cn-gold" data-list="work">
+        {
+          works.length === 0 ? (
+            <p class="picker__none">
+              No works yet — they’re created from a quote’s Work field, or in{' '}
+              <a href="/admin/library" class="underline">Library</a>.
+            </p>
+          ) : (
+            works.map((w) => (
+              <button
+                type="button"
+                class="picker__row"
+                data-pick="work"
+                data-id={w.id}
+                data-label={w.title}
+                data-search={[w.title, w.authorName].filter(Boolean).join(' ').toLowerCase()}
+              >
+                <span class="picker__t">{w.title}</span>
+                <span class="picker__meta">
+                  {linkedW.has(w.id) ? 'linked' : [w.authorName, w.year].filter(Boolean).join(' · ')}
+                </span>
+              </button>
+            ))
+          )
+        }
+        <p class="picker__none" data-none hidden>Nothing by that name.</p>
+      </div>
+
+      <div class="picker cn-gold" data-list="fragment" hidden>
+        {
+          fragments.length === 0 ? (
+            <p class="picker__none">Nothing in the corpus yet.</p>
+          ) : (
+            fragments.map((f) => (
+              <button
+                type="button"
+                class="picker__row"
+                data-pick="fragment"
+                data-id={f.id}
+                data-label={f.label}
+                data-search={[f.label, f.attribution].filter(Boolean).join(' ').toLowerCase()}
+              >
+                <span class="picker__t">{f.label}</span>
+                <span class="picker__meta">{linkedF.has(f.id) ? 'linked' : TYPE_LABEL[f.type]}</span>
+              </button>
+            ))
+          )
+        }
+        <p class="picker__none" data-none hidden>Nothing by that name.</p>
+      </div>
+
+      {/* THE FLOW MICHAEL NAMED (§5), placed where you discover you need it:
+          you came here to attach the quote they said out loud, searched for
+          it, and it is not in the corpus because you never wrote it down. A
+          real link rather than an overlay — the quote editor is TipTap, and
+          both Piece 1 and Piece 2 kept that bundle off this page on purpose.
+          The fragments room opens the quote sheet already linked to them. */}
+      <p class="admin-hint mt-2 text-xs" data-add-quote hidden>
+        Not written down yet?{' '}
+        <a href={`/admin/fragments?person=${personSlug}&new=quote`} class="underline">
+          Add a quote from {personName} →
+        </a>
+      </p>
+
+      {/* §5 keeps free text instead of an enum of link kinds: "recommended,
+          Mar 2024" says more than a dropdown of three verbs, and a taxonomy
+          invented before there is data to shape it is wrong in a month. */}
+      <label class="f mt-4">
+        <span>Note</span>
+        <input type="text" maxlength="280" data-link-note placeholder="recommended, Mar 2024" />
+      </label>
+    </div>
+
+    <footer class="flex shrink-0 justify-end gap-2 border-t border-base-300 px-6 py-4">
+      <button type="button" class="btn btn-ghost btn-sm font-sans" data-close>Cancel</button>
+      <button type="button" class="btn btn-sm font-sans zone__cta cn-gold" data-link-save disabled>Link</button>
+    </footer>
+  </div>
+</dialog>
+
+<script>
+  import '../../scripts/link-sheet';
+</script>

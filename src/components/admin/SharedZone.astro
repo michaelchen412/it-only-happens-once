@@ -1,0 +1,153 @@
+---
+/*
+  SharedZone — what they've given him (docs/plans/12-people.md §5, §4).
+
+  THE ONE SEAM BETWEEN THE TWO HALVES OF THE HOUSE. 10-hq.md §2 is otherwise
+  absolute: HQ data never becomes corpus data, a log entry is never promoted
+  into an essay. This zone is the exception, and it leaks in one direction only
+  — it renders public rows on a private page, never the reverse. The link rows
+  themselves carry no `anon` policy and no public route touches them.
+
+  ⚠ A WORK EXPANDS IN PLACE; IT IS NOT A LINK OUT. That is the whole payoff of
+  the two-hop path (§5): link somebody to a book once and every quote carrying
+  that `work_id` is one tap below it — including quotes added years later.
+  Michael's words were "on Noelle's profile I want to see the quotes from that
+  book", and a count with a link elsewhere is a weaker, different thing. The
+  link to the fragment room stays, for when you want to edit rather than read.
+
+  NO COUNTS ANYWHERE BUT THE FOLD. §3 is explicit that interaction counts turn
+  people into metrics; the same applies here. `3 quotes` says how much is
+  hidden, which is navigation. It is never a score and never coloured.
+*/
+import { Icon } from 'astro-icon/components';
+import type { Shared, SharedFragment } from '../../lib/hq/links';
+import type { Person } from '../../lib/hq/people';
+
+interface Props {
+  person: Person;
+  shared: Shared;
+}
+const { person, shared } = Astro.props;
+
+/** The glyph carries the type, as it does on every fragment row in the admin. */
+const MARK: Record<SharedFragment['type'], string> = {
+  quote: 'ph:quotes',
+  song: 'ph:music-notes',
+  writing: 'ph:article',
+};
+---
+
+<section class="zone cn-gold" data-shared data-person-id={person.id}>
+  <div class="zone__head">
+    <span class="zone__chip"><Icon name="ph:books" /></span>
+    <h2 class="zone__title">Shared</h2>
+    <button type="button" class="zone__act" data-open-link-sheet aria-label="Link a book or a fragment">
+      <Icon name="ph:plus" />
+    </button>
+  </div>
+
+  {/* Unlinking happens with the sheet CLOSED, so its failure cannot be
+      reported inside the sheet — a message written into a closed <dialog> is
+      a silent failure wearing the costume of a handled one. */}
+  <p data-shared-error hidden role="alert" class="admin-alert mx-3 mt-3"></p>
+
+  {
+    shared.count === 0 ? (
+      /* One line, and no skeleton. The ＋ above is the invitation; this only
+         says the shelf is empty (10-hq.md §10b). */
+      <p class="zone__empty">Nothing linked yet.</p>
+    ) : (
+      <div class="shelf">
+        {shared.works.map((w) => (
+          <details class="shelf__row" data-work={w.id}>
+            <summary class="shelf__sum">
+              <Icon name="ph:book-open" class="shelf__mark" />
+              <span class="shelf__t">
+                {w.title}
+                {(w.authorName || w.year) && (
+                  <span class="shelf__by">
+                    {[w.authorName, w.year].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+                {w.note && <span class="shelf__note">{w.note}</span>}
+              </span>
+              <span class="shelf__n">
+                {w.fragments.length === 0
+                  ? 'nothing yet'
+                  : `${w.fragments.length} ${w.fragments.length === 1 ? 'piece' : 'pieces'}`}
+              </span>
+            </summary>
+
+            {w.fragments.length === 0 ? (
+              /* Honest rather than hidden: the link is real and correct, and
+                 nothing in the corpus carries this work yet. It will fill in
+                 on its own, which is exactly why the link was worth making. */
+              <p class="shelf__q admin-hint">
+                No quotes from this yet — they’ll appear here as you add them.
+              </p>
+            ) : (
+              w.fragments.map((f) => (
+                <div class="shelf__q">
+                  <a href={`/admin/fragments#edit=${f.id}`} class="shelf__qt block hover:underline">
+                    {f.label}
+                  </a>
+                  {f.note && <span class="shelf__note">{f.note}</span>}
+                </div>
+              ))
+            )}
+            {/* Unlinking lives HERE, one tap inside the fold, rather than on
+                the summary row. Two reasons, and the second is the load-bearing
+                one: a <button> inside a <summary> is activated by the same
+                click that toggles the <details>, so the row would open or close
+                every time you removed something; and removing a link is a
+                deliberate act that has no business sitting under the cursor
+                while you are only reading the shelf. */}
+            <p class="shelf__q flex items-baseline justify-between gap-3">
+              <a href={`/admin/fragments?work=${w.slug}`} class="admin-hint hover:underline">
+                Everything from this work →
+              </a>
+              <button
+                type="button"
+                class="shelf__x admin-hint hover:underline"
+                data-unlink="work"
+                data-id={w.id}
+                data-label={w.title}
+              >
+                Unlink
+              </button>
+            </p>
+          </details>
+        ))}
+
+        {/* Direct edges — a song someone sent, a line they said out loud that
+            never came from a book. Anything already visible under one of the
+            works above is NOT repeated here: the same row twice reads as a
+            rendering bug, so its note is carried up there instead. */}
+        {shared.fragments.map((f) => (
+          <div class="shelf__row">
+            <div class="shelf__sum">
+              <Icon name={MARK[f.type]} class="shelf__mark" />
+              <span class="shelf__t">
+                <a href={`/admin/fragments#edit=${f.id}`} class="shelf__qt block hover:underline">
+                  {f.label}
+                </a>
+                {f.attribution && <span class="shelf__by">{f.attribution}</span>}
+                {f.note && <span class="shelf__note">{f.note}</span>}
+              </span>
+              <button
+                type="button"
+                class="shelf__x"
+                data-unlink="fragment"
+                data-id={f.id}
+                data-label={f.label}
+                aria-label="Unlink"
+              >
+                <Icon name="ph:x" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+</section>

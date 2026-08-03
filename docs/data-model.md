@@ -238,7 +238,8 @@ Writes are bounded to a **three-day backfill window**, enforced in [`src/actions
 | `birth_month` · `birth_day` · `birth_year` | three `smallint`, the year **nullable** | Never a `date` with a sentinel year. The year is frequently unknown; the "next 30 days" question is a month/day computation anyway (mind the December→January wrap); and a sentinel year is the kind of thing that silently becomes somebody's age on a screen. Three CHECKs enforce that month and day travel together, that a lone year is refused, and that **31 April cannot be stored** — while 29 February can, because a leap-day birthday is real. |
 | `birthday_lead_days` | `int`, default **30** | Per person. Thirty, not seven: *"happy birthday on time"* for the people who matter means weeks of warning, because choosing and shipping a gift takes them. A week is enough to send a message and nothing else. |
 | `cadence_days` | `int`, default **365** | Drift is **on by default for everyone**. A year is long enough that being told is a favour rather than a scold; the same design would not be defensible at 30 days. Entered in the UI in *months* — the conversion is 365.25/12 so that 12 ⇄ 365 round-trips exactly and saving an untouched form cannot move it. |
-| `drift_muted_until` | `date` | *"This is fine"* — some relationships genuinely are annual. |
+| `drift_muted_until` | `date` | *"This is fine"* — some relationships genuinely are annual. Set to today + that person's own cadence, **counted from today** rather than from the last contact, which would expire the moment you pressed it. |
+| `drift_mutes` | `smallint`, default 0 | How many times that has been said. The count accrues now; **the UI that reads it does not exist yet** — at a one-year cadence a second mute cannot happen before 2028, and building against a rule nothing can exercise is worse than waiting. Starting the count later would mean starting it at zero on the day it mattered. |
 | `photo_path` | `text` | An object path in the **private `hq` bucket**, never a URL: the only URLs that bucket has are signed and they expire (§7c of the HQ plan). Sign at render, never persist. |
 | `archived_at` | `timestamptz` | **Explicit only, never automatic**, however long the silence. It removes somebody from the roster and from search while keeping every row. Since there is no `acquaintances` tier, this is the *only* way somebody leaves the roster. |
 
@@ -264,12 +265,28 @@ Writes are bounded to a **three-day backfill window**, enforced in [`src/actions
 
 > **⚠ `security_invoker = true` on that view is load-bearing.** A Postgres view runs with its **owner's** privileges by default, so without it the view would read `interactions` as the owner and hand the results to whoever asked — bypassing every policy above and turning the one derived surface into a leak. With it, the view sees exactly what the caller may see; for `anon`, nothing. Verified against live PostgREST as a genuinely signed-out client.
 
+**`person_works` + `person_fragments`** — the one seam with the corpus ([admin.md](admin.md) §12). Everywhere else the boundary is absolute: HQ data never becomes corpus data, and a log entry is never promoted into an essay. These two tables are the exception, and they are shaped so it leaks in one direction only — they **reference** public rows and are themselves entirely private.
+
+> **⚠ Two tables, not one `person → fragment` join, and the reason is the whole payoff.** The link that matters is **person → work → fragments**, a two-hop path over `works`, which already exists (§4). Linking somebody to a book once means every fragment carrying that `work_id` appears on their profile **automatically, including ones added years later**. Tagging each quote by hand gives the same page today and a stale one in a year.
+
+| Table | Key | Why |
+|---|---|---|
+| `person_works` | `(person_id, work_id)` | The two-hop link. Resolved at read time, never materialised — see above. |
+| `person_fragments` | `(person_id, fragment_id)` | The direct edge, for what that path cannot reach: a song somebody sent, a line they said out loud that never came from a book. |
+
+Both carry an optional free-text `note` (*"recommended, Mar 2024"*) and **no enum of link kinds**. "Recommended" / "gave me" / "we read it together" is a taxonomy that looks right on paper and is wrong after a month; the note holds the nuance until a pattern actually emerges. There is **no `person_authors`** — plausible, weaker, largely derivable from the works already linked, and deferred until it earns itself.
+
+`person_fragments` is indexed on `fragment_id`, because the editor's *Shared by* field asks the reverse question on every open. `person_works` gets no matching index: nothing asks "who recommended this work?", because there is no work page to ask it from.
+
+> **⚠ These tables have no `anon` policy, and the guarantee is stronger than that.** A published quote stays public; **the fact that somebody is why it exists is HQ data** — not the note, not the count, not the existence of the row. The second half is not written in SQL: **public queries never touch these tables at all**, so there is no join for a policy to have to get right. Verified as a genuinely signed-out client, directly and **through an embedded join from a public `fragments` row**.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
 - **Reading time** — from `body` word count if not stored in `details`.
 - **Time in bed, estimated sleep, sleep efficiency** — from `daily_checkins.bed_at` / `woke_at` and the two buckets, computed at render by [`src/lib/hq/checkin.ts`](../src/lib/hq/checkin.ts). Efficiency in particular is the number that actually moves under CBT-I, which makes a stale stored copy of it worse than none. The estimate stays null until *both* buckets are answered — an efficiency that silently assumed "asleep instantly, never woke" would be a number the person never gave.
 - **Last contact** — `max(occurred_on)` over a person's interactions, served by the `person_last_contact` view. Not a column, so it can never disagree with the entries it summarises. Note what it is derived *from*: interactions only. `people.updated_at` is deliberately excluded — fixing a typo in somebody's record is not evidence you were in touch with them, and letting it silence a one-year notice would defeat the feature by the most trivial possible action. Its two guards belong here too, because both were found by prototyping the *query* rather than the pixels: **drift requires at least one logged interaction** (last contact is null the day somebody is added, and the naive rule would flag the whole roster on creation day), and **anyone with an event today is never drifting**, however long since the last log.
+- **Drift** — `now - last_contact > cadence_days`, in [`src/lib/hq/drift.ts`](../src/lib/hq/drift.ts), and deliberately **not a flag anybody can set**. A hand-set column was the people lab's own bug: a person 420 days cold never appeared under *Been a while* because nothing had updated their flag. Ordering is by how far past **their own** cadence, not by raw days — sorting by days would silently override every cadence set by hand. Its two guards are above, and **one of them is currently unenforceable**: "anyone with an event today is never drifting" needs an events table that does not exist yet, so on the morning you are seeing somebody for the first time in a year they will still be listed until you log it.
 - **A person's next birthday** — `nextOccurrence(birth_month, birth_day)` in [`src/lib/hq/dates.ts`](../src/lib/hq/dates.ts). A month/day pair has **no weekday until the occurrence is resolved**, and it rolls to next year the day after it passes. 29 February falls back to 1 March in a common year: celebrating early is wrong, and skipping drops the person off the page three years out of four.
 
 ## 8. Domain → schema mapping
@@ -286,6 +303,10 @@ Writes are bounded to a **three-day backfill window**, enforced in [`src/actions
 | Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` (facets; display stays in `attribution` / `details`) |
 | Emergent links between constellations | shared membership (no table) |
 | The morning check-in | `daily_checkins`, keyed by local `log_date` (§6b) |
+| A person | `people` row (§6b) |
+| A logged contact | `interactions` + `interaction_people` — participants, never an owner (§6b) |
+| "What they've given me" | `person_works` (two-hop, via `works`) + `person_fragments` (§6b) |
+| Drift | derived from `person_last_contact` and `people.cadence_days` (§7) |
 | The configured home timezone | `settings.home_timezone` (§6b) |
 | The blog / index | queries over `fragments` by `type` + `occurred_at` |
 

@@ -36,6 +36,7 @@ import type { SuiteItem } from '../../../lib/constellations';
 import type { SubjectRef } from '../../../lib/blog';
 import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
+import { allFragmentPeople } from '../../../lib/hq/links';
 import StarMark from '../../../components/StarMark.astro';
 
 const sb = Astro.locals.supabase;
@@ -48,7 +49,7 @@ const { data: c } = await sb
   .maybeSingle();
 if (!c) return Astro.redirect('/admin/constellations');
 
-const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { data: subjectRows }, { data: authors }, { data: works }] =
+const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { data: subjectRows }, { data: authors }, { data: works }, { data: people }] =
   await Promise.all([
     sb
       .from('fragment_constellations')
@@ -64,7 +65,14 @@ const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { 
     sb.from('subjects').select('name').order('name'),
     sb.from('authors').select('id, name').order('name'),
     sb.from('works').select('id, title, author_id').order('title'),
+    // The roster, for the sheet's "Shared by" field (12 · Piece 3). Passed
+    // here as well as from /admin/fragments on purpose: a field that exists in
+    // one room and silently not in the other is worse than not having it.
+    sb.from('people').select('id, display_name').order('display_name'),
   ]);
+
+// `fragment_id -> person_id[]`, so opening a sheet needs no round trip.
+const sharedBy = await allFragmentPeople(sb);
 
 const snip = (s: string | null | undefined, max = 110) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
@@ -400,6 +408,8 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     authors={authors ?? []}
     works={(works ?? []).map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
     constellations={allConstellations ?? []}
+    people={people ?? []}
+    sharedBy={sharedBy}
   />
   <WritingSheet subjects={subjectNames} constellations={allConstellations ?? []} />
   <FragmentBrowser

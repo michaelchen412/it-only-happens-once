@@ -7,6 +7,7 @@ import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireConstellationPicker } from './constellation-picker';
+import { wireSharedBy } from './shared-by';
 import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireSubjectSuggest } from './subject-suggest';
@@ -234,6 +235,21 @@ cnPanel.addEventListener('change', refreshCnCount);
 /** A membership edit changes the list underneath — refresh on close. */
 const membershipTouched = () => picker.changed();
 
+// --- "Shared by": the corpus side of the person link (12 · Piece 3) ---
+// One handle per form, because the field lives beside the provenance facets in
+// each rather than in a shared tab — a song someone sent and a quote someone
+// said are the same link, but they are asked for in two different places.
+// Absent when the roster is empty: the component renders nothing at all then.
+const sharedByHandles = new Map<'quote' | 'song', ReturnType<typeof wireSharedBy>>();
+for (const scope of ['quote', 'song'] as const) {
+  const el = sheet.querySelector<HTMLElement>(`[data-sby="${scope}"]`);
+  if (el) sharedByHandles.set(scope, wireSharedBy(el));
+}
+/** `fragment_id → person_id[]`, rendered by the server so an open needs no fetch. */
+const sharedByMap: Record<string, string[]> = JSON.parse(sheet.dataset.sharedBy || '{}');
+/** Set when you arrived from a profile's "Add a quote" (`?person=<slug>`). */
+const linkPersonId = sheet.dataset.linkPerson || '';
+
 function openSheet(type: 'quote' | 'song') {
   clearError();
   quoteForm.hidden = type !== 'quote';
@@ -319,6 +335,12 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
     picker.setFragment(null, []);
     const placeIn = document.body.dataset.placeIn;
     if (placeIn) picker.preselect(placeIn);
+    // Same shape, one table over: nothing to be shared by yet either, so ticks
+    // queue until the first save. Arriving from a profile's "Add a quote"
+    // pre-ticks that person, which is the whole flow §5 asked for — the quote
+    // enters the corpus AND attaches, in one move.
+    sharedByHandles.get(type)?.setFragment(null, []);
+    if (linkPersonId) sharedByHandles.get(type)?.preselect(linkPersonId);
     sheetTitle.textContent = type === 'quote' ? 'New quote' : 'New song';
     openSheet(type);
   });
@@ -372,6 +394,7 @@ document.addEventListener('fragment:edit', (e) => {
     }
     toggleDelete(form, true);
     picker.setFragment(d.id, Array.isArray(d.constellationIds) ? d.constellationIds : []);
+    sharedByHandles.get(type)?.setFragment(d.id, sharedByMap[d.id] ?? []);
     sheetTitle.textContent = type === 'quote' ? 'Edit quote' : 'Edit song';
     openSheet(type);
   }
@@ -448,8 +471,12 @@ for (const [form, action] of [
     submitBtn.disabled = false;
     if (!error) {
       // A brand-new fragment's queued memberships (including the composer's
-      // pre-ticked constellation) can only be written once it has an id.
-      if (data?.id) await picker.flush(data.id);
+      // pre-ticked constellation, and a profile's pre-ticked person) can only
+      // be written once it has an id.
+      if (data?.id) {
+        await picker.flush(data.id);
+        await sharedByHandles.get(form === quoteForm ? 'quote' : 'song')?.flush(data.id);
+      }
       dirty = false; // saved — don't prompt on the reload
       window.location.reload();
       return;
@@ -482,3 +509,20 @@ document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
     window.location.reload();
   });
 });
+
+// --- arriving from a profile's "Add a quote" (12 · Piece 3, §5) ------------
+// The whole flow is one click from the person's Shared zone to a quote sheet
+// that is already attributed to them. Opening it HERE rather than from an
+// inline script on the page removes any question of module ordering: by the
+// time this line runs, the New button's own listener is already bound.
+//
+// `history.replaceState` so a refresh — or Back, later — does not reopen a
+// sheet you deliberately closed. The link brought you here once; it is not a
+// property of the room.
+if (sheet.dataset.autoNew === 'quote') {
+  document.querySelector<HTMLElement>('[data-new="quote"]')?.click();
+  const url = new URL(window.location.href);
+  url.searchParams.delete('new');
+  url.searchParams.delete('person');
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+}
