@@ -2,90 +2,68 @@
 /*
   PeopleZone — People, on Today (docs/plans/12-people.md §2a and §8).
 
-  ⚠ WHAT IS HERE, AND WHAT IS NOT, because the difference is a dependency and
-  not a decision. §2a's BRIEF — the four labelled lines you read before seeing
-  somebody tonight — hangs off a people-tagged EVENT, and there is no events
-  table: that is plan 13. §10 anticipates exactly this: "Until 13 lands, Piece 4
-  can key off birthdays and drift only, and gain the event brief later."
+  ⚠ THE BRIEF IS HERE NOW (13 · Piece 5, 2026-08-03), and it is what this zone
+  was waiting for. §2a's four labelled lines hang off a people-tagged EVENT, and
+  until 13 · Piece 4 there was no `events` table — so Piece 4 shipped birthdays
+  and drift only, and §10 anticipated exactly this: *"Until 13 lands, Piece 4 can
+  key off birthdays and drift only, and gain the event brief later."*
 
-  So this zone is two things today: birthdays inside their own lead window, and
-  drift capped at three. When 13 lands the brief joins at the top, above both.
+  ⚠ AND BIRTHDAYS HAVE LEFT. They lived here as a placeholder, with a comment
+  saying so: a "Coming up" zone whose only possible content was birthdays would
+  have misrepresented a zone that was about to mean something else. It means
+  something else now, and 13 §6 is explicit that Coming up is driven by each
+  item's own lead — `birthday_lead_days` included. See ComingUpZone.astro.
 
-  BIRTHDAYS LIVE HERE RATHER THAN IN A "Coming up" ZONE. §10c lists Coming up as
-  its own amber agenda zone driven by each item's lead — but it is the agenda's,
-  it holds events and tasks, and neither exists. A Coming up zone whose only
-  possible content is birthdays would misrepresent a zone that is about to mean
-  something else (10-hq.md §10b). The roster already renders birthdays as an
-  azure "Coming up" rail inside the People room, so this follows what shipped
-  rather than inventing a second home.
-
-  THE ORDER IS BIRTHDAYS FIRST. A birthday is a thing to DO in the next few
-  weeks; drift is a thing to notice. Reversing them would open the zone with the
-  observation and bury the action.
+  So this zone is two things, and the order is the argument: **the brief, then
+  drift.** The brief is a thing to READ before today happens; drift is a thing to
+  notice. Reversing them would open with the observation and bury the payoff —
+  and the payoff is what makes the logging habit survive (§2a).
 */
-import { Icon } from 'astro-icon/components';
 import BeenAWhile from './BeenAWhile.astro';
-import { dmd } from '../../lib/hq/dates';
-import { hueFor, monogram, type Person, type UpcomingBirthday } from '../../lib/hq/people';
+import Brief from './Brief.astro';
+import { Icon } from 'astro-icon/components';
+import type { Brief as BriefRow } from '../../lib/hq/brief';
 import { TODAY_DRIFT_CAP, type Drift } from '../../lib/hq/drift';
 import type { Ymd } from '../../lib/hq/time';
 
 interface Props {
-  birthdays: { person: Person; birthday: UpcomingBirthday }[];
+  briefs: BriefRow[];
   drifting: Drift[];
   today: Ymd;
   photos: Map<string, string>;
 }
-const { birthdays, drifting, today, photos } = Astro.props;
+const { briefs, drifting, today, photos } = Astro.props;
 
 // THE CAP IS THE POINT (§8): "the roster is where the full list lives; Today is
 // a nudge, not an inbox." Three is small enough that it can never become a wall
 // on a morning that started badly.
 const shown = drifting.slice(0, TODAY_DRIFT_CAP);
 const more = drifting.length - shown.length;
-const face = (p: Person) => (p.photo_path ? photos.get(p.photo_path) : null);
 ---
 
 {
-  (birthdays.length > 0 || shown.length > 0) && (
-    <section class="zone cn-azure" data-people-zone>
+  (briefs.length > 0 || shown.length > 0) && (
+    <section class="zone cn-azure o-3" data-people-zone>
       <div class="zone__head">
         <span class="zone__chip">
           <Icon name="ph:users-three" />
         </span>
         <h2 class="zone__title">People</h2>
+        <a class="zone__act" href="/admin/people" aria-label="Open People">
+          <Icon name="ph:arrow-right" />
+        </a>
       </div>
 
-      {birthdays.length > 0 && (
-        <div class="zone__body pb-1" data-birthdays>
-          {birthdays.map(({ person, birthday }) => (
-            <a href={`/admin/people/${person.slug}`} class="row">
-              <span class:list={['face face--sm', hueFor(person.id)]} aria-hidden="true">
-                {face(person) ? <img src={face(person)!} alt="" /> : monogram(person.display_name)}
-              </span>
-              {/* `.pc__name` / `.pc__epi` rather than a new pair of row
-                  primitives. 10-hq.md §10b treats a new zone primitive as a
-                  smell first: these are the same two facts about the same
-                  person, and reusing the classes is what guarantees a name
-                  looks identical in both rooms. */}
-              <span class="min-w-0 flex-1">
-                <span class="pc__name">{person.display_name}</span>
-                {person.epithet && <span class="pc__epi">{person.epithet}</span>}
-              </span>
-              {/* A future date, so the compact register (§10d) — and "today"
-                  in words on the day itself, because "8/3 Mon" on 3 August is
-                  the interface making you do arithmetic. */}
-              <span class="chip u-warn">
-                <Icon name="ph:cake" />
-                {birthday.days === 0 ? 'today' : dmd(birthday.ymd, today)}
-              </span>
-            </a>
+      {briefs.length > 0 && (
+        <div class="zone__body pb-1" data-briefs>
+          {briefs.map((brief) => (
+            <Brief brief={brief} today={today} photos={photos} />
           ))}
         </div>
       )}
 
       {shown.length > 0 && (
-        <div class="zone__body pt-0">
+        <div class:list={['zone__body', briefs.length > 0 && 'pt-0']}>
           <BeenAWhile drifting={shown} today={today} photos={photos} />
           {more > 0 && (
             /* Never a fourth row. A count and a door — the room holds the list,

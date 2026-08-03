@@ -22,7 +22,7 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 
 | Surface | Route | What it is |
 |---|---|---|
-| **Today** | `/admin` | The front door, and the daily one ([ADR 0015](adr/0015-admin-root-becomes-today.md)). The date bar *is* the control — `‹ ›` step a day, the date opens a month calendar, `↩ Today` returns, and the route is `/admin?date=YYYY-MM-DD`. Below it, one bordered zone per domain: **Morning** (the check-in, §11) and **People** (birthdays inside their lead, then drift capped at three, §12). People renders **only on today** — drift is a statement about *now*, and its dismissals write an entry dated today. Today is the private half's landing page; the corpus rooms are one click away in the sidebar. |
+| **Today** | `/admin` | The front door, and the daily one ([ADR 0015](adr/0015-admin-root-becomes-today.md)). The date bar *is* the control — `‹ ›` step a day, the date opens a month calendar, `↩ Today` returns, and the route is `/admin?date=YYYY-MM-DD`. Below it, one bordered zone per domain: **Morning** (§11), **Today** (the day's events and tasks), **People** (the brief, then drift), **Coming up** (lead-driven), **Practice** (signals) and **Past due**, full width at the foot. **Only the check-in follows the date bar** — every other zone is a statement about *now*. See §16. |
 | **People** | `/admin/people` | The roster (§12), grouped by circle with a coming-up rail above it. Search appears only past six people and filters in place. Archived people sit in a section of their own, out of the roster and out of search. |
 | **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, the **timeline** in the main column with its log box open at the head, **About** and **Shared** in the rail, and a pencil on the block it edits. On a phone the order inverts: About first, because you open a profile there to remember who somebody is, not to scroll a year of entries. |
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
@@ -480,11 +480,17 @@ It shows in exactly three places, and never as arrears:
 
 **⚠ What deliberately does *not* reset the clock: editing the person's record.** If fixing a typo silenced a one-year notice, the feature would be defeated by the most trivial possible action — and silently, so you would never know it had happened.
 
-**⚠ And one guard is not enforceable yet.** *Anyone with an event today is never drifting* needs an events table, which does not exist. So on the morning you are seeing somebody for the first time in a year, they are still listed until you log it. It closes with the agenda, as one more clause in the same derivation.
+**⚠ Both guards are live.** *Drift requires at least one logged interaction* has always been enforced; *anyone with an event today is never drifting* needed an events table and closed with §15's calendar, as one more clause in the same derivation.
 
-### What is still not rendered
+### The brief — logging pays out at the moment of use
 
-**The brief** — §2a's four labelled lines you read before seeing somebody tonight — hangs off a people-tagged **event**, and there is no events table. It joins Today's People zone when the agenda lands. Until then that zone is birthdays and drift, which is a correct, quiet page rather than a placeholder for one.
+*Live since the agenda landed; see §16.* When somebody you have tagged on an event is on today's calendar, Today's People zone leads with **what you last knew about them** — their last contact as a duration, the last log entry **in your own words, verbatim**, the newest thing on their shelf, and their birthday.
+
+**Four lines, four sources, labelled as such.** They are four different queries about four different things, and an early prototype ran them together as one bullet list — which read as a system-written summary of the friendship, the single worst thing this surface could be. The labels are what stop the page implying it understands anything.
+
+**What is absent stays absent.** A person with no logged entry gets no *Last contact* line and no *Then* line rather than "never" — the same guard drift keeps. A brief with nothing to say is reduced to a name, a time, and **Log an entry**, which is the one thing you can do about it.
+
+**It caps at three**, and the cap is applied before the history is fetched: a dinner party of nine must not cost nine people's history to render three briefs. The drift guard is deliberately *not* computed from the capped list — a guest the cap dropped is still someone you are seeing today.
 
 ---
 
@@ -571,3 +577,58 @@ Clicking any item opens the day, and **the affordance is the whole explanation**
 **Who was there is the point.** An event's people are what make the People zone's brief possible, and tagging is additive by construction — it never has to live inside Google's copy, so it cannot create a conflict.
 
 It also closes something: *anyone with an event today is never drifting*. That guard was named in [§12](#12-people--the-roster) and unenforceable for a day and a half, because it needs an events table. The interaction will not be logged until the evening at the earliest, so without it the "Been a while" panel spends the whole of the one day it is wrong telling you that you have neglected somebody you are about to have dinner with.
+
+---
+
+## 16. Today, assembled
+
+*The landing surface, and the reason all of this is in one app: the correlation thesis needs sleep, agenda, people and practice on **one page**, or it is four apps again. Schema is elsewhere — this section owns no table. It is entirely a set of reading rules over what §11–§15 already store.*
+
+**Six zones, and their order is an argument:**
+
+| | Zone | What it holds |
+|---|---|---|
+| 1 | **Morning** | The check-in (§11). Pinned first, answered or not. |
+| 2 | **Today** | The day's events and tasks in **one** time-ordered list — a day does not come in sections. Plus a birthday falling today, which is a fact about the whole day and therefore leads it. |
+| 3 | **People** | The brief (§12), then drift capped at three. |
+| 4 | **Coming up** | Everything approaching, each on **its own lead**. |
+| 5 | **Practice** | Signals. The one zone you cannot act on. |
+| 6 | **Past due** | Full width, below both columns, **always open**. |
+
+On a phone the two columns collapse to one stack and **People moves above Coming up** — who you are seeing today matters more than what is three weeks out. That reordering is CSS `order` over a `display: contents` wrapper, so the DOM order and the visual order deliberately disagree below 46rem.
+
+### Only the check-in follows the date bar
+
+The bar exists to **backfill a check-in**. Everything else on the page is a statement about *now*: "Past due", "Been a while" and "Last published" are all false on a Tuesday last March, and offering their dismissals there would write a row dated today from a page that is not about today. So on any other date the page is the date bar and the check-in — which is exactly what it was before the agenda landed, and is still the honest answer.
+
+### Nothing counts what you owe
+
+The single rule the whole page is built to keep ([ADR 0013](adr/0013-absence-never-accumulates.md)). There is no total, no badge, no streak, and no percentage anywhere on it.
+
+- **`1 of 2 done`** counts what you *did*, resets nightly, and **says nothing until you have done one**. `0 of 3 done` at 7am is arithmetic about what you have not done yet — the arrears count wearing a different hat. The alternative that lost was showing `0 of 3` for symmetry, so the line would not "pop in"; a line you earn is a better reward than a line that starts at zero and watches you.
+- **Past due can only ever hold as many rows as there are tasks**, never one per missed occurrence, because those occurrences were never rows.
+- **A skip is not progress.** It moves a row out of the unanswered state without moving the number.
+
+### Coming up is driven entirely by each item's lead
+
+A `project` announces itself 21 days out; a `quick` task the day before; a birthday at whatever its `birthday_lead_days` says. **There is no "next 7 days" setting anywhere in this feature, and its absence is the point** — the list is short because the leads are honest, so when it gets long the fix is the effort on a task rather than a dial on a page. Which is also why it is uncapped, unlike past due: a cap would be the window arriving again under another name.
+
+**Birthdays live here rather than in People.** They sat in the People zone while there was no Coming up to put them in, with a comment saying so. A birthday needs runway for exactly the reason a task does. The cost is real and was weighed: a person's name now sits in an amber agenda zone rather than the azure people one, so the domain hue no longer says what it is — the cake carries that instead.
+
+### Past due is open, and it is last
+
+Two plans disagreed about this and the interface spec won. The sketch had it collapsed to one line — *"3 things past due →"* — and the argument against is that **hiding arrears at the bottom means never resolving them**, and a click in front of a one-tap disposition defeats the point of the one-tap disposition. Being last already does the work the collapse was doing: **you meet it after today, not before it.**
+
+The one guard kept is a **cap on the list, not a hidden section** — eight rows and then a door to the room that holds them all, so a bad fortnight cannot become a wall while nothing is ever concealed.
+
+### Practice: a signal has no verb
+
+Michael asked for the writing nudge in these words: *"Hey, you haven't actually posted anything, any piece of writing, this week."* It is built as a **quiet line and never an overdue item**, because a self-imposed writing commitment turned into a red row is precisely the guilt engine HQ exists to prevent. Nothing in this zone can be pressed, and **cold reads quieter rather than redder** — the moment one of these turns amber it is a debt.
+
+**Writing only**, and that is a fact about the data as much as about the ask: `published_at` is stamped on every published essay, but on 1 quote in 73, and every song's stamp is the day the catalogue was imported. A "last published" line over all three types would report an import as an act of writing.
+
+Beside it sit the active goals' observations (§14), which keep their own cold-start guard: **a goal with nothing to observe says nothing at all.**
+
+### Today reads; the rooms write
+
+A row's title is plain text here, where in the tasks room it opens the sheet. An event's title is a link to the day panel. **No `TaskSheet`, no `EventSheet`, no TipTap** — this is the page opened on a phone at 7am, and the editors stay in the rooms that need them. The only writes on the page are the tick and drift's two dismissals, and both reuse their room's script verbatim.

@@ -1,0 +1,72 @@
+---
+/*
+  PracticeZone — the signals (docs/plans/13-agenda.md §6; 10-hq.md §10c item 6).
+
+  ⚠ SIGNALS, NOT TASKS, and the distinction is the whole reason this zone is
+  separate from the agenda. Michael asked for the writing nudge in these words:
+  *"Hey, you haven't actually posted anything, any piece of writing, this week."*
+  §6 answers it with a rule: build it as a quiet line, **never a red overdue
+  item**. A self-imposed writing commitment turned into an overdue to-do is
+  precisely the guilt engine 10-hq.md §3 exists to prevent.
+
+  So nothing in here is tickable, nothing in here is countable, and nothing in
+  here has a verb. It is the one zone you cannot act on — you read it, and it
+  goes quieter rather than louder as it recedes.
+
+  ⚠ THE COLD READING IS QUIETER, NEVER REDDER. Past eight weeks the line steps
+  back — the same treatment a cold goal observation gets, at the same boundary at
+  which `observationFor` stops counting in weeks. Verified against the real data
+  before building: the first thing this will say is *3 years ago*, which is true,
+  and is the sentence that was asked for.
+
+  A GOAL WITH NOTHING TO OBSERVE SAYS NOTHING AT ALL. `observationFor` returns
+  null on a goal created this morning rather than greeting it with "nothing in 6
+  weeks" — the cold-start bug, which is drift's shape arriving from the other
+  direction. The same guard governs the writing line: never published, nothing
+  said.
+*/
+import { Icon } from 'astro-icon/components';
+import type { Observation } from '../../lib/hq/goals';
+import type { Signal } from '../../lib/hq/today';
+
+interface Props {
+  published: Signal | null;
+  goals: { id: string; name: string; slug: string; observation: Observation }[];
+}
+const { published, goals } = Astro.props;
+---
+
+{
+  (published || goals.length > 0) && (
+    <section class="zone cn-rose o-5" data-practice>
+      <div class="zone__head">
+        <span class="zone__chip">
+          <Icon name="ph:pen-nib" />
+        </span>
+        <h2 class="zone__title">Practice</h2>
+      </div>
+
+      <div class="zone__body">
+        {published && (
+          <div class:list={['sig', published.cold && 'sig--cold']} data-signal="published">
+            <span class="sig__k">Last published</span>
+            <span class="sig__v">{published.text}</span>
+          </div>
+        )}
+        {goals.map((g) => (
+          <a
+            class:list={['sig', g.observation.cold && 'sig--cold']}
+            href={`/admin/agenda/goals/${g.slug}`}
+            data-signal="goal"
+          >
+            <span class="sig__k">
+              <Icon name="ph:target" class="row__i" />
+              {g.name}
+            </span>
+            <span class="sig__v">{g.observation.text}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )
+}

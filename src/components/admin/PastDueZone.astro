@@ -1,0 +1,110 @@
+---
+/*
+  PastDueZone — arrears, met AFTER the day rather than before it
+  (10-hq.md §10f).
+
+  ⚠ TWO PLANS DISAGREED ABOUT THIS ONE, AND §10f WON (settled 2026-08-03).
+  13-agenda.md §6 sketched it as "collapsed to one line — 3 things past due →".
+  §10f argues the opposite and argues it explicitly: *"it is NOT an accordion —
+  hiding arrears at the bottom means never resolving them, and a click in front
+  of a one-tap disposition defeats the point."* Being last already does the work
+  the collapse was doing: **you meet it after today, not before it.**
+
+  ⚠ THE ONE GUARD KEPT IS A CAP ON THE LIST, NOT A HIDDEN SECTION. Eight rows,
+  then a door to the room that holds them all — so a bad fortnight cannot become
+  a wall on a morning that started badly, while nothing is ever concealed.
+
+  ⚠ AND IT COUNTS NOTHING. No total, no badge. The number of rows here can only
+  ever be the number of TASKS, never one per missed occurrence, because those
+  occurrences were never rows (ADR-0013). "6 overdue" would be a verdict about a
+  person; a list is a fact about a list.
+
+  BOTH ANSWERS, ON THE ROW. There are two honest things to say to something that
+  has gone past its date, and a circle beside a "Did it" chip is two paths to one
+  outcome while saying nothing about the other one.
+
+  FULL WIDTH, BELOW BOTH COLUMNS. It is not the rail's and it is not the main
+  column's — it is the thing you meet at the end of the page.
+*/
+import { Icon } from 'astro-icon/components';
+import { lateBy } from '../../lib/hq/tasks';
+import { PAST_DUE_CAP } from '../../lib/hq/today';
+import type { Ymd } from '../../lib/hq/time';
+
+export interface PastDueRow {
+  id: string;
+  title: string;
+  dueOn: Ymd;
+  priority: string;
+  answeredAs: 'done' | 'skipped' | null;
+}
+
+interface Props {
+  rows: PastDueRow[];
+  today: Ymd;
+}
+const { rows, today } = Astro.props;
+const shown = rows.slice(0, PAST_DUE_CAP);
+const more = rows.length - shown.length;
+---
+
+{
+  rows.length > 0 && (
+    <section class="zone cn-amber mt-5" data-past-due>
+      <div class="zone__head">
+        {/* The one warm chip on the page. Semantic, not a domain hue — red means
+            pressing here and nowhere means "belongs to the agenda" (§10a). */}
+        <span class="zone__chip zone__chip--warn">
+          <Icon name="ph:warning" />
+        </span>
+        <h2 class="zone__title">Past due</h2>
+        <a class="zone__act" href="/admin/agenda/tasks" aria-label="Open tasks">
+          <Icon name="ph:arrow-right" />
+        </a>
+      </div>
+
+      <div class="zone__body" data-task-list>
+        {shown.map((t) => (
+          <div
+            class:list={[
+              'row',
+              `task--${t.priority}`,
+              t.answeredAs === 'done' && 'task--done',
+              t.answeredAs === 'skipped' && 'task--skipped',
+            ]}
+            data-id={t.id}
+            data-task
+          >
+            <span class="min-w-0 flex-1">
+              <span class="row__t">{t.title}</span>
+              <span class="row__sub">
+                <span class="task__late">{lateBy(t.dueOn, today)}</span>
+                <span class="task__skip">skipped</span>
+              </span>
+            </span>
+
+            <span class="flex shrink-0 gap-1" data-unanswered hidden={!!t.answeredAs}>
+              <button type="button" class="chip chip--act chip--did" data-dispose="done">
+                <Icon name="ph:check" /> Did it
+              </button>
+              <button type="button" class="chip chip--act chip--skip" data-dispose="skipped">
+                <Icon name="ph:skip-forward" /> Skipping it
+              </button>
+            </span>
+            {/* Answered, the two chips become the way back — one control,
+                because there is now one question. */}
+            <span class="flex shrink-0" data-answered hidden={!t.answeredAs}>
+              <button type="button" class="chip chip--act" data-undo>Undo</button>
+            </span>
+          </div>
+        ))}
+
+        {more > 0 && (
+          <p class="admin-hint mt-2 text-xs">
+            <a href="/admin/agenda/tasks" class="hover:underline">{more} more in Tasks →</a>
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}

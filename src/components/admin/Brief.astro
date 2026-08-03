@@ -1,0 +1,107 @@
+---
+/*
+  Brief — what you last knew, at the moment you need it
+  (docs/plans/12-people.md §2a).
+
+  ⚠ THE LINES ARE LABELLED BY SOURCE, AND THAT IS THE WHOLE DESIGN. The people
+  lab's round-2 prototype rendered these four facts as one tidy bullet list, and
+  it read as a system-written summary of the friendship — the single worst thing
+  this surface could be. They are four different queries about four different
+  things, and saying so in four small labels is what stops the page implying it
+  understands anything about the person.
+
+  ⚠ "THEN" IS YOUR OWN WORDS, VERBATIM. Nothing generates or condenses it; it is
+  the last log entry as it was typed. It is set in the serif the corpus uses,
+  because it is prose you wrote — not a field the system filled in. Clamped by
+  CSS so the full text stays in the DOM and stays findable.
+
+  WHAT IS ABSENT IS ABSENT. A person with no logged entry gets no *Last contact*
+  line and no *Then* line rather than "never" — the same guard drift keeps: a
+  person with no entries is NEW, not neglected. A brief with nothing to say is
+  reduced to a name, a time and the one thing you can do about it, which is
+  10-hq.md §10i's first preference: let the affordance say it.
+
+  IT LINKS RATHER THAN EDITS. The log box lives on the profile and is a real
+  editor with its own popovers and script; putting a second copy on the front
+  door would ship that weight to every morning to be used on a few of them.
+*/
+import { Icon } from 'astro-icon/components';
+import { birthdayLine, type Brief } from '../../lib/hq/brief';
+import { clockTime, fullDate } from '../../lib/hq/dates';
+import { since } from '../../lib/hq/interactions';
+import { hueFor, monogram } from '../../lib/hq/people';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  brief: Brief;
+  today: Ymd;
+  photos: Map<string, string>;
+}
+const { brief, today, photos } = Astro.props;
+const { person, event } = brief;
+const photo = person.photo_path ? photos.get(person.photo_path) : null;
+const birthday = birthdayLine(person);
+---
+
+<div class="brf" data-brief={person.id}>
+  <div class="brf__head">
+    <a href={`/admin/people/${person.slug}`} class="flex min-w-0 items-center gap-2">
+      <span class:list={['face face--sm', hueFor(person.id)]} aria-hidden="true">
+        {photo ? <img src={photo} alt="" /> : monogram(person.display_name)}
+      </span>
+      <span class="pc__name truncate">{person.display_name}</span>
+    </a>
+    {/* The event that put them here. §2a's sketch wrote "Tonight, 7:00 PM" —
+        the word went, because the clock already says which end of the day it is
+        and a derived time-of-day word is one more thing that can be wrong at
+        4:30. */}
+    <span class="brf__when">
+      {event.title}
+      {event.at ? <span class="brf__at">{clockTime(event.at)}</span> : <span class="brf__at">all day</span>}
+    </span>
+  </div>
+
+  <dl class="brf__lines">
+    {
+      brief.lastOn && (
+        <>
+          <dt>Last contact</dt>
+          <dd>
+            <span class="stamp" title={fullDate(brief.lastOn)}>{since(brief.lastOn, today)}</span>
+          </dd>
+        </>
+      )
+    }
+    {
+      brief.then && (
+        <>
+          <dt>Then</dt>
+          <dd class="brf__then">{brief.then}</dd>
+        </>
+      )
+    }
+    {
+      brief.shelf && (
+        <>
+          <dt>Shared</dt>
+          <dd class="truncate">{brief.shelf}</dd>
+        </>
+      )
+    }
+    {
+      birthday && (
+        <>
+          <dt>Birthday</dt>
+          <dd>{birthday}</dd>
+        </>
+      )
+    }
+  </dl>
+
+  {/* §2b retired the morning-after prompt and admitted it removed one of the
+      two defences against the log going empty. This is the other one: logging
+      is one click from where you already are. */}
+  <a class="brf__log" href={`/admin/people/${person.slug}#log`}>
+    <Icon name="ph:note-pencil" /> Log an entry
+  </a>
+</div>

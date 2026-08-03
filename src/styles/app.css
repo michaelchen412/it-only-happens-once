@@ -1718,6 +1718,38 @@ html.reader-open .sky-return {
   opacity: 0.75;
 }
 .row__time--wide { width: 5rem; }
+/* A row's own title and its second line. Siblings of `.row__time`, added by
+   Today's stack (13 · Piece 5) — the FOURTH surface to want them, which is the
+   test §10b sets before a new primitive is allowed to exist. */
+.row__t {
+  display: block;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+a.row__t:hover { color: var(--cn); }
+.row__i {
+  display: inline-block;
+  margin-right: 0.3125rem;
+  vertical-align: -0.125em;
+  opacity: 0.6;
+}
+.row__sub {
+  display: block;
+  margin-top: 0.125rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+/* The same 44px box a tick occupies, with nothing in it. Not for alignment —
+   alignment is a side effect. An event is not tickable, and the missing circle
+   has to be visible AS missing, which is the entire explanation (§10i). */
+.tick--none {
+  display: block;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: -0.625rem 0 -0.625rem -0.75rem;
+}
 
 /* ── chips: the URGENCY axis (semantic only, never a domain hue) ────────── */
 .chip {
@@ -3287,9 +3319,11 @@ html.reader-open .sky-return {
 /* PRIORITY IS PROMINENCE, AND PROMINENCE IS NOT COLOUR (§3). Weight and ink
    only: a red high-priority task beside a red overdue one makes both
    meaningless. */
-.task--high .task__t { font-weight: 700; }
+.task--high .task__t,
+.task--high .row__t { font-weight: 700; }
 .task--high .tick { color: color-mix(in oklch, var(--color-base-content) 75%, transparent); }
-.task--low .task__t { color: color-mix(in oklch, var(--color-base-content) 62%, transparent); }
+.task--low .task__t,
+.task--low .row__t { color: color-mix(in oklch, var(--color-base-content) 62%, transparent); }
 
 /* One click, and it stays (§10f). A task that vanishes gives no sense of
    progress and no way back from a mis-tap, so it sits there struck through
@@ -3313,13 +3347,22 @@ html.reader-open .sky-return {
 .task--done .tick { color: var(--color-success, var(--color-info)); }
 .task--done .tick__o { display: none; }
 .task--done .tick__x { display: block; }
-.task--done .task__t {
+/* ⚠ `.task--done` IS A STATE, NOT A ROW SHAPE, which is why it also governs
+   `.row__t`. Today's stack (13 · Piece 5) lays its rows out with the `.row`
+   family and carries this same state class, so that one tick and one undo have
+   one meaning in both rooms — and so `task-list.ts` can drive both without
+   knowing which page it is on. A second class name for one state is the
+   two-sources-of-truth mistake data-model.md §7 forbids in data, arriving in
+   CSS. */
+.task--done .task__t,
+.task--done .row__t {
   text-decoration: line-through;
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
 }
 /* A SKIP IS NOT A TICK. Struck through would read as "did it", and the whole
    argument for recording skips is that the two are different answers. */
-.task--skipped .task__t { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
+.task--skipped .task__t,
+.task--skipped .row__t { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
 .task--skipped .tick { color: color-mix(in oklch, var(--color-base-content) 30%, transparent); }
 
 /* Disposition carries ICONS, not bare words: two same-shaped text chips side by
@@ -3866,3 +3909,121 @@ html.reader-open .sky-return {
 .chip--act:disabled {
   cursor: default;
 }
+
+/* ── Today's brief (12-people.md §2a) ──────────────────────────────────────
+   ⚠ NOT CARD-SHAPED, for the same reason `.bw` is not: it is an observation
+   ABOUT a person rather than a second copy of their card, and the moment it
+   looks like one the People room has two rosters in it. A left rule and a set
+   of labelled lines, so the eye reads it as a note.
+
+   ⚠ THE LABELS ARE THE DESIGN. Four facts from four queries, and the people
+   lab's round-2 prototype ran them together as one bullet list — which read as
+   a system-written summary of the friendship. A `<dl>` is what they actually
+   are, and the term/description pairing is what stops the page implying it
+   understands anything. */
+.brf {
+  border-left: 3px solid color-mix(in oklch, var(--cn) 40%, transparent);
+  padding: 0.125rem 0 0.375rem 0.75rem;
+}
+.brf + .brf { margin-top: 0.75rem; }
+.brf__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.brf__when {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+}
+.brf__at {
+  color: var(--cn);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.brf__lines {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.125rem 0.625rem;
+  margin-top: 0.375rem;
+}
+.brf__lines dt {
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 0.1875rem;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+  white-space: nowrap;
+}
+.brf__lines dd {
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+/* YOUR OWN WORDS, VERBATIM — set in the corpus serif because it is prose you
+   wrote, not a field the system filled in. Clamped rather than truncated on the
+   server, so the whole entry stays in the DOM and stays findable. */
+.brf__then {
+  font-family: var(--font-serif);
+  font-size: 0.875rem;
+  color: color-mix(in oklch, var(--color-base-content) 82%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.brf__then::before { content: '“'; }
+.brf__then::after { content: '”'; }
+/* §2b retired the morning-after prompt and admitted it removed one of the two
+   defences against the log going empty. This is the other one, and it is why it
+   sits on the row rather than one navigation away. */
+.brf__log {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--cn) 80%, var(--color-base-content));
+}
+.brf__log:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Practice: signals (13-agenda.md §6) ───────────────────────────────────
+   ⚠ A SIGNAL HAS NO VERB. Nothing in this zone can be pressed to make it go
+   away, because the whole argument of §6 is that the writing nudge must be a
+   quiet line and never an overdue item. A goal's line links to the goal — that
+   is navigation, not disposition.
+
+   ⚠ AND COLD READS QUIETER, NEVER REDDER. The moment one of these turns amber
+   it becomes a debt, which is the guilt engine 10-hq.md §3 exists to prevent. */
+.sig {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.375rem 0;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+}
+.sig + .sig { border-top: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent); }
+.sig__k {
+  min-width: 0;
+  flex: 1;
+  color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sig__v {
+  flex-shrink: 0;
+  color: color-mix(in oklch, var(--color-base-content) 88%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+a.sig:hover .sig__k { color: var(--color-base-content); }
+.sig--cold .sig__v { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }

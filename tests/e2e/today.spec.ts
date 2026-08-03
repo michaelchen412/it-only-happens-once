@@ -269,19 +269,25 @@ test.describe("the date bar is the page's control", () => {
 });
 
 test.describe('what Today does not claim', () => {
-  // ⚠ NARROWED BY 12 · PIECE 4. This used to name People among the unbuilt
-  // domains, which was true until People had a source. The rule it guards is
-  // unchanged and is the reason it was worth keeping rather than deleting: a
-  // domain that does not exist yet renders NOTHING — never a "no data" box —
-  // because on day one a grid of empty cards reads as a broken app *and* as a
-  // list of things you have already failed to do (10-hq.md §10b).
-  test('unbuilt domains render one sentence, never a row of empty boxes', async ({ page }) => {
+  // ⚠ RETIRED BY 13 · PIECE 5, and deliberately not deleted. This used to
+  // assert that Today / Coming up / Practice / Past due were ABSENT and that
+  // one sentence stood in their place — true from 2026-08-02 until the agenda
+  // existed, and false the moment it did. The rule underneath is unchanged and
+  // is now enforced from the other side, in `today-stack.spec.ts`: a domain
+  // with nothing to say renders nothing, and a domain WITH something renders
+  // rows — never an empty box either way (10-hq.md §10b).
+  //
+  // What survives here is the half that outlived the sentence: the page must
+  // never carry a "no data" skeleton, whatever is or is not built.
+  test('a zone is present with rows, or absent — never an empty skeleton', async ({ page }) => {
     await page.goto('/admin');
+    await expect(page.getByText(/isn’t built yet/)).toHaveCount(0);
 
-    for (const zone of ['Today', 'Coming up', 'Practice', 'Past due']) {
-      await expect(page.getByRole('heading', { name: zone, exact: true })).toHaveCount(0);
+    for (const attr of ['[data-agenda-zone]', '[data-coming-up]', '[data-practice]', '[data-past-due]', '[data-people-zone]']) {
+      const zone = page.locator(attr);
+      if ((await zone.count()) === 0) continue;
+      expect(await zone.locator('.row, .sig, .brf, .bw__row').count(), `${attr} is an empty box`).toBeGreaterThan(0);
     }
-    await expect(page.getByText(/isn’t built yet/)).toBeVisible();
   });
 
   test('People renders only when it has something to say, and quietly when it does', async ({ page }) => {
@@ -289,8 +295,8 @@ test.describe('what Today does not claim', () => {
     const zone = page.locator('[data-people-zone]');
 
     // The same rule from the other side: People has a source now, so it is
-    // allowed on the page — but a birthday-less, drift-less morning still gets
-    // no zone at all rather than an empty one.
+    // allowed on the page — but a brief-less, drift-less morning still gets no
+    // zone at all rather than an empty one.
     if ((await zone.count()) === 0) {
       await expect(page.getByRole('heading', { name: 'People', exact: true })).toHaveCount(0);
     } else {

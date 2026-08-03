@@ -16,9 +16,14 @@
 // surface designed for a sweep down the page.
 import { actions } from 'astro:actions';
 
-const list = document.querySelector<HTMLElement>('[data-task-list]');
+// ⚠ EVERY LIST, NOT THE FIRST ONE. The tasks room has exactly one and this was a
+// `querySelector` for a day; Today has three — the day itself, Coming up and
+// past due — and binding only the first would have left two zones of dead
+// controls that look identical to live ones. Found by counting the lists on the
+// page rather than by pressing one.
+const lists = Array.from(document.querySelectorAll<HTMLElement>('[data-task-list]'));
 
-if (list) {
+for (const list of lists) {
   const errorEl = document.querySelector<HTMLElement>('[data-task-error]');
 
   const show = (msg: string | null) => {
@@ -30,6 +35,27 @@ if (list) {
   /** Every control on the row, so an in-flight answer cannot be double-sent. */
   const controls = (row: HTMLElement) =>
     Array.from(row.querySelectorAll<HTMLButtonElement>('.tick, .chip--act'));
+
+  /**
+   * `1 of 2 done`, kept true after a tick.
+   *
+   * ⚠ IT COUNTS WHAT YOU DID AND NOTHING ELSE. Zero renders as no line at all
+   * rather than as `0 of 3 done` — the same rule `progressLabel` keeps on the
+   * server, restated here because a client that disagreed with it would put the
+   * arrears count back on the page the moment you undid something.
+   *
+   * A SKIP IS NOT PROGRESS. It is a recorded answer, not a completion, so it
+   * moves the row out of the unanswered state without moving this number.
+   */
+  const repaint = () => {
+    const el = list.querySelector<HTMLElement>('[data-progress]')
+      ?? list.closest('.zone')?.querySelector<HTMLElement>('[data-progress]');
+    const total = Number(list.dataset.progressTotal ?? 0);
+    if (!el || !total) return;
+    const done = list.querySelectorAll('.task--done').length;
+    el.textContent = done > 0 ? `${done} of ${total} done` : '';
+    el.hidden = done === 0;
+  };
 
   list.addEventListener('click', async (e) => {
     const btn = (e.target as Element).closest<HTMLButtonElement>('[data-dispose], [data-undo]');
@@ -65,6 +91,7 @@ if (list) {
       // answered they become the way back — one control, not two.
       row.querySelectorAll<HTMLElement>('[data-answered]').forEach((el) => (el.hidden = !undoing));
       row.querySelectorAll<HTMLElement>('[data-unanswered]').forEach((el) => (el.hidden = undoing));
+      repaint();
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }`. Without this the row would sit there with dead controls

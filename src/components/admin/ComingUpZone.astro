@@ -1,0 +1,85 @@
+---
+/*
+  ComingUpZone — what is approaching, on its own terms
+  (docs/plans/13-agenda.md §6; 10-hq.md §10c).
+
+  ⚠ DRIVEN ENTIRELY BY EACH ITEM'S OWN LEAD, and "entirely" is the plan's own
+  emphasis. A `project` announces itself 21 days out; a `quick` task the day
+  before; a birthday at whatever `birthday_lead_days` says. There is no "next 7
+  days" setting anywhere in this feature, and its absence is the point: **the
+  list is short because the leads are honest.** When it gets long the fix is the
+  effort on a task, not a dial on a page.
+
+  Which is also why it is UNCAPPED, unlike past due. A cap would be the window
+  arriving again under another name.
+
+  ⚠ BIRTHDAYS LIVE HERE NOW, not in People (settled 2026-08-03). 12 · Piece 4 put
+  them in the People zone and said so in a comment — because a "Coming up" zone
+  whose only possible content was birthdays would have misrepresented a zone that
+  was about to mean something else. It means something else now. A birthday needs
+  runway for exactly the reason a task does: you have to find time to do
+  something about it.
+
+  The cost is real and was weighed: a person's name now sits in an amber agenda
+  zone rather than the azure people one, so the domain hue no longer says what it
+  is. The cake carries that instead — one glyph, in place, rather than a second
+  zone repeating a name that is already on the page (§10i).
+
+  A BIRTHDAY *TODAY* IS NOT HERE — it is on the day itself, with the day's other
+  things. Coming up means not yet.
+
+  `o-4`: on a phone People comes before this, because who you are seeing today
+  matters more than what is approaching (§10b).
+*/
+import { Icon } from 'astro-icon/components';
+import type { CalendarItem } from '../../lib/hq/calendar';
+import { clockTime, dmd, fullDate } from '../../lib/hq/dates';
+import { byDayThenTime } from '../../lib/hq/today';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  items: CalendarItem[];
+  today: Ymd;
+}
+const { items, today } = Astro.props;
+const rows = [...items].sort(byDayThenTime);
+---
+
+{
+  rows.length > 0 && (
+    <section class="zone cn-amber o-4" data-coming-up>
+      <div class="zone__head">
+        <span class="zone__chip">
+          <Icon name="ph:clock-light" />
+        </span>
+        <h2 class="zone__title">Coming up</h2>
+        <a class="zone__act" href="/admin/agenda/tasks" aria-label="Open tasks">
+          <Icon name="ph:arrow-right" />
+        </a>
+      </div>
+
+      <div class="zone__body">
+        {rows.map((it) => (
+          <div class="row" data-id={it.id} data-kind={it.kind}>
+            {/* No tick. Nothing here is due yet, and offering to complete
+                something ahead of its lead is how a lead becomes a deadline. */}
+            <span class="row__time row__time--wide" title={fullDate(it.on)}>
+              {dmd(it.on, today)}
+            </span>
+            <span class="min-w-0 flex-1">
+              {it.href ? (
+                <a class="row__t row-open" href={it.href}>
+                  {it.kind === 'birthday' && <Icon name="ph:cake" class="row__i" />}
+                  {it.title}
+                </a>
+              ) : (
+                <span class="row__t">{it.title}</span>
+              )}
+              {it.at && <span class="row__sub">{clockTime(it.at)}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}

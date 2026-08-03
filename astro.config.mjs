@@ -32,6 +32,10 @@ export default defineConfig({
           'sun-horizon', 'star', 'star-fill', 'warning', 'calendar-blank', 'users-three', 'pen-nib', 'cake', 'check-circle', 'circle', 'chat-circle', 'phone', 'lock-simple', 'target',
           // The agenda (13): a recurrence rule, disposition, and the effort meter.
           'arrows-clockwise', 'dots-three', 'check', 'skip-forward',
+          // Today's brief (13 · Piece 5): "Log an entry". Its own glyph rather
+          // than `note` — which already means the `note` interaction KIND on a
+          // timeline row — or `pencil-simple`, which already means Edit.
+          'note-pencil',
           // People (12 · Piece 2): the interaction kinds. `gift` is its own mark
           // rather than reusing `cake` — a cake already means a birthday on the
           // roster, and one glyph meaning two things is how a timeline stops

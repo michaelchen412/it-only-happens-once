@@ -1,37 +1,38 @@
 ---
 /*
-  /admin — TODAY. The Observatory's front door (ADR-0015, docs/admin.md §2).
+  /admin — TODAY, ASSEMBLED (ADR-0015, docs/admin.md §2, 13-agenda.md §6,
+  10-hq.md §10c). The Observatory's front door and the reason all of this is in
+  one app: the correlation thesis needs the sleep, the agenda, the people and the
+  practice on ONE page or it is four apps again.
 
   The Fragment Manager lived here until 2026-08-02 and now lives at
   `/admin/fragments`. This is the daily surface: the one page opened every
   morning, which is why it took the root from a surface used weekly.
 
-  WHAT IS AND IS NOT HERE YET. Today is a hub with four contributors — the
-  morning check-in, the agenda, people, and writing signals. The check-in and
-  People are live; the agenda and writing signals are not, so the page renders
-  the date bar, those two zones, and one plain sentence naming what is missing.
-  It does NOT render an empty slot per unbuilt feature: on day one a row of "no
-  data" boxes reads as a broken app *and* as a list of things you have already
-  failed to do (docs/admin.md §1, "a domain with nothing to say renders quiet").
+  ⚠ ONLY THE CHECK-IN FOLLOWS THE DATE BAR, and that is the rule this page is
+  built on. The bar exists to BACKFILL A CHECK-IN — every other zone is a
+  statement about *now*. "Past due", "Been a while" and "Last published" are all
+  false on a Tuesday last March, and offering their dismissals there would write
+  a row dated today from a page that is not about today. So on any other date the
+  page is the date bar and the check-in, which is exactly what it was before this
+  piece and is still the honest answer.
 
-  ⚠ THE PEOPLE ZONE IS NOT THE BRIEF. §2a's four labelled lines hang off a
-  people-tagged EVENT and there is no events table — that is plan 13. What is
-  here is what has a source today: birthdays inside their own lead, and drift
-  capped at three. See PeopleZone.astro.
+  ⚠ NOTHING ON THIS PAGE COUNTS WHAT YOU OWE. No total, no badge, no streak.
+  `1 of 2 done` counts what you DID and says nothing until you have done one;
+  Coming up is bounded by honest leads rather than by a window; past due is
+  capped at eight rows with a door. That is 10-hq.md §3 — *absence never
+  accumulates* — spent on every zone rather than argued once.
 
-  ⚠ AND IT ONLY RENDERS ON TODAY. Drift is a statement about NOW, the same way
-  Past due is (10-hq.md §10f): rendering "been a while" while you are looking at
-  a day last March would be the page asserting something untrue, and offering
-  its dismissals there would write an interaction dated today from a page that
-  is not about today.
+  ⚠ A DOMAIN WITH NOTHING TO SAY RENDERS NOTHING (§10b). Every zone below is
+  wrapped in its own emptiness check, so a quiet morning is a short page rather
+  than a grid of "no data" boxes — which reads as a broken app *and* as a list of
+  things you have already failed to do. The "the agenda isn't built yet" sentence
+  that stood here from 2026-08-02 is gone: it is built.
 
-  THE CAPTURE ✚ IS DELIBERATELY ABSENT rather than inert. Its CSS is in
-  `app.css` and the capture piece wires it; a button that does nothing when
-  pressed is the same invented affordance the prototypes existed to catch.
-
-  NO WritingSheet, NO TipTap. The sheets are imported by `/admin/fragments` and
-  the composer, never by the layout, so the page opened on a phone at 7am stays
-  free of an editor bundle it will not use.
+  NO WritingSheet, NO TipTap, NO TaskSheet. The sheets are imported by
+  `/admin/fragments`, the composer and the agenda rooms, never by the layout — so
+  the page opened on a phone at 7am stays free of editors it will not use. Today
+  reads; the rooms write.
 
   THE DATE BAR IS SERVER-DRIVEN. Every control is a real link to
   `?date=YYYY-MM-DD`, the month grid is 42 rendered anchors, and the popover is
@@ -41,15 +42,26 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import AgendaZone from '../../components/admin/AgendaZone.astro';
 import CheckinZone from '../../components/admin/CheckinZone.astro';
+import ComingUpZone from '../../components/admin/ComingUpZone.astro';
+import PastDueZone, { type PastDueRow } from '../../components/admin/PastDueZone.astro';
+import PeopleZone from '../../components/admin/PeopleZone.astro';
+import PracticeZone from '../../components/admin/PracticeZone.astro';
 import { today as hqToday, parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
 import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
 import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
-import PeopleZone from '../../components/admin/PeopleZone.astro';
+import type { CalendarItem } from '../../lib/hq/calendar';
+import { seenOn } from '../../lib/hq/calendar';
+import { briefsFor, type Brief } from '../../lib/hq/brief';
 import { signPhotos, upcomingBirthday, type Person } from '../../lib/hq/people';
 import { lastContactMap } from '../../lib/hq/interactions';
 import { driftList, type Drift } from '../../lib/hq/drift';
-import { seenOn } from '../../lib/hq/calendar';
+import { OBSERVATION_DAYS, observationFor, type Observation } from '../../lib/hq/goals';
+import { announces, publishedSignal, type Signal } from '../../lib/hq/today';
+import type { Tables } from '../../lib/database.types';
+
+type Task = Tables<'tasks'>;
 
 const supabase = Astro.locals.supabase;
 const { tz, ymd: todayYmd } = await hqToday(supabase);
@@ -106,37 +118,179 @@ if (selected === todayYmd && !times.bed && !times.woke) {
   prefill ??= DEFAULT_TIMES;
 }
 
-/*
-  PEOPLE (12 · Piece 4). Only on today — see the header. Archived people are
-  excluded here as well as by `driftFor`, so a birthday cannot bring somebody
-  back onto a page they were deliberately removed from.
-*/
-let birthdays: { person: Person; birthday: NonNullable<ReturnType<typeof upcomingBirthday>> }[] = [];
+/* ── the stack (13 · Piece 5) ───────────────────────────────────────────────
+   Everything below is a statement about NOW — see the header. Off today none of
+   it is fetched, which also means stepping through the calendar to backfill a
+   check-in costs one query rather than eleven. */
+let dayItems: CalendarItem[] = [];
+let comingItems: CalendarItem[] = [];
+let pastDue: PastDueRow[] = [];
+let answeredToday = new Map<string, 'done' | 'skipped'>();
+let briefs: Brief[] = [];
 let drifting: Drift[] = [];
 let peoplePhotos = new Map<string, string>();
+let published: Signal | null = null;
+let goalSignals: { id: string; name: string; slug: string; observation: Observation }[] = [];
 
 if (!offToday) {
-  const { data: everyone } = await supabase.from('people').select('*').is('archived_at', null);
-  const roster: Person[] = everyone ?? [];
-  if (roster.length) {
-    const lastContact = await lastContactMap(supabase);
-    // GUARD 2, live since 13 · Piece 4 (12-people.md §8): anyone with an event
-    // today is never drifting. The interaction will not be logged until tonight
-    // at the earliest, so without this the panel spends the whole of the one
-    // day it is wrong telling you that you have neglected somebody you are
-    // about to have dinner with.
-    const seenToday = await seenOn(supabase, todayYmd);
-    drifting = driftList(roster, lastContact, todayYmd, seenToday);
-    birthdays = roster
-      .map((person) => ({ person, birthday: upcomingBirthday(person, todayYmd) }))
-      .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday)
-      .sort((a, b) => a.birthday.days - b.birthday.days);
+  const since30 = shiftYmd(todayYmd, -OBSERVATION_DAYS);
 
-    // One round trip for every face the zone can show, and no more: signing the
-    // whole roster would mint URLs for people who are not on this page.
-    const shown = [...birthdays.map((b) => b.person), ...drifting.map((d) => d.person)];
-    peoplePhotos = await signPhotos(supabase, shown.map((p) => p.photo_path));
+  const [
+    { data: eventRows },
+    { data: liveTasks },
+    { data: taskEventRows },
+    { data: everyone },
+    lastContact,
+    seenToday,
+    briefRows,
+    { data: goalRows },
+    { data: lastDone },
+    { data: recentDone },
+    { data: lastWriting },
+  ] = await Promise.all([
+    supabase
+      .from('events')
+      .select('*, event_people(person_id, people(id, display_name))')
+      .eq('starts_on', todayYmd),
+    supabase.from('tasks').select('*').is('archived_at', null),
+    // The embedded task row rather than a second lookup: a one-off answered this
+    // morning is already archived, so it is NOT in the query above — and it must
+    // still stay on screen until midnight (§10f).
+    supabase.from('task_events').select('for_due_on, outcome, tasks(*)').eq('occurred_on', todayYmd),
+    supabase.from('people').select('*').is('archived_at', null),
+    lastContactMap(supabase),
+    // GUARD 2 (12-people.md §8): anyone with an event today is never drifting.
+    // Asked separately from the brief even though both read today's tags — the
+    // brief drops archived people and caps at three, and a guard computed from a
+    // capped list would silently stop guarding on a busy evening.
+    seenOn(supabase, todayYmd),
+    briefsFor(supabase, todayYmd),
+    supabase.from('goals').select('id, name, slug').eq('status', 'active').order('created_at'),
+    supabase.from('goal_last_done').select('*'),
+    supabase.from('task_events').select('tasks!inner(goal_id)').eq('outcome', 'done').gte('occurred_on', since30),
+    // ⚠ WRITING ONLY. `published_at` is stamped on every published essay and is
+    // honest for them; only 1 of 73 quotes carries one, and every song's stamp
+    // is the day the catalogue was imported. A "last published" over all three
+    // would report an import as an act of writing.
+    supabase
+      .from('fragments')
+      .select('published_at')
+      .eq('type', 'writing')
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .not('published_at', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(1),
+  ]);
+
+  briefs = briefRows;
+
+  /* ── tasks: one query, three zones ───────────────────────────────────────
+     A task appears exactly once. `answeredToday` is what lets a ticked row stay
+     on screen struck through until midnight even though its date has already
+     advanced past today. */
+  const answered = new Map(
+    (taskEventRows ?? [])
+      .filter((e): e is typeof e & { tasks: Task } => !!e.tasks)
+      .map((e) => [e.tasks.id, { outcome: e.outcome, forDueOn: e.for_due_on }]),
+  );
+  answeredToday = new Map([...answered].map(([id, a]) => [id, a.outcome]));
+
+  type Row = Task & { answeredAs: 'done' | 'skipped' | null; shownDueOn: string | null };
+  const taskRows: Row[] = [
+    ...(liveTasks ?? [])
+      .filter((t) => !answered.has(t.id))
+      .map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
+    ...(taskEventRows ?? [])
+      .filter((e): e is typeof e & { tasks: Task } => !!e.tasks)
+      .map((e) => ({ ...e.tasks, answeredAs: e.outcome, shownDueOn: e.for_due_on })),
+  ];
+
+  pastDue = taskRows
+    .filter((t) => t.shownDueOn && t.shownDueOn < todayYmd)
+    .sort((a, b) => a.shownDueOn!.localeCompare(b.shownDueOn!) || a.title.localeCompare(b.title))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      dueOn: t.shownDueOn as Ymd,
+      priority: t.priority,
+      answeredAs: t.answeredAs,
+    }));
+
+  const roster: Person[] = everyone ?? [];
+
+  const eventItems: CalendarItem[] = (eventRows ?? []).map((e) => ({
+    kind: 'event' as const,
+    id: e.id,
+    on: e.starts_on as Ymd,
+    title: e.title,
+    at: e.starts_at ? e.starts_at.slice(0, 5) : null,
+    location: e.location,
+    href: `/admin/agenda?day=${e.starts_on}#day`,
+    people: (e.event_people ?? [])
+      .map((ep) => ep.people)
+      .filter((p): p is { id: string; display_name: string } => !!p)
+      .map((p) => ({ id: p.id, name: p.display_name })),
+  }));
+
+  const taskItem = (t: Row): CalendarItem => ({
+    kind: 'task',
+    id: t.id,
+    on: t.shownDueOn as Ymd,
+    title: t.title,
+    at: t.due_time ? t.due_time.slice(0, 5) : null,
+  });
+
+  /* ── birthdays: today's belong to the day, the rest to Coming up ─────────
+     A birthday is not a row anywhere (12-people.md §8) — it is derived from
+     `birth_month`/`birth_day`, which is why it can never be ticked and why the
+     only thing it offers is a door to the person. */
+  const birthdays = roster
+    .map((person) => ({ person, birthday: upcomingBirthday(person, todayYmd) }))
+    .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday);
+
+  const birthdayItem = (person: Person, ymd: Ymd): CalendarItem => ({
+    kind: 'birthday',
+    id: person.id,
+    on: ymd,
+    title: person.display_name,
+    at: null,
+    href: `/admin/people/${person.slug}`,
+  });
+
+  dayItems = [
+    ...eventItems,
+    ...taskRows.filter((t) => t.shownDueOn === todayYmd).map(taskItem),
+    ...birthdays.filter((b) => b.birthday.days === 0).map((b) => birthdayItem(b.person, todayYmd)),
+  ];
+
+  comingItems = [
+    ...taskRows
+      .filter((t) => !t.answeredAs && announces({ ...t, due_on: t.shownDueOn }, todayYmd))
+      .map(taskItem),
+    ...birthdays.filter((b) => b.birthday.days > 0).map((b) => birthdayItem(b.person, b.birthday.ymd)),
+  ];
+
+  /* ── people ─────────────────────────────────────────────────────────────── */
+  if (roster.length) drifting = driftList(roster, lastContact, todayYmd, seenToday);
+
+  // One round trip for every face the zone can show, and no more: signing the
+  // whole roster would mint URLs for people who are not on this page.
+  const shown = [...briefs.map((b) => b.person), ...drifting.map((d) => d.person)];
+  if (shown.length) peoplePhotos = await signPhotos(supabase, shown.map((p) => p.photo_path));
+
+  /* ── practice ───────────────────────────────────────────────────────────── */
+  published = publishedSignal((lastWriting?.[0]?.published_at ?? null)?.slice(0, 10) as Ymd | null, todayYmd);
+
+  const lastById = new Map((lastDone ?? []).map((r) => [r.goal_id, r.last_done_on]));
+  const doneIn30 = new Map<string, number>();
+  for (const row of recentDone ?? []) {
+    const id = (row.tasks as { goal_id: string | null } | null)?.goal_id;
+    if (id) doneIn30.set(id, (doneIn30.get(id) ?? 0) + 1);
   }
+  goalSignals = (goalRows ?? [])
+    .map((g) => ({ ...g, observation: observationFor(doneIn30.get(g.id) ?? 0, lastById.get(g.id) ?? null, todayYmd) }))
+    .filter((g): g is typeof g & { observation: Observation } => !!g.observation);
 }
 
 // `?cal=` is the month the popover is showing, and its presence is what keeps
@@ -230,28 +384,50 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
         it invisibly (docs/plans/11-checkin.md §2). */}
     <p id="tz-note" hidden class="admin-hint mb-4 text-xs" data-tz={tz}></p>
 
+    {/* One alert for every write on this page: the tick, and both of drift's
+        dismissals. The zones themselves are read-only. */}
+    <p hidden role="alert" class="admin-alert mb-4" data-task-error></p>
+
+    {/* ⚠ THE ORDER IS §10c's, AND THE `o-*` CLASSES ARE WHY IT SURVIVES A PHONE.
+        The wrappers go `display: contents` when narrow, so these five zones
+        collapse into one stack and `order` resequences them — People outranks
+        Coming up on a small screen, because who you are seeing today matters
+        more than what is approaching. Wide, the orders reset and the columns
+        take over. (Trap 1: a `grid-column: 2` here would conjure an implicit
+        column and put every zone on its own row.) */}
     <div class="hq-grid">
       <div class="col-main">
         {/* ══ MORNING ══ pinned first, always, answered or not. Every field is
             a real column on `daily_checkins`. ══ */}
         <CheckinZone logDate={selected} today={todayYmd} row={checkin ?? null} times={times} prefill={prefill} writable={writable} tz={tz} />
+
+        {/* ══ TODAY ══ the day itself: events and tasks in one time order. ══ */}
+        <AgendaZone items={dayItems} answered={answeredToday} />
+
+        {/* ══ COMING UP ══ each item's own lead, and no window to tune. ══ */}
+        <ComingUpZone items={comingItems} today={todayYmd} />
       </div>
 
-      {/* ══ PEOPLE ══ birthdays inside their lead, then drift capped at three.
-          The rail rather than the main column: the check-in is the thing you
-          came to do, and this is the thing you came to notice. ══ */}
       <div class="col-rail">
-        <PeopleZone birthdays={birthdays} drifting={drifting} today={todayYmd} photos={peoplePhotos} />
+        {/* ══ PEOPLE ══ the brief, then drift capped at three. The rail rather
+            than the main column: the check-in is the thing you came to do, and
+            this is the thing you came to notice. ══ */}
+        <PeopleZone briefs={briefs} drifting={drifting} today={todayYmd} photos={peoplePhotos} />
+
+        {/* ══ PRACTICE ══ signals. Nothing here is tickable or countable. ══ */}
+        <PracticeZone published={published} goals={goalSignals} />
       </div>
     </div>
 
-    <p class="admin-hint mt-5 text-sm">
-      The agenda isn’t built yet. This page grows as it lands.
-    </p>
+    {/* ══ PAST DUE ══ full width, below both columns, always open (§10f). ══ */}
+    <PastDueZone rows={pastDue} today={todayYmd} />
   </div>
 
   <script>
     import '../../scripts/checkin';
+    // The tick, and the two dismissals on a drift row. Both are the rooms' own
+    // scripts, reused verbatim rather than reimplemented for this page.
+    import '../../scripts/task-list';
 
     // The travel note (docs/plans/11-checkin.md §2). Client-side because the
     // server has no business asking what the device thinks the zone is — and

@@ -49,6 +49,13 @@ export interface CalendarItem {
   answered?: boolean;
   /** Whoever is tagged on it. */
   people?: { id: string; name: string }[];
+  /**
+   * Where this row opens, when it has somewhere to go — a birthday to its
+   * person, an event to the day panel. Set by the PAGE rather than by a zone, so
+   * routing lives where the rest of this app's routing lives; a zone with no
+   * href simply renders text.
+   */
+  href?: string;
 }
 
 /**
