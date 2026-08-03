@@ -53,10 +53,20 @@ test.describe('the admin at 390px', () => {
         const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
         const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
         return [...zone.querySelectorAll('*')]
+          .filter(
+            (el) =>
+              // ONLY WHAT IS ACTUALLY DRAWN. An unrendered element — a hidden
+              // panel, or an SVG `<symbol>`/`<path>` living in a sprite — has an
+              // all-zero rect, so `left - 0` reports the zone's own left inset
+              // as an overflow. First run of this assertion flagged 162
+              // elements, every one of them by exactly the same 17px, which is
+              // the tell: a real shear does not produce a uniform number.
+              el.getClientRects().length > 0 && !el.closest('svg'),
+          )
           .map((el) => {
             const r = el.getBoundingClientRect();
             const over = Math.max(r.right - right, left - r.left);
-            return { tag: el.tagName.toLowerCase(), cls: el.className, over: Math.round(over) };
+            return { tag: el.tagName.toLowerCase(), cls: String(el.className), over: Math.round(over) };
           })
           .filter((x) => x.over > 1);
       }),

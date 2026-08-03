@@ -97,22 +97,37 @@ if (zone) {
         return;
       }
       inFlight = true;
-      note('Saving…');
-      const { error } = await actions.checkin.save(collect());
-      inFlight = false;
-
-      if (error) {
-        // Deliberately not retried on a loop and deliberately not cleared: the
-        // words on screen must not outlive their truth.
-        note(error.message || 'Not saved — check your connection', true);
-        return;
+      try {
+        // A LOOP, not a recursive call. Re-entering `flush()` to pick up a
+        // change made mid-request would find `inFlight` still true — the flag
+        // is only cleared in the `finally` below — so the change would be
+        // marked dirty and then never sent. `collect()` re-reads the DOM each
+        // pass, so the last iteration always carries the latest answers.
+        do {
+          dirty = false;
+          note('Saving…');
+          const { error } = await actions.checkin.save(collect());
+          if (error) {
+            // Deliberately not retried on a loop and deliberately not cleared:
+            // the words on screen must not outlive their truth.
+            note(error.message || 'Not saved — check your connection', true);
+            return;
+          }
+        } while (dirty);
+        note('Saved');
+      } catch {
+        // ⚠ `astro:actions` THROWS on a dead network rather than returning
+        // `{ error }` — the same trap that once left the AI button stuck on
+        // "Thinking…" for the life of the page (subject-suggest.ts). Here it
+        // was worse than a stuck label: without this catch the rejection also
+        // skipped `inFlight = false`, so the flag stayed true and EVERY
+        // subsequent save was silently swallowed as a duplicate. A check-in
+        // that quietly stops saving is the exact failure this feature cannot
+        // have. Caught by `checkin.spec.ts`, on its first ever run.
+        note('Not saved — check your connection', true);
+      } finally {
+        inFlight = false;
       }
-      if (dirty) {
-        dirty = false;
-        void flush();
-        return;
-      }
-      note('Saved');
     }
 
     /** A tap: save now. */

@@ -60,10 +60,15 @@ test.describe('the check-in at 390px', () => {
         const right = box.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
         const left = box.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
         return [...zone.querySelectorAll('*')]
+          // Only what is actually drawn — see the note in
+          // admin-layout.mobile.spec.ts. A hidden panel and an SVG sprite both
+          // report an all-zero rect, which reads as an overflow of exactly the
+          // zone's left inset on every single element.
+          .filter((el) => el.getClientRects().length > 0 && !el.closest('svg'))
           .map((el) => {
             const r = el.getBoundingClientRect();
             return {
-              what: `${el.tagName.toLowerCase()}.${el.className}`.slice(0, 60),
+              what: `${el.tagName.toLowerCase()}.${String(el.className)}`.slice(0, 60),
               text: (el.textContent ?? '').trim().slice(0, 24),
               over: Math.round(Math.max(r.right - right, left - r.left)),
             };
@@ -119,11 +124,29 @@ test.describe('the check-in at 390px', () => {
     // TRAP 6: `:hover` beats the selected state at equal specificity, so source
     // order decides — and the option you just tapped reading as disabled, on
     // the one control you are using, is the failure.
+    //
+    // `.opt` transitions `background-color` over 120ms, so reading the computed
+    // style straight after a click samples the animation mid-flight: the first
+    // run of this test compared a half-faded hover colour against the settled
+    // selected one and failed on a page that was behaving correctly. Freezing
+    // transitions makes it a question about the CASCADE, which is what it is.
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
+
     const opt = page.locator('[data-lat="15_30"]');
     await opt.click();
-    const selected = await opt.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // Clicking leaves the pointer ON the control, so this reading is already
+    // "selected + hovered". Move away to get the selected colour by itself.
+    await page.mouse.move(0, 0);
+    const settled = await opt.evaluate((el) => getComputedStyle(el).backgroundColor);
+
     await opt.hover();
     const hovered = await opt.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(hovered).toBe(selected);
+
+    expect(hovered, 'hovering a selected option must not change how it looks').toBe(settled);
+    // …and it must not be the plain hover grey, which is what "pale" meant.
+    const unselected = await page.locator('[data-lat="30_60"]').evaluate((el) => {
+      return getComputedStyle(el).backgroundColor;
+    });
+    expect(hovered).not.toBe(unselected);
   });
 });
