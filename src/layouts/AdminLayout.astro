@@ -210,7 +210,7 @@ const nav = [
       document.documentElement.dataset.theme = next;
       try {
         localStorage.setItem('theme', next);
-      } catch (e) {}
+      } catch {}
       syncThemeBtn();
     });
     // keep other open tabs in sync

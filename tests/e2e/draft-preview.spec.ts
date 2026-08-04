@@ -8,7 +8,7 @@ import { fixtures } from './fixtures';
 
 test.describe('draft preview — signed in as the admin', () => {
   test('an unpublished essay renders instead of 404ing', async ({ page }) => {
-    const { draftSlug, draftStatus } = fixtures();
+    const { draftSlug } = fixtures();
     test.skip(!draftSlug, 'no unpublished essay in the database to preview');
 
     const response = await page.goto(`/blog/${draftSlug}`);

@@ -1,0 +1,15 @@
+# Generated — regenerate, never hand-format.
+src/lib/database.types.ts
+.astro/
+dist/
+.vercel/
+node_modules/
+
+# Not ours.
+package-lock.json
+legacy/
+
+# Working notes with deliberate hand-wrapping and ASCII tables. `docs/` is
+# prose, and reflowing it would produce a diff nobody can review.
+docs/
+*.md

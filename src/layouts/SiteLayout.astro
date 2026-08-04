@@ -130,7 +130,7 @@ const nav = [
       document.documentElement.dataset.theme = next;
       try {
         localStorage.setItem('theme', next);
-      } catch (err) {}
+      } catch {}
       btn.setAttribute('aria-pressed', String(next === 'paper'));
     });
     window.addEventListener('storage', (e) => {

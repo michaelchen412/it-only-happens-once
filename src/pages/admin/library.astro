@@ -29,7 +29,6 @@ const tally = (rows: any[] | null, key: string) => {
 const subjCount = tally(fs, 'subject_id');
 const authorCount = tally(frs, 'author_id');
 const workCount = tally(frs, 'work_id');
-const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name]));
 ---
 
 <AdminLayout title="Library" active="library">

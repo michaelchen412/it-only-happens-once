@@ -148,7 +148,7 @@ export function parse(rrule: string): Rule | null {
   const interval = parts.has('INTERVAL') ? Number(parts.get('INTERVAL')) : 1;
   if (!Number.isInteger(interval) || interval < 1 || interval > 366) return null;
 
-  let byday: number[] = [];
+  const byday: number[] = [];
   let nth: number | null = null;
   const rawDays = parts.get('BYDAY');
   if (rawDays) {

@@ -28,7 +28,6 @@ import { today as hqToday, parseYmd, type Ymd } from '../../lib/hq/time';
 import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
 import { CELL_ROWS, KINDS, byDay, byTime, legendFor, mirroredBetween, type CalendarItem } from '../../lib/hq/calendar';
 import { staleness } from '../../lib/hq/mirror';
-import { upcomingBirthday } from '../../lib/hq/people';
 
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = await hqToday(supabase);

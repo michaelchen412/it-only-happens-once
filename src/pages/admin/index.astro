@@ -330,7 +330,7 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       bounce you here again. */}
   <script is:inline>
     (function () {
-      var h = location.hash;
+      const h = location.hash;
       if (/^#edit=[0-9a-f][0-9a-f-]{30,40}$/i.test(h) || h === '#new-writing' || h === '#new-note') {
         location.replace('/admin/fragments' + h);
       }

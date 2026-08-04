@@ -149,7 +149,10 @@ function parseFile(text) {
   let cur = [];
   for (const line of text.split('\n')) {
     if (line.trim() === '') {
-      if (cur.length) blocks.push(cur), (cur = []);
+      if (cur.length) {
+        blocks.push(cur);
+        cur = [];
+      }
     } else {
       cur.push(line);
     }
