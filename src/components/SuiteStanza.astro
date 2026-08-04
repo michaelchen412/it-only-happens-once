@@ -50,7 +50,7 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
         {item.body}
       </blockquote>
       {item.attribution && (
-        <figcaption class="mt-3 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+        <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
           — {item.attribution}
         </figcaption>
       )}
@@ -62,7 +62,7 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
   item.kind === 'writing' && (
     <a href={`/blog/${item.item.slug}`} data-read={item.item.slug} class="block cursor-pointer">
       <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.item.title}</h2>
-      <p class="sw-excerpt excerpt-fade prose-measure mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] text-base-content/70">
+      <p class="sw-excerpt excerpt-fade prose-measure text-base-content/70 mt-3 line-clamp-4 text-[1.05rem] leading-[1.7]">
         {item.item.excerpt}
       </p>
     </a>
@@ -80,7 +80,7 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
       {item.attribution && (
         <p
           class:list={[
-            'suite-attrib font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]',
+            'suite-attrib text-base-content/50 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]',
             // prose wants a little more air beneath it than a title does
             noteHtml ? 'mt-3' : 'mt-2',
           ]}

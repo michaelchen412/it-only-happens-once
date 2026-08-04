@@ -1,0 +1,270 @@
+---
+/*
+  /admin/fragments — the Fragment Manager (docs/admin.md §2). A flat, sortable
+  table over ALL fragments (admin sees everything via RLS), rendered by the shared
+  FragmentListPanel (also served as the fragments-panel partial to the
+  composer's browser sheet). Filtering/sorting swap the table in place
+  (fragment-panel.ts) — no full reload. Every fragment edits in an overlay:
+  quotes/songs in the FragmentSheet, writing in the WritingSheet — the page
+  underneath never navigates away.
+
+  It lived at `/admin` until 2026-08-02; the root is Today now (ADR-0015). The
+  `#edit=<id>` / `#new-writing` deep links came with it — a hash never reaches
+  the server, so Today bounces them here client-side rather than 302ing and
+  silently dropping the identifier.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
+import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
+import TypeMark from '../../components/admin/TypeMark.astro';
+import StarMark from '../../components/StarMark.astro';
+import FragmentSheet from '../../components/admin/FragmentSheet.astro';
+import WritingSheet from '../../components/admin/WritingSheet.astro';
+import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
+import { allFragmentPeople } from '../../lib/hq/links';
+
+const supabase = Astro.locals.supabase;
+
+// `?view=notes` was this room's third view until 2026-08-03 (14 · Piece 1).
+// Brain dumps have their own room now, and a jotting rendered as a table row
+// with an empty title column was the thing that made a note feel like a
+// document it never was. Redirect rather than 404: the old URL is in browser
+// history and on the old capture lab's header.
+if (Astro.url.searchParams.get('view') === 'notes') return Astro.redirect('/admin/notes', 302);
+
+const params = parseListParams(Astro.url.searchParams);
+params.constellation = null; // pick-mode concern; never used here
+const data = await queryFragmentList(supabase, params);
+const view = params.view;
+const subjectNames = data.allSubjects.map((s) => s.name);
+
+/*
+  THE SEAM (12 · Piece 3, §5). This room is corpus-side, and these two reads
+  are the only HQ data on it — the roster for "Shared by", and the existing
+  edges so opening a sheet needs no round trip.
+
+  `?person=<slug>&new=quote` is the arrival from a profile's "Add a quote": the
+  quote sheet opens already attributed to them, so a quote somebody said out
+  loud enters the corpus AND attaches in one move. An unknown slug is ignored
+  rather than 404ing — you came here to write a quote, and the worst outcome of
+  a stale link should be an unattributed one, not a dead end.
+*/
+const [people, sharedBy] = await Promise.all([
+  supabase.from('people').select('id, display_name').order('display_name'),
+  allFragmentPeople(supabase),
+]);
+
+const personSlug = Astro.url.searchParams.get('person');
+const linkPerson = personSlug
+  ? (await supabase.from('people').select('id').eq('slug', personSlug).maybeSingle()).data
+  : null;
+const autoNew = linkPerson && Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
+
+const TITLES = { list: 'Fragments', trash: 'Trash' } as const;
+const SUBTITLES = {
+  list: undefined,
+  trash:
+    'Deleted fragments wait here until you empty them. Anything placed in a constellation leaves that suite while it sits in the trash.',
+} as const;
+---
+
+<AdminLayout title={TITLES[view]} active="fragments">
+  <div class="mx-auto max-w-5xl px-6 py-8">
+    <PageHeader
+      title={TITLES[view]}
+      back={view === 'list' ? undefined : { href: '/admin/fragments', label: 'Fragments' }}
+      subtitle={SUBTITLES[view]}
+    >
+      <Fragment slot="actions">
+        {
+          view === 'trash' ? (
+            <button
+              id="empty-trash"
+              class="btn btn-outline btn-sm text-error gap-1.5 font-sans"
+              disabled={data.rows.length === 0}
+            >
+              <Icon name="ph:trash" class="text-base" /> Empty trash
+            </button>
+          ) : (
+            <>
+              {view === 'list' && (
+                <>
+                  {/* No Notes button, and no `?view=notes` behind it — brain
+                      dumps are a room in the sidebar now (14 · Piece 1). This
+                      room is pieces: drafts and published, nothing else. */}
+                  <a href="/admin/fragments?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
+                    <Icon name="ph:trash" />
+                    Trash
+                    <span
+                      id="trash-count"
+                      class="bg-base-300 text-base-content/70 rounded-full px-1.5 text-xs empty:hidden"
+                    >
+                      {data.trashCount || ''}
+                    </span>
+                  </a>
+                </>
+              )}
+              <div class="relative">
+                <button
+                  id="add-btn"
+                  class="btn btn-primary btn-sm gap-1 font-sans"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                >
+                  <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
+                </button>
+                <div
+                  id="add-menu"
+                  hidden
+                  role="menu"
+                  aria-label="Add a fragment"
+                  class="rounded-box border-base-300 bg-base-100 absolute right-0 z-30 mt-1 w-40 overflow-hidden border py-1 shadow-lg"
+                >
+                  {/* ⚠ NO "Note" ITEM. It opened a near-fullscreen sheet with a
+                      title field for something that has no title — the exact
+                      door 14 §2 was written to replace ("today a note costs
+                      Add ▾ → Note"). The ✚ in the corner is the only way to
+                      write one now, from any room. A piece can still be sent
+                      DOWN to the pile: that is the bulk bar's "Make notes",
+                      which is a demotion rather than a second front door. */}
+                  <button
+                    data-new-writing
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="writing" /> Writing
+                  </button>
+                  <button
+                    data-new="quote"
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="quote" /> Quote
+                  </button>
+                  <button
+                    data-new="song"
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="song" /> Song
+                  </button>
+                </div>
+              </div>
+            </>
+          )
+        }
+      </Fragment>
+    </PageHeader>
+
+    <FragmentListPanel data={data} params={params} mode="manage" />
+  </div>
+
+  {/* Floating bulk-action bar (buttons rendered per view) */}
+  <div id="bulkbar" class="bulkbar font-sans text-sm" data-view={view}>
+    <span id="bulkcount" class="text-base-content/70">0 selected</span>
+    <div class="flex gap-1">
+      {
+        view === 'trash' ? (
+          <>
+            <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">
+              Restore
+            </button>
+            <button data-bulk="purge" class="btn btn-xs btn-ghost text-error normal-case">
+              Delete forever
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Elevate a selection into the sky — the bulk half of the
+                fragment→constellation view (docs/admin.md §2). */}
+            <div class="relative">
+              <button
+                id="bulk-cn-btn"
+                class="btn btn-xs btn-ghost gap-1 normal-case"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <span class="text-primary">
+                  <StarMark />
+                </span>{' '}
+                Constellation <span aria-hidden="true">▾</span>
+              </button>
+              <div
+                id="bulk-cn-menu"
+                hidden
+                role="menu"
+                aria-label="Add to or remove from a constellation"
+                class="rounded-box border-base-300 bg-base-100 absolute bottom-full left-0 z-40 mb-1 max-h-96 w-96 overflow-y-auto border py-1 shadow-lg"
+              >
+                {/* The full description (4-line cap): you're about to elevate a
+                    whole selection, so "what is this constellation for" should
+                    be readable here, not hidden behind a hover. */}
+                <p class="admin-label px-3 pt-1.5">Add to</p>
+                {data.allConstellations.map((c) => (
+                  <button role="menuitem" class="add-item block w-full px-3 py-2 text-left" data-cn-add={c.id}>
+                    <span class="block truncate text-sm leading-snug">{c.name}</span>
+                    {c.description && (
+                      <span class="text-base-content/55 mt-0.5 line-clamp-4 block text-xs leading-snug">
+                        {c.description}
+                      </span>
+                    )}
+                  </button>
+                ))}
+                <p id="bulk-cn-remove-label" class="admin-label border-base-300 mt-1 border-t px-3 pt-2" hidden>
+                  Remove from
+                </p>
+                {data.allConstellations.map((c) => (
+                  <button
+                    role="menuitem"
+                    hidden
+                    class="add-item text-error/80 block w-full truncate px-3 py-1.5 text-left text-sm"
+                    data-cn-remove={c.id}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                {data.allConstellations.length === 0 && <p class="admin-hint px-3 py-2">No constellations yet.</p>}
+              </div>
+            </div>
+            <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">
+              Publish
+            </button>
+            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">
+              Unpublish
+            </button>
+            <button data-bulk="note" class="btn btn-xs btn-ghost normal-case">
+              Make notes
+            </button>
+            <button data-bulk="trash" class="btn btn-xs btn-ghost text-error normal-case">
+              Delete
+            </button>
+          </>
+        )
+      }
+    </div>
+  </div>
+  <p
+    id="bulk-error"
+    hidden
+    role="alert"
+    class="rounded-field border-error/40 bg-base-200 text-error fixed bottom-20 left-1/2 z-40 -translate-x-1/2 border px-3 py-1.5 font-sans text-xs shadow"
+  >
+  </p>
+
+  <FragmentSheet
+    subjects={subjectNames}
+    authors={data.allAuthors.map((a) => ({ id: a.id, name: a.name }))}
+    works={data.allWorks.map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
+    constellations={data.allConstellations}
+    people={people.data ?? []}
+    sharedBy={sharedBy}
+    linkPersonId={linkPerson?.id ?? null}
+    autoNew={autoNew}
+  />
+  <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
+
+  <script>
+    import '../../scripts/admin-list';
+  </script>
+</AdminLayout>

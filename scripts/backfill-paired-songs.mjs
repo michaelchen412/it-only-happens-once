@@ -68,7 +68,9 @@ const songRefUrl = (ref) =>
 const url = process.env.PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
-  console.error('Missing Supabase env. Run with: node --env-file=.env.local scripts/backfill-paired-songs.mjs [--commit]');
+  console.error(
+    'Missing Supabase env. Run with: node --env-file=.env.local scripts/backfill-paired-songs.mjs [--commit]',
+  );
   process.exit(1);
 }
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
@@ -113,10 +115,9 @@ const yearOf = (d) => {
 
 async function lookup(ref) {
   if (ref.provider === 'youtube') {
-    const res = await fetch(
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(songRefUrl(ref))}`,
-      { headers: { accept: 'application/json' } },
-    );
+    const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(songRefUrl(ref))}`, {
+      headers: { accept: 'application/json' },
+    });
     if (!res.ok) return null;
     const d = await res.json();
     return {
@@ -162,7 +163,9 @@ async function resolveWork(title, authorId) {
   if (!t) return null;
   const slug = slugify(t);
   if (!COMMIT) return `(work:${slug})`;
-  await sb.from('works').upsert({ title: t, slug, author_id: authorId }, { onConflict: 'slug', ignoreDuplicates: true });
+  await sb
+    .from('works')
+    .upsert({ title: t, slug, author_id: authorId }, { onConflict: 'slug', ignoreDuplicates: true });
   const { data } = await sb.from('works').select('id').eq('slug', slug).single();
   return data?.id ?? null;
 }

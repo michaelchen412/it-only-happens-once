@@ -46,6 +46,33 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_sync: {
+        Row: {
+          id: boolean
+          last_error: string | null
+          last_error_at: string | null
+          sync_token: string | null
+          synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          sync_token?: string | null
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          sync_token?: string | null
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       constellations: {
         Row: {
           color: string
@@ -79,6 +106,186 @@ export type Database = {
           slug?: string
           sort?: number
           status?: string
+        }
+        Relationships: []
+      }
+      daily_checkins: {
+        Row: {
+          arousal: number | null
+          awakenings: Database["public"]["Enums"]["awakenings"] | null
+          bed_at: string | null
+          created_at: string
+          dream_body: string | null
+          dream_intensity: number | null
+          dream_recall: Database["public"]["Enums"]["dream_recall"] | null
+          id: string
+          log_date: string
+          note: string | null
+          restedness: number | null
+          skipped: boolean
+          sleep_latency: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality: number | null
+          updated_at: string
+          valence: number | null
+          woke_at: string | null
+        }
+        Insert: {
+          arousal?: number | null
+          awakenings?: Database["public"]["Enums"]["awakenings"] | null
+          bed_at?: string | null
+          created_at?: string
+          dream_body?: string | null
+          dream_intensity?: number | null
+          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          id?: string
+          log_date: string
+          note?: string | null
+          restedness?: number | null
+          skipped?: boolean
+          sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality?: number | null
+          updated_at?: string
+          valence?: number | null
+          woke_at?: string | null
+        }
+        Update: {
+          arousal?: number | null
+          awakenings?: Database["public"]["Enums"]["awakenings"] | null
+          bed_at?: string | null
+          created_at?: string
+          dream_body?: string | null
+          dream_intensity?: number | null
+          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          id?: string
+          log_date?: string
+          note?: string | null
+          restedness?: number | null
+          skipped?: boolean
+          sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
+          sleep_quality?: number | null
+          updated_at?: string
+          valence?: number | null
+          woke_at?: string | null
+        }
+        Relationships: []
+      }
+      event_people: {
+        Row: {
+          created_at: string
+          event_id: string | null
+          external_id: string | null
+          person_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          person_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_people_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          starts_at: string | null
+          starts_on: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          starts_on: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          starts_on?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      external_events: {
+        Row: {
+          cancelled: boolean
+          ends_at: string | null
+          ends_on: string | null
+          event_type: string | null
+          external_id: string
+          id: string
+          location: string | null
+          series_id: string
+          starts_at: string | null
+          starts_on: string
+          synced_at: string
+          title: string | null
+          url: string | null
+        }
+        Insert: {
+          cancelled?: boolean
+          ends_at?: string | null
+          ends_on?: string | null
+          event_type?: string | null
+          external_id: string
+          id?: string
+          location?: string | null
+          series_id: string
+          starts_at?: string | null
+          starts_on: string
+          synced_at?: string
+          title?: string | null
+          url?: string | null
+        }
+        Update: {
+          cancelled?: boolean
+          ends_at?: string | null
+          ends_on?: string | null
+          event_type?: string | null
+          external_id?: string
+          id?: string
+          location?: string | null
+          series_id?: string
+          starts_at?: string | null
+          starts_on?: string
+          synced_at?: string
+          title?: string | null
+          url?: string | null
         }
         Relationships: []
       }
@@ -280,6 +487,96 @@ export type Database = {
           },
         ]
       }
+      goals: {
+        Row: {
+          created_at: string
+          horizon: Database["public"]["Enums"]["goal_horizon"]
+          id: string
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["goal_status"]
+          updated_at: string
+          why: string | null
+        }
+        Insert: {
+          created_at?: string
+          horizon?: Database["public"]["Enums"]["goal_horizon"]
+          id?: string
+          name: string
+          slug: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          updated_at?: string
+          why?: string | null
+        }
+        Update: {
+          created_at?: string
+          horizon?: Database["public"]["Enums"]["goal_horizon"]
+          id?: string
+          name?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          updated_at?: string
+          why?: string | null
+        }
+        Relationships: []
+      }
+      interaction_people: {
+        Row: {
+          interaction_id: string
+          person_id: string
+        }
+        Insert: {
+          interaction_id: string
+          person_id: string
+        }
+        Update: {
+          interaction_id?: string
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_people_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interaction_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interactions: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["interaction_kind"]
+          occurred_on?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pages: {
         Row: {
           content: Json
@@ -294,6 +591,171 @@ export type Database = {
         Update: {
           content?: Json
           slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      people: {
+        Row: {
+          archived_at: string | null
+          bio: string | null
+          birth_day: number | null
+          birth_month: number | null
+          birth_year: number | null
+          birthday_lead_days: number
+          cadence_days: number
+          circle: Database["public"]["Enums"]["person_circle"]
+          created_at: string
+          display_name: string
+          drift_muted_until: string | null
+          drift_mutes: number
+          epithet: string | null
+          full_name: string | null
+          id: string
+          known_since_year: number | null
+          location: string | null
+          photo_path: string | null
+          slug: string
+          sort_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          bio?: string | null
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          birthday_lead_days?: number
+          cadence_days?: number
+          circle?: Database["public"]["Enums"]["person_circle"]
+          created_at?: string
+          display_name: string
+          drift_muted_until?: string | null
+          drift_mutes?: number
+          epithet?: string | null
+          full_name?: string | null
+          id?: string
+          known_since_year?: number | null
+          location?: string | null
+          photo_path?: string | null
+          slug: string
+          sort_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          bio?: string | null
+          birth_day?: number | null
+          birth_month?: number | null
+          birth_year?: number | null
+          birthday_lead_days?: number
+          cadence_days?: number
+          circle?: Database["public"]["Enums"]["person_circle"]
+          created_at?: string
+          display_name?: string
+          drift_muted_until?: string | null
+          drift_mutes?: number
+          epithet?: string | null
+          full_name?: string | null
+          id?: string
+          known_since_year?: number | null
+          location?: string | null
+          photo_path?: string | null
+          slug?: string
+          sort_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      person_fragments: {
+        Row: {
+          created_at: string
+          fragment_id: string
+          note: string | null
+          person_id: string
+        }
+        Insert: {
+          created_at?: string
+          fragment_id: string
+          note?: string | null
+          person_id: string
+        }
+        Update: {
+          created_at?: string
+          fragment_id?: string
+          note?: string | null
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_fragments_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_fragments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_works: {
+        Row: {
+          created_at: string
+          note: string | null
+          person_id: string
+          work_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          person_id: string
+          work_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          person_id?: string
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_works_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_works_work_id_fkey"
+            columns: ["work_id"]
+            isOneToOne: false
+            referencedRelation: "works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          created_at: string
+          home_timezone: string
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          home_timezone?: string
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          home_timezone?: string
+          id?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -321,6 +783,106 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      task_events: {
+        Row: {
+          created_at: string
+          for_due_on: string | null
+          id: string
+          occurred_on: string
+          outcome: Database["public"]["Enums"]["task_outcome"]
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          for_due_on?: string | null
+          id?: string
+          occurred_on: string
+          outcome: Database["public"]["Enums"]["task_outcome"]
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          for_due_on?: string | null
+          id?: string
+          occurred_on?: string
+          outcome?: Database["public"]["Enums"]["task_outcome"]
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          due_on: string | null
+          due_time: string | null
+          effort: Database["public"]["Enums"]["task_effort"]
+          goal_id: string | null
+          id: string
+          lead_days: number | null
+          notes: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          recur_every: number | null
+          recur_mode: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule: string | null
+          recur_unit: Database["public"]["Enums"]["recurrence_unit"] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          due_on?: string | null
+          due_time?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
+          goal_id?: string | null
+          id?: string
+          lead_days?: number | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recur_every?: number | null
+          recur_mode?: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule?: string | null
+          recur_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          due_on?: string | null
+          due_time?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
+          goal_id?: string | null
+          id?: string
+          lead_days?: number | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recur_every?: number | null
+          recur_mode?: Database["public"]["Enums"]["recurrence_mode"] | null
+          recur_rrule?: string | null
+          recur_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       works: {
         Row: {
@@ -362,15 +924,64 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      goal_last_done: {
+        Row: {
+          done_total: number | null
+          goal_id: string | null
+          last_done_on: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_last_contact: {
+        Row: {
+          interaction_count: number | null
+          last_contact_on: string | null
+          person_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_people_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
+      awakenings: "none" | "few" | "many"
       date_precision: "day" | "year"
+      dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
       fragment_type: "writing" | "quote" | "song"
+      goal_horizon: "this_season" | "this_year" | "next_few_years"
+      goal_status: "active" | "paused" | "achieved" | "let_go"
+      interaction_kind:
+        | "hangout"
+        | "call"
+        | "message"
+        | "gift"
+        | "shared"
+        | "note"
+      person_circle: "family" | "friends" | "professional"
+      recurrence_mode: "after_completion" | "fixed"
+      recurrence_unit: "days" | "weeks" | "months"
+      sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
+      task_effort: "quick" | "sitting" | "block" | "project"
+      task_outcome: "done" | "skipped"
+      task_priority: "low" | "normal" | "high"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -498,9 +1109,28 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      awakenings: ["none", "few", "many"],
       date_precision: ["day", "year"],
+      dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
       fragment_type: ["writing", "quote", "song"],
+      goal_horizon: ["this_season", "this_year", "next_few_years"],
+      goal_status: ["active", "paused", "achieved", "let_go"],
+      interaction_kind: [
+        "hangout",
+        "call",
+        "message",
+        "gift",
+        "shared",
+        "note",
+      ],
+      person_circle: ["family", "friends", "professional"],
+      recurrence_mode: ["after_completion", "fixed"],
+      recurrence_unit: ["days", "weeks", "months"],
+      sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
+      task_effort: ["quick", "sitting", "block", "project"],
+      task_outcome: ["done", "skipped"],
+      task_priority: ["low", "normal", "high"],
     },
   },
 } as const

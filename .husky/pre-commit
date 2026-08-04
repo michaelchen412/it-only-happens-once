@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Format and lint what is being committed, and NOTHING else (plan 00 · Piece 10).
+#
+# ⚠ STAGED FILES ONLY, AND NO TEST RUN. A hook that takes twenty seconds is a
+# hook that gets `--no-verify`'d, and a bypassed hook is worse than no hook at
+# all because it manufactures confidence. The full sweep lives in
+# `npm run verify` — format, lint, check, tests — and belongs before a push,
+# not in front of every commit.
+#
+# Bypass deliberately with `git commit --no-verify` when you mean to; that is a
+# decision, not a workaround.
+npx lint-staged

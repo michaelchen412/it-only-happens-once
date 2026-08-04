@@ -20,7 +20,13 @@ import type { APIRoute } from 'astro';
  * Dependency order: an importer can insert these top to bottom without ever
  * tripping a foreign key. Subjects/authors/constellations own nothing; works
  * point at authors; fragments point at authors and works; the join tables and
- * versions point at fragments.
+ * versions point at fragments. HQ's tables follow, in their own order.
+ *
+ * ⚠ STANDING RULE (ADR-0012): **any piece that creates an HQ table appends it
+ * here, in the same commit, in foreign-key order.** A piece is not done until
+ * its tables are in this array. Doing it per-piece is what keeps the export
+ * permanently right rather than wrong until somebody remembers — and it is
+ * mechanical, because the list is already ordered for exactly this reason.
  */
 const TABLES = [
   'subjects',
@@ -32,6 +38,47 @@ const TABLES = [
   'fragment_subjects',
   'fragment_constellations',
   'fragment_versions',
+  // --- HQ (private; never public, at any grain) ---------------------------
+  'settings',
+  'daily_checkins',
+  'people',
+  // `interactions` owns nothing; `interaction_people` carries BOTH foreign keys,
+  // so it must come after `people` and after `interactions` — an importer
+  // walking this list top to bottom can never trip either one.
+  'interactions',
+  'interaction_people',
+  // The agenda (13 · Pieces 1 and 2). FK order: `goals` first, because
+  // `tasks.goal_id` points at it; then `task_events`, which points at `tasks`.
+  // An importer walking this list top to bottom can never trip either one.
+  // ⚠ NOT `goal_last_done` — a VIEW, and exporting a derived value would put a
+  // stored copy of a computation into the artefact you restore from.
+  'goals',
+  'tasks',
+  'task_events',
+  // 13 · Piece 4. `event_people` carries a key into BOTH `events` above and
+  // `people` far above, so it lands after each of them.
+  'events',
+  // 13 · Piece 3. The Google mirror. It owns no foreign key at all — the tags
+  // that reference it do so by TEXT (`event_people.external_id` is a series id,
+  // deliberately not an FK) — so its only ordering requirement is to precede
+  // `event_people`, which reads better anyway.
+  //
+  // ⚠ IT IS EXPORTED EVEN THOUGH IT IS A COPY, and the reason is the tags: an
+  // export holding the annotations without the rows they hang off would restore
+  // to a set of person tags pointing at nothing until the next sync.
+  'external_events',
+  // The cursor and the mirror's health. One row.
+  'calendar_sync',
+  'event_people',
+  // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
+  // — `works` and `fragments`, already listed far above — as well as into
+  // `people`, so they land last and an importer walking top to bottom is safe.
+  'person_works',
+  'person_fragments',
+  // ⚠ NOT `person_last_contact`. It is a VIEW, derived from the two rows above,
+  // and exporting it would put a stored copy of a computed value into the
+  // artefact people restore from — the exact drift data-model.md §7 forbids.
+  // The type union below would reject it anyway, which is the check working.
 ] as const;
 
 /**
@@ -88,8 +135,13 @@ export const GET: APIRoute = async ({ locals, url }) => {
 
   const counts = Object.fromEntries(TABLES.map((t) => [t, tables[t].length]));
   const payload = {
-    format: 'it-only-happens-once/corpus',
-    version: 1,
+    // `personal`, not `corpus`, since 2026-08-02: the file stopped being the
+    // publishable half of the site the moment HQ tables joined it (ADR-0012).
+    // The rename is the point — an importer that keys off `format` should fail
+    // loudly on the change rather than quietly treat a private export as a
+    // corpus one, and the version bump says the shape widened.
+    format: 'it-only-happens-once/personal',
+    version: 2,
     exportedAt: new Date().toISOString(),
     source: url.origin,
     // Images are referenced by URL, never embedded. They live in the `site`
@@ -104,8 +156,11 @@ export const GET: APIRoute = async ({ locals, url }) => {
   return new Response(JSON.stringify(payload, null, 2), {
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'content-disposition': `attachment; filename="it-only-happens-once-${date}.json"`,
-      // The corpus, drafts and private notes included. Never store this.
+      // `-personal-` in the filename, deliberately: this is the most sensitive
+      // artefact the app can emit, and the name is the only part of it visible
+      // in a downloads folder six months later.
+      'content-disposition': `attachment; filename="it-only-happens-once-personal-${date}.json"`,
+      // The corpus, drafts, private notes and every HQ table. Never store this.
       'cache-control': 'private, no-store',
     },
   });

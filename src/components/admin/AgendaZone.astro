@@ -1,0 +1,116 @@
+---
+/*
+  AgendaZone — TODAY, the day itself (docs/plans/13-agenda.md §6; 10-hq.md §10c).
+
+  Events and tasks due today in ONE time-ordered list, not two. The question this
+  zone answers is "what is my day", and a day does not come in sections. `byTime`
+  is the calendar's own sort, reused rather than reimplemented, so the same
+  dinner cannot sit above the same task here and below it there.
+
+  ⚠ ONLY TASKS TICK (§10f). An event happens or it doesn't. It gets the same
+  44px column and nothing in it — so the presence of the circle IS the
+  explanation, and no sentence anywhere has to say that events cannot be
+  completed (10-hq.md §10i, preference 1).
+
+  ⚠ AND A TICKED ROW STAYS. Struck through and muted until midnight, and the same
+  click undoes it: a task that vanishes gives no sense of progress and no way
+  back from a mis-tap. `1 of 2 done` counts what you DID — it appears only once
+  you have done one, and it resets nightly. Never a streak, never a total.
+
+  THE ZONE CARRIES ITS OWN `o-*` ORDER, the way CheckinZone does — the narrow
+  stack order (§10c) must not have to be known in two places.
+
+  NO EDITOR HERE, and that is a deliberate reading of "the title is the edit
+  affordance". In the tasks room the title opens the sheet; here it is plain
+  text, and an EVENT's title is a link to the day panel. Today is a summary you
+  read forward — the room is where you change things. That also keeps `TaskSheet`
+  and its goal query off the page opened on a phone at 7am.
+*/
+import { Icon } from 'astro-icon/components';
+import Tick from './Tick.astro';
+import Zone from './Zone.astro';
+import { byTime, type CalendarItem } from '../../lib/hq/calendar';
+import { clockTime } from '../../lib/hq/dates';
+import { progressLabel } from '../../lib/hq/today';
+
+interface Props {
+  items: CalendarItem[];
+  /** Which of today's tasks already carry an answer — they stay, struck through. */
+  answered: Map<string, 'done' | 'skipped'>;
+}
+const { items, answered } = Astro.props;
+
+const rows = [...items].sort(byTime);
+const tasks = rows.filter((i) => i.kind === 'task');
+const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done').length, tasks.length);
+---
+
+{
+  rows.length > 0 && (
+    <Zone title="Today" icon="ph:calendar-blank" accent="cn-amber" order={2} data-agenda-zone>
+      <Fragment slot="actions">
+        <span class="zone__count ml-auto" data-progress hidden={!progress}>
+          {progress}
+        </span>
+        <a class="zone__act" href="/admin/agenda" aria-label="Open the calendar">
+          <Icon name="ph:arrow-right" />
+        </a>
+      </Fragment>
+
+      <div class="zone__body" data-task-list data-progress-total={tasks.length}>
+        {rows.map((it) => {
+          const state = it.kind === 'task' ? answered.get(it.id) : undefined;
+          return (
+            <div
+              class:list={['row', state === 'done' && 'task--done', state === 'skipped' && 'task--skipped']}
+              data-id={it.id}
+              data-kind={it.kind}
+              data-task={it.kind === 'task' ? '' : undefined}
+            >
+              {it.kind === 'task' ? (
+                <Tick answered={!!state} title={it.title} />
+              ) : (
+                /* The same box, empty. Alignment is not the reason — the reason
+                   is that the missing circle has to be visible as missing. */
+                <span class="tick tick--none" aria-hidden="true" />
+              )}
+
+              {/* `anytime` earns its place here for the same reason it does in
+                  the tasks room, and only there: the list is time-ordered, so a
+                  missing time is what decides where the row sits. */}
+              <span class:list={['row__time', !it.at && 'row__time--none']}>
+                {it.at ? clockTime(it.at) : it.kind === 'task' ? 'anytime' : 'all day'}
+              </span>
+
+              <span class="min-w-0 flex-1">
+                {/* A mirrored row's door leads OUT — to the event on Google,
+                    which is the only place it can be changed. New tab, because
+                    leaving Today to read somebody else's calendar entry and
+                    losing your morning is not a trade anybody wants. */}
+                {it.href ? (
+                  <a
+                    class="row__t row-open"
+                    href={it.href}
+                    target={it.kind === 'mirror' ? '_blank' : undefined}
+                    rel={it.kind === 'mirror' ? 'noreferrer' : undefined}
+                  >
+                    {it.kind === 'birthday' && <Icon name="ph:cake" class="row__i" />}
+                    {it.title}
+                    {it.kind === 'mirror' && <Icon name="ph:arrow-up-right" class="row__i" />}
+                  </a>
+                ) : (
+                  <span class="row__t">{it.title}</span>
+                )}
+                {/* Who is there is the reason 12's brief works at all, so it
+                    rides the row rather than being something you open to find. */}
+                {!!it.people?.length && <span class="row__sub">{it.people.map((p) => p.name).join(' · ')}</span>}
+                {it.location && <span class="row__sub">{it.location}</span>}
+                <span class="task__skip">skipped</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Zone>
+  )
+}

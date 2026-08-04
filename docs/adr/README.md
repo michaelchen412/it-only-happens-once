@@ -32,3 +32,22 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted |
 | [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |
 | [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Accepted |
+| [0012](0012-hq-is-a-private-second-domain.md) | HQ is a private second domain in the same app — its own tables, no `anon` policy | Accepted |
+| [0013](0013-absence-never-accumulates.md) | Absence never accumulates: a recurrence is a rule plus one date, and a row is written only on disposition | Accepted |
+| [0014](0014-calendar-is-one-way.md) | The calendar is one-way: Google reads in, HQ owns the personal, and tags are additive | Accepted |
+| [0015](0015-admin-root-becomes-today.md) | `/admin` becomes Today; the Fragment Manager moves to `/admin/fragments`; the building is the Observatory | Accepted |
+| [0016](0016-hq-layering.md) | HQ's three layers — rules are pure, loaders gather, pages render; routing belongs to the page | Accepted |
+
+**Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
+move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —
+0013 with `tasks`/`task_events`, 0014 with the Google mirror. That is the
+pattern the four were written to follow: an ADR is *written* when the decision is
+made and *published* when it is load-bearing, and a decision sitting in a
+git-ignored folder is one nobody outside this repo can read.
+
+⚠ **0014's Context was corrected before it was accepted, not after.** Its draft
+justified the mirror by invitations from other people; reading the live calendar
+end to end found one event in forty-eight created by anyone else, and that what
+actually arrives is Gmail-extracted bookings — flights, hotels, reservations.
+The decision was unchanged and the reasoning was not. ADRs are immutable once
+Accepted, which is exactly why a false premise had to be fixed on the way in.

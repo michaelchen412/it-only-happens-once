@@ -29,7 +29,6 @@ const tally = (rows: any[] | null, key: string) => {
 const subjCount = tally(fs, 'subject_id');
 const authorCount = tally(frs, 'author_id');
 const workCount = tally(frs, 'work_id');
-const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name]));
 ---
 
 <AdminLayout title="Library" active="library">
@@ -38,29 +37,39 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
       title="Library"
       subtitle="The vocabulary the workshop shares — subjects (what a piece is about; their definitions feed the AI suggester), authors and works (where it comes from). Edit in place, merge duplicates, or delete."
     >
-      {/* The corpus export (plan 05·2) lives here rather than in the composing
-          room: it's a housekeeping tool, like everything else on this page.
-          A plain link, not a button with script — the endpoint sets
-          Content-Disposition, so the browser downloads it and never navigates. */}
+      {
+        /* The export lives here rather than in the composing room: it's a
+          housekeeping tool, like everything else on this page. A plain link,
+          not a button with script — the endpoint sets Content-Disposition, so
+          the browser downloads it and never navigates.
+
+          It says "everything" because it now is everything: the corpus AND the
+          private HQ tables in one file (ADR-0012). The label has to carry that,
+          because a file called "corpus" gets treated like one. */
+      }
       <a
         slot="actions"
         href="/admin/export.json"
         download
         class="btn btn-ghost btn-sm normal-case"
-        title="Every fragment, subject, author, work, constellation and page as one JSON file"
+        title="Everything in one JSON file — the whole corpus and every private HQ table. The most sensitive file this site can produce; keep it somewhere you'd keep a password."
       >
-        <Icon name="ph:arrow-down" class="text-base-content/60" /> Export corpus
+        <Icon name="ph:arrow-down" class="text-base-content/60" /> Export everything
       </a>
     </PageHeader>
     <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
 
     {/* SUBJECTS */}
     <section class="mb-12">
-      <h2 class="mb-3 font-display text-lg">Subjects <span class="text-base-content/40 text-sm">({(subjects ?? []).length})</span></h2>
-      <div class="overflow-x-auto rounded-box border border-base-300">
+      <h2 class="font-display mb-3 text-lg">
+        Subjects <span class="text-base-content/40 text-sm">({(subjects ?? []).length})</span>
+      </h2>
+      <div class="rounded-box border-base-300 overflow-x-auto border">
         <table class="w-full font-sans text-sm">
           <thead>
-            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+            <tr
+              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
+            >
               <th class="px-3 py-2 font-normal">Name</th>
               <th class="px-3 py-2 font-normal">Definition</th>
               <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
@@ -68,23 +77,42 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
             </tr>
           </thead>
           <tbody>
-            {(subjects ?? []).map((s) => (
-              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="subject" data-id={s.id}>
-                <td class="px-3 py-2"><input data-field="name" value={s.name} class="input input-xs input-bordered w-36" /></td>
-                <td class="px-3 py-2"><input data-field="definition" value={s.definition ?? ''} placeholder="one-line meaning…" class="input input-xs input-bordered w-full" /></td>
-                <td class="px-3 py-2 text-right text-base-content/60">{subjCount[s.id] ?? 0}</td>
-                <td class="px-3 py-2">
-                  <div class="flex items-center gap-2">
-                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                      <option value="">Merge into…</option>
-                      {(subjects ?? []).filter((o) => o.id !== s.id).map((o) => <option value={o.id}>{o.name}</option>)}
-                    </select>
-                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {
+              (subjects ?? []).map((s) => (
+                <tr
+                  class="lib-row border-base-300 border-b align-top last:border-0"
+                  data-entity="subject"
+                  data-id={s.id}
+                >
+                  <td class="px-3 py-2">
+                    <input data-field="name" value={s.name} class="input input-xs input-bordered w-36" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      data-field="definition"
+                      value={s.definition ?? ''}
+                      placeholder="one-line meaning…"
+                      class="input input-xs input-bordered w-full"
+                    />
+                  </td>
+                  <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
+                  <td class="px-3 py-2">
+                    <div class="flex items-center gap-2">
+                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                        <option value="">Merge into…</option>
+                        {(subjects ?? [])
+                          .filter((o) => o.id !== s.id)
+                          .map((o) => (
+                            <option value={o.id}>{o.name}</option>
+                          ))}
+                      </select>
+                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
           </tbody>
         </table>
       </div>
@@ -92,11 +120,15 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
 
     {/* AUTHORS */}
     <section class="mb-12">
-      <h2 class="mb-3 font-display text-lg">Authors <span class="text-base-content/40 text-sm">({(authors ?? []).length})</span></h2>
-      <div class="overflow-x-auto rounded-box border border-base-300">
+      <h2 class="font-display mb-3 text-lg">
+        Authors <span class="text-base-content/40 text-sm">({(authors ?? []).length})</span>
+      </h2>
+      <div class="rounded-box border-base-300 overflow-x-auto border">
         <table class="w-full font-sans text-sm">
           <thead>
-            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+            <tr
+              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
+            >
               <th class="px-3 py-2 font-normal">Name</th>
               <th class="px-3 py-2 font-normal">Note</th>
               <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
@@ -104,23 +136,42 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
             </tr>
           </thead>
           <tbody>
-            {(authors ?? []).map((a) => (
-              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="author" data-id={a.id}>
-                <td class="px-3 py-2"><input data-field="name" value={a.name} class="input input-xs input-bordered w-44" /></td>
-                <td class="px-3 py-2"><input data-field="note" value={a.note ?? ''} placeholder="dates, a line…" class="input input-xs input-bordered w-full" /></td>
-                <td class="px-3 py-2 text-right text-base-content/60">{authorCount[a.id] ?? 0}</td>
-                <td class="px-3 py-2">
-                  <div class="flex items-center gap-2">
-                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                      <option value="">Merge into…</option>
-                      {(authors ?? []).filter((o) => o.id !== a.id).map((o) => <option value={o.id}>{o.name}</option>)}
-                    </select>
-                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {
+              (authors ?? []).map((a) => (
+                <tr
+                  class="lib-row border-base-300 border-b align-top last:border-0"
+                  data-entity="author"
+                  data-id={a.id}
+                >
+                  <td class="px-3 py-2">
+                    <input data-field="name" value={a.name} class="input input-xs input-bordered w-44" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      data-field="note"
+                      value={a.note ?? ''}
+                      placeholder="dates, a line…"
+                      class="input input-xs input-bordered w-full"
+                    />
+                  </td>
+                  <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
+                  <td class="px-3 py-2">
+                    <div class="flex items-center gap-2">
+                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                        <option value="">Merge into…</option>
+                        {(authors ?? [])
+                          .filter((o) => o.id !== a.id)
+                          .map((o) => (
+                            <option value={o.id}>{o.name}</option>
+                          ))}
+                      </select>
+                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
           </tbody>
         </table>
       </div>
@@ -128,11 +179,15 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
 
     {/* WORKS */}
     <section class="mb-12">
-      <h2 class="mb-3 font-display text-lg">Works <span class="text-base-content/40 text-sm">({(works ?? []).length})</span></h2>
-      <div class="overflow-x-auto rounded-box border border-base-300">
+      <h2 class="font-display mb-3 text-lg">
+        Works <span class="text-base-content/40 text-sm">({(works ?? []).length})</span>
+      </h2>
+      <div class="rounded-box border-base-300 overflow-x-auto border">
         <table class="w-full font-sans text-sm">
           <thead>
-            <tr class="border-b border-base-300 bg-base-200/50 text-left text-xs tracking-wide text-base-content/60 uppercase">
+            <tr
+              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
+            >
               <th class="px-3 py-2 font-normal">Title</th>
               <th class="px-3 py-2 font-normal">Author</th>
               <th class="w-16 px-3 py-2 font-normal">Year</th>
@@ -141,30 +196,49 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
             </tr>
           </thead>
           <tbody>
-            {(works ?? []).map((w) => (
-              <tr class="lib-row border-b border-base-300 last:border-0 align-top" data-entity="work" data-id={w.id}>
-                <td class="px-3 py-2"><input data-field="title" value={w.title} class="input input-xs input-bordered w-44" /></td>
-                <td class="px-3 py-2">
-                  <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
-                    <option value="">— none —</option>
-                    {(authors ?? []).map((a) => <option value={a.id} selected={a.id === w.author_id}>{a.name}</option>)}
-                  </select>
-                </td>
-                <td class="px-3 py-2"><input data-field="year" type="number" value={w.year ?? ''} class="input input-xs input-bordered w-16" /></td>
-                <td class="px-3 py-2 text-right text-base-content/60">{workCount[w.id] ?? 0}</td>
-                <td class="px-3 py-2">
-                  <input data-field="kind" type="hidden" value={w.kind ?? ''} />
-                  <div class="flex items-center gap-2">
-                    <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                    <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                      <option value="">Merge into…</option>
-                      {(works ?? []).filter((o) => o.id !== w.id).map((o) => <option value={o.id}>{o.title}</option>)}
+            {
+              (works ?? []).map((w) => (
+                <tr class="lib-row border-base-300 border-b align-top last:border-0" data-entity="work" data-id={w.id}>
+                  <td class="px-3 py-2">
+                    <input data-field="title" value={w.title} class="input input-xs input-bordered w-44" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
+                      <option value="">— none —</option>
+                      {(authors ?? []).map((a) => (
+                        <option value={a.id} selected={a.id === w.author_id}>
+                          {a.name}
+                        </option>
+                      ))}
                     </select>
-                    <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td class="px-3 py-2">
+                    <input
+                      data-field="year"
+                      type="number"
+                      value={w.year ?? ''}
+                      class="input input-xs input-bordered w-16"
+                    />
+                  </td>
+                  <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
+                  <td class="px-3 py-2">
+                    <input data-field="kind" type="hidden" value={w.kind ?? ''} />
+                    <div class="flex items-center gap-2">
+                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
+                        <option value="">Merge into…</option>
+                        {(works ?? [])
+                          .filter((o) => o.id !== w.id)
+                          .map((o) => (
+                            <option value={o.id}>{o.title}</option>
+                          ))}
+                      </select>
+                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
           </tbody>
         </table>
       </div>
@@ -192,7 +266,9 @@ const authorName = Object.fromEntries((authors ?? []).map((a) => [a.id, a.name])
         const btn = e.currentTarget as HTMLButtonElement;
         const fd = new FormData();
         fd.set('id', id);
-        row.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach((el) => fd.set(el.dataset.field!, el.value));
+        row
+          .querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]')
+          .forEach((el) => fd.set(el.dataset.field!, el.value));
         btn.disabled = true;
         const { error } = await api.update(fd);
         btn.disabled = false;

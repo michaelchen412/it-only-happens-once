@@ -9,7 +9,7 @@ import { blockWrites } from './fixtures';
 
 /** Open the composer on a brand-new piece and wait for the editor to mount. */
 async function openNewWriting(page: import('@playwright/test').Page) {
-  await page.goto('/admin#new-writing');
+  await page.goto('/admin/fragments#new-writing');
   await expect(page.locator('#wsheet')).toBeVisible();
   await expect(page.locator('#ws-editor .tiptap-doc')).toBeVisible();
 }

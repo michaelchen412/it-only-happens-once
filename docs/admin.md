@@ -1,14 +1,18 @@
 # The admin
 
-*The private workshop where Michael creates and edits content. Companion to [`architecture.md`](architecture.md) (rendering/data flow), [`data-model.md`](data-model.md) (the fragment schema), and [`auth.md`](auth.md) (who gets in). The editing-architecture decision is recorded in [ADR 0005](adr/0005-admin-editing-architecture.md).*
+*The private half of the site, where Michael creates and edits content. Companion to [`architecture.md`](architecture.md) (rendering/data flow), [`data-model.md`](data-model.md) (the fragment schema), and [`auth.md`](auth.md) (who gets in). The editing-architecture decision is recorded in [ADR 0005](adr/0005-admin-editing-architecture.md); what lives at the root, and why the building has a name, in [ADR 0015](adr/0015-admin-root-becomes-today.md).*
 
 ---
 
 ## 1. The third room
 
-`design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: a private workshop seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
+`design.md` names two registers: the **Sky** (evocative, curated, near-chromeless) and the **Index** (utilitarian retrieval — search, filters, pills). The admin is **neither**. It is a *third room*: private, seen by no one but Michael, gated to a single account ([`auth.md`](auth.md)).
 
-So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. We deliberately do not over-invest in visual polish for a room only one person enters. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
+**One building, plain rooms.** The whole of `/admin` is the **Observatory** — the room a sky is watched from, and a building whose defining activity is the repeated nightly log. Inside it the rooms keep plain nouns: **Today · People · Agenda · Fragments · Constellations · Library · About**. The Agenda holds three surfaces — Calendar, Tasks and Goals — which is what §9's name was always waiting for. The contrast is deliberate — you navigate by nouns, the corpus keeps the celestial vocabulary. It was called the *Workshop* until 2026-08-02, when `/admin` stopped being the fragment table and the name started describing both the whole and one of its parts ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
+
+So its rule is different. It uses the same design tokens — the `dusk` theme, Atkinson for chrome, Newsreader on the actual writing surface so drafting *feels* like the published essay — but otherwise **optimizes for speed and density over poetry**. Warmth here is expressed as *low friction*: paste a link and the fields fill; type a title and the slug follows; one keystroke publishes.
+
+**The standard is legibility at a glance, not decoration** — and that replaces an earlier rule (*"we deliberately do not over-invest in visual polish for a room only one person enters"*), which was written when this was a publishing form used weekly. Today is opened first thing every morning, and a daily driver earns the investment a form did not. Legibility is the test, so the spend goes on knowing where you are before reading a word: bordered zones with hue-tinted headers, one colour axis for *domain* and a separate one for *urgency* that never mean each other, and a domain with nothing to say rendering quiet rather than as an empty skeleton.
 
 Everything under `/admin` is `prerender = false` and auth-gated by [`middleware.ts`](../src/middleware.ts) (must be the admin role). Nothing here is ever cached or public.
 
@@ -18,14 +22,23 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 
 | Surface | Route | What it is |
 |---|---|---|
-| **Fragment list** | `/admin` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
-| **Trash** | `/admin?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
-| **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
-| **Song quick-editor** | slide-over, any admin page | Light: paste a Spotify track or album link → title/art/embed auto-fill; artist/album/year, subjects with **✦ Suggest with AI** (which needs the annotation — §8), and **"Why this one"** — the annotation that leads the public stanza (§6). **Publishes on save** (like quotes); unpublish via the list. |
-| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin#edit=<id>` / `#new-writing`, which auto-open the sheet. |
+| **Today** | `/admin` | The front door, and the daily one ([ADR 0015](adr/0015-admin-root-becomes-today.md)). The date bar *is* the control — `‹ ›` step a day, the date opens a month calendar, `↩ Today` returns, and the route is `/admin?date=YYYY-MM-DD`. Below it, one bordered zone per domain: **Morning** (§11), **Today** (the day's events and tasks), **People** (the brief, then drift), **Coming up** (lead-driven), **Practice** (signals) and **Past due**, full width at the foot. **Only the check-in follows the date bar** — every other zone is a statement about *now*. See §16. |
+| **People** | `/admin/people` | The roster (§12), grouped by circle with a coming-up rail above it. Search appears only past six people and filters in place. Archived people sit in a section of their own, out of the roster and out of search. |
+| **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, the **timeline** in the main column with its log box open at the head, **About** and **Shared** in the rail, and a pencil on the block it edits. On a phone the order inverts: About first, because you open a profile there to remember who somebody is, not to scroll a year of entries. |
+| **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
+| **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
+| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one plain textarea that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil edits in place, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5c). Visible only when a reading filled the sheet in. |
+| **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
+| **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
+| **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
+| **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. A collapsed **Shared by** field says which person put these words in front of you (§12) — applied immediately, like constellation membership. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
+| **Song quick-editor** | slide-over, any admin page | Light: paste a Spotify track or album link → title/art/embed auto-fill; artist/album/year, subjects with **✦ Suggest with AI** (which needs the annotation — §8), and **"Why this one"** — the annotation that leads the public stanza (§6). Plus **Shared by** (§12), for the song somebody sent you. **Publishes on save** (like quotes); unpublish via the list. |
+| **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin/fragments#edit=<id>` / `#new-writing`, which auto-open the sheet. A hash never reaches the server, so those links are updated at every *producer* rather than redirected; `/admin` keeps a client-side bounce for old ones. |
 | **Constellations index** | `/admin/constellations` | Every constellation, draft + published: create (a "pile" is just a draft), publish/unpublish, reorder the sky's authored order, delete (placements cascade; fragments untouched). |
 | **The composer** | `/admin/constellations/[id]` | The composing room (design.md §13): the suite in two views over one sequence — **Compose** (dense rows; drag or Alt+↑/↓ to reorder, ✕ unplaces) and **Read** (the public stanzas verbatim, drafts included) — plus the constellation's name/slug/colour/status/description/score, the three tests as quiet gauges, Preview → the real public page (drafts render for the admin only). One **Add** button opens the fragment browser. |
-| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite. |
+| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin/fragments` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite. |
 
 **The fragment → constellation view** (added 2026-07-24). The composer answers *what is in this constellation*; these answer *where does this fragment live* — the same join read from the other end:
 
@@ -44,7 +57,7 @@ Adding from this side **appends** to the end of that suite — composed order st
 
 **Shared chrome.** The pieces every surface repeats have exactly one implementation: [`PageHeader`](../src/components/admin/PageHeader.astro) (back link + title + right-aligned actions + one-line explanation), [`TypeMark`](../src/components/admin/TypeMark.astro) (the ▤ ” ♪ mark in its type color, from `TYPE_META`), [`TypeCount`](../src/components/admin/TypeCount.astro) ("▤ 5 writing" badges), [`StatusChip`](../src/components/admin/StatusChip.astro), and the `.admin-*` utilities in `app.css` (`admin-alert`, `admin-label`, `admin-hint`, `admin-back`, `admin-stat`, `admin-chip`). Added 2026-07-23 after four pages had each hand-rolled their own chips, labels, and error banners — and drifted apart. **Type color is not decoration**: it's the same coding the public site uses (design.md §7), so a quote reads as a quote in the manager, the composer, and the browser alike. Navigation is never deeper than one level, so surfaces get a **back link, not a breadcrumb trail**.
 
-**Every fragment edits in an overlay** — clicking a row anywhere (manager, browser, suite) opens the matching sheet; the page underneath never navigates away. One table implementation serves both the page and the browser: `FragmentListPanel` (class-scoped, wired per-instance by `fragment-panel.ts`) rendered by `/admin` directly and by the **`/admin/fragments-panel` partial** for in-place refreshes and the browser (auth-gated by the same middleware).
+**Every fragment edits in an overlay** — clicking a row anywhere (manager, browser, suite) opens the matching sheet; the page underneath never navigates away. One table implementation serves both the page and the browser: `FragmentListPanel` (class-scoped, wired per-instance by `fragment-panel.ts`) rendered by `/admin/fragments` directly and by the **`/admin/fragments-panel` partial** for in-place refreshes and the browser (auth-gated by the same middleware).
 
 ## 3. The shape decisions
 
@@ -143,32 +156,89 @@ with the live anon key — empty array, including through an embedded join.
 **Retention:** keep everything. At ~125 fragments this is fine for years;
 revisit only if it stops being.
 
-## 5b. Notes — the tier below a draft
+## 5b. Notes — the brain dump, and its room
 
-A **note** is a private fragment: a thought that isn't a draft yet. It's a
+A **note** is a private fragment: a thought that isn't a piece yet. It's a
 `status`, not a type, so `note → draft → published` is one linear promotion
 rather than a migration between kinds — private thought graduating into public
 piece, which is the whole shape of this site. See
-[plan 09](plans/09-offline-and-notes.md) Piece 2.
+[plan 09](plans/09-offline-and-notes.md) Piece 2 for the tier and
+[plan 14](plans/14-capture.md) for the room that reads it.
+
+**⚠ The interface around this tier was rebuilt on 2026-08-03, and the reason is
+worth keeping.** Notes shipped in July as a *view of the fragment manager*: a
+table row per note, with a title column, a checkbox and an open action. But a
+jotting has no title, so the room read `untitled, untitled, untitled` and every
+thought cost a click to find out what it said. That is a document interface
+wrapped around something that is not a document, and it made the tier feel like
+an uncomfortable third thing between a piece of writing and a scratch line.
+
+**There are exactly two things now: writing fragments, and brain dumps.**
 
 - **Private by construction.** `fragments_select_published` is an *allowlist*
   (`status = 'published' and deleted_at is null`), so a new tier is unreadable
   by anon with no policy edit and no way to leak by omission. Verified against
   live PostgREST with the real anon key on 2026-07-30 — 0 rows by id, by slug,
   by status, and through the constellation join.
-- **Its own room, not a filter.** Notes live at `/admin?view=notes`, reached
-  from a button beside Trash. A view can't be accidentally cleared into showing
-  scratch work beside finished pieces, and the view's scope is shared by the
-  rows *and* the type-count badges, so the numbers can never disagree with the
-  table.
+- **One door, from every room.** The **✚** at the bottom-right of every
+  Observatory page opens a plain textarea that saves itself on a 700ms debounce
+  — shorter than the writing sheet's 1200ms, because a dump box is not a
+  document you sit in and the pause before *Saved* is the whole reassurance.
+  **＋ New** (or ⌘/Ctrl+Enter) parks the thought under its own id and hands over
+  a blank. An empty box is never a row. It is a `<dialog>`, so you keep the room
+  you were standing in, and there is no title field anywhere.
+- **⚠ It must stay a plain `<textarea>`.** Dictation software types into any
+  text field, so voice capture works for free — provided nothing gets clever
+  with the input handling. That is a constraint on future changes, not a
+  feature.
+- **Its own room, showing the words.** `/admin/notes` renders each dump as its
+  own text, newest-touched first, with an elapsed stamp. A pencil turns the card
+  into a textarea in place — reading is the dominant motion there, so a tap
+  while scrolling must not put a cursor (and on a phone, a keyboard) into a
+  thought you were only passing.
+- **Four ways out, behind one → chooser.** Reading (a pencil) and discarding (a
+  bin) are direct; the four destinations sit behind one control, because they
+  are not four questions — they are one question, *what kind of thing is this?*,
+  asked once. The menu is a top-layer popover (trap 7) positioned against the
+  card that opened it.
+  - **Add to the Agenda…** reads the sentence first (§5c) and opens whichever
+    sheet the reading calls for — a task or an event — already filled in.
+    Saving creates the row and consumes the dump.
+  - **Log an entry…** opens a sheet that asks **who** first — the one field a
+    profile's log box never needs, because there the person *is* the page. Kind
+    and date have honest defaults; there is no defensible default for whose life
+    this was, so Save stays disabled until somebody is named. **The row is
+    absent entirely when the roster is empty.**
+  - **Make it a piece** flips the row to `draft`: same id, same text, same
+    history, no copy.
+  - **Add to a piece…** picks an existing writing fragment and appends the dump
+    to the end of its body as Markdown, then consumes the dump — a pile that
+    keeps showing you a thought you have already filed is a pile you stop
+    trusting.
+- **What can be undone, and the rule behind it.** A task or an entry is a whole
+  row, so undo deletes it and restores the dump. **An append cannot be undone**,
+  and that is the one exception: reversing it means editing the target's body
+  back out, and the writing sheet may have saved over it by then — an undo that
+  sometimes silently does nothing is worse than none. It offers the way to where
+  the words went instead.
+- **Deleted dumps do not go to the corpus trash.** `?view=trash` excludes them,
+  as the working list always has, so scratch cannot reappear beside finished
+  work at either end. The pile's own undo strip is the way back; after that the
+  row survives in the database and in the nightly backup, which is the right
+  amount of ceremony for a jotting.
+- **No new table, deliberately.** A `captures` table of its own would buy an
+  honest model — no slug, no title, ever — and pay for it with a migration and,
+  worse, with *make it a piece* becoming an insert-plus-delete across two
+  tables. The motion that matters most is free precisely because a dump and a
+  piece are the same row at different stages. The slug is minted once on insert
+  (the column is `NOT NULL`) and never shown.
 - **Where it sorts is load-bearing.** `'note'` was added to the enum **before**
   `'draft'`, because the manager sorts `.order('status')` — so the list reads in
   the same order the pipeline runs. Enum ordering can't be changed later without
   recreating the type.
-- **Creating and promoting.** *Add ▾ → Note*, or `#new-note`. A note autosaves
-  exactly like a draft. **Make it a draft** in the sheet promotes one; the notes
-  view's bulk bar promotes many. The working list can send pieces the other way
-  with **Make notes**.
+- **A piece can still be sent back down.** **Make notes** in the bulk bar is a
+  demotion, and it stays. What went is *Add ▾ → Note* — a second front door that
+  opened a titled sheet for something with no title.
 - **Every fragment type can be a note** — a jotted quote is a real thing. But
   constellations can't: `constellations.status` is a plain `text` column, not the
   enum, so the Zod schema is deliberately split into `fragmentStatus` and
@@ -296,9 +366,9 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 
 **Always an explicit press, never automatic** — it's a paid call, and the publish dialog's contract is instruments that never act on their own. **When it fails, the reason is the reason:** the action used to report every failure as "couldn't reach the model", including a 400 whose body said the account was out of credit. It now surfaces the API's own message (admin-only, so that's safe) and logs the rest.
 
-## 9. Installing the Workshop (phone & iPad) — and why it's not optional
+## 9. Installing the Observatory (phone & iPad) — and why it's not optional
 
-**The Workshop is installable to the home screen; the public site is not.** Only
+**The Observatory is installable to the home screen; the public site is not.** Only
 [`AdminLayout`](../src/layouts/AdminLayout.astro) carries a manifest
 ([`public/workshop.webmanifest`](../public/workshop.webmanifest)), so readers are
 never offered an "install" they'd have no use for.
@@ -309,7 +379,7 @@ visit**, and home-screen web apps are exempt, so installing was what kept the
 writing sheet's offline outbox alive between sessions. **That outbox was removed
 the following day** ([ADR 0010](adr/0010-online-first-writing.md)) — there is no
 local storage left to protect, and the install is now simply a convenience: its
-own icon, its own window, opening straight into the workshop instead of the
+own icon, its own window, opening straight into Today instead of the
 homepage. Kept because it costs nothing and reads better than a browser tab.
 
 **How, on iOS:** open `/admin` in **Safari** (not another browser) → Share →
@@ -319,7 +389,7 @@ would forfeit the storage exemption. On Android/desktop Chrome, the install
 prompt appears in the address bar.
 
 **Install from `/admin`, not from the homepage** — nothing public links into the
-Workshop, so an app that lands anywhere else means typing the URL every time.
+Observatory, so an app that lands anywhere else means typing the URL every time.
 The manifest's `start_url` says `/admin` for the same reason; `scope` is `/` so
 tapping **Site ↗** stays inside the app instead of bouncing you to Safari.
 
@@ -346,3 +416,373 @@ theme toggle against it can leave the bar a shade out.
 - ~~**Revision history / timeline**~~ — **shipped 2026-07-30** as draft versions (§5a), and it arrived by a side door: history stopped being a feature to build and became a *consequence* of how editing a published piece works. What is still deferred is a **diff view** — side-by-side preview is enough for one author.
 - **Bulk import tooling** beyond paste (quote capture) — [architecture.md](architecture.md) §6.5. *Batch Spotify is off the table, not deferred:* Spotify removed the batch endpoints for Development Mode apps in Feb 2026, so it's one request per track now.
 - **`/listening`** — songs have no public surface of their own (no permalink, no `/blog` view); they appear only as stanzas inside a constellation. Plan 04 Piece 5.
+
+## 11. The morning check-in
+
+*The first HQ surface. Schema in [data-model.md](data-model.md) §6b; the boundary it sits behind in [ADR 0012](adr/0012-hq-is-a-private-second-domain.md).*
+
+It is the **Morning zone on Today**, pinned first and always present — answered or not. It is deliberately **not a modal and not a wall**: it is a card that dismisses, so the day behind it is reachable in one tap.
+
+**It is not a form you submit.** One row per local date, upserted as you go. A tap saves immediately; typing debounces and flushes on blur. There is no Save button, because the thing a Save button implies — that the answers are provisional until you press it — is false. "Done" only closes the card.
+
+**Four states, all rendered from the same row:**
+
+| State | What it is |
+|---|---|
+| **ask** | The prompt. One tap to start, one to skip. |
+| **fill** | The form, prefilled from the row — or, on today only, from your recent medians. |
+| **done** | A compact summary with a pencil back into the form. |
+| **skipped** | Explicit, recorded, and reversible. Skipping never wipes answers already given. |
+
+**What it records, and why those shapes**, is in [data-model.md](data-model.md) §6b — the two star scales that must not be merged, the two affect axes that must not become one, and the buckets that are honest where a number would be a guess.
+
+**The field order is dream first.** Dream recall decays within minutes of waking, while the times and the ratings are just as answerable at 9am — so the perishable field goes where you are most likely to still have it. The ordering is done with flex `order`, not source order.
+
+**Every scale carries a word for its current value** (`low`, `restless`, `wrung out`), right-aligned. Half-awake, a bare position on a track means nothing, and the word is also how a mis-tap is noticed without re-reading the scale. **Stars get no word** — five stars are self-evident. The words are kept short because at 390px the column has about 66px: the intensity scale's honest top value was *"overwhelming"*, which widened the card and was then sheared off by the zone's `overflow: hidden`, silently.
+
+**The one thing it gives back on day one** is a derived line under the times — time in bed, then an estimate of actual sleep and an efficiency once both buckets are answered. It grows as you answer, and it claims nothing before its inputs exist.
+
+**Backfill is three days**, reachable only by navigating to a past date deliberately, and **enforced in the action** rather than only in the form. Prefill is switched **off** for a past day: a plausible suggested time on a day you are reconstructing gets confirmed without ever being recalled. Outside the window a date is readable and not editable.
+
+**Times on screen are never UTC.** A project rule, not a detail of this surface: pages render on a server whose clock is UTC, so any date formatted there is UTC unless something says otherwise — and *"Saved 12:41 AM"* in UTC is not a time anybody was awake for. It looks like a real time, which is what makes it worth a mechanism. Every stamp renders a real `<time datetime>` whose server-side fallback is already in the **configured home zone**, and [`src/scripts/local-time.ts`](../src/scripts/local-time.ts) — mounted from the layout, so no page has to remember to opt in — rewrites it into whatever zone the reader's device is in.
+
+⚠ **That is display only, and the distinction is load-bearing.** The browser may say what o'clock it was; it never says what *day* it was. The day boundary stays server-side on the configured zone, because scheduled work has no browser and a laptop with a stale clock must not be able to move it ([data-model.md](data-model.md) §6b).
+
+**Phone-first**, and that is not a variant — it is the constraint the design was drawn against: under 60 seconds, one screen, thumb-reachable, done half-awake in bad light. Native `<input type="time">` is used deliberately; anything hand-rolled is slower and worse on iOS. The free-text fields sit behind a tap because they are the ones that summon a keyboard.
+
+## 12. People — the roster
+
+*The second HQ room. Schema in [data-model.md](data-model.md) §6b; the boundary it sits behind in [ADR 0012](adr/0012-hq-is-a-private-second-domain.md).*
+
+Two surfaces: **`/admin/people`**, the roster, and **`/admin/people/[slug]`**, one person's profile. Adding and editing happen in a shared sheet.
+
+**The roster is grouped by circle.** Not alphabetical, which is a contacts app answering a question he does not have; and **not drift-first**, which would greet him with mild accusation every time he opened the room. That would violate HQ's own principle — *absence never accumulates*, and an observation is never a verdict. Above the sections sits a **coming-up rail** carrying what is actually actionable in the next weeks, which is the reason to open the room at all.
+
+**Search appears only above six people.** A search box over four faces is furniture: it takes space and implies the list is too long to read. Past six it filters the cards already on the page rather than asking the server — the roster's ceiling is 50 rows and they are all present, so a keystroke is a DOM pass. A section whose every member is filtered out hides its heading too, because a heading over an empty grid reads as a rendering bug.
+
+**The card is a horizontal photo-beside-text row**, three across on desktop and one on a phone. A vertical photo-above-name tile is the contacts-app shape and leaves the epithet nowhere to live — and the epithet is what makes a roster feel like people. The photo is generous because faces are recognised far faster than names, falling back to a **monogram on a hue wash** taken from the constellation ramp, keyed on the person's id so it is stable and so adding somebody does not repaint the roster. Deliberately left off the card: interaction counts and any cadence progress bar, which turn people into metrics.
+
+**Archiving is the only way somebody leaves the roster**, it is always an explicit click, and it is reversible. Archived people are out of the roster *and* out of search, in a section of their own at the bottom. Nothing is ever archived automatically, however long the silence.
+
+### The profile is a full page, and that is a departure from §3.6
+
+§3.6 retired the standalone writing page in favour of overlays everywhere. **That decision was about editing context** — clicking an essay while composing a constellation threw you out of the room you were working in. A profile has no analogous host: it is a **reading destination** you navigate to on purpose, and it is long and multi-sectioned in a way a sheet would cramp. The rule still holds for the things you *do* here: adding and editing are overlays.
+
+The header is a compact `dt`/`dd` **fact strip** rather than a form-like stacked list — four short facts read faster side by side and wrap cleanly on a phone. **Editing is a pencil on the block it edits**, not a row of buttons in a corner away from them.
+
+### ⚠ No pronouns in any system-authored label
+
+The prototype shipped headings reading *"Who he is"* and *"From him"*, which quietly assumed HQ knows everybody's gender — and would need a pronoun column to keep that promise. **It does not get one.** Every label is neutral: **About**, **Where**, **Known since**, **Last contact**. Pronouns appear only inside Michael's own prose, where he is the author. This is cheap to hold now and expensive to retrofit, since a pronoun column would exist to serve labels that should never have needed it.
+
+### Photos live in a private bucket, and that changes the mechanics
+
+Person photos **cannot** go in the `site` bucket. `site` is `public = true`; listing was closed off later, but objects stay readable by anyone holding the URL, and the unguessable path is the entire protection. That trade is right for an essay's photographs, which are published anyway. It is not right for a friend's face.
+
+So there is a second bucket, **`hq`**, private, `is_admin()` on all four verbs and **no public-read policy at all** — that omission is the point. It excludes GIF on top of `site`'s no-SVG rule, which also means every object in it has been through the downscale path (a canvas keeps one frame of a GIF, so GIF is the one format the uploader passes through untouched).
+
+Three consequences worth knowing:
+
+- **URLs are signed and they expire.** Sign at request time and never bake one into anything cached or persisted. `people.photo_path` stores the object **path**, never a URL.
+- **The upload happens after the row exists**, because the path is keyed on the person's id so a rename never orphans a face. Add sheet order is therefore save → upload → point the row at it, and a failed upload leaves you with a created person and a sentence rather than a lost form.
+- ⚠ **The nightly archive does not cover this bucket**, and copying the existing step would not fix it. That workflow fetches each object's bytes from its **public URL**; a private bucket has no such URL, so the copied step would archive nothing and the failure would look exactly like an empty bucket. See [backups.md](backups.md).
+
+### The log — the piece that makes the roster pay for itself
+
+*Added 2026-08-03 by 12 · Piece 2.*
+
+Every personal CRM dies the same way: logging is work and the payoff is years away, so by March the database is empty. The defence is that **logging pays out at the moment of use** — you open a profile before seeing somebody and read what you last knew, **in your own words**. Nothing here generates or condenses that text, and the interface must not imply otherwise.
+
+**The box is open at the head of the timeline, always.** Not behind a button, not in a dialog: *"if logging always costs opening a document editor, the 15-second jots never happen — and the 15-second jots are most of what makes the brief good."* So it is one line tall and grows as you type; every field is pre-defaulted (this person, today, hangout); and the kind/date/people controls stay hidden until there are words, because an empty box already showing three controls is not a box you dash a thought into. `Expand ↗` is the second altitude — same entry, same storage, room for the conversation that mattered.
+
+**A textarea, not TipTap** (2026-08-03, reversing the original plan). Piece 4 puts this same box on Today, and Today deliberately ships no editor bundle so the page opened on a phone at 7am stays light. It stores the same Markdown either way.
+
+**One editor, two jobs.** Editing an entry loads it back into the same box rather than opening a second one — a profile with two places to type is a profile where you have to decide which one to use. Deleting is a hard delete behind a confirm: unlike a person there is no archive to fall back on, and a log entry is only ever removed because it was wrong.
+
+**Saving is explicit, unlike the check-in.** That surface autosaves because it is one row per day you return to; an entry is a discrete thing you finish, and a debounce would turn a half-typed sentence into a row every time the phone locked.
+
+**The date is a date.** Three one-tap options (today / yesterday / 2 days ago), then a real date input, and **no time field anywhere** — nobody recalls that the dinner started at 7:14. Backdating is unlimited: this is *not* the check-in's three-day window, because a dinner three months ago is a memory rather than an invention, and entering a year of history on the day you start is a feature. The future is refused.
+
+**What the log gives back:** *Last contact* joins the profile's fact strip — a derived fact sitting in the same row as the stored ones, because they look identical to a reader — and the roster gains a last-contact line on every card, **sorted by last interaction, descending**. That is §3's *information without accusation*: people you are actually in touch with float up and drift sinks on its own. Somebody with no entries reads **"No entries yet"** and sorts last, because they are **new rather than neglected**.
+
+### Shared — the one seam with the corpus
+
+*Added 2026-08-03 by 12 · Piece 3.*
+
+Everywhere else the boundary is absolute: HQ data never becomes corpus data, and a log entry is never promoted into an essay. **Shared** is the exception, and it leaks in one direction only — it renders public rows on a private page, never the reverse. The link rows carry no `anon` policy, and no public route touches the tables at all.
+
+**A work is the link that keeps paying.** Link somebody to a book once and **every quote carrying that `work_id` appears on their profile — including ones added years later**. That is why the link routes through `works` rather than tagging each quote: hand-tagging gives the same page today and a stale one in a year. The row is a `<details>`; the quotes are one tap below it, not behind a navigation, because the thing asked for was *"on their profile I want to see the quotes from that book."*
+
+**A fragment is the direct edge**, for what that path cannot reach: a song somebody sent, a line they said out loud that never came from a book. A fragment reachable **both** ways appears exactly once — under its work, carrying the direct link's note — because the same row twice reads as a rendering bug.
+
+**Both directions get UI.** From a profile, the ＋ opens a two-mode drawer; from the quote and song editors, a collapsed **Shared by** field. And when you search the corpus for a line somebody said and find it is not there, the sheet offers **"Add a quote from them →"**, which opens the fragments room with the quote sheet already attributed. That is a real link rather than an overlay: the quote editor is TipTap, and the profile deliberately ships no composer bundle.
+
+**Unlinking lives inside the fold**, one tap into the expanded row rather than on the summary. Two reasons, and the second is load-bearing: removing a link is deliberate and has no business under the cursor while you are only reading, and **a `<button>` inside a `<summary>` is activated by the same click that toggles the `<details>`** — so an unlink control on the summary row would open or close it every time.
+
+**A trashed fragment leaves the shelf; its link row survives.** Restoring the fragment restores the attribution. Losing it silently on a trash-then-restore is the kind of quiet data loss this database cannot survive.
+
+### Drift — the observation, never the verdict
+
+*Added 2026-08-03 by 12 · Piece 4. This is the piece that pays the logging back.*
+
+**Cadence is one year, on by default, for everyone**, overridable per person. A year is long enough that being told is a favour rather than a scold, and at 25 people it surfaces a handful rather than a wall. The same design would not be defensible at 30 days.
+
+It shows in exactly three places, and never as arrears:
+
+- **On the card**, the last-contact line **shifts weight and darkens**. Nothing else changes — no badge, no count, no red, no progress bar. The person is already named once in the panel above; this exists so that *scanning* a section still tells you, not so drift is announced twice.
+- **On the roster**, a **"Been a while"** notice panel above the circle sections. Warm, not red, because it persists until acted on and a permanent red marker becomes wallpaper you resent — and **deliberately not card-shaped**, so it can never read as a second section of the directory. It is an observation *about* the roster, not part of it. It renders a **duration** (*"over a year ago"*), never a date, with the exact day one tap away.
+- **On Today**, the same panel **capped at three**, most-drifted first, with a count and a door to the room. Never a fourth row: the roster is where the full list lives, and Today is a nudge rather than an inbox.
+
+**Ordering is by how far past their OWN cadence, not by raw days.** Somebody on a six-month cadence at seven months has drifted further than somebody on a one-year cadence at eleven, even though the second number is bigger — and sorting by days would silently override every cadence set by hand.
+
+**Two dismissals, both on the row**, because a notice you cannot clear from where you are reading it is a notice you learn to scroll past:
+
+- **Reached out** writes a real interaction dated today. Not a hidden flag: a `last_reached_out_on` column would be a *second* source of "when did I last make contact" sitting beside the one everything derives from. The honest cost is that the entry's words are the system's — it is editable and deletable like any other, which is the way back.
+- **That's fine** mutes for another full cadence, counted **from today**. Some relationships genuinely *are* annual. The count of mutes accrues for a rule that cannot fire before 2028; see [data-model.md](data-model.md) §6b.
+
+**⚠ What deliberately does *not* reset the clock: editing the person's record.** If fixing a typo silenced a one-year notice, the feature would be defeated by the most trivial possible action — and silently, so you would never know it had happened.
+
+**⚠ Both guards are live.** *Drift requires at least one logged interaction* has always been enforced; *anyone with an event today is never drifting* needed an events table and closed with §15's calendar, as one more clause in the same derivation.
+
+### The brief — logging pays out at the moment of use
+
+*Live since the agenda landed; see §16.* When somebody you have tagged on an event is on today's calendar, Today's People zone leads with **what you last knew about them** — their last contact as a duration, the last log entry **in your own words, verbatim**, the newest thing on their shelf, and their birthday.
+
+**Four lines, four sources, labelled as such.** They are four different queries about four different things, and an early prototype ran them together as one bullet list — which read as a system-written summary of the friendship, the single worst thing this surface could be. The labels are what stop the page implying it understands anything.
+
+**What is absent stays absent.** A person with no logged entry gets no *Last contact* line and no *Then* line rather than "never" — the same guard drift keeps. A brief with nothing to say is reduced to a name, a time, and **Log an entry**, which is the one thing you can do about it.
+
+**It caps at three**, and the cap is applied before the history is fetched: a dinner party of nine must not cost nine people's history to render three briefs. The drift guard is deliberately *not* computed from the capped list — a guest the cap dropped is still someone you are seeing today.
+
+---
+
+## 13. Tasks — the agenda's first surface
+
+*Schema in [data-model.md](data-model.md) §6b; the principle it is built to enforce in [ADR 0013](adr/0013-absence-never-accumulates.md).*
+
+**`/admin/agenda/tasks`**, with a `<dialog>` sheet for writing one down. **Personal only** — work lives on the company's platform, which is what removes the pressure that turns a personal task list into project management. Deliberately excluded, and each is where one goes to die: sub-tasks, dependencies, tags, time-blocking, contexts, energy levels.
+
+**The list is grouped by when: `Past due · Today · This week · Later · Unscheduled`.** Past due is **first here — the opposite of Today**. That looks like an inconsistency and is not one: both rooms order by time, and arrears are chronologically first. Today is a summary you read forward, so meeting them last is right there; this room is where triage happens, so meeting them first is right here.
+
+**Nothing on the page counts what is owed.** The number beside a heading says how big a list is; *"6 overdue"* would be a verdict about a person, on a page that can be opened at 7am on a bad morning.
+
+**Effort is drawn as a magnitude, not a category** — a four-step meter plus the word, filled to the step, because effort is *ordered* and four identical chips throw that away. The ramp is the agenda's own amber at four densities: an intensity ramp **inside** the domain colour, so no fifth colour meaning enters the system and red still means only one thing. **Priority is prominence, and prominence is not colour**: `high` sets the title in bold, `low` mutes it, and neither ever borrows the urgency axis.
+
+### Answering for something
+
+**A task ticks off in place and stays.** One click, no menu, no dialog; it sits there struck through until midnight and the same click undoes it. A task that vanishes gives no sense of progress and no way back from a mis-tap.
+
+**A past-due row carries the choice instead of a circle:** **Did it** / **Skipping it**, with icons rather than two same-shaped text chips, because this is the one control that has to be answerable at a glance. There are two honest answers to something that has gone past its date, and a tick beside a *Did it* chip is two paths to one outcome while saying nothing about the other.
+
+**Both answers are recorded and both advance the schedule.** A skip is an answer, never inferred from silence — a day the app was not opened must stay distinguishable from a day a chore was deliberately let go. Answering twice on the same day is refused, so a double-tap on a slow connection cannot advance a fortnightly chore by a month.
+
+### The two live mechanics in the sheet
+
+Both exist because the rules they express are invisible until weeks later, and an invisible rule is one you fight instead of use.
+
+- **The lead sentence** — *"On Today from **Fri, Aug 7th** — 7 days ahead"*, live as you change effort or priority. It names a **date**, because a date is what you can judge; and when the lead reaches back past today it says **"Already on Today"** rather than printing a date that has gone by. A `project` is 21 days, so that is the common case, not an edge one. One line, and only the outcome: a second line naming which rule fired was drafted and cut for teaching the mechanic instead of stating the result.
+- **The next three occurrences** — the only available verification of a recurrence. You cannot read a rule and know it means what you meant, and one that is subtly wrong stays invisible until months of chores have been scheduled against it. Schedules are picked **by name** (*every Monday · every other Monday · monthly on the 3rd Monday · every weekday…*), and the names are rebuilt from the date, because "every Monday" is only true while the date is a Monday. **`After I do it` previews nothing and says so in one clause** — *"Counted from the day you tick it."* Showing three dates for both modes would have been a lie.
+
+**A lead and a recurrence are both functions of a date, so neither section exists until there is one.** Not a disabled control beside a sentence explaining why it is disabled.
+
+---
+
+## 14. Goals — intentions, not projects
+
+*`/admin/agenda/goals`. Goals are visited monthly, so they are a surface of the Agenda room rather than a room of their own. Schema in [data-model.md](data-model.md) §6b.*
+
+**A goal is a direction, not a scoped deliverable.** *Get back in shape. Finish the Sky.* That framing is the whole reason this exists without becoming project management, and it is visible mostly in what the two surfaces refuse to draw: **no progress bar, no percentage, no subtask count, no "3 of 7 done"** — and no paragraph explaining the absence of any of them.
+
+**Five active goals, and the cap is a fact you can see** (`3 of 5 active` beside the New button) rather than an error you hit. Goals are capped harder than constellations because they are about attention, and attention is scarcer than taxonomy. The sixth is refused in a sentence — and so is re-activating a paused one when five are already active, which is the same overflow arriving through a control that looks like a toggle.
+
+**Four statuses, side by side in the goal's header, and one of them is Let go.** Not hidden behind a delete: abandoning a goal should be a dignified act you take, not a row you erase. One tap, no confirm — it is reversible and it destroys nothing, and a confirm would dress a dignified decision as a dangerous one. Deleting a goal outright *does* confirm, because that one cannot be undone; the sentence names what survives, which is the actual question.
+
+**The one number a goal gets is an observation over the last 30 days** — *"4 tasks done"*, or *"nothing in 6 weeks"* set in italic grey. **A cold goal reads quieter, never redder:** the moment it turns amber it becomes a debt. And **a goal with nothing to observe says nothing at all** — a goal written this morning is new, not neglected, and the naive version would greet it with "nothing in 6 weeks" before lunch.
+
+**The goal page is three sections:** *Scheduled*, *Not scheduled yet*, and *Done toward this*. The third is **a list of what happened**, dated, never a count with a bar beside it — that is the difference between a goal and a project, made visible. The second is why undated tasks have a home at all: a task with a goal and no date is not a graveyard item, it is *part of something I care about, not scheduled yet*. Each of its rows offers **Give it a date**, and that affordance is the entire explanation of what the section is for.
+
+**The horizon is a segmented control, not a text field** — *this season · this year · the next few years*. Three buttons cannot say "March 3rd", which is the vagueness rule enforced by shape rather than by discipline: the moment a goal has a deadline it is a task.
+
+---
+
+## 15. The calendar — four sources, two of them writable
+
+*`/admin/agenda`, the Agenda room's front door. Schema in [data-model.md](data-model.md) §6b; the one-way rule it sits behind in [13-agenda.md] §2.*
+
+A month grid by default — the mental model most people already have, and with one calendar it is not too dense to read. **Week is the same union with room for detail, never a second data model.** Both are **six week rows, always**: a grid that changes height between months makes the page jump and moves the row under the cursor.
+
+### Fill means writable
+
+The contents are a union of four sources, and only two of them can be changed here. Rendering has to make that obvious *without* a label — Today already cut *"Google · read-only"* as chrome nobody would act on — so authority is carried by the shape:
+
+| | Treatment | Because |
+|---|---|---|
+| **HQ event** | solid fill | yours, and the most present thing on the grid |
+| **Task** | lighter fill + `○` | yours, but not an event — it ticks off |
+| **Google mirror** | hairline, no fill | a copy of something that lives elsewhere — its title links out to Google |
+| **Birthday** | no body at all, a cake and a name | not a row anywhere |
+
+**The first draft got this wrong in a way worth recording:** tasks were given an outline ring, which put them in the same visual class as the Google rows — so the loudest distinction on the grid became *event vs everything else* rather than **yours vs not yours**, which is the one the whole treatment exists to make. Fill is now the writable signal and nothing else uses it.
+
+Two reinforcements, neither a word: read-only rows **do not lift on hover** and **reveal a small lock** when the cursor reaches them. That second one is mouse-only — on a phone there is no hover, which is exactly why fill has to carry it alone.
+
+**The legend is the one piece of chrome that earns itself** — four sources on one grid is genuinely ambiguous, and a four-word key is a fixed cost. It lists **only the sources actually present**: a key for something with nothing in it names a feature that does not exist, so until the Google mirror lands nothing says anything is mirrored.
+
+### The day panel is where read-only is explained
+
+Clicking any item opens the day, and **the affordance is the whole explanation**. An HQ event offers *Edit*; a task offers *Did it*; a mirrored row offers **no Edit at all** — its title is a link out to Google, the only place it *can* be changed — plus **Tag someone**, the one write HQ has against Google's copy; a birthday offers nothing at all, because there is no row to open. **No footer, no per-row note, no summary line** — all three were drafted and cut, and the summary earned its removal twice.
+
+**Every control on this page is a real link.** The month steps, the view switches and the day opens through `?date=` / `?view=` / `?day=`, all rendered server-side, so the page works before a byte of JavaScript runs — and so the day panel survives a reload and a back button. It is also how the whole grid avoids the trap that bit the Today prototype: a calendar built with `createElement` silently gets none of its scoped hover, cursor or focus rules.
+
+### Tagging, and the guard it closes
+
+**Who was there is the point.** An event's people are what make the People zone's brief possible, and tagging is additive by construction — it never has to live inside Google's copy, so it cannot create a conflict.
+
+It also closes something: *anyone with an event today is never drifting*. That guard was named in [§12](#12-people--the-roster) and unenforceable for a day and a half, because it needs an events table. The interaction will not be logged until the evening at the earliest, so without it the "Been a while" panel spends the whole of the one day it is wrong telling you that you have neglected somebody you are about to have dinner with.
+
+
+### The mirror — what Google puts there ([ADR 0014](adr/0014-calendar-is-one-way.md))
+
+*Live since 2026-08-03.* The fourth source on the grid finally has a producer.
+
+**It is one direction, and the credential enforces it.** The token carries `calendar.events.readonly` — narrower than `calendar.readonly` — so "HQ never writes to Google" is not a convention the code observes but the only thing the credential permits.
+
+**What it actually carries is not what the plan assumed.** Read end to end before it was built, the live calendar held 48 events: 31 auto-generated birthdays, 9 Gmail-extracted bookings (flights, hotel stays, restaurant and cinema reservations), and 8 test events. **One was created by anybody else.** So the mirror's value is *things Michael did not type and would never type into HQ* — roughly one a month, each of them exactly what you want on the day. The correction is recorded in the ADR rather than quietly fixed, because it changes what "this stopped being worth it" would look like later.
+
+**Google's birthdays are dropped at ingest** — 31 of those 48. HQ derives birthdays from `people` and draws them as a mark rather than a row, so importing Google's would put two differently-drawn entries on the same day, which reads as a bug.
+
+**Two things the API's shape decides, both of them silent if you get them wrong:**
+
+- **Google's all-day end date is exclusive.** A two-night stay reads `29 → 31`. Stored verbatim it puts you in the hotel a night longer than you were, on every stay, for ever.
+- **A multi-day row is on every day it covers.** A four-night hotel is not an event on the day you checked in; it is where you are all week, and the grid's question is *what is my day*.
+
+**It refreshes when you open a page that shows it**, throttled to ten minutes, not on a schedule. There is no scheduler in this repository, and a calendar that changes monthly does not earn push channels renewed weekly. The page renders from the mirror first and asks Google after paint, so a slow or dead network costs freshness and nothing else. The cost is stated plainly rather than hidden: **the mirror is only ever as fresh as your last visit.**
+
+**Staleness is the one thing that speaks.** A one-way mirror buys its simplicity by introducing exactly one new silent failure — if the sync stops, Today is confidently wrong. So Today and the Agenda room carry a quiet line **only when it has gone a day without reaching Google, or has failed**; the rest of the time they say nothing at all, because a permanent "synced 4 minutes ago" is the status line you read once and ignore for ever.
+
+**A `410 GONE` is an instruction, not an error.** It means the incremental cursor is dead; the sync drops it and does a full one rather than logging and carrying on with a stale mirror. That full sync **upserts and marks** — it never truncates and reloads, because a reload leaves a window in which the mirror is empty.
+
+---
+
+## 16. Today, assembled
+
+*The landing surface, and the reason all of this is in one app: the correlation thesis needs sleep, agenda, people and practice on **one page**, or it is four apps again. Schema is elsewhere — this section owns no table. It is entirely a set of reading rules over what §11–§15 already store.*
+
+**Six zones, and their order is an argument:**
+
+| | Zone | What it holds |
+|---|---|---|
+| 1 | **Morning** | The check-in (§11). Pinned first, answered or not. |
+| 2 | **Today** | The day's events and tasks in **one** time-ordered list — a day does not come in sections. Plus a birthday falling today, which is a fact about the whole day and therefore leads it. |
+| 3 | **People** | The brief (§12), then drift capped at three. |
+| 4 | **Coming up** | Everything approaching, each on **its own lead**. |
+| 5 | **Practice** | Signals. The one zone you cannot act on. |
+| 6 | **Past due** | Full width, below both columns, **always open**. |
+
+On a phone the two columns collapse to one stack and **People moves above Coming up** — who you are seeing today matters more than what is three weeks out. That reordering is CSS `order` over a `display: contents` wrapper, so the DOM order and the visual order deliberately disagree below 46rem.
+
+### Only the check-in follows the date bar
+
+The bar exists to **backfill a check-in**. Everything else on the page is a statement about *now*: "Past due", "Been a while" and "Last published" are all false on a Tuesday last March, and offering their dismissals there would write a row dated today from a page that is not about today. So on any other date the page is the date bar and the check-in — which is exactly what it was before the agenda landed, and is still the honest answer.
+
+### Nothing counts what you owe
+
+The single rule the whole page is built to keep ([ADR 0013](adr/0013-absence-never-accumulates.md)). There is no total, no badge, no streak, and no percentage anywhere on it.
+
+- **`1 of 2 done`** counts what you *did*, resets nightly, and **says nothing until you have done one**. `0 of 3 done` at 7am is arithmetic about what you have not done yet — the arrears count wearing a different hat. The alternative that lost was showing `0 of 3` for symmetry, so the line would not "pop in"; a line you earn is a better reward than a line that starts at zero and watches you.
+- **Past due can only ever hold as many rows as there are tasks**, never one per missed occurrence, because those occurrences were never rows.
+- **A skip is not progress.** It moves a row out of the unanswered state without moving the number.
+
+### Coming up is driven entirely by each item's lead
+
+A `project` announces itself 21 days out; a `quick` task the day before; a birthday at whatever its `birthday_lead_days` says. **There is no "next 7 days" setting anywhere in this feature, and its absence is the point** — the list is short because the leads are honest, so when it gets long the fix is the effort on a task rather than a dial on a page. Which is also why it is uncapped, unlike past due: a cap would be the window arriving again under another name.
+
+**Birthdays live here rather than in People.** They sat in the People zone while there was no Coming up to put them in, with a comment saying so. A birthday needs runway for exactly the reason a task does. The cost is real and was weighed: a person's name now sits in an amber agenda zone rather than the azure people one, so the domain hue no longer says what it is — the cake carries that instead.
+
+### Past due is open, and it is last
+
+Two plans disagreed about this and the interface spec won. The sketch had it collapsed to one line — *"3 things past due →"* — and the argument against is that **hiding arrears at the bottom means never resolving them**, and a click in front of a one-tap disposition defeats the point of the one-tap disposition. Being last already does the work the collapse was doing: **you meet it after today, not before it.**
+
+The one guard kept is a **cap on the list, not a hidden section** — eight rows and then a door to the room that holds them all, so a bad fortnight cannot become a wall while nothing is ever concealed.
+
+### Practice: a signal has no verb
+
+Michael asked for the writing nudge in these words: *"Hey, you haven't actually posted anything, any piece of writing, this week."* It is built as a **quiet line and never an overdue item**, because a self-imposed writing commitment turned into a red row is precisely the guilt engine HQ exists to prevent. Nothing in this zone can be pressed, and **cold reads quieter rather than redder** — the moment one of these turns amber it is a debt.
+
+**Writing only**, and that is a fact about the data as much as about the ask: `published_at` is stamped on every published essay, but on 1 quote in 73, and every song's stamp is the day the catalogue was imported. A "last published" line over all three types would report an import as an act of writing.
+
+Beside it sit the active goals' observations (§14), which keep their own cold-start guard: **a goal with nothing to observe says nothing at all.**
+
+### Today reads; the rooms write
+
+A row's title is plain text here, where in the tasks room it opens the sheet. An event's title is a link to the day panel. **No `TaskSheet`, no `EventSheet`, no TipTap** — this is the page opened on a phone at 7am, and the editors stay in the rooms that need them. The only writes on the page are the tick and drift's two dismissals, and both reuse their room's script verbatim.
+
+## 5c. Reading a task out of a sentence
+
+*The parser, [plan 14](plans/14-capture.md) §6. Claude Haiku 4.5, structured
+output, Zod-validated — the same pattern as ✦ Suggest with AI
+([ADR 0007](adr/0007-ai-subject-tagging.md)), and the same rule: the model
+proposes, the person disposes.*
+
+**Add to the Agenda…** on a brain dump sends the sentence to the model and opens
+the sheet it belongs in, filled. *"I have an appointment with the dentist every
+Thursday at 4:00 p.m. Please warn me one day ahead. This is a very important
+task! And leave a note that I should bring a gift every single time."* becomes a
+task titled *Appointment with the dentist*, due the coming Thursday at 4:00 PM,
+repeating weekly, warning one day ahead, at high priority, with the gift as its
+notes.
+
+**Why a model rather than a date library.** `chrono` handles *"tomorrow at
+4:30pm"* and falls over on *"warn me three days in advance"* and *"every third
+Monday"* — those are not date parsing, they are this system's own concepts. And
+separating a task's **title** from its **scheduling words** is exactly what a
+language model is good at and a regex is not.
+
+### What makes it safe
+
+- **The output schema is the system's own enums.** `recurrence` is
+  `z.enum(PRESETS)`, so the model **cannot** propose a schedule the database has
+  no way to store. Asked for *"water the plants every three weeks"* it returns no
+  recurrence and says *"can't schedule that: every three weeks"* — the failure
+  where a parser invents a rule and something downstream rounds it to the
+  nearest one is closed by construction, not by review.
+- **Every filled field carries the words it was read from.** *"2026-08-06 — read
+  from 'every Thursday'"* can be judged at a glance; a date on its own cannot be
+  judged at all, and a silently misparsed date is worse than no parse.
+- **Today and the timezone are passed in**, from `localToday()` over the
+  `settings` table — never the browser, never the server's clock. *"4:30pm
+  tomorrow"* is meaningless without both.
+- **It never makes triage worse by existing.** No key, a dead model, a slow
+  network: the sheet opens anyway with the first line as the title and the rest
+  as the notes, which is exactly what shipped before the parser. No error is
+  shown, because nothing is wrong.
+- **Three contradictions are settled in code, not asked of the model**, because
+  each one is arithmetic and each was seen to fail live: a weekly rule whose
+  weekday disagrees with its date; an *event* carrying a repeat or a lead, which
+  `events` has no column for; and a repeat with no first date to anchor it.
+
+### Which row it picks, and why that is not the router §4.21 banned
+
+**[10-hq §4.21](plans/10-hq.md) forbids a model deciding what a captured thought
+IS**, and the recorded reason is that a router's failure is *silent* — a thought
+filed as the wrong kind disappears into the wrong room. **That ban stands** for
+task vs log entry vs piece.
+
+Event vs task is the one pair it does not reach, for a structural reason:
+**events and tasks share every surface.** Both render on the calendar grid, both
+appear on Today. A wrong guess is the wrong *shape* somewhere you are already
+looking, never a disappearance. And most of the call is capability rather than
+taste — a repeat or a lead **cannot** be an event.
+
+So the model picks, and the **kind bar** at the top of the sheet says which and
+why, with the other shape one tap away. The switch carries the whole reading
+across rather than asking again. **The reason on that bar is derived from the
+fields, never written by the model**: asked to explain itself, it justified a
+correct answer with a repeat the sentence never mentioned and its own fields did
+not contain.
+
+**The line it does not remove:** the same appointment phrased two ways can land
+in two different rows — *"dentist appointment Thursday at 4pm"* is an event,
+*"dentist every Thursday, remind me"* is a task. Both are right, and the second
+is the only one the database could hold. The decision does not disappear; it
+moves out of your head and into the sentence, where the bar can show you what it
+did with it.

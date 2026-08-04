@@ -20,13 +20,60 @@ async function overflowOf(page: import('@playwright/test').Page, selector: strin
 }
 
 test.describe('the admin at 390px', () => {
-  test('the page itself never scrolls sideways', async ({ page }) => {
+  // Both front doors, because they are now different pages: `/admin` is Today
+  // (the one opened on a phone every morning) and `/admin/fragments` is the
+  // manager's dense table. Today is the one that has to hold at 390px.
+  for (const route of ['/admin', '/admin/fragments']) {
+    test(`${route} never scrolls sideways`, async ({ page }) => {
+      await page.goto(route);
+      const doc = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        client: document.documentElement.clientWidth,
+      }));
+      expect(doc.scroll, 'the whole page scrolling sideways is the failure mode to look for').toBeLessThanOrEqual(
+        doc.client + 1,
+      );
+    });
+  }
+
+  // TRAP 5 (10-hq.md §10h), pre-armed. A zone's `overflow: hidden` shears a too-
+  // wide child off the card SILENTLY: a page-level sideways-scroll check never
+  // reaches the page edge, and `scrollWidth` on an ancestor reports nothing
+  // because the overflow is hidden. The only assertion that catches it measures
+  // descendants against their container's own content edge, which is what this
+  // does. It has nothing to shear yet — the point is that it is already here
+  // when the check-in's scales arrive.
+  test('nothing inside a zone is wider than the zone', async ({ page }) => {
     await page.goto('/admin');
-    const doc = await page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth,
-      client: document.documentElement.clientWidth,
-    }));
-    expect(doc.scroll, 'the whole page scrolling sideways is the failure mode to look for').toBeLessThanOrEqual(doc.client + 1);
+    const zones = page.locator('.zone');
+    await expect(zones.first()).toBeVisible();
+
+    const overflows = await zones.evaluateAll((els) =>
+      els.flatMap((zone) => {
+        const box = zone.getBoundingClientRect();
+        const style = getComputedStyle(zone);
+        const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+        const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+        return [...zone.querySelectorAll('*')]
+          .filter(
+            (el) =>
+              // ONLY WHAT IS ACTUALLY DRAWN. An unrendered element — a hidden
+              // panel, or an SVG `<symbol>`/`<path>` living in a sprite — has an
+              // all-zero rect, so `left - 0` reports the zone's own left inset
+              // as an overflow. First run of this assertion flagged 162
+              // elements, every one of them by exactly the same 17px, which is
+              // the tell: a real shear does not produce a uniform number.
+              el.getClientRects().length > 0 && !el.closest('svg'),
+          )
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            const over = Math.max(r.right - right, left - r.left);
+            return { tag: el.tagName.toLowerCase(), cls: String(el.className), over: Math.round(over) };
+          })
+          .filter((x) => x.over > 1);
+      }),
+    );
+    expect(overflows, `content escaping its zone at 390px: ${JSON.stringify(overflows)}`).toHaveLength(0);
   });
 
   // KNOWN DEFECT, recorded rather than hidden — plan 08, finding 4.
@@ -51,13 +98,13 @@ test.describe('the admin at 390px', () => {
   test('the writing sheet command row fits its drawer', async ({ page }) => {
     test.fail();
     await blockWrites(page);
-    await page.goto('/admin#new-writing');
+    await page.goto('/admin/fragments#new-writing');
     await expect(page.locator('#wsheet')).toBeVisible();
 
     const row = await overflowOf(page, '#wsheet form > div > div.flex.items-center');
     expect(
       row.over,
-      `command row overflows its drawer by ${row.over}px at 390px (content ${row.scroll}px in ${row.client}px)`
+      `command row overflows its drawer by ${row.over}px at 390px (content ${row.scroll}px in ${row.client}px)`,
     ).toBeLessThanOrEqual(0);
   });
 
@@ -80,13 +127,13 @@ test.describe('the admin at 390px', () => {
     const table = await overflowOf(page, '#fbrowser table');
     expect(
       table.over,
-      `browser table overflows by ${table.over}px at 390px (content ${table.scroll}px in ${table.client}px)`
+      `browser table overflows by ${table.over}px at 390px (content ${table.scroll}px in ${table.client}px)`,
     ).toBeLessThanOrEqual(0);
   });
 
   test('tap targets in the command row clear the 44px guideline', async ({ page }) => {
     await blockWrites(page);
-    await page.goto('/admin#new-writing');
+    await page.goto('/admin/fragments#new-writing');
     await expect(page.locator('#wsheet')).toBeVisible();
 
     const publish = await page.locator('#ws-open-publish').boundingBox();
@@ -94,7 +141,9 @@ test.describe('the admin at 390px', () => {
     // Reported rather than hard-failed at first: this is an audit, and the
     // number is the finding. Tighten to a hard assertion once it's fixed.
     if (publish && publish.height < 44) {
-      test.info().annotations.push({ type: 'finding', description: `Publish… is ${Math.round(publish.height)}px tall (<44px)` });
+      test
+        .info()
+        .annotations.push({ type: 'finding', description: `Publish… is ${Math.round(publish.height)}px tall (<44px)` });
     }
   });
 });

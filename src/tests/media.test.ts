@@ -274,7 +274,9 @@ describe('lookupSong', () => {
   });
 
   it('WITHOUT credentials: falls back to oEmbed, and says so', async () => {
-    const calls = stubFetch([[/open\.spotify\.com\/oembed/, { title: 'Last Birthday', thumbnail_url: 'https://i/x.jpg' }]]);
+    const calls = stubFetch([
+      [/open\.spotify\.com\/oembed/, { title: 'Last Birthday', thumbnail_url: 'https://i/x.jpg' }],
+    ]);
     const { lookupSong: fresh } = await import('../lib/media');
     const got = await fresh('https://open.spotify.com/track/697MdxMbVWn1Ajbw8iaPv5');
 

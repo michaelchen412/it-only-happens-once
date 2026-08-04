@@ -41,9 +41,11 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
 <article class="post-card py-9 first:pt-0">
-  {/* The reading surface: title + excerpt warm together on hover/focus and open
+  {
+    /* The reading surface: title + excerpt warm together on hover/focus and open
       the Reader. The metadata sits inside so it warms with them, but stays its
-      own (non-link) chrome. */}
+      own (non-link) chrome. */
+  }
   <div class="post-read">
     <h2 class="post-title font-display text-2xl leading-snug font-light sm:text-3xl">
       <a href={`/blog/${item.slug}`} data-read={item.slug}>
@@ -51,15 +53,20 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
       </a>
     </h2>
 
-    <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-base-content/40">
-      <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
+    <div class="text-base-content/40 mt-3 flex flex-wrap items-center gap-3 text-sm">
+      <Timestamp
+        date={item.occurredAt}
+        updated={item.updatedAt ?? undefined}
+        kind="posted"
+        precision={item.precision}
+      />
       <span class="font-sans">·</span>
       <span class="font-sans">{item.readMinutes} min read</span>
     </div>
 
     {
       showWindows ? (
-        <div class="mt-4 space-y-1.5 font-serif leading-relaxed text-base-content/70">
+        <div class="text-base-content/70 mt-4 space-y-1.5 font-serif leading-relaxed">
           {windows.map((w) => (
             <p>
               {w.lead && '… '}
@@ -68,7 +75,7 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
             </p>
           ))}
           {more > 0 && (
-            <p class="font-sans text-xs text-base-content/40">
+            <p class="text-base-content/40 font-sans text-xs">
               +{more} more {more === 1 ? 'match' : 'matches'}
             </p>
           )}
@@ -77,7 +84,7 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
         <a href={`/blog/${item.slug}`} data-read={item.slug} class="mt-4 block cursor-pointer">
           <p
             class:list={[
-              'post-excerpt font-serif leading-relaxed text-base-content/70',
+              'post-excerpt text-base-content/70 font-serif leading-relaxed',
               item.hasMore && 'post-excerpt-fade line-clamp-5',
             ]}
           >
@@ -91,10 +98,10 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
   {/* Subjects — left-aligned filter links, the quiet chrome at the foot (§7). */}
   {
     item.subjects.length > 0 && (
-      <ul class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-base-content/40">
+      <ul class="text-base-content/40 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs">
         {shownSubjects.map((s) => (
           <li>
-            <a href={`/blog?subject=${s.slug}`} class="transition-colors hover:text-base-content/70">
+            <a href={`/blog?subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
               {s.name}
             </a>
           </li>

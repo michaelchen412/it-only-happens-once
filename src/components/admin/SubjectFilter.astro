@@ -14,10 +14,7 @@ interface Props {
 const { subjects, value = [] } = Astro.props;
 ---
 
-<subject-filter
-  class="subject-filter"
-  data-options={JSON.stringify(subjects)}
-  data-value={value.join(',')}
+<subject-filter class="subject-filter" data-options={JSON.stringify(subjects)} data-value={value.join(',')}
 ></subject-filter>
 
 <script>

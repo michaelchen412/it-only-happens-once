@@ -1,0 +1,457 @@
+---
+/*
+  /admin/agenda — THE CALENDAR (docs/plans/13-agenda.md §5).
+
+  ⚠ FOUR SOURCES ON ONE GRID, AND ONLY TWO ARE WRITABLE. §5: "rendering must
+  make the read-only ones visibly read-only, or he will try to drag one and be
+  confused about why the change vanished." The answer is NOT a label — Today
+  already cut "Google · read-only" as chrome nobody would act on — so authority
+  is carried by the shape: **fill means writable, and nothing else uses fill.**
+
+  ⚠ RENDERED SERVER-SIDE, INCLUDING THE DAY PANEL. Two reasons, and both were
+  paid for. Astro compiles scoped styles to selectors carrying a
+  `data-astro-cid-*` attribute stamped onto elements IN THE TEMPLATE, so the
+  Today lab's `createElement` grid silently got none of its hover, cursor or
+  focus rules (10-hq.md §10h, trap 3). And the date bar established the better
+  habit anyway: every control here is a real link to `?date=` / `?day=`, so the
+  page works before a byte of JavaScript runs.
+
+  SIX WEEK ROWS, ALWAYS. A month grid that changes height makes the page jump
+  and moves the row under the cursor while you are stepping through months.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AgendaTabs from '../../components/admin/AgendaTabs.astro';
+import EventSheet from '../../components/admin/EventSheet.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
+import TagSheet from '../../components/admin/TagSheet.astro';
+import { today as hqToday, parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
+import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
+import {
+  CELL_ROWS,
+  KINDS,
+  birthdayItem,
+  byDay,
+  byTime,
+  eventItem,
+  legendFor,
+  mirroredBetween,
+  type CalendarItem,
+} from '../../lib/hq/calendar';
+import { staleness } from '../../lib/hq/mirror';
+
+const supabase = Astro.locals.supabase;
+const { ymd: todayYmd } = await hqToday(supabase);
+
+const anchor = parseYmd(Astro.url.searchParams.get('date')) ?? todayYmd;
+const openDay = parseYmd(Astro.url.searchParams.get('day'));
+const week = Astro.url.searchParams.get('view') === 'week';
+
+// The 42 cells, Sunday-first — the same helper the date bar's popover uses.
+const cells = monthGrid(anchor);
+
+/**
+ * Week view: the seven days around the anchor, same union, never a second model.
+ *
+ * ⚠ THROUGH `time.ts`, NOT `new Date(\`${ymd}T00:00:00Z\`)`. This page built its
+ * own calendar arithmetic in four places while importing `parseYmd` from the
+ * module that already had it — and `time.ts` opens by explaining why that is
+ * the one thing not to do: *"the moment two surfaces each derive it slightly
+ * differently, the check-in, 'due today' and 'overdue' start disagreeing at
+ * midnight and nobody notices for a week."* The second derivation happened to
+ * agree. That is luck, not design.
+ */
+const weekStart = shiftYmd(anchor, -ymdToUtc(anchor).getUTCDay());
+const weekCells = Array.from({ length: 7 }, (_, i) => shiftYmd(weekStart, i));
+
+const from = week ? weekCells[0] : cells[0].ymd;
+const to = week ? weekCells[6] : cells[41].ymd;
+
+const [
+  { data: eventRows, error },
+  { data: taskRows },
+  { data: peopleRows },
+  { data: answeredRows },
+  mirrored,
+  { data: syncState },
+] = await Promise.all([
+  supabase
+    .from('events')
+    .select('*, event_people(person_id, people(id, display_name))')
+    .gte('starts_on', from)
+    .lte('starts_on', to),
+  supabase
+    .from('tasks')
+    .select('id, title, due_on, due_time')
+    .is('archived_at', null)
+    .gte('due_on', from)
+    .lte('due_on', to),
+  supabase.from('people').select('id, display_name, birth_month, birth_day, birthday_lead_days, archived_at'),
+  supabase.from('task_events').select('task_id').eq('occurred_on', todayYmd),
+  // 13 · Piece 3. The fourth source finally has a producer — until now `mirror`
+  // was a kind of row nothing could create.
+  mirroredBetween(supabase, from, to),
+  supabase.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
+]);
+
+// ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). A permanent "synced 4 minutes ago"
+// is the status line you read once and ignore for ever; a mirror that has gone
+// quietly stale is the one silent failure this integration introduced. So this
+// is null almost always, and says one sentence when it matters.
+const stale = staleness(syncState ?? null);
+
+const answered = new Set((answeredRows ?? []).map((r) => r.task_id));
+
+const items: CalendarItem[] = [
+  // No `href`: this page IS the day panel, so an event's door is already here.
+  ...(eventRows ?? []).map(eventItem),
+  ...(taskRows ?? []).map((t) => ({
+    kind: 'task' as const,
+    id: t.id,
+    on: t.due_on!,
+    title: t.title,
+    at: t.due_time ? t.due_time.slice(0, 5) : null,
+    answered: answered.has(t.id),
+  })),
+  // ⚠ BIRTHDAYS ARE NOT ROWS ANYWHERE — derived from `people.birth_month/day`
+  // (12-people.md §8), which is why they get no body on the grid and nothing at
+  // all to press in the day panel. There is no row to open.
+  ...(peopleRows ?? [])
+    .filter((p) => !p.archived_at && p.birth_month && p.birth_day)
+    .map((p) => ({ person: p, ymd: nextOccurrence(p.birth_month!, p.birth_day!, from) }))
+    .filter((b) => b.ymd >= from && b.ymd <= to)
+    // No door either: there is no row to open, and the profile is a click away
+    // in People. Today offers one because Today is a summary you read out of.
+    .map((b) => birthdayItem(b.person, b.ymd)),
+  // Google's copy. Its rows carry `href` — the event on Google — which is the
+  // whole of their read-only explanation: the one door a mirrored row offers
+  // leads to the only place it can be changed.
+  ...mirrored,
+];
+
+const days = byDay(items);
+const legend = legendFor(items);
+
+const panelItems = openDay ? (days.get(openDay) ?? []) : [];
+
+/** Everything a link here needs to keep, so stepping months does not lose the day. */
+const href = (params: Record<string, string | null>) => {
+  const url = new URLSearchParams();
+  const merged: Record<string, string | null> = {
+    date: anchor === todayYmd ? null : anchor,
+    view: week ? 'week' : null,
+    day: openDay,
+    ...params,
+  };
+  for (const [k, v] of Object.entries(merged)) if (v) url.set(k, v);
+  const q = url.toString();
+  return `/admin/agenda${q ? `?${q}` : ''}${params.day ? '#day' : ''}`;
+};
+
+/** No roster, no tag control — the same rule the "who was there" field follows. */
+const roster = (peopleRows ?? [])
+  .filter((p) => !p.archived_at)
+  .map((p) => ({ id: p.id, display_name: p.display_name }));
+const taggable = roster.length > 0;
+
+const stepWeek = (n: number) => shiftYmd(weekStart, n * 7);
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** The weekday name for a local date — via `ymdToUtc`, like everything else. */
+const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
+---
+
+<AdminLayout title="Agenda" active="agenda">
+  <div class="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-6">
+    <AgendaTabs active="calendar" />
+
+    {
+      /* The `title` slot rather than the `title` prop: this room's heading is
+         a period, not a name, and it travels with the two step arrows and the
+         way back. Those belong beside it — moving them to `actions` would put
+         "previous month" at the far end of the bar, away from the month it
+         steps. The slot exists for exactly this. */
+    }
+    <PageHeader class="mb-4">
+      <div slot="title" class="flex flex-wrap items-center gap-3">
+        <h1 class="font-display text-2xl font-light">
+          {week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}
+        </h1>
+        <span class="flex items-center">
+          <a
+            class="navb"
+            href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
+            aria-label={week ? 'Previous week' : 'Previous month'}
+          >
+            <Icon name="ph:caret-left" />
+          </a>
+          <a
+            class="navb"
+            href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
+            aria-label={week ? 'Next week' : 'Next month'}
+          >
+            <Icon name="ph:caret-right" />
+          </a>
+        </span>
+        {
+          /* Being on another month must never be ambiguous — the same rule the
+             date bar follows on Today. */
+          (week ? todayYmd < weekCells[0] || todayYmd > weekCells[6] : anchor.slice(0, 7) !== todayYmd.slice(0, 7)) && (
+            <a class="chip u-none" href={href({ date: null })}>
+              ↩ Today
+            </a>
+          )
+        }
+      </div>
+
+      {
+        /* ⚠ `aria-current`, NEVER `aria-pressed`. These are real links to
+           `?view=week` — navigation, not a toggle — and `aria-pressed` is only
+           valid on `role="button"`, so on an `<a>` it is ignored or announced
+           wrongly. `AgendaTabs.astro` three lines up already gets this right,
+           which is what made the inconsistency worth fixing rather than
+           tolerating (plans/00-groundwork.md · Piece 9). */
+      }
+      <span slot="actions" class="pseg pseg--fit" role="group" aria-label="View">
+        <a class="pseg__b" href={href({ view: null })} aria-current={!week ? 'true' : undefined}>Month</a>
+        <a class="pseg__b" href={href({ view: 'week' })} aria-current={week ? 'true' : undefined}>Week</a>
+      </span>
+      <button
+        slot="actions"
+        type="button"
+        data-open-event-sheet={openDay ?? anchor}
+        class="btn btn-sm zone__cta cn-amber gap-1 font-sans"
+      >
+        <Icon name="ph:plus" /> New event
+      </button>
+    </PageHeader>
+
+    {
+      error && (
+        <p class="admin-alert mb-4" role="alert">
+          Couldn’t load the calendar: {error.message}
+        </p>
+      )
+    }
+    {
+      /* One alert for both writes on this page: the sheet's, and the day
+        panel's tick, which is the tasks room's script reused verbatim. */
+    }
+    <p hidden role="alert" class="admin-alert mb-4" data-event-error data-task-error></p>
+
+    {
+      /* ⚠ THE ONE THING ADR-0014 ASKED FOR IN EXCHANGE FOR ITS SIMPLICITY: a
+         mirror that has gone stale must not render quietly, because a calendar
+         that is confidently wrong is worse than one that admits it. Absent
+         while the sync is working — see `staleness`. */
+      stale && (
+        <p class="mstale" data-stale>
+          <Icon name="ph:warning" /> {stale.text}
+        </p>
+      )
+    }
+
+    {
+      /* Four sources on one grid is genuinely ambiguous, and a four-word key is
+         a fixed cost — unlike a label repeated on every row, which is what got
+         cut from Today. It lists only the sources actually present. */
+      legend.length > 1 && (
+        <div class="legend">
+          {legend.map((l) => (
+            <span class="lg">
+              <i class:list={['lg__m', `lg__m--${l.kind}`]} />
+              {l.label}
+            </span>
+          ))}
+        </div>
+      )
+    }
+
+    {
+      week ? (
+        <div class="wk">
+          {weekCells.map((ymd) => (
+            <div class:list={['wkcol', ymd === todayYmd && 'wkcol--today']}>
+              <a class="wkcol__h" href={href({ day: ymd })}>
+                <span class="wkcol__d">{dowOf(ymd)}</span>
+                <span class="wkcol__n">{Number(ymd.slice(8))}</span>
+              </a>
+              <div class="wkcol__b">
+                {(days.get(ymd) ?? []).length === 0 ? (
+                  <span class="wkcol__e">—</span>
+                ) : (
+                  (days.get(ymd) ?? []).map((it) => (
+                    <a
+                      href={href({ day: ymd })}
+                      class:list={['wev', `ev--${it.kind}`, !KINDS[it.kind].writable && 'ev--ro']}
+                    >
+                      <span class="wev__t">
+                        {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                        {it.kind === 'task' && <Icon name="ph:circle" class="ev__i" />}
+                        {it.at ? clockTime(it.at) : it.kind === 'task' ? 'anytime' : 'all day'}
+                        {!KINDS[it.kind].writable && <Icon name="ph:lock-simple" class="ev__lock" />}
+                      </span>
+                      <span class="wev__x">{it.title}</span>
+                    </a>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="month">
+          <div class="month__dow">
+            {DOW.map((d) => (
+              <span>{d}</span>
+            ))}
+          </div>
+          <div class="month__grid">
+            {cells.map((cell) => {
+              const list = days.get(cell.ymd) ?? [];
+              return (
+                <div
+                  class:list={[
+                    'cell',
+                    cell.outside && 'cell--out',
+                    cell.ymd === todayYmd && 'cell--today',
+                    cell.ymd === openDay && 'cell--open',
+                  ]}
+                >
+                  <a class="cell__n" href={href({ day: cell.ymd })}>
+                    {cell.day}
+                  </a>
+                  {list.slice(0, CELL_ROWS).map((it) => (
+                    <a
+                      href={href({ day: cell.ymd })}
+                      class:list={['ev', `ev--${it.kind}`, !KINDS[it.kind].writable && 'ev--ro']}
+                    >
+                      {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                      {it.kind === 'task' && <Icon name="ph:circle" class="ev__i" />}
+                      {it.at && <span class="ev__t">{clockTime(it.at).replace(':00', '')}</span>}
+                      <span class="ev__x">{it.title}</span>
+                      {!KINDS[it.kind].writable && <Icon name="ph:lock-simple" class="ev__lock" />}
+                    </a>
+                  ))}
+                  {list.length > CELL_ROWS && (
+                    <a class="cell__more" href={href({ day: cell.ymd })}>
+                      +{list.length - CELL_ROWS} more
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )
+    }
+
+    {
+      /* THE DAY PANEL — where read-only is explained, once, at the moment you
+         tried to act on something. Each row offers exactly what HQ can do to
+         it and nothing else: that affordance IS the whole explanation, and it
+         cannot go stale. No footer, no per-row note, no summary line — all
+         three were drafted and cut (10-hq.md §10i). */
+      openDay && (
+        <aside class="day mt-5" id="day" data-day={openDay}>
+          <div class="day__head">
+            <h2 class="font-display text-lg font-light">{fullDate(openDay)}</h2>
+            <a class="zone__act" href={href({ day: null })} aria-label="Close">
+              <Icon name="ph:x" />
+            </a>
+          </div>
+          {panelItems.length === 0 ? (
+            <p class="zone__empty">Nothing on this day.</p>
+          ) : (
+            <ul class="day__list" data-task-list>
+              {panelItems.sort(byTime).map((it) => (
+                <li
+                  class:list={['drow', `ev--${it.kind}`, it.answered && 'drow--done']}
+                  data-id={it.id}
+                  data-kind={it.kind}
+                  data-task={it.kind === 'task' ? '' : undefined}
+                  data-event={
+                    it.kind === 'event'
+                      ? JSON.stringify({
+                          id: it.id,
+                          title: it.title,
+                          starts_on: it.on,
+                          starts_at: it.at,
+                          ends_at: it.endAt ?? null,
+                          location: it.location ?? null,
+                          notes: it.notes ?? null,
+                          person_ids: (it.people ?? []).map((p) => p.id),
+                        })
+                      : undefined
+                  }
+                >
+                  <span class="drow__t">
+                    {it.at ? clockTime(it.at) : it.kind === 'task' ? 'anytime' : 'all day'}
+                    {it.endAt && <span class="drow__e">→ {clockTime(it.endAt)}</span>}
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    {/* A mirrored row's title is a link to Google — the only
+                        place it can actually be changed. That door IS the
+                        explanation of read-only, and it cannot go stale. */}
+                    {it.kind === 'mirror' && it.href ? (
+                      <a class="drow__x row-open" href={it.href} target="_blank" rel="noreferrer">
+                        {it.title}
+                        <Icon name="ph:arrow-up-right" class="ev__i" />
+                      </a>
+                    ) : (
+                      <span class="drow__x">
+                        {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                        {it.title}
+                      </span>
+                    )}
+                    {it.location && <span class="drow__l">{it.location}</span>}
+                    {!!it.people?.length && <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>}
+                  </span>
+                  {it.kind === 'event' && (
+                    <button type="button" class="chip chip--act shrink-0" data-edit-event>
+                      <Icon name="ph:pencil-simple" /> Edit
+                    </button>
+                  )}
+                  {it.kind === 'task' && !it.answered && (
+                    <button type="button" class="chip chip--act chip--did shrink-0" data-dispose="done">
+                      <Icon name="ph:check" /> Did it
+                    </button>
+                  )}
+                  {/* ⚠ THE ONE WRITE HQ HAS AGAINST GOOGLE'S COPY, and it is
+                      additive by construction — it adds what Google does not
+                      know and changes nothing Google owns, so it can never
+                      produce a conflict (ADR-0014). No Edit here, ever: the
+                      row's own affordances are the whole statement of what is
+                      and is not ours. */}
+                  {it.kind === 'mirror' && taggable && (
+                    <button
+                      type="button"
+                      class="chip chip--act shrink-0"
+                      data-tag={it.id}
+                      data-tag-title={it.title}
+                      data-tag-people={(it.people ?? []).map((p) => p.id).join(',')}
+                    >
+                      <Icon name="ph:users-three" /> {it.people?.length ? 'Who’s there' : 'Tag someone'}
+                    </button>
+                  )}
+                  {/* A birthday offers nothing. There is no row to open. */}
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+      )
+    }
+  </div>
+
+  <EventSheet today={todayYmd} people={roster} />
+  <TagSheet people={roster} />
+
+  <script>
+    // The tick in the day panel is the same control as the one in the tasks
+    // room, so it is the same script: `[data-task-list]` is what it binds to.
+    import '../../scripts/task-list';
+    // Render first, then ask Google. This page is never blocked on the network
+    // — a slow or dead one costs freshness and nothing else (ADR-0014).
+    import '../../scripts/calendar-sync';
+  </script>
+</AdminLayout>

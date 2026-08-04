@@ -87,7 +87,7 @@ const weightedList = [
 
 <Base title="Sky lab — It Only Happens Once">
   <!-- ── lab bar ─────────────────────────────────────────────────────── -->
-  <div class="sticky top-0 z-50 border-b border-base-300 bg-base-100/85 backdrop-blur">
+  <div class="border-base-300 bg-base-100/85 sticky top-0 z-50 border-b backdrop-blur">
     <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3">
       <Label variant="chrome" as="span">Sky lab · local only</Label>
       <div class="flex flex-wrap items-center gap-2 font-sans text-sm">
@@ -102,38 +102,31 @@ const weightedList = [
   <main class="mx-auto max-w-5xl px-6 py-16">
     <header class="mb-20">
       <Label variant="voice">prototype · round two</Label>
-      <h1 class="mt-4 font-display text-4xl leading-[1.1] font-light sm:text-6xl">
-        The suite, refined
-      </h1>
-      <p class="prose-measure mt-6 text-lg text-base-content/70">
-        Real fragments, the real Reader, both music treatments, and a softer
-        drawn line — cycle its style from the bar above. This is the model of
-        what gets built.
+      <h1 class="font-display mt-4 text-4xl leading-[1.1] font-light sm:text-6xl">The suite, refined</h1>
+      <p class="prose-measure text-base-content/70 mt-6 text-lg">
+        Real fragments, the real Reader, both music treatments, and a softer drawn line — cycle its style from the bar
+        above. This is the model of what gets built.
       </p>
     </header>
 
     <!-- ═══ 1 · the suite ═════════════════════════════════════════════ -->
     <section class="mb-28">
       <Label as="h2" variant="voice" class="mb-2">1 · The constellation</Label>
-      <p class="prose-measure mb-10 text-base-content/60">
-        Writing carries no metadata here — hover it and the lamplight falls on
-        it; click and the blog's own Reader opens. The playlist under the
-        epigraph and the track inside the suite are the two candidate roles
-        for music — judge them against each other.
+      <p class="prose-measure text-base-content/60 mb-10">
+        Writing carries no metadata here — hover it and the lamplight falls on it; click and the blog's own Reader
+        opens. The playlist under the epigraph and the track inside the suite are the two candidate roles for music —
+        judge them against each other.
       </p>
 
-      <div class="rounded-box border border-base-300 bg-base-100 px-5 py-12 sm:px-12 sm:py-16">
+      <div class="rounded-box border-base-300 bg-base-100 border px-5 py-12 sm:px-12 sm:py-16">
         <!-- the landing header -->
         <Label variant="voice">tonight</Label>
         <div class="mt-2 flex items-baseline gap-3">
           <span class="text-primary" aria-hidden="true">&#10022;</span>
-          <h3 class="font-display text-4xl leading-[1.05] font-light sm:text-5xl">
-            conditions, not character
-          </h3>
+          <h3 class="font-display text-4xl leading-[1.05] font-light sm:text-5xl">conditions, not character</h3>
         </div>
-        <p class="prose-measure mt-5 border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
-          Outcomes are shaped by structural conditions far more than individual
-          willpower.
+        <p class="prose-measure border-base-300 text-base-content/55 mt-5 border-l pl-5 text-lg italic">
+          Outcomes are shaped by structural conditions far more than individual willpower.
         </p>
 
         <!-- candidate A: the set's score — one tap, plays through the read -->
@@ -147,13 +140,13 @@ const weightedList = [
             allow="encrypted-media"
             title="The score — Disconsolate (2013–2015)"
             style="border-radius: var(--radius-box)"></iframe>
-          <p class="mt-2 font-sans text-xs text-base-content/40">
+          <p class="text-base-content/40 mt-2 font-sans text-xs">
             candidate a · the set&rsquo;s score — press play, then read
           </p>
         </div>
 
         <!-- the suite -->
-        <div id="suite" class="suite relative mt-16 flex flex-col gap-16 text-base-content">
+        <div id="suite" class="suite text-base-content relative mt-16 flex flex-col gap-16">
           {
             suite.map((f, i) => (
               <article
@@ -161,7 +154,7 @@ const weightedList = [
                 style={`--indent:${indents[i]}`}
               >
                 <span
-                  class="suite-mark mt-1.5 w-5 shrink-0 text-center font-serif text-base text-base-content/35 select-none"
+                  class="suite-mark text-base-content/35 mt-1.5 w-5 shrink-0 text-center font-serif text-base select-none"
                   aria-hidden="true"
                 >
                   {glyph[f.kind]}
@@ -172,7 +165,7 @@ const weightedList = [
                       <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
                         {f.text}
                       </blockquote>
-                      <figcaption class="mt-3 font-serif text-[1.05rem] tracking-[0.06em] text-base-content/50 [font-variant:all-small-caps]">
+                      <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
                         — {f.attribution}
                       </figcaption>
                     </figure>
@@ -182,7 +175,7 @@ const weightedList = [
                       <h4 class="sw-title font-display text-2xl leading-tight font-light transition-colors sm:text-3xl">
                         {essayBySlug.get(f.slug)!.title}
                       </h4>
-                      <p class="sw-excerpt excerpt-fade prose-measure mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] text-base-content/70 transition-colors">
+                      <p class="sw-excerpt excerpt-fade prose-measure text-base-content/70 mt-3 line-clamp-4 text-[1.05rem] leading-[1.7] transition-colors">
                         {essayBySlug.get(f.slug)!.excerpt}
                       </p>
                     </a>
@@ -197,8 +190,11 @@ const weightedList = [
                         loading="lazy"
                         allow="encrypted-media"
                         title="Mantra — Makaya McCraven"
-                        style="border-radius: var(--radius-box)"></iframe>
-                      <p class="mt-2 font-sans text-xs text-base-content/40">candidate b · a stanza in the suite · {f.note}</p>
+                        style="border-radius: var(--radius-box)"
+                      />
+                      <p class="text-base-content/40 mt-2 font-sans text-xs">
+                        candidate b · a stanza in the suite · {f.note}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -208,7 +204,7 @@ const weightedList = [
         </div>
 
         <!-- the peek: the next constellation, drifting in -->
-        <div class="mt-20 border-t border-base-300 pt-8">
+        <div class="border-base-300 mt-20 border-t pt-8">
           <div class="flex items-baseline gap-3 opacity-40">
             <span class="text-primary" aria-hidden="true">&#10022;</span>
             <p class="font-display text-2xl font-light">the one who reaches first</p>
@@ -220,18 +216,23 @@ const weightedList = [
     <!-- ═══ 2 · the sky — weighted list ═══════════════════════════════ -->
     <section class="mb-28">
       <Label as="h2" variant="voice" class="mb-2">2 · The sky</Label>
-      <p class="prose-measure mb-10 text-base-content/60">
-        Zoomed out: the weighted, staggered list. Uneven on purpose — weight is
-        signal.
+      <p class="prose-measure text-base-content/60 mb-10">
+        Zoomed out: the weighted, staggered list. Uneven on purpose — weight is signal.
       </p>
 
-      <div class="rounded-box border border-base-300 bg-base-100 px-6 py-14 sm:px-16">
+      <div class="rounded-box border-base-300 bg-base-100 border px-6 py-14 sm:px-16">
         <div class="flex flex-col gap-5">
           {
             weightedList.map((c, i) => (
-              <div class={`flex items-baseline gap-3 ${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}>
-                <span class="text-xs text-primary/60" aria-hidden="true">&#10022;</span>
-                <span class={`${c.weight} font-display cursor-pointer font-light transition-colors hover:text-primary`}>{c.name}</span>
+              <div
+                class={`flex items-baseline gap-3 ${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}
+              >
+                <span class="text-primary/60 text-xs" aria-hidden="true">
+                  &#10022;
+                </span>
+                <span class={`${c.weight} font-display hover:text-primary cursor-pointer font-light transition-colors`}>
+                  {c.name}
+                </span>
               </div>
             ))
           }
@@ -239,7 +240,7 @@ const weightedList = [
       </div>
     </section>
 
-    <footer class="border-t border-base-300 pt-8 font-sans text-xs text-base-content/30">
+    <footer class="border-base-300 text-base-content/30 border-t pt-8 font-sans text-xs">
       Local prototype — dev only, never deployed. Every value comes from
       <code>src/styles/app.css</code>; the lines are currentColor at low opacity.
     </footer>
@@ -247,7 +248,13 @@ const weightedList = [
 
   <!-- the blog's own Reader — literally the same component -->
   <Reader />
-  {essays.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
+  {
+    essays.map((w) => (
+      <template data-reader-content={w.slug}>
+        <PostArticle item={w} linkTitle />
+      </template>
+    ))
+  }
 </Base>
 
 <style is:global>
@@ -318,11 +325,7 @@ const weightedList = [
   /* excerpts: clamped with a true ellipsis (line-clamp) AND a fade —
      the mask bottoms out at partial opacity so the ellipsis stays legible */
   .excerpt-fade {
-    mask-image: linear-gradient(
-      to bottom,
-      black 45%,
-      color-mix(in srgb, black 38%, transparent) 100%
-    );
+    mask-image: linear-gradient(to bottom, black 45%, color-mix(in srgb, black 38%, transparent) 100%);
   }
 
   /* the drawn line: injected SVG, behind the text */
@@ -371,7 +374,7 @@ const weightedList = [
       const b = { x: p2.x - ux * GAP, y: p2.y - uy * GAP };
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       const bow = Math.min(30, len * 0.16) * (i % 2 ? -1 : 1);
-      const c = { x: mid.x + (-uy) * bow, y: mid.y + ux * bow };
+      const c = { x: mid.x + -uy * bow, y: mid.y + ux * bow };
       d += `M ${a.x} ${a.y} Q ${c.x} ${c.y} ${b.x} ${b.y} `;
     }
     return d;

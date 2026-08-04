@@ -29,11 +29,15 @@ export function wireSheetTabs(root: ParentNode, onSelect?: (key: string) => void
     const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
     if (i === -1) return;
     const to =
-      ev.key === 'ArrowRight' ? (i + 1) % tabs.length
-      : ev.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length
-      : ev.key === 'Home' ? 0
-      : ev.key === 'End' ? tabs.length - 1
-      : -1;
+      ev.key === 'ArrowRight'
+        ? (i + 1) % tabs.length
+        : ev.key === 'ArrowLeft'
+          ? (i - 1 + tabs.length) % tabs.length
+          : ev.key === 'Home'
+            ? 0
+            : ev.key === 'End'
+              ? tabs.length - 1
+              : -1;
     if (to === -1) return;
     ev.preventDefault();
     tabs[to].focus();

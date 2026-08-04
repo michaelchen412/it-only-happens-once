@@ -43,8 +43,7 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
   data-noun={noun}
   data-label={label ?? noun}
   data-placeholder={placeholder}
-  data-options={JSON.stringify(options)}
-></entity-combo>
+  data-options={JSON.stringify(options)}></entity-combo>
 
 <script>
   if (!customElements.get('entity-combo')) {
@@ -231,7 +230,7 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
       }
       private commitFromText() {
         const text = this.field.value.trim();
-        const before = `${this.idInput.value} ${this.nameInput.value}`;
+        const before = `${this.idInput.value}�${this.nameInput.value}`;
         if (!text) {
           this.commit('', '', null);
         } else {
@@ -239,7 +238,7 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
           if (match) this.commit(match.id, match.name, match);
           else this.commit('', text, null);
         }
-        if (`${this.idInput.value} ${this.nameInput.value}` !== before) this.emit();
+        if (`${this.idInput.value}�${this.nameInput.value}` !== before) this.emit();
       }
       private commit(id: string, name: string, opt: Opt | null) {
         this.idInput.value = id;

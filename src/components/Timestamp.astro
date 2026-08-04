@@ -47,9 +47,7 @@ else label = monthDayYear;
 
 const verb = kind === 'added' ? 'Added' : 'Posted';
 const detail =
-  precision === 'year'
-    ? `${verb} in ${d.getFullYear()}`
-    : `${verb} on ${weekdayLong}, ${monthDayYear} at ${time}`;
+  precision === 'year' ? `${verb} in ${d.getFullYear()}` : `${verb} on ${weekdayLong}, ${monthDayYear} at ${time}`;
 const updatedDetail = u
   ? `Last updated on ${u.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -68,27 +66,31 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     type="button"
     popovertarget={pid}
     style={`anchor-name: --${pid}`}
-    class="inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-base-content/70"
+    class="hover:text-base-content/70 inline-flex cursor-pointer items-center gap-1.5 transition-colors"
   >
-    {/* is:inline renders the clock SELF-CONTAINED (path inline; no <symbol>/<use>).
+    {
+      /* is:inline renders the clock SELF-CONTAINED (path inline; no <symbol>/<use>).
         A Timestamp is cloned from a <template> into the Reader, and astro-icon's
         page-level <symbol> dedup would otherwise emit the single symbol inside the
         FIRST essay's inert template — leaving every other essay's <use> dangling
         (the clock vanishes for all but one, most visibly in the constellation,
-        where no live Timestamp seeds the symbol). Inlining sidesteps the sprite. */}
+        where no live Timestamp seeds the symbol). Inlining sidesteps the sprite. */
+    }
     <Icon name="ph:clock-light" is:inline class="size-3.5 opacity-70" />
     {prefix && <span>{prefix}</span>}
-    {/* No underline: the clock icon + hover already read as interactive, and the
-        date is a quiet detail — an underline over-advertises a non-critical tap. */}
+    {
+      /* No underline: the clock icon + hover already read as interactive, and the
+        date is a quiet detail — an underline over-advertises a non-critical tap. */
+    }
     <time datetime={d.toISOString()}>{label}</time>
   </button>
   <div
     id={pid}
     popover
     style={`position-anchor: --${pid}`}
-    class="ts-popover rounded-box border border-base-300 bg-base-200 p-4 text-sm shadow-lg"
+    class="ts-popover rounded-box border-base-300 bg-base-200 border p-4 text-sm shadow-lg"
   >
     <p class="text-base-content/80">{detail}</p>
-    {updatedDetail && <p class="mt-1 text-base-content/50">{updatedDetail}</p>}
+    {updatedDetail && <p class="text-base-content/50 mt-1">{updatedDetail}</p>}
   </div>
 </span>

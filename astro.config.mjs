@@ -6,6 +6,14 @@ import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
+  // The two routes 13 · Pieces 1 and 2 shipped at, before Piece 4 gathered all
+  // three surfaces into the Agenda room (10-hq.md §9). They existed for half a
+  // day, which is long enough for a bookmark.
+  redirects: {
+    '/admin/tasks': '/admin/agenda/tasks',
+    '/admin/goals': '/admin/agenda/goals',
+    '/admin/goals/[slug]': '/admin/agenda/goals/[slug]',
+  },
   // SSR + edge caching for DB-backed content; the admin renders on demand.
   // See docs/adr/0001. Static pages opt back in with `export const prerender = true`.
   output: 'server',
@@ -17,8 +25,81 @@ export default defineConfig({
   integrations: [
     icon({
       include: {
-        ph: ['clock-light', 'magnifying-glass', 'x', 'caret-down', 'caret-left', 'caret-right', 'arrow-right', 'arrow-up', 'arrow-up-right', 'arrow-down', 'funnel', 'trash', 'plus', 'pencil-simple', 'sun', 'moon', 'moon-stars', 'list', 'stack', 'books', 'user-circle', 'image', 'note', 'eye'],
-        'simple-icons': ['github', 'astro', 'supabase', 'tailwindcss', 'daisyui', 'typescript', 'vercel'],
+        ph: [
+          'clock-light',
+          'magnifying-glass',
+          'x',
+          'caret-down',
+          'caret-left',
+          'caret-right',
+          'arrow-right',
+          'arrow-up',
+          'arrow-up-right',
+          'arrow-down',
+          'funnel',
+          'trash',
+          'plus',
+          'pencil-simple',
+          'sun',
+          'moon',
+          'moon-stars',
+          'list',
+          'stack',
+          'books',
+          'user-circle',
+          'image',
+          'note',
+          'eye',
+          // HQ (docs/plans/10-hq.md). Zone marks + the check-in's own controls.
+          // `sun-horizon` is the Today room in the sidebar — deliberately not
+          // `sun`, which the theme toggle already owns two blocks below it.
+          'sun-horizon',
+          'star',
+          'star-fill',
+          'warning',
+          'calendar-blank',
+          'users-three',
+          'pen-nib',
+          'cake',
+          'check-circle',
+          'circle',
+          'chat-circle',
+          'phone',
+          'lock-simple',
+          'target',
+          // The agenda (13): a recurrence rule, disposition, and the effort meter.
+          'arrows-clockwise',
+          'dots-three',
+          'check',
+          'skip-forward',
+          // Today's brief (13 · Piece 5): "Log an entry". Its own glyph rather
+          // than `note` — which already means the `note` interaction KIND on a
+          // timeline row — or `pencil-simple`, which already means Edit.
+          'note-pencil',
+          // People (12 · Piece 2): the interaction kinds. `gift` is its own mark
+          // rather than reusing `cake` — a cake already means a birthday on the
+          // roster, and one glyph meaning two things is how a timeline stops
+          // being scannable.
+          'gift',
+          // People (12 · Piece 3): the Shared shelf, where the glyph carries
+          // what KIND of corpus row this is — the same job TypeMark does in the
+          // fragment manager, done with icons because the shelf is a rail.
+          'book-open',
+          'quotes',
+          'music-notes',
+          'article',
+        ],
+        'simple-icons': [
+          'github',
+          'astro',
+          'supabase',
+          'tailwindcss',
+          'daisyui',
+          'typescript',
+          'vercel',
+          // HQ: marks a mirrored calendar event as Google's, without a word of chrome.
+          'google',
+        ],
       },
     }),
   ],

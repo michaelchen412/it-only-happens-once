@@ -17,6 +17,7 @@ import TagInput from '../TagInput.astro';
 import SubjectsField from './SubjectsField.astro';
 import EntityCombo from './EntityCombo.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
+import SharedByField from './SharedByField.astro';
 import BackToTop from '../BackToTop.astro';
 
 interface Props {
@@ -25,25 +26,69 @@ interface Props {
   works?: { id: string; title: string; authorId: string | null }[];
   /** Every constellation — the membership picker (docs/admin.md §2). */
   constellations?: { id: string; name: string; slug: string }[];
+  /** The roster, for "Shared by" (12 · Piece 3). Empty = the field renders nothing. */
+  people?: { id: string; display_name: string }[];
+  /** `fragment_id → person_id[]`, rendered once so opening a sheet needs no round trip. */
+  sharedBy?: Record<string, string[]>;
+  /**
+   * Arriving from a profile's "Add a quote" (§5). The new-quote sheet opens
+   * with this person already ticked in Shared by — which is the whole flow:
+   * a quote they said out loud enters the corpus AND attaches, in one move.
+   */
+  linkPersonId?: string | null;
+  /** Open this editor on load, for the same arrival. */
+  autoNew?: 'quote' | null;
 }
-const { subjects, authors = [], works = [], constellations = [] } = Astro.props;
+const {
+  subjects,
+  authors = [],
+  works = [],
+  constellations = [],
+  people = [],
+  sharedBy = {},
+  linkPersonId = null,
+  autoNew = null,
+} = Astro.props;
 const authorOptions = authors.map((a) => ({ id: a.id, name: a.name }));
 const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
 const thisYear = new Date().getUTCFullYear();
 ---
 
-<dialog id="sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="sheet-title">
+<dialog
+  id="sheet"
+  class="drawer-dialog w-full max-w-md"
+  aria-labelledby="sheet-title"
+  data-shared-by={JSON.stringify(sharedBy)}
+  data-link-person={linkPersonId ?? undefined}
+  data-auto-new={autoNew ?? undefined}
+>
   <div class="flex h-full flex-col overflow-y-auto overscroll-contain">
-    <header class="flex items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex items-center justify-between border-b px-6 py-4">
       <h2 id="sheet-title" class="font-display text-xl">New quote</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <div class="admin-tabs px-6" role="tablist" aria-label="Editor sections">
-      <button type="button" role="tab" class="admin-tab" data-tab="fields" aria-selected="true" aria-controls="sheet-panel-fields">
+      <button
+        type="button"
+        role="tab"
+        class="admin-tab"
+        data-tab="fields"
+        aria-selected="true"
+        aria-controls="sheet-panel-fields"
+      >
         <span id="sheet-tab-fields-label">Quote</span>
       </button>
-      <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="sheet-panel-cn">
+      <button
+        type="button"
+        role="tab"
+        class="admin-tab"
+        data-tab="constellations"
+        aria-selected="false"
+        tabindex="-1"
+        aria-controls="sheet-panel-cn"
+      >
         Constellations<span id="sheet-cn-count" class="admin-tab__n"></span>
       </button>
     </div>
@@ -51,158 +96,253 @@ const thisYear = new Date().getUTCFullYear();
     <p id="sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
     <div id="sheet-panel-fields" role="tabpanel" data-tabpanel="fields">
-    {/* QUOTE */}
-    <form id="quote-form" method="POST" action={actions.fragments.saveQuote} class="flex flex-col gap-4 p-6 font-sans">
-      <input type="hidden" name="id" />
-      <input type="hidden" name="body" id="quote-body" />
+      {/* QUOTE */}
+      <form
+        id="quote-form"
+        method="POST"
+        action={actions.fragments.saveQuote}
+        class="flex flex-col gap-4 p-6 font-sans"
+      >
+        <input type="hidden" name="id" />
+        <input type="hidden" name="body" id="quote-body" />
 
-      {/* — required — */}
-      <div class="flex flex-col gap-1 text-sm">
-        <span class="flex items-center gap-1 text-base-content/70">Quote <span class="text-error" title="required" aria-hidden="true">*</span></span>
-        <div id="quote-editor-wrap" class="rounded-field border border-base-300 focus-within:border-primary">
-          <div class="flex items-center gap-0.5 border-b border-base-300/60 px-1.5 py-1" role="toolbar" aria-label="Formatting">
-            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
-            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+        {/* — required — */}
+        <div class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70 flex items-center gap-1"
+            >Quote <span class="text-error" title="required" aria-hidden="true">*</span></span
+          >
+          <div id="quote-editor-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
+            <div
+              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
+              role="toolbar"
+              aria-label="Formatting"
+            >
+              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
+                ><b>B</b></button
+              >
+              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+                ><i>I</i></button
+              >
+            </div>
+            <div id="quote-editor" class="max-h-[45vh] min-h-[10rem] overflow-y-auto px-3 py-2"></div>
           </div>
-          <div id="quote-editor" class="max-h-[45vh] min-h-[10rem] overflow-y-auto px-3 py-2"></div>
         </div>
-      </div>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="flex items-center gap-1 text-base-content/70">Attribution <span class="text-error" title="required" aria-hidden="true">*</span></span>
-        <input name="attribution" required class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
-      </label>
-
-      {/* — provenance facets: Author → Work (structured; a work belongs to its author) — */}
-      <div class="flex flex-col gap-3">
         <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Author <span class="text-base-content/40">— group / search by</span></span>
-          <EntityCombo id="quote-author" name="author_name" idName="author_id" noun="author" label="Author" placeholder="Marcus Aurelius" options={authorOptions} />
+          <span class="text-base-content/70 flex items-center gap-1"
+            >Attribution <span class="text-error" title="required" aria-hidden="true">*</span></span
+          >
+          <input name="attribution" required class="input input-sm input-bordered" placeholder="Marcus Aurelius" />
         </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Work <span class="text-base-content/40">— scoped to the author</span></span>
-          <EntityCombo id="quote-work" name="work_name" idName="work_id" noun="work" label="Work" placeholder="Meditations · The Bible" options={workOptions} />
-        </label>
-      </div>
 
-      {/* — optional display + citation details — */}
-      <details class="rounded-field border border-base-300/70 px-3 py-2">
-        <summary class="cursor-pointer text-xs font-medium tracking-wide text-base-content/55 uppercase">
-          Source &amp; citation <span class="font-normal text-base-content/40 normal-case">— optional</span>
-        </summary>
-        <div class="mt-3 grid grid-cols-2 gap-3">
-          <p class="col-span-2 text-xs text-base-content/45">
-            <span class="text-base-content/60">Attribution</span> &amp; <span class="text-base-content/60">Source title</span> are what’s shown — they default to the Author &amp; Work above, but you can override them (e.g. show “Matthew 5:43–48” while grouping under “The Bible”).
+        {/* — provenance facets: Author → Work (structured; a work belongs to its author) — */}
+        <div class="flex flex-col gap-3">
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70"
+              >Author <span class="text-base-content/40">— group / search by</span></span
+            >
+            <EntityCombo
+              id="quote-author"
+              name="author_name"
+              idName="author_id"
+              noun="author"
+              label="Author"
+              placeholder="Marcus Aurelius"
+              options={authorOptions}
+            />
+          </label>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-base-content/70"
+              >Work <span class="text-base-content/40">— scoped to the author</span></span
+            >
+            <EntityCombo
+              id="quote-work"
+              name="work_name"
+              idName="work_id"
+              noun="work"
+              label="Work"
+              placeholder="Meditations · The Bible"
+              options={workOptions}
+            />
+          </label>
+        </div>
+
+        {/* — optional display + citation details — */}
+        <details class="rounded-field border-base-300/70 border px-3 py-2">
+          <summary class="text-base-content/55 cursor-pointer text-xs font-medium tracking-wide uppercase">
+            Source &amp; citation <span class="text-base-content/40 font-normal normal-case">— optional</span>
+          </summary>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <p class="text-base-content/45 col-span-2 text-xs">
+              <span class="text-base-content/60">Attribution</span> &amp; <span class="text-base-content/60"
+                >Source title</span
+              > are what’s shown — they default to the Author &amp; Work above, but you can override them (e.g. show “Matthew
+              5:43–48” while grouping under “The Bible”).
+            </p>
+            <label class="col-span-2 flex flex-col gap-1 text-sm">
+              <span class="text-base-content/70"
+                >Source title <span class="text-base-content/40">— shown after the attribution</span></span
+              >
+              <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
+            </label>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-base-content/70">Work year</span>
+              <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
+            </label>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-base-content/70">Page</span>
+              <input name="page" type="number" class="input input-sm input-bordered" />
+            </label>
+            <label class="col-span-2 flex flex-col gap-1 text-sm">
+              <span class="text-base-content/70"
+                >Citation <span class="text-base-content/40">(chapter / verse / letter)</span></span
+              >
+              <input name="citation" class="input input-sm input-bordered" placeholder="Book 2:2" />
+            </label>
+            <label class="col-span-2 flex flex-col gap-1 text-sm">
+              <span class="text-base-content/70">Source link</span>
+              <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
+            </label>
+          </div>
+        </details>
+
+        {
+          /* Beside the provenance facets, because that is what it is: Author and
+          Work say where the words came from, this says who put them in front
+          of you. A tick applies immediately (§5) — it never rides along with
+          the save below. */
+        }
+        <SharedByField scope="quote" people={people} />
+
+        <SubjectsField id="quote-subjects">
+          <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="stoicism, acceptance" />
+        </SubjectsField>
+
+        {/* — date: automatic unless backdating a legacy quote — */}
+        <div class="flex flex-col gap-2 text-sm">
+          <label class="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" id="quote-date-toggle" class="checkbox checkbox-xs" />
+            <span class="text-base-content/70">Set a specific date</span>
+          </label>
+          <p id="quote-date-note" class="text-base-content/45 text-xs">
+            Dated today automatically — enable only to backdate a legacy quote.
           </p>
-          <label class="col-span-2 flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Source title <span class="text-base-content/40">— shown after the attribution</span></span>
-            <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
-          </label>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Work year</span>
-            <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
-          </label>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Page</span>
-            <input name="page" type="number" class="input input-sm input-bordered" />
-          </label>
-          <label class="col-span-2 flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Citation <span class="text-base-content/40">(chapter / verse / letter)</span></span>
-            <input name="citation" class="input input-sm input-bordered" placeholder="Book 2:2" />
-          </label>
-          <label class="col-span-2 flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Source link</span>
-            <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
-          </label>
+          <input
+            type="datetime-local"
+            name="occurred_at"
+            id="quote-occurred"
+            disabled
+            class="input input-sm input-bordered"
+          />
         </div>
-      </details>
 
-      <SubjectsField id="quote-subjects">
-        <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="stoicism, acceptance" />
-      </SubjectsField>
+        {/* Quotes publish on save — no draft lifecycle (docs/admin.md). Unpublish via the list. */}
+        <input type="hidden" name="status" value="published" />
 
-      {/* — date: automatic unless backdating a legacy quote — */}
-      <div class="flex flex-col gap-2 text-sm">
-        <label class="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" id="quote-date-toggle" class="checkbox checkbox-xs" />
-          <span class="text-base-content/70">Set a specific date</span>
-        </label>
-        <p id="quote-date-note" class="text-xs text-base-content/45">Dated today automatically — enable only to backdate a legacy quote.</p>
-        <input type="datetime-local" name="occurred_at" id="quote-occurred" disabled class="input input-sm input-bordered" />
-      </div>
+        <div class="mt-2 flex items-center gap-2">
+          <button type="submit" id="quote-save" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
+          <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+        </div>
+      </form>
 
-      {/* Quotes publish on save — no draft lifecycle (docs/admin.md). Unpublish via the list. */}
-      <input type="hidden" name="status" value="published" />
-
-      <div class="mt-2 flex items-center gap-2">
-        <button type="submit" id="quote-save" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
-        <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
-      </div>
-    </form>
-
-    {/* SONG */}
-    <form id="song-form" method="POST" action={actions.fragments.saveSong} hidden class="flex flex-col gap-4 p-6 font-sans">
-      <input type="hidden" name="id" />
-      <input type="hidden" name="thumbnail_url" />
-      <input type="hidden" name="body" id="song-body" />
-      {/* Filled by the Web API lookup only (docs/plans/04 Piece 4) — the album's
+      {/* SONG */}
+      <form
+        id="song-form"
+        method="POST"
+        action={actions.fragments.saveSong}
+        hidden
+        class="flex flex-col gap-4 p-6 font-sans"
+      >
+        <input type="hidden" name="id" />
+        <input type="hidden" name="thumbnail_url" />
+        <input type="hidden" name="body" id="song-body" />
+        {
+          /* Filled by the Web API lookup only (docs/plans/04 Piece 4) — the album's
           release year, kept apart from `occurred_at` (the year YOU added it),
-          and the Spotify ids that make provenance exact instead of name-matched. */}
-      <input type="hidden" name="release_year" />
-      <input type="hidden" name="spotify_artist_ids" />
-      <input type="hidden" name="spotify_album_id" />
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Link <span class="text-base-content/40">— a Spotify track or album, or a YouTube video</span></span>
-        <input name="spotify_url" type="url" required class="input input-sm input-bordered" placeholder="https://open.spotify.com/track/…" />
-        <span id="song-lookup" class="text-xs text-base-content/55" role="status"></span>
-      </label>
-      {/* Artist and album auto-fill from the API but stay editable: a five-artist
+          and the Spotify ids that make provenance exact instead of name-matched. */
+        }
+        <input type="hidden" name="release_year" />
+        <input type="hidden" name="spotify_artist_ids" />
+        <input type="hidden" name="spotify_album_id" />
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70"
+            >Link <span class="text-base-content/40">— a Spotify track or album, or a YouTube video</span></span
+          >
+          <input
+            name="spotify_url"
+            type="url"
+            required
+            class="input input-sm input-bordered"
+            placeholder="https://open.spotify.com/track/…"
+          />
+          <span id="song-lookup" class="text-base-content/55 text-xs" role="status"></span>
+        </label>
+        {
+          /* Artist and album auto-fill from the API but stay editable: a five-artist
           track joins to "Miles Davis, John Coltrane, Cannonball Adderley, Bill
           Evans", which is a credit list, not an attribution. Autofill only ever
           writes into an EMPTY field — same merge-never-replace rule the AI
-          subject suggester follows. */}
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Title <span class="text-base-content/40">(auto-filled)</span></span>
-        <input name="title" required class="input input-sm input-bordered" />
-      </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Artist <span class="text-base-content/40">(auto-filled)</span></span>
-        <input name="attribution" required class="input input-sm input-bordered" placeholder="Miles Davis" />
-      </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Album <span class="text-base-content/40">(auto-filled)</span></span>
-        <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
-      </label>
+          subject suggester follows. */
+        }
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Title <span class="text-base-content/40">(auto-filled)</span></span>
+          <input name="title" required class="input input-sm input-bordered" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Artist <span class="text-base-content/40">(auto-filled)</span></span>
+          <input name="attribution" required class="input input-sm input-bordered" placeholder="Miles Davis" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Album <span class="text-base-content/40">(auto-filled)</span></span>
+          <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
+        </label>
 
-      {/* The annotation (ADR 0009) — the one thing Spotify has no field for, and
+        {
+          /* The annotation (ADR 0009) — the one thing Spotify has no field for, and
           what makes this a fragment rather than a link. Optional, always: the
-          stanza falls back to title + artist when a song says nothing. */}
-      <div class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Why this one <span class="text-base-content/40">— optional; it leads the stanza</span></span>
-        <div id="song-editor-wrap" class="rounded-field border border-base-300 focus-within:border-primary">
-          <div class="flex items-center gap-0.5 border-b border-base-300/60 px-1.5 py-1" role="toolbar" aria-label="Formatting">
-            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
-            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+          stanza falls back to title + artist when a song says nothing. */
+        }
+        <div class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70"
+            >Why this one <span class="text-base-content/40">— optional; it leads the stanza</span></span
+          >
+          <div id="song-editor-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
+            <div
+              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
+              role="toolbar"
+              aria-label="Formatting"
+            >
+              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
+                ><b>B</b></button
+              >
+              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+                ><i>I</i></button
+              >
+            </div>
+            <div id="song-editor" class="max-h-[40vh] min-h-[7rem] overflow-y-auto px-3 py-2"></div>
           </div>
-          <div id="song-editor" class="max-h-[40vh] min-h-[7rem] overflow-y-auto px-3 py-2"></div>
         </div>
-      </div>
-      {/* Songs publish on save — no draft lifecycle. Unpublish via the list. */}
-      <input type="hidden" name="status" value="published" />
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Added (year)</span>
-        <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
-      </label>
-      {/* Placeholder deliberately not "jazz": a song's subjects here are what it
+        {/* Songs publish on save — no draft lifecycle. Unpublish via the list. */}
+        <input type="hidden" name="status" value="published" />
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Added (year)</span>
+          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
+        </label>
+        {/* A song is the clearest case §5 has: "a specific song she sent". */}
+        <SharedByField scope="song" people={people} />
+
+        {
+          /* Placeholder deliberately not "jazz": a song's subjects here are what it
           is ABOUT, not what genre it is — and the example is the first thing
-          that teaches which. Same reason the AI button demands the annotation. */}
-      <SubjectsField id="song-subjects">
-        <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="longing, memory" />
-      </SubjectsField>
-      <div class="mt-2 flex items-center gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
-        <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
-      </div>
-    </form>
+          that teaches which. Same reason the AI button demands the annotation. */
+        }
+        <SubjectsField id="song-subjects">
+          <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="longing, memory" />
+        </SubjectsField>
+        <div class="mt-2 flex items-center gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
+          <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+        </div>
+      </form>
     </div>
 
     <div id="sheet-panel-cn" role="tabpanel" data-tabpanel="constellations" hidden class="p-6">

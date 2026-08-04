@@ -11,7 +11,7 @@ const PARTIAL = '/admin/fragments-panel';
 export interface PanelOpts {
   /** Params pinned to every fetch (e.g. { mode: 'pick', constellation: id }). */
   extraParams?: Record<string, string>;
-  /** Mirror the filter state onto this URL via replaceState ('/admin'); null = don't. */
+  /** Mirror the filter state onto this URL via replaceState ('/admin/fragments'); null = don't. */
   historyBase?: string | null;
   /** Whole-row / title click (never fires in trash view or on [data-noedit]). */
   onOpen?: (row: HTMLElement, e: MouseEvent) => void;
@@ -50,7 +50,9 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
   // the fresh numbers from the fetched partial.
   function syncCounts(doc: Document) {
     doc.querySelectorAll<HTMLElement>('.type-badge').forEach((src) => {
-      const dst = root.querySelector<HTMLElement>(`.type-badge[data-type-filter="${src.dataset.typeFilter ?? ''}"] .type-badge__n`);
+      const dst = root.querySelector<HTMLElement>(
+        `.type-badge[data-type-filter="${src.dataset.typeFilter ?? ''}"] .type-badge__n`,
+      );
       const val = src.querySelector('.type-badge__n')?.textContent;
       if (dst && val != null) dst.textContent = val;
     });
@@ -199,7 +201,10 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
   return {
     root,
     refresh: applyFilters,
-    getSelected: () => checkList().filter((c) => c.checked).map((c) => c.value),
+    getSelected: () =>
+      checkList()
+        .filter((c) => c.checked)
+        .map((c) => c.value),
     clearSelection: () => {
       checkList().forEach((c) => (c.checked = false));
       refreshSelection();

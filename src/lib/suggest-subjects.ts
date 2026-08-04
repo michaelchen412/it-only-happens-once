@@ -37,7 +37,9 @@ export async function suggestSubjects(
   if (!names.length) return { existing: [], proposed: null };
 
   const Suggestion = z.object({
-    applicable: z.array(z.enum(names as [string, ...string[]])).describe('Existing subjects that genuinely apply (0–3).'),
+    applicable: z
+      .array(z.enum(names as [string, ...string[]]))
+      .describe('Existing subjects that genuinely apply (0–3).'),
     new_subject: z
       .object({ name: z.string(), definition: z.string() })
       .nullable()

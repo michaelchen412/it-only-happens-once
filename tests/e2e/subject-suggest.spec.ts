@@ -12,7 +12,11 @@ import { test, expect, type Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
 import { stubActions } from './fixtures';
 
-type Returns<T> = T extends (...a: never[]) => Promise<infer R> ? (R extends { data: infer D } ? NonNullable<D> : never) : never;
+type Returns<T> = T extends (...a: never[]) => Promise<infer R>
+  ? R extends { data: infer D }
+    ? NonNullable<D>
+    : never
+  : never;
 type Suggestion = Returns<typeof actions.fragments.suggestSubjects>;
 
 const EXISTING = ['solitude', 'attention'];
@@ -44,7 +48,7 @@ const subjects = (root: ReturnType<Page['locator']>) => root.locator('input[name
 
 /** Quote and song are behind the list page's Add ▾ menu, not bare buttons. */
 async function openNew(page: Page, type: 'quote' | 'song') {
-  await page.goto('/admin');
+  await page.goto('/admin/fragments');
   await page.locator('#add-btn').click();
   await page.locator(`#add-menu [data-new="${type}"]`).click();
 }
@@ -52,7 +56,7 @@ async function openNew(page: Page, type: 'quote' | 'song') {
 test.describe('suggest subjects — writing', () => {
   test('the button reaches the model with the whole essay, and the preflight notices', async ({ page }) => {
     const { sent } = await stubSuggest(page);
-    await page.goto('/admin#new-writing');
+    await page.goto('/admin/fragments#new-writing');
     await expect(page.locator('#ws-editor .tiptap-doc')).toBeVisible();
 
     await page.locator('#wsheet input[name="title"]').fill('On thresholds');
@@ -85,7 +89,7 @@ test.describe('suggest subjects — writing', () => {
 
   test('a proposed new subject is offered, never applied on its own', async ({ page }) => {
     await stubSuggest(page);
-    await page.goto('/admin#new-writing');
+    await page.goto('/admin/fragments#new-writing');
     await page.locator('#wsheet input[name="title"]').fill('On thresholds');
     await page.locator('#ws-editor .tiptap-doc').click();
     await page.keyboard.type('Something worth tagging.');
@@ -110,7 +114,7 @@ test.describe('suggest subjects — writing', () => {
 
   test('nothing written yet means nothing to read', async ({ page }) => {
     const { sent } = await stubSuggest(page);
-    await page.goto('/admin#new-writing');
+    await page.goto('/admin/fragments#new-writing');
     await expect(page.locator('#ws-editor .tiptap-doc')).toBeVisible();
     await page.locator('#ws-open-publish').click();
 

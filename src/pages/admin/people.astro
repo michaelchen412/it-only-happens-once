@@ -1,0 +1,297 @@
+---
+/*
+  /admin/people — THE ROSTER (docs/plans/12-people.md §3, ADR-0012).
+
+  Grouped by circle. NOT alphabetical, which is a contacts app answering a
+  question he does not have; and NOT drift-first, which greets him with mild
+  accusation every single time he opens the room — a direct violation of
+  10-hq.md §3, where absence is an observation and never a verdict.
+
+  THE RAIL, THEN THE NOTICE, THEN THE SECTIONS. "Been a while" (12 · Piece 4)
+  sits above the circles and is deliberately NOT card-shaped — it is an
+  observation about the roster, not part of it, and the moment it looks like a
+  section it becomes a list of people you have failed (10-hq.md §3). It only
+  ever holds people with at least one logged interaction: somebody with none is
+  NEW, not neglected, and treating null as ancient would flag the whole roster
+  on the day it was filled in.
+
+  THE ROSTER IS SMALL BY DESIGN — ~25 people, ceiling 50 — so everyone is on the
+  page at once: no pagination, no infinite scroll, and search only above six,
+  because a search box over four faces is furniture.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
+import PersonSheet from '../../components/admin/PersonSheet.astro';
+import { today as hqToday } from '../../lib/hq/time';
+import { dmd } from '../../lib/hq/dates';
+import {
+  CIRCLES,
+  SEARCH_APPEARS_ABOVE,
+  hueFor,
+  monogram,
+  rosterOrder,
+  searchText,
+  signPhotos,
+  upcomingBirthday,
+  type Person,
+} from '../../lib/hq/people';
+import { byLastContact, lastContactMap, since } from '../../lib/hq/interactions';
+import { driftFor, driftList } from '../../lib/hq/drift';
+import { seenOn } from '../../lib/hq/calendar';
+import BeenAWhile from '../../components/admin/BeenAWhile.astro';
+
+const supabase = Astro.locals.supabase;
+const { ymd: todayYmd } = await hqToday(supabase);
+
+const { data, error } = await supabase.from('people').select('*');
+const everyone: Person[] = data ?? [];
+
+// One round trip for the whole roster, through the `person_last_contact` view —
+// so the `max()` happens in Postgres over an indexed join rather than by
+// pulling every interaction into this page.
+const lastContact = await lastContactMap(supabase);
+
+// GUARD 2, live since 13 · Piece 4 (§8): anyone with an event today is never
+// drifting. It applies to the card marker as well as the panel, so the roster
+// cannot mark somebody you are seeing this evening.
+const seenToday = await seenOn(supabase, todayYmd);
+
+// Archived people are OUT OF THE ROSTER AND OUT OF SEARCH (§3) — they live in
+// their own section at the bottom. Archiving is the only way somebody leaves,
+// it is always an explicit click, and it is reversible: putting a photo in a
+// drawer, not a judgement.
+//
+// SORTED BY LAST INTERACTION, DESCENDING (§3) — this is what Piece 1 left as
+// alphabetical because it had no interactions to sort by. People you are
+// actually in touch with float up and drift sinks on its own: the same fact a
+// red badge would deliver, delivered kindly. The archived section keeps the
+// alphabetical order, since "how recently" is not the question you are asking
+// of a drawer.
+const roster = everyone.filter((p) => !p.archived_at).sort(byLastContact(lastContact));
+const archived = everyone.filter((p) => p.archived_at).sort(rosterOrder);
+
+// One round trip for every face on the page. These URLs expire, which is why
+// they are minted here per render and never stored (lib/hq/people.ts).
+const photos = await signPhotos(
+  supabase,
+  everyone.map((p) => p.photo_path),
+);
+
+// The rail carries what is actually actionable in the next weeks, and each
+// person's own lead decides whether they are on it — 30 days by default,
+// because choosing and shipping a gift takes longer than a week.
+const soon = roster
+  .map((p) => ({ person: p, birthday: upcomingBirthday(p, todayYmd) }))
+  .filter((x): x is { person: Person; birthday: NonNullable<ReturnType<typeof upcomingBirthday>> } => !!x.birthday)
+  .sort((a, b) => a.birthday.days - b.birthday.days);
+
+const sections = CIRCLES.map((c) => ({ ...c, members: roster.filter((p) => p.circle === c.key) })).filter(
+  (s) => s.members.length > 0,
+);
+
+// Drift, derived in full here and per-card below from the same function, so the
+// panel and the cards can never disagree about who is drifting. The roster
+// holds the WHOLE list — Today caps it at three, because Today is a nudge and
+// this is the room where the full picture lives (§8).
+const drifting = driftList(roster, lastContact, todayYmd, seenToday);
+---
+
+<AdminLayout title="People" active="people">
+  <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
+    <PageHeader title="People" class="pt-1">
+      {
+        roster.length > SEARCH_APPEARS_ABOVE && (
+          <label slot="actions" class="search">
+            <Icon name="ph:magnifying-glass" class="opacity-45" />
+            <input type="search" id="people-search" placeholder="Find someone…" aria-label="Find someone" />
+          </label>
+        )
+      }
+      <button slot="actions" type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure gap-1 font-sans">
+        <Icon name="ph:plus" /> Add
+      </button>
+    </PageHeader>
+
+    {
+      error && (
+        <p class="admin-alert mb-5" role="alert">
+          Couldn’t load the roster: {error.message}
+        </p>
+      )
+    }
+
+    {
+      everyone.length === 0 ? (
+        /* The room on day one. One line, one button — no grid of skeletons, no
+           "0 people", no setup checklist. A roster is designed on the day it is
+           full and lived in on the day it is empty. */
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
+          <p class="font-serif text-lg">Nobody here yet.</p>
+          <button type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure mt-4 gap-1 font-sans">
+            <Icon name="ph:plus" /> Add the first
+          </button>
+        </div>
+      ) : (
+        <>
+          {soon.length > 0 && (
+            <div class="rail cn-azure mb-6" data-roster-part>
+              <span class="rail__k">
+                <Icon name="ph:cake" /> Coming up
+              </span>
+              {soon.map(({ person, birthday }) => (
+                <a href={`/admin/people/${person.slug}`} class="rail__item">
+                  <span class:list={['face face--sm', hueFor(person.id)]} aria-hidden="true">
+                    {photos.get(person.photo_path ?? '') ? (
+                      <img src={photos.get(person.photo_path!)} alt="" />
+                    ) : (
+                      monogram(person.display_name)
+                    )}
+                  </span>
+                  <span class="rail__name">{person.display_name}</span>
+                  <span class="admin-hint">{birthday.days === 0 ? 'today' : dmd(birthday.ymd, todayYmd)}</span>
+                </a>
+              ))}
+            </div>
+          )}
+
+          <BeenAWhile drifting={drifting} today={todayYmd} photos={photos} class="mb-6" />
+
+          {sections.map((section) => (
+            <section class="mb-6" data-section data-roster-part>
+              <h2 class="admin-label mb-2">
+                {section.label}{' '}
+                <span class="opacity-50" data-count>
+                  {section.members.length}
+                </span>
+              </h2>
+              <div class="pgrid">
+                {section.members.map((person) => {
+                  const birthday = upcomingBirthday(person, todayYmd);
+                  const photo = person.photo_path ? photos.get(person.photo_path) : null;
+                  const last = lastContact.get(person.id);
+                  // Past cadence the line shifts weight and darkens — nothing
+                  // else changes (§3). No badge, no count, no red. They are
+                  // already named once in the panel above; this exists so that
+                  // SCANNING a section still tells you, not so drift is
+                  // announced twice.
+                  const adrift = !!driftFor(person, last, todayYmd, seenToday);
+                  return (
+                    <a
+                      href={`/admin/people/${person.slug}`}
+                      class:list={['pc', hueFor(person.id)]}
+                      data-person
+                      data-search={searchText(person)}
+                    >
+                      <span class="face face--card" aria-hidden="true">
+                        {photo ? <img src={photo} alt="" /> : monogram(person.display_name)}
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="pc__name">{person.display_name}</span>
+                        {person.epithet && <span class="pc__epi">{person.epithet}</span>}
+                        {/* THE SINGLE MOST DECISION-RELEVANT FACT ON THE CARD
+                            (§3), and a DURATION rather than a date: "3 weeks
+                            ago" answers the question the roster is asking, and
+                            a compact `M/D Ddd` carries no year — which is how
+                            the lab's two-year-old contact read as last month.
+
+                            "No entries yet" is a statement of fact, not a gap:
+                            nobody drifts here, because a person with no
+                            interactions is NEW rather than neglected (§8).
+
+                            A cake joins it ONLY inside the lead window —
+                            otherwise it is noise for 340 days a year. */}
+                        <span class:list={['pc__meta', adrift && 'is-drifting']}>
+                          <Icon name="ph:clock-light" class="pc__clock" />
+                          {last ? since(last.on, todayYmd) : 'No entries yet'}
+                          {birthday && (
+                            <>
+                              <span class="pc__bday">
+                                <Icon name="ph:cake" />
+                              </span>
+                              {birthday.days === 0 ? 'today' : dmd(birthday.ymd, todayYmd)}
+                            </>
+                          )}
+                        </span>
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          <p id="people-no-match" hidden class="admin-hint py-6 text-center text-sm">
+            Nobody by that name.
+          </p>
+
+          {archived.length > 0 && (
+            <details class="border-base-300 mt-8 border-t pt-4">
+              <summary class="admin-label cursor-pointer">
+                Archived <span class="opacity-50">{archived.length}</span>
+              </summary>
+              <div class="pgrid mt-3 opacity-70">
+                {archived.map((person) => {
+                  const photo = person.photo_path ? photos.get(person.photo_path) : null;
+                  return (
+                    <a href={`/admin/people/${person.slug}`} class:list={['pc', hueFor(person.id)]}>
+                      <span class="face face--card" aria-hidden="true">
+                        {photo ? <img src={photo} alt="" /> : monogram(person.display_name)}
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="pc__name">{person.display_name}</span>
+                        {person.epithet && <span class="pc__epi">{person.epithet}</span>}
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+        </>
+      )
+    }
+  </div>
+
+  <PersonSheet />
+
+  <script>
+    // Search filters the cards already on the page. At a ceiling of 50 rows
+    // they are all here, so a keystroke is a DOM pass rather than a round trip
+    // — and a section whose every member is filtered out hides its heading too,
+    // because a heading over an empty grid reads as a rendering bug.
+    const input = document.querySelector<HTMLInputElement>('#people-search');
+    const noMatch = document.querySelector<HTMLElement>('#people-no-match');
+
+    input?.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+
+      document.querySelectorAll<HTMLElement>('[data-person]').forEach((card) => {
+        const hit = !q || (card.dataset.search ?? '').includes(q);
+        card.hidden = !hit;
+        if (hit) shown++;
+      });
+
+      document.querySelectorAll<HTMLElement>('[data-section]').forEach((section) => {
+        const visible = Array.from(section.querySelectorAll<HTMLElement>('[data-person]')).filter((c) => !c.hidden);
+        section.hidden = visible.length === 0;
+        const count = section.querySelector<HTMLElement>('[data-count]');
+        // The count follows the filter. Left alone it would keep announcing a
+        // section size the grid below it no longer shows.
+        if (count) count.textContent = String(visible.length);
+      });
+
+      // The rail and the drift notice are both statements about the WHOLE
+      // roster, not about who you are looking for — so they go while a search
+      // is running rather than sitting there unfiltered. Leaving the notice up
+      // would be worse than leaving the rail: it would look like the answer to
+      // the name you just typed.
+      document.querySelectorAll<HTMLElement>('.rail, [data-been-a-while]').forEach((el) => {
+        el.hidden = q.length > 0;
+      });
+
+      if (noMatch) noMatch.hidden = shown > 0 || !q;
+    });
+  </script>
+</AdminLayout>

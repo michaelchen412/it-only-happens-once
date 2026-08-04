@@ -36,6 +36,7 @@ import type { SuiteItem } from '../../../lib/constellations';
 import type { SubjectRef } from '../../../lib/blog';
 import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
+import { allFragmentPeople } from '../../../lib/hq/links';
 import StarMark from '../../../components/StarMark.astro';
 
 const sb = Astro.locals.supabase;
@@ -48,23 +49,37 @@ const { data: c } = await sb
   .maybeSingle();
 if (!c) return Astro.redirect('/admin/constellations');
 
-const [{ data: placements }, { data: allLinks }, { data: allConstellations }, { data: subjectRows }, { data: authors }, { data: works }] =
-  await Promise.all([
-    sb
-      .from('fragment_constellations')
-      .select(
-        // `details` comes in via PAIRED_SELECT rather than being named twice.
-        `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, status, occurred_at, updated_at, date_precision, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`
-      )
-      .eq('constellation_id', c.id)
-      .is('fragments.deleted_at', null)
-      .order('position'),
-    sb.from('fragment_constellations').select('fragment_id, constellation_id'),
-    sb.from('constellations').select('id, name, slug, description, color').order('sort'),
-    sb.from('subjects').select('name').order('name'),
-    sb.from('authors').select('id, name').order('name'),
-    sb.from('works').select('id, title, author_id').order('title'),
-  ]);
+const [
+  { data: placements },
+  { data: allLinks },
+  { data: allConstellations },
+  { data: subjectRows },
+  { data: authors },
+  { data: works },
+  { data: people },
+] = await Promise.all([
+  sb
+    .from('fragment_constellations')
+    .select(
+      // `details` comes in via PAIRED_SELECT rather than being named twice.
+      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, status, occurred_at, updated_at, date_precision, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
+    )
+    .eq('constellation_id', c.id)
+    .is('fragments.deleted_at', null)
+    .order('position'),
+  sb.from('fragment_constellations').select('fragment_id, constellation_id'),
+  sb.from('constellations').select('id, name, slug, description, color').order('sort'),
+  sb.from('subjects').select('name').order('name'),
+  sb.from('authors').select('id, name').order('name'),
+  sb.from('works').select('id, title, author_id').order('title'),
+  // The roster, for the sheet's "Shared by" field (12 · Piece 3). Passed
+  // here as well as from /admin/fragments on purpose: a field that exists in
+  // one room and silently not in the other is worse than not having it.
+  sb.from('people').select('id, display_name').order('display_name'),
+]);
+
+// `fragment_id -> person_id[]`, so opening a sheet needs no round trip.
+const sharedBy = await allFragmentPeople(sb);
 
 const snip = (s: string | null | undefined, max = 110) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
@@ -77,26 +92,50 @@ for (const l of allLinks ?? []) {
 
 const suite = (placements ?? []).map((p) => {
   const f = p.fragments as unknown as {
-    id: string; type: FragmentType; slug: string; title: string | null; body: string | null;
-    excerpt: string | null; attribution: string | null; source_url: string | null; status: string;
-    occurred_at: string; updated_at: string | null;
-    date_precision: 'day' | 'year'; details: Record<string, unknown> | null; author_id: string | null; work_id: string | null;
-    authors: { name: string } | null; works: { title: string } | null;
+    id: string;
+    type: FragmentType;
+    slug: string;
+    title: string | null;
+    body: string | null;
+    excerpt: string | null;
+    attribution: string | null;
+    source_url: string | null;
+    status: string;
+    occurred_at: string;
+    updated_at: string | null;
+    date_precision: 'day' | 'year';
+    details: Record<string, unknown> | null;
+    author_id: string | null;
+    work_id: string | null;
+    authors: { name: string } | null;
+    works: { title: string } | null;
     fragment_subjects: { subjects: SubjectRef | null }[] | null;
   };
-  const subjects = (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean).join(', ');
+  const subjects = (f.fragment_subjects ?? [])
+    .map((fs) => fs.subjects?.name)
+    .filter(Boolean)
+    .join(', ');
   // the FragmentSheet edit payload (same shape FragmentRow emits)
   const editorData =
     f.type === 'writing'
       ? null
       : JSON.stringify({
-          id: f.id, type: f.type, title: f.title, body: f.body, attribution: f.attribution,
-          source_url: f.source_url, status: f.status,
+          id: f.id,
+          type: f.type,
+          title: f.title,
+          body: f.body,
+          attribution: f.attribution,
+          source_url: f.source_url,
+          status: f.status,
           year: (f.details as { year?: number } | null)?.year ?? null,
-          occurredIso: f.occurred_at, datePrecision: f.date_precision,
-          authorId: f.author_id, authorName: f.authors?.name ?? '',
-          workId: f.work_id, workName: f.works?.title ?? '',
-          subjects, details: f.details ?? {},
+          occurredIso: f.occurred_at,
+          datePrecision: f.date_precision,
+          authorId: f.author_id,
+          authorName: f.authors?.name ?? '',
+          workId: f.work_id,
+          workName: f.works?.title ?? '',
+          subjects,
+          details: f.details ?? {},
           constellationIds: (allLinks ?? []).filter((l) => l.fragment_id === f.id).map((l) => l.constellation_id),
         });
   // The Read view's stanza — the SAME SuiteItem shape the public sky renders,
@@ -108,7 +147,13 @@ const suite = (placements ?? []).map((p) => {
     f.type === 'quote'
       ? { kind: 'quote', body: f.body ?? '', attribution: f.attribution }
       : f.type === 'song'
-        ? { kind: 'song', title: f.title || '(untitled)', body: f.body ?? '', attribution: f.attribution, sourceUrl: f.source_url }
+        ? {
+            kind: 'song',
+            title: f.title || '(untitled)',
+            body: f.body ?? '',
+            attribution: f.attribution,
+            sourceUrl: f.source_url,
+          }
         : {
             kind: 'writing',
             item: {
@@ -134,8 +179,17 @@ const suite = (placements ?? []).map((p) => {
           };
 
   return {
-    id: f.id, type: f.type, status: f.status, editorData, read,
-    summary: f.type === 'quote' ? snip(f.body) : f.type === 'song' ? `${f.title ?? ''} — ${f.attribution ?? ''}` : (f.title ?? '(untitled)'),
+    id: f.id,
+    type: f.type,
+    status: f.status,
+    editorData,
+    read,
+    summary:
+      f.type === 'quote'
+        ? snip(f.body)
+        : f.type === 'song'
+          ? `${f.title ?? ''} — ${f.attribution ?? ''}`
+          : (f.title ?? '(untitled)'),
     attribution: f.type === 'quote' ? (f.attribution ?? '') : '',
     subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
     others: elsewhere.get(f.id) ?? 0,
@@ -154,7 +208,13 @@ const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
 const mix = { writing: 0, quote: 0, song: 0 } as Record<FragmentType, number>;
 for (const s of suite) mix[s.type]++;
 const sizeHint =
-  placedCount === 0 ? '' : placedCount < 5 ? 'thin — a constellation usually holds ~5–15' : placedCount > 15 ? 'heavy — two constellations fused? (~5–15)' : '';
+  placedCount === 0
+    ? ''
+    : placedCount < 5
+      ? 'thin — a constellation usually holds ~5–15'
+      : placedCount > 15
+        ? 'heavy — two constellations fused? (~5–15)'
+        : '';
 const spreadHint = placedCount > 0 && subjectSpread < 3 ? 'narrow — a way of seeing usually crosses ≥3 subjects' : '';
 
 const subjectNames = (subjectRows ?? []).map((s) => s.name);
@@ -175,7 +235,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
           <input name="name" required value={c.name} aria-label="Constellation name" class="admin-title-input" />
         </div>
         <Fragment slot="actions">
-          <span id="cc-saved" hidden class="font-sans text-xs text-success">saved</span>
+          <span id="cc-saved" hidden class="text-success font-sans text-xs">saved</span>
           <a
             id="cc-preview"
             href={`/${c.slug}`}
@@ -189,29 +249,38 @@ const TYPES = ['writing', 'quote', 'song'] as const;
         </Fragment>
       </PageHeader>
 
-      <div class="rounded-box border border-base-300 bg-base-200/50 p-5">
+      <div class="rounded-box border-base-300 bg-base-200/50 border p-5">
         <div class="grid gap-5 sm:grid-cols-2">
           <div>
             <label class="admin-label" for="cc-slug">URL</label>
             <div class="flex items-center gap-1.5">
-              <span class="font-mono text-xs text-base-content/40">/</span>
-              <input id="cc-slug" name="slug" value={c.slug} class="input input-sm input-bordered w-full font-mono text-xs" />
+              <span class="text-base-content/40 font-mono text-xs">/</span>
+              <input
+                id="cc-slug"
+                name="slug"
+                value={c.slug}
+                class="input input-sm input-bordered w-full font-mono text-xs"
+              />
             </div>
             <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
           </div>
           <div>
             <label class="admin-label">Star colour</label>
-            {/* The colour is a SLOT, not a value — app.css owns what each means
+            {
+              /* The colour is a SLOT, not a value — app.css owns what each means
                 in dusk and paper (design.md §13). It tints this constellation's
-                star out front, its lamplight inside, and its chips in here. */}
+                star out front, its lamplight inside, and its chips in here. */
+            }
             <div class="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Star colour">
-              {COLOR_SLOTS.map((slot) => (
-                <label class:list={['cn-swatch', `cn-${slot}`, c.color === slot && 'is-active']} title={slot}>
-                  <input type="radio" name="color" value={slot} checked={c.color === slot} class="sr-only" />
-                  <StarMark />
-                  <span class="sr-only">{slot}</span>
-                </label>
-              ))}
+              {
+                COLOR_SLOTS.map((slot) => (
+                  <label class:list={['cn-swatch', `cn-${slot}`, c.color === slot && 'is-active']} title={slot}>
+                    <input type="radio" name="color" value={slot} checked={c.color === slot} class="sr-only" />
+                    <StarMark />
+                    <span class="sr-only">{slot}</span>
+                  </label>
+                ))
+              }
             </div>
           </div>
           <div>
@@ -225,13 +294,21 @@ const TYPES = ['writing', 'quote', 'song'] as const;
 
         <div class="mt-5">
           <label class="admin-label" for="cc-description">Description</label>
-          <textarea id="cc-description" name="description" rows="3" class="textarea textarea-bordered w-full font-serif leading-relaxed"
-            placeholder="Why this way of seeing exists — what truth it tells, how it relates to who you are.">{c.description}</textarea>
+          <textarea
+            id="cc-description"
+            name="description"
+            rows="3"
+            class="textarea textarea-bordered w-full font-serif leading-relaxed"
+            placeholder="Why this way of seeing exists — what truth it tells, how it relates to who you are."
+            >{c.description}</textarea
+          >
           <p class="admin-hint mt-1.5">Shown under the name on the home overview, and again as the suite's epigraph.</p>
         </div>
 
         <div class="mt-5">
-          <label class="admin-label" for="cc-score">The score <span class="normal-case opacity-70">— optional</span></label>
+          <label class="admin-label" for="cc-score"
+            >The score <span class="normal-case opacity-70">— optional</span></label
+          >
           <input
             id="cc-score"
             name="score_url"
@@ -239,12 +316,14 @@ const TYPES = ['writing', 'quote', 'song'] as const;
             placeholder="https://open.spotify.com/playlist/…"
             class="input input-sm input-bordered w-full font-sans"
           />
-          <p class="admin-hint mt-1.5">A Spotify playlist to play through the read; it appears above the first fragment.</p>
+          <p class="admin-hint mt-1.5">
+            A Spotify playlist to play through the read; it appears above the first fragment.
+          </p>
         </div>
 
-        <div class="mt-5 flex items-center justify-between gap-4 border-t border-base-300 pt-4">
+        <div class="border-base-300 mt-5 flex items-center justify-between gap-4 border-t pt-4">
           <p class="admin-hint">Deleting removes this composition only — the fragments themselves are never touched.</p>
-          <button type="button" id="cc-delete" class="btn btn-ghost btn-sm gap-1.5 font-sans text-error normal-case">
+          <button type="button" id="cc-delete" class="btn btn-ghost btn-sm text-error gap-1.5 font-sans normal-case">
             <Icon name="ph:trash" /> Delete
           </button>
         </div>
@@ -259,8 +338,12 @@ const TYPES = ['writing', 'quote', 'song'] as const;
           {
             suite.length > 0 && (
               <div class="seg" role="group" aria-label="Suite view">
-                <button type="button" class="type-badge is-active" data-view="compose" aria-pressed="true">Compose</button>
-                <button type="button" class="type-badge" data-view="read" aria-pressed="false">Read</button>
+                <button type="button" class="type-badge is-active" data-view="compose" aria-pressed="true">
+                  Compose
+                </button>
+                <button type="button" class="type-badge" data-view="read" aria-pressed="false">
+                  Read
+                </button>
               </div>
             )
           }
@@ -281,69 +364,115 @@ const TYPES = ['writing', 'quote', 'song'] as const;
           <span class="admin-stat__label">placed</span>
         </span>
       </div>
-      {
-        (sizeHint || spreadHint) && (
-          <p class="admin-hint mt-2">{[sizeHint, spreadHint].filter(Boolean).join(' · ')}</p>
-        )
-      }
+      {(sizeHint || spreadHint) && <p class="admin-hint mt-2">{[sizeHint, spreadHint].filter(Boolean).join(' · ')}</p>}
 
-      {suite.length === 0 ? (
-        <div class="mt-4 rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
-          <p class="font-display text-lg text-base-content/60">Nothing placed yet.</p>
-          <p class="admin-hint mt-1">Press <b>Add</b> to browse everything you've written, quoted, or heard — or make something new inside it.</p>
-        </div>
-      ) : (
-        <ol id="suite-rows" class="mt-4 divide-y divide-base-300 rounded-box border border-base-300 bg-base-200/50">
-          {suite.map((s, i) => (
-            <li
-              class="suite-row group flex items-center gap-3 px-3 py-2.5"
-              draggable="true"
-              data-fid={s.id}
-              data-type={s.type}
-              data-fragment={s.editorData}
-              data-writing={s.type === 'writing' ? s.id : undefined}
-            >
-              <span class="cursor-grab text-base-content/25 transition-colors select-none group-hover:text-base-content/50" title="Drag to reorder (or Alt+↑/↓)" aria-hidden="true">⋮⋮</span>
-              <span data-num class="w-4 shrink-0 text-right font-sans text-xs tabular-nums text-base-content/35" aria-hidden="true">{i + 1}</span>
-              <TypeMark type={s.type} class="w-4 text-center" />
-              <button type="button" class="row-open min-w-0 grow truncate text-left font-serif text-[0.95rem]" data-open>
-                {s.summary}
-                {s.attribution && <span class="ml-1.5 font-sans text-xs text-base-content/45">— {s.attribution}</span>}
-              </button>
-              {s.status === 'draft' && <StatusChip status={s.status} />}
-              {s.others > 0 && (
-                <span class="font-sans text-xs text-base-content/40" title={`Also lives in ${s.others} other constellation${s.others > 1 ? 's' : ''}`}>
-                  <StarMark />&times;{s.others + 1}
+      {
+        suite.length === 0 ? (
+          <div class="rounded-box border-base-300 mt-4 border border-dashed px-6 py-12 text-center">
+            <p class="font-display text-base-content/60 text-lg">Nothing placed yet.</p>
+            <p class="admin-hint mt-1">
+              Press <b>Add</b> to browse everything you've written, quoted, or heard — or make something new inside it.
+            </p>
+          </div>
+        ) : (
+          <ol id="suite-rows" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 mt-4 divide-y border">
+            {suite.map((s, i) => (
+              <li
+                class="suite-row group flex items-center gap-3 px-3 py-2.5"
+                draggable="true"
+                data-fid={s.id}
+                data-type={s.type}
+                data-fragment={s.editorData}
+                data-writing={s.type === 'writing' ? s.id : undefined}
+              >
+                <span
+                  class="text-base-content/25 group-hover:text-base-content/50 cursor-grab transition-colors select-none"
+                  title="Drag to reorder (or Alt+↑/↓)"
+                  aria-hidden="true"
+                >
+                  ⋮⋮
                 </span>
-              )}
-              {/* The nudges are the TOUCH path only — with a pointer you drag,
+                <span
+                  data-num
+                  class="text-base-content/35 w-4 shrink-0 text-right font-sans text-xs tabular-nums"
+                  aria-hidden="true"
+                >
+                  {i + 1}
+                </span>
+                <TypeMark type={s.type} class="w-4 text-center" />
+                <button
+                  type="button"
+                  class="row-open min-w-0 grow truncate text-left font-serif text-[0.95rem]"
+                  data-open
+                >
+                  {s.summary}
+                  {s.attribution && (
+                    <span class="text-base-content/45 ml-1.5 font-sans text-xs">— {s.attribution}</span>
+                  )}
+                </button>
+                {s.status === 'draft' && <StatusChip status={s.status} />}
+                {s.others > 0 && (
+                  <span
+                    class="text-base-content/40 font-sans text-xs"
+                    title={`Also lives in ${s.others} other constellation${s.others > 1 ? 's' : ''}`}
+                  >
+                    <StarMark />
+                    &times;{s.others + 1}
+                  </span>
+                )}
+                {/* The nudges are the TOUCH path only — with a pointer you drag,
                   and with a keyboard you Alt+↑/↓. On a hovering device they'd
                   reserve row width for a duplicate of drag, so `.row-nudge`
                   removes them there entirely (app.css). */}
-              <span class="row-edit flex shrink-0 items-center gap-0.5">
-                <button type="button" class="row-nudge btn btn-ghost btn-xs" data-move="up" title="Move up" aria-label="Move up"><Icon name="ph:arrow-up" /></button>
-                <button type="button" class="row-nudge btn btn-ghost btn-xs" data-move="down" title="Move down" aria-label="Move down"><Icon name="ph:arrow-down" /></button>
-                <button type="button" class="btn btn-ghost btn-xs text-error/70" data-unplace title="Remove from this constellation" aria-label="Remove from this constellation">
-                  <Icon name="ph:x" />
-                </button>
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+                <span class="row-edit flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    class="row-nudge btn btn-ghost btn-xs"
+                    data-move="up"
+                    title="Move up"
+                    aria-label="Move up"
+                  >
+                    <Icon name="ph:arrow-up" />
+                  </button>
+                  <button
+                    type="button"
+                    class="row-nudge btn btn-ghost btn-xs"
+                    data-move="down"
+                    title="Move down"
+                    aria-label="Move down"
+                  >
+                    <Icon name="ph:arrow-down" />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs text-error/70"
+                    data-unplace
+                    title="Remove from this constellation"
+                    aria-label="Remove from this constellation"
+                  >
+                    <Icon name="ph:x" />
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )
+      }
 
-      {/* ── the Read view ────────────────────────────────────────────────
+      {
+        /* ── the Read view ────────────────────────────────────────────────
           The same stanzas the sky sets (SuiteStanza, verbatim), so composing
           can be judged on the writing rather than on 110-character snips —
           and it includes DRAFTS, which the public page can't show. It stops
           at the content on purpose: the arcs, the lamplight and the score are
           Preview's job. Read asks "is this composition any good?"; Preview
-          asks "does the page look right?" */}
+          asks "does the page look right?" */
+      }
       {
         suite.length > 0 && (
           <div id="suite-read" class:list={['mt-8', `cn-${c.color}`]} hidden>
             {c.description && (
-              <p class="prose-measure border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
+              <p class="prose-measure border-base-300 text-base-content/55 border-l pl-5 text-lg italic">
                 {c.description}
               </p>
             )}
@@ -357,10 +486,14 @@ const TYPES = ['writing', 'quote', 'song'] as const;
                   data-writing={s.type === 'writing' ? s.id : undefined}
                 >
                   <div class="flex w-6 shrink-0 flex-col items-center gap-1">
-                    <span class="suite-mark font-serif text-base text-base-content/35 select-none" aria-hidden="true">
+                    <span class="suite-mark text-base-content/35 font-serif text-base select-none" aria-hidden="true">
                       {TYPE_META[s.type].glyph}
                     </span>
-                    <span data-num class="font-sans text-[0.65rem] text-base-content/30 tabular-nums" aria-hidden="true">
+                    <span
+                      data-num
+                      class="text-base-content/30 font-sans text-[0.65rem] tabular-nums"
+                      aria-hidden="true"
+                    >
                       {i + 1}
                     </span>
                     <button
@@ -390,16 +523,26 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     </section>
   </div>
 
-  {/* Essays open in the blog's own Reader — the same component, the same
-      PostArticle, so a piece reads here exactly as it will out there. */}
+  {
+    /* Essays open in the blog's own Reader — the same component, the same
+      PostArticle, so a piece reads here exactly as it will out there. */
+  }
   <Reader />
-  {readerWritings.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
+  {
+    readerWritings.map((w) => (
+      <template data-reader-content={w.slug}>
+        <PostArticle item={w} linkTitle />
+      </template>
+    ))
+  }
 
   <FragmentSheet
     subjects={subjectNames}
     authors={authors ?? []}
     works={(works ?? []).map((w) => ({ id: w.id, title: w.title, authorId: w.author_id }))}
     constellations={allConstellations ?? []}
+    people={people ?? []}
+    sharedBy={sharedBy}
   />
   <WritingSheet subjects={subjectNames} constellations={allConstellations ?? []} />
   <FragmentBrowser
@@ -528,8 +671,10 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       return location.reload();
     }
     if (btn?.hasAttribute('data-open')) {
-      if (li.dataset.writing) return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: li.dataset.writing }));
-      if (li.dataset.fragment) document.dispatchEvent(new CustomEvent('fragment:edit', { detail: li.dataset.fragment }));
+      if (li.dataset.writing)
+        return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: li.dataset.writing }));
+      if (li.dataset.fragment)
+        document.dispatchEvent(new CustomEvent('fragment:edit', { detail: li.dataset.fragment }));
     }
   });
 
@@ -563,7 +708,10 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-pressed', String(on));
     }
-    if (persist) try { localStorage.setItem(VIEW_KEY, v); } catch {}
+    if (persist)
+      try {
+        localStorage.setItem(VIEW_KEY, v);
+      } catch {}
   }
   for (const b of viewBtns) b.addEventListener('click', () => setView(b.dataset.view!));
   try {
@@ -575,8 +723,10 @@ const TYPES = ['writing', 'quote', 'song'] as const;
   readPanel?.addEventListener('click', (e) => {
     if (!(e.target as Element).closest('button[data-open]')) return;
     const art = (e.target as Element).closest('[data-fid]') as HTMLElement | null;
-    if (art?.dataset.writing) return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: art.dataset.writing }));
-    if (art?.dataset.fragment) document.dispatchEvent(new CustomEvent('fragment:edit', { detail: art.dataset.fragment }));
+    if (art?.dataset.writing)
+      return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: art.dataset.writing }));
+    if (art?.dataset.fragment)
+      document.dispatchEvent(new CustomEvent('fragment:edit', { detail: art.dataset.fragment }));
   });
 
   // drag to reorder (the nudges remain the touch path, Alt+↑/↓ the keyboard's)

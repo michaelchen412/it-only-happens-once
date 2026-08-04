@@ -38,14 +38,10 @@ const tierIndex = (count: number) => Math.min(distinct.indexOf(count), TIERS.len
 const tierOf = (count: number) => TIERS[tierIndex(count)];
 // Each star breathes on its own phase — synchronised pulsing reads as
 // machinery. Derived from the slug so it's stable across renders.
-const phaseOf = (slug: string) =>
-  -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
+const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
 ---
 
-<SiteLayout
-  description="A walkable self-portrait — constellations of writing, quotes, and music."
-  active="home"
->
+<SiteLayout description="A walkable self-portrait — constellations of writing, quotes, and music." active="home">
   <section class="mx-auto flex min-h-[80vh] max-w-4xl flex-col justify-center px-5 py-20 sm:px-8">
     {
       refs.length > 0 ? (
@@ -58,7 +54,9 @@ const phaseOf = (slug: string) =>
                     class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
                     style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}; --phase: ${phaseOf(c.slug)}`}
                     transition:name={`star-${c.slug}`}
-                    ><StarBloom /></span>
+                  >
+                    <StarBloom />
+                  </span>
                   <span
                     class={`${tierOf(c.count)} sky-name font-display font-light transition-colors`}
                     transition:name={`c-${c.slug}`}
@@ -69,7 +67,7 @@ const phaseOf = (slug: string) =>
                 {/* why this constellation exists — the same words that greet
                     you as the epigraph inside, so the zoom carries meaning */}
                 {c.description && (
-                  <p class="mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed text-base-content/55">
+                  <p class="text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed">
                     {c.description}
                   </p>
                 )}
@@ -78,7 +76,7 @@ const phaseOf = (slug: string) =>
           ))}
         </div>
       ) : (
-        <p class="text-center font-serif text-lg text-base-content/55">The sky is being composed.</p>
+        <p class="text-base-content/55 text-center font-serif text-lg">The sky is being composed.</p>
       )
     }
   </section>

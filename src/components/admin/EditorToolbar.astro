@@ -6,19 +6,38 @@
   border/padding via `class`.
 */
 const TOOLS = [
-  { group: [{ cmd: 'undo', label: '↶', aria: 'Undo' }, { cmd: 'redo', label: '↷', aria: 'Redo' }] },
-  { group: [{ cmd: 'h2', label: 'H2', aria: 'Heading', toggle: true }, { cmd: 'h3', label: 'H3', aria: 'Subheading', toggle: true }] },
-  { group: [
+  {
+    group: [
+      { cmd: 'undo', label: '↶', aria: 'Undo' },
+      { cmd: 'redo', label: '↷', aria: 'Redo' },
+    ],
+  },
+  {
+    group: [
+      { cmd: 'h2', label: 'H2', aria: 'Heading', toggle: true },
+      { cmd: 'h3', label: 'H3', aria: 'Subheading', toggle: true },
+    ],
+  },
+  {
+    group: [
       { cmd: 'bold', label: 'B', aria: 'Bold', klass: 'font-bold', toggle: true },
       { cmd: 'italic', label: 'I', aria: 'Italic', klass: 'italic', toggle: true },
       { cmd: 'strike', label: 'S', aria: 'Strikethrough', klass: 'line-through', toggle: true },
-    ] },
-  { group: [
+    ],
+  },
+  {
+    group: [
       { cmd: 'blockquote', label: '“', aria: 'Quote', toggle: true },
       { cmd: 'bulletList', label: '•', aria: 'Bulleted list', toggle: true },
       { cmd: 'orderedList', label: '1.', aria: 'Numbered list', toggle: true },
-    ] },
-  { group: [{ cmd: 'link', label: '🔗', aria: 'Add link' }, { cmd: 'hr', label: '—', aria: 'Divider' }] },
+    ],
+  },
+  {
+    group: [
+      { cmd: 'link', label: '🔗', aria: 'Add link' },
+      { cmd: 'hr', label: '—', aria: 'Divider' },
+    ],
+  },
 ] as const;
 
 interface Props {
@@ -31,16 +50,14 @@ interface Props {
   image?: boolean;
 }
 const { class: className = '', image = false } = Astro.props;
-const sections = image
-  ? [...TOOLS, { group: [{ cmd: 'image', label: '▣', aria: 'Insert image' }] }]
-  : [...TOOLS];
+const sections = image ? [...TOOLS, { group: [{ cmd: 'image', label: '▣', aria: 'Insert image' }] }] : [...TOOLS];
 ---
 
 <div class:list={['flex flex-wrap items-center gap-1', className]} role="toolbar" aria-label="Formatting">
   {
     sections.map((section, i) => (
       <>
-        {i > 0 && <span class="mx-1 h-5 w-px bg-base-300" />}
+        {i > 0 && <span class="bg-base-300 mx-1 h-5 w-px" />}
         {section.group.map((t) => (
           <button
             type="button"

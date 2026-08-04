@@ -1,11 +1,19 @@
 {
   "id": "/admin",
-  "name": "Workshop — It Only Happens Once",
-  "short_name": "Workshop",
-  "description": "Where the writing happens: drafts, quotes, songs, and the sky.",
+  "name": "Observatory — It Only Happens Once",
+  "short_name": "Observatory",
+  "description": "The private half: today, the corpus, and the sky.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",
+  "shortcuts": [
+    {
+      "name": "New note",
+      "short_name": "New note",
+      "description": "Write something down",
+      "url": "/admin/notes?new=1"
+    }
+  ],
   "background_color": "#1a1511",
   "theme_color": "#1a1511",
   "icons": [

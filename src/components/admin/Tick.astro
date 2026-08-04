@@ -1,0 +1,37 @@
+---
+/*
+  Tick — the one-click disposition (10-hq.md §10f).
+
+  ⚠ ONE CLICK, AND IT STAYS. A ticked task is struck through and muted until
+  midnight, and the SAME control undoes it: a task that vanishes gives no sense
+  of progress and no way back from a mis-tap. That is why this is one button in
+  two states rather than a tick and a separate undo — `data-dispose` and
+  `data-undo` are what `task-list.ts` binds to, and exactly one is ever present.
+
+  Both icons are always rendered; CSS swaps which is visible (`tick__o` /
+  `tick__x`). A JS swap would flash the wrong glyph on a slow connection, at the
+  exact moment you are looking for confirmation that the tap registered.
+
+  Extracted 2026-08-04 from AgendaZone and the tasks room, which had it twice.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  /** Already answered for today — the control becomes the way back. */
+  answered: boolean;
+  /** The task's title, so the label is a sentence a screen reader can use. */
+  title: string;
+}
+const { answered, title } = Astro.props;
+---
+
+<button
+  type="button"
+  class="tick"
+  data-dispose={answered ? undefined : 'done'}
+  data-undo={answered ? '' : undefined}
+  aria-label={answered ? `Undo “${title}”` : `Mark “${title}” done`}
+>
+  <Icon name="ph:circle" class="tick__o" />
+  <Icon name="ph:check-circle" class="tick__x" />
+</button>

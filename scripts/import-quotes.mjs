@@ -149,7 +149,10 @@ function parseFile(text) {
   let cur = [];
   for (const line of text.split('\n')) {
     if (line.trim() === '') {
-      if (cur.length) blocks.push(cur), (cur = []);
+      if (cur.length) {
+        blocks.push(cur);
+        cur = [];
+      }
     } else {
       cur.push(line);
     }
@@ -159,7 +162,10 @@ function parseFile(text) {
 }
 
 // --- parse every file ------------------------------------------------------
-const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.md')).sort();
+const files = fs
+  .readdirSync(DIR)
+  .filter((f) => f.endsWith('.md'))
+  .sort();
 const all = [];
 const seen = new Map(); // body-key → index in `all` (dedupe; merge source folders)
 
@@ -189,7 +195,12 @@ if (!COMMIT) {
 
   console.log(`Parsed ${all.length} unique quotes from ${files.length} files → ${OUT}\n`);
   for (const q of all) {
-    const attr = [q.attribution, q.work && `*${q.work}*`, q.citation && `(${q.citation})`, q.page != null && `p.${q.page}`]
+    const attr = [
+      q.attribution,
+      q.work && `*${q.work}*`,
+      q.citation && `(${q.citation})`,
+      q.page != null && `p.${q.page}`,
+    ]
       .filter(Boolean)
       .join(' ');
     console.log(`• [${q.key}]`);
@@ -245,7 +256,11 @@ if (!COMMIT) {
       occurred_at: `${THIS_YEAR}-01-01T00:00:00Z`,
       date_precision: 'year',
     };
-    const { data: frag, error: fragErr } = await sb.from('fragments').upsert(row, { onConflict: 'slug' }).select('id').single();
+    const { data: frag, error: fragErr } = await sb
+      .from('fragments')
+      .upsert(row, { onConflict: 'slug' })
+      .select('id')
+      .single();
     if (fragErr) {
       console.error(`✗ ${q.key}:`, fragErr.message);
       continue;

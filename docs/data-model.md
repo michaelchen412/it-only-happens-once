@@ -200,10 +200,154 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`paired_song_id`** — *the song that goes with this piece* ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). A self-FK from a `writing` row to a `song` row, rendered at the head of the essay. **`ON DELETE SET NULL`** — deleting a song blanks the pairing rather than taking the essay with it. The FK deliberately does *not* enforce `type = 'song'`: a composite FK on `(id, type)` would need a generated column holding the constant, and a generated column cannot be set to null, which is precisely what SET NULL must do — so the check lives in the `songs.pair` action, where the error can be a sentence. **RLS needs no help here:** a PostgREST embed re-applies the fragments policies, so an unpublished paired song simply doesn't come back. The reader that consumes this (`pairedMediaOf`) must therefore treat "id set, embed null" as *no pairing* and never fall through to the legacy `details.media`, which all 48 promoted essays still carry.
 - **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
+## 6b. HQ — the private second domain
+
+**HQ tables are not fragments and never become them** ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)). The corpus is authored to be *published*, so its RLS is an allowlist on `status = 'published'`; HQ is authored to be *never seen*, and its safety comes from a different property entirely — **the absence of any `anon` policy at all**, the pattern `fragment_versions` already uses (§6). Every HQ table is `is_admin()` for all four verbs, with no `anon` grant, so no public route can read one even by accident.
+
+**`settings`** — one row, enforced by `id boolean primary key check (id)`. It holds `home_timezone`, an **IANA name** (`America/Los_Angeles`), never an offset: DST is then Postgres's problem and `Intl`'s rather than ours, and a hard-coded `-08:00` is wrong for half of every year. It lives in the database rather than in env so that moving cities is one `UPDATE` and not a redeploy — and so that server-side work with no browser agrees with what the screen says. [`src/lib/hq/time.ts`](../src/lib/hq/time.ts) is the only thing that reads it, and `localToday()` is the only way anything computes "today".
+
+**`daily_checkins`** — one upserted row per local wake date ([admin.md](admin.md) §11).
+
+| Column | Shape | Why |
+|---|---|---|
+| `log_date` | `date`, **unique** | The local date you woke up on. Going to bed at 1am and waking at 8am the same morning is **one** record. Postgres has no notion of "today", so this column is the only thing that does — never derive it from `created_at`. |
+| `bed_at` / `woke_at` | `timestamptz` | Full instants, not times, so the cross-midnight case is unambiguous rather than inferred. A bed time later on the clock than the wake time belongs to the day before. |
+| `sleep_latency` | enum bucket | A minute count is a guess at 7am; a bucket is honest and just as useful for a trend. |
+| `awakenings` | enum bucket | Same reason — nobody knows the count. |
+| `sleep_quality` · `restedness` | two `smallint` 1–5 | **Two fields on purpose, and they must not be merged.** Physical rest and mental rest come apart, and one combined score erases exactly the case worth noticing. |
+| `valence` · `arousal` | two `smallint` 1–5 | **Two axes, not one mood score.** A single scale cannot distinguish *calm but hollow* from *wired and afraid*. |
+| `dream_recall` | enum, 4 values | `none` is one tap and is **real data**, not a hole. |
+| `dream_intensity` · `dream_body` | 1–5, Markdown | Guarded by a CHECK: they cannot outlive the dream they describe. |
+| `note` | text | One optional line of anything. |
+| `skipped` | `boolean not null` | **Recorded, never inferred.** A row with `skipped = true` means "not today"; no row at all means nothing was said. Neither is ever counted, and there are no streaks anywhere in HQ. |
+
+**Every field except `log_date` is nullable, and that is the design.** The check-in is not a form that gets submitted: the phone captures times and ratings on waking, a desktop appends the longer text later, and both are the same row. An unfinished check-in is a check-in — there is no completeness meter and there must not be one.
+
+Writes are bounded to a **three-day backfill window**, enforced in [`src/actions/checkin.ts`](../src/actions/checkin.ts) rather than only in the form. That is a data-quality limit, not a convenience one: affect recalled a week later is invention, and an invented row is worse than an absent one because a trend cannot tell them apart.
+
+**`people`** — the roster ([admin.md](admin.md) §12). A person is a **first-class entity**: its own table, its own room and its own full page, not a tag over fragments. The roster's working size is ~25 with a ceiling of 50, and several decisions below only make sense at that size.
+
+> **⚠ This table is deliberately bounded in what it may hold**, and the bound is a design constraint rather than a habit: *"I only write nice things about people and have no business putting deeply personal or sensitive info about anyone."* That is what makes the nightly backup and the widened `/admin/export.json` safe with no exclusion and no separate encryption — anything that would make a leak genuinely harmful is out of scope **by design**. It only stays true if it is defended at the schema, so: **no health field, no "concerns", no conflict log, no ratings, no sentiment.** A later migration that adds their opposite has broken something it cannot see.
+
+| Column | Shape | Why |
+|---|---|---|
+| `slug` | `text`, **unique** | The profile URL. **Minted once and never re-minted** — a rename ("Kate" becomes "Mum", a surname changes) must not move a page that is already in browser history. |
+| `display_name` | `text not null` | What he *calls* them, which is the name in every heading. `full_name` and `sort_name` exist beside it for the formal name and for ordering. |
+| `circle` | enum, 3 values | `family · friends · professional`. **One field, not two.** Relationship kind and closeness are genuinely different axes, and splitting them at 25 people is structure that never gets used. There is **no `acquaintances`** value, and its absence is a statement rather than a simplification: it would be the only bucket defined by neglect. Someone who has genuinely fallen out of your life is archived, not demoted. |
+| `epithet` | `text` | The one hand-written line on the card — *"college roommate, now in Seattle"*. Not a bio; that is `bio`. |
+| `birth_month` · `birth_day` · `birth_year` | three `smallint`, the year **nullable** | Never a `date` with a sentinel year. The year is frequently unknown; the "next 30 days" question is a month/day computation anyway (mind the December→January wrap); and a sentinel year is the kind of thing that silently becomes somebody's age on a screen. Three CHECKs enforce that month and day travel together, that a lone year is refused, and that **31 April cannot be stored** — while 29 February can, because a leap-day birthday is real. |
+| `birthday_lead_days` | `int`, default **30** | Per person. Thirty, not seven: *"happy birthday on time"* for the people who matter means weeks of warning, because choosing and shipping a gift takes them. A week is enough to send a message and nothing else. |
+| `cadence_days` | `int`, default **365** | Drift is **on by default for everyone**. A year is long enough that being told is a favour rather than a scold; the same design would not be defensible at 30 days. Entered in the UI in *months* — the conversion is 365.25/12 so that 12 ⇄ 365 round-trips exactly and saving an untouched form cannot move it. |
+| `drift_muted_until` | `date` | *"This is fine"* — some relationships genuinely are annual. Set to today + that person's own cadence, **counted from today** rather than from the last contact, which would expire the moment you pressed it. |
+| `drift_mutes` | `smallint`, default 0 | How many times that has been said. The count accrues now; **the UI that reads it does not exist yet** — at a one-year cadence a second mute cannot happen before 2028, and building against a rule nothing can exercise is worse than waiting. Starting the count later would mean starting it at zero on the day it mattered. |
+| `photo_path` | `text` | An object path in the **private `hq` bucket**, never a URL: the only URLs that bucket has are signed and they expire (§7c of the HQ plan). Sign at render, never persist. |
+| `archived_at` | `timestamptz` | **Explicit only, never automatic**, however long the silence. It removes somebody from the roster and from search while keeping every row. Since there is no `acquaintances` tier, this is the *only* way somebody leaves the roster. |
+
+`last_contact_at` is **derived, never stored** (§7) — and note what it is derived *from*: interactions only. `people.updated_at` is deliberately not part of it, because fixing a typo in someone's record is not evidence you were in touch with them, and letting it silence a one-year notice would defeat the feature by the most trivial possible action.
+
+**No `contacts` column, and its absence is a decision.** Phone and email already live on his phone, backed up elsewhere. A second copy buys one saved tap and guarantees it goes stale — and a stale number is worse than no number, because you act on it.
+
+**No indexes beyond the primary key and the unique slug.** At a ceiling of 50 rows Postgres will sequential-scan whatever we build, and an unused index is a thing that has to be maintained and explained.
+
+**`interactions` + `interaction_people`** — the log ([admin.md](admin.md) §12).
+
+> **⚠ An interaction has PARTICIPANTS, not an owner.** One dinner with three friends is **one row appearing on three profiles**. A `person_id` column on `interactions` would force writing it three times or losing two of the three records — and it would destroy the group dimension, which the join gives for free: who you actually see together, and who you only ever see through somebody else.
+
+| Column | Shape | Why |
+|---|---|---|
+| `occurred_on` | **`date`**, not null, **no default** | A local date, because every consumer asks a local-date question — "3 weeks ago", `now - last_contact > cadence_days`, the brief's *Last contact*. A `timestamptz` would make every reader redo a zone conversion, which is where the cross-midnight bug class starts. **And no default:** `current_date` evaluates on a server whose clock is UTC, so an entry logged at 5pm in California would silently be dated tomorrow. The action supplies it through `localToday()`. |
+| `kind` | enum, 6 values | `hangout · call · message · gift · shared · note`. `gift` prevents repeat presents and informs the next one; `shared` covers a recommendation that never became a fragment. Entry kinds, not separate tables. |
+| `body` | `text not null`, non-blank | An entry with no words is not an entry — it is a row that will mean nothing to you in three years, which is the span this table exists to survive. |
+
+**No `title`, and no `location`.** A title is a second decision before you have written the first word, and the whole design target is fifteen seconds. Where you were is either irrelevant or part of the story, and then it belongs in the words — a structured field would be empty on most rows and would invite filtering by something nobody filters by.
+
+**`person_last_contact` is a VIEW, not a column** — `max(occurred_on)` and a count, grouped by person. A stored copy would drift every time an entry was edited, deleted or backdated.
+
+> **⚠ `security_invoker = true` on that view is load-bearing.** A Postgres view runs with its **owner's** privileges by default, so without it the view would read `interactions` as the owner and hand the results to whoever asked — bypassing every policy above and turning the one derived surface into a leak. With it, the view sees exactly what the caller may see; for `anon`, nothing. Verified against live PostgREST as a genuinely signed-out client.
+
+**`person_works` + `person_fragments`** — the one seam with the corpus ([admin.md](admin.md) §12). Everywhere else the boundary is absolute: HQ data never becomes corpus data, and a log entry is never promoted into an essay. These two tables are the exception, and they are shaped so it leaks in one direction only — they **reference** public rows and are themselves entirely private.
+
+> **⚠ Two tables, not one `person → fragment` join, and the reason is the whole payoff.** The link that matters is **person → work → fragments**, a two-hop path over `works`, which already exists (§4). Linking somebody to a book once means every fragment carrying that `work_id` appears on their profile **automatically, including ones added years later**. Tagging each quote by hand gives the same page today and a stale one in a year.
+
+| Table | Key | Why |
+|---|---|---|
+| `person_works` | `(person_id, work_id)` | The two-hop link. Resolved at read time, never materialised — see above. |
+| `person_fragments` | `(person_id, fragment_id)` | The direct edge, for what that path cannot reach: a song somebody sent, a line they said out loud that never came from a book. |
+
+Both carry an optional free-text `note` (*"recommended, Mar 2024"*) and **no enum of link kinds**. "Recommended" / "gave me" / "we read it together" is a taxonomy that looks right on paper and is wrong after a month; the note holds the nuance until a pattern actually emerges. There is **no `person_authors`** — plausible, weaker, largely derivable from the works already linked, and deferred until it earns itself.
+
+`person_fragments` is indexed on `fragment_id`, because the editor's *Shared by* field asks the reverse question on every open. `person_works` gets no matching index: nothing asks "who recommended this work?", because there is no work page to ask it from.
+
+> **⚠ These tables have no `anon` policy, and the guarantee is stronger than that.** A published quote stays public; **the fact that somebody is why it exists is HQ data** — not the note, not the count, not the existence of the row. The second half is not written in SQL: **public queries never touch these tables at all**, so there is no join for a policy to have to get right. Verified as a genuinely signed-out client, directly and **through an embedded join from a public `fragments` row**.
+
+**`tasks` + `task_events`** — the agenda ([admin.md](admin.md) §13, [ADR 0013](adr/0013-absence-never-accumulates.md)). Personal only; work lives on the company's platform.
+
+> **⚠ A RECURRENCE IS A RULE PLUS ONE MATERIALISED DATE, and a row is written only when a task is DISPOSED OF.** This is where ADR 0013 stops being a principle and becomes a shape: the conventional design materialises future occurrences and then hides, rolls, or bulk-dismisses the ones that passed, which is safety by discipline — every subsequent query, export, backup and "show all" view is one forgotten filter away from the wall. Forty-seven overdue rows cannot be rendered here because forty-seven rows were never created.
+
+| Column | Shape | Why |
+|---|---|---|
+| `due_on` + `due_time` | `date` + **nullable** `time` | Two columns, never one `timestamptz`. "Clean the bathroom Saturday" and "call the bank at 4:30 Tuesday" are different things, and a single timestamp gives every date-only task a midnight deadline that is wrong and then has to be hidden. Nullable time keeps *sometime that day* honest — and a date-only task must not shift when you travel. A null `due_on` is the **Unscheduled** list: a permanently valid state, not a graveyard. |
+| `effort` | enum, 4 values | `quick · sitting · block · project`, named in **time**. It drives **lead** — how far ahead the task surfaces — because how early you need to see something tracks how much runway you need to find the time, not how much it matters. |
+| `priority` | enum, 3 values | Drives **prominence** only: weight and ink, never colour. Urgency is the one semantic axis, and a red high-priority task beside a red overdue one makes both meaningless. |
+| `lead_days` | `int`, nullable | Null = derive from `effort` (1 / 3 / 7 / 21, bumped one bucket by `high`, never shortened by `low`). Set = an override that always wins. |
+| `recur_mode` + `recur_rrule` \| `recur_every`/`recur_unit` | enum + **four columns, not `jsonb`** | The two modes are different kinds of thing, so they store differently: **`fixed`** is an RRULE (RFC 5545 — the language Google speaks, which matters once the calendar mirror exists); **`after_completion`** is a plain interval, deliberately *not* RRULE, because "two weeks after I actually did it" is not a calendar rule and RFC 5545 cannot say it. As columns, a CHECK makes the half-filled state **unrepresentable** — and a half-filled recurrence does not fail loudly, it silently reschedules a chore. |
+
+**The RRULE is always generated server-side from (preset, date)** by [`src/lib/hq/recurrence.ts`](../src/lib/hq/recurrence.ts) — the editor offers six named schedules and posts which one it picked, never a rule string. So the column can only hold rules the expander is known to understand, which is what makes storing the standard string safe without shipping a full RFC 5545 parser to the browser. Nobody hand-writes an RRULE, and nobody can read one either: the editor verifies a rule by showing **the next three dates it actually produces**.
+
+**`goals`** — intentions, not projects ([admin.md](admin.md) §13, [ADR 0013](adr/0013-absence-never-accumulates.md)).
+
+> **⚠ A GOAL IS A DIRECTION, NOT A SCOPED DELIVERABLE**, and the table is shaped by what it refuses. **No `progress`, no `percent_complete`, no target count** — a goal is not 60% done, and a schema that can express that will eventually render it. **No `due_on`**: the moment a goal has a deadline it is a task, and `tasks` is one table over.
+
+| Column | Shape | Why |
+|---|---|---|
+| `horizon` | **enum**, 3 values | `this_season · this_year · next_few_years`. An enum rather than free text *precisely so a date cannot be typed into it* — the vagueness rule made structural instead of left to discipline. |
+| `status` | enum, 4 values | `active · paused · achieved · **let_go**`. Letting go is a first-class status beside the others, not a delete: abandoning a goal should be a dignified act you take, not a row you erase or a thing that rots in a list. |
+| `slug` | text, unique | Minted once from the name and never re-minted, like `people`. A goal being renamed is ordinary; a rename must not move its page. |
+
+**No `sort`**, though it is easy to imagine: at a cap of five there is no reorder UI to build, and a column nothing can write is a column somebody later reads as broken. **The cap of five active goals is enforced in the action, not the schema** — a partial unique index cannot express "at most five", and a trigger would fail at the database, where an error cannot be a sentence. It is checked at *both* doors: creating a sixth, and re-activating a paused one.
+
+**`tasks.goal_id` is `on delete set null`, never cascade.** Letting a goal go — or deleting one outright — must not delete the tasks that were done toward it. What you actually did stays done; only the intention it was filed under goes.
+
+`task_events` is the disposition log — one row per time a task was dealt with, **both outcomes**. A skip is a recorded answer, never inferred from silence: a day the app was not opened must stay distinguishable from a day a chore was deliberately let go, or the adherence signal the mechanism exists to produce is corrupt. It carries `occurred_on` (the day you answered) *and* `for_due_on` (**which occurrence** you answered about) — they differ routinely, and the second is what makes undo exact rather than recomputed by running the rule backwards.
+
+**`events` + `event_people`** — the calendar's writable half ([admin.md](admin.md) §15).
+
+> **⚠ A DATE AND A TIME, NOT A `timestamptz`** — reversing the §7 sketch, and for the third time in this workstream. The calendar's whole job is *what is my day*, which is a local-date question, and `timestamptz` has no notion of a day. **And "all day" is the ABSENCE of a time**, not a boolean beside one: `all_day = true` alongside a meaningful `starts_at` is two columns that can contradict each other with nothing to say which is right.
+
+There is deliberately **no check that `ends_at > starts_at`**: an event crossing midnight is a real thing, and refusing it would be the schema being confidently wrong about somebody's evening. There is also **no recurrence** — `tasks` already carries that machinery, and a second implementation is how two of them start disagreeing about what "every other Tuesday" means.
+
+**`event_people` is HQ's additive layer over the whole calendar**, and it is the one write HQ has against a mirrored Google row (§2 of [13-agenda.md]). Exactly one of `event_id` / `external_id` is set, enforced by `num_nonnulls(...) = 1` — and expressed as two partial unique indexes rather than a primary key, since a composite key cannot contain the nullable column that is always half of this pair.
+
+> **⚠ `external_id` is TEXT and deliberately NOT a foreign key**, even once `external_events` exists. With `singleEvents=true` the Google mirror receives *instances*, whose ids are not stable — reschedule the series and a tag keyed on an instance id orphans silently. A tag attaches to the **series**, which may not be a row in the mirror at all. A foreign key here would force the wrong key on the right design.
+
+**`external_events` + `calendar_sync`** — the read-only Google mirror ([ADR 0014](adr/0014-calendar-is-one-way.md), [admin.md](admin.md) §15).
+
+**Never written by hand.** One direction only: Google owns these rows, HQ copies them, nothing in the app edits one. The additive layer is `event_people` above.
+
+> **⚠ A DATE AND TIMES, NOT A `timestamptz` — the FOURTH time this workstream has reversed the same sketch**, after `interactions`, `tasks` and `events`. Four is a pattern, not four decisions. It is a sharper reversal here because the source really *is* an instant, and two facts settle it anyway: Google gives all-day events **no instant at all** (a bare `start.date`), so storing them as `timestamptz` means inventing a time — precisely the `all_day boolean` mess the other three deleted; and the grid counts days in the **home zone**, so an 11pm New York event is on the previous day in California and a mirror of instants would make every reader redo that conversion. The consequence is stated rather than hidden: the local columns are derived at ingest, so changing `home_timezone` leaves the mirror wrong until a resync — which is why the sync exposes a full resync and not only the one a `410` forces.
+
+- **`series_id` is what a tag attaches to** — `recurringEventId` when there is one, else the event's own id. See the `event_people` note above for why.
+- **`ends_on` means the last day the thing actually covers.** Google's all-day end date is *exclusive*; storing it verbatim puts you in a hotel one night longer than you were. Two of the nine real events on the live calendar are multi-night stays, so this is not hypothetical.
+- **`cancelled` is marked, never deleted.** An annotation written on an event somebody later cancelled stays legible instead of vanishing. Every reader filters it, which is why there is one reader.
+- **Google's auto-generated birthdays are dropped at ingest** — HQ derives birthdays from `people` and draws them as a mark rather than a row, so importing Google's would put two differently-drawn entries on one day. On the live calendar that filter removes **31 of 48 events**.
+- **`calendar_sync` is one row**: the incremental cursor, when Google was last reached, and the last error. It is a *separate* table from `settings` on purpose — `settings` is configuration a person chooses, this is machine state a sync writes, and a background write should not touch the row everything else derives "today" from.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
 - **Reading time** — from `body` word count if not stored in `details`.
+- **Time in bed, estimated sleep, sleep efficiency** — from `daily_checkins.bed_at` / `woke_at` and the two buckets, computed at render by [`src/lib/hq/checkin.ts`](../src/lib/hq/checkin.ts). Efficiency in particular is the number that actually moves under CBT-I, which makes a stale stored copy of it worse than none. The estimate stays null until *both* buckets are answered — an efficiency that silently assumed "asleep instantly, never woke" would be a number the person never gave.
+- **Last contact** — `max(occurred_on)` over a person's interactions, served by the `person_last_contact` view. Not a column, so it can never disagree with the entries it summarises. Note what it is derived *from*: interactions only. `people.updated_at` is deliberately excluded — fixing a typo in somebody's record is not evidence you were in touch with them, and letting it silence a one-year notice would defeat the feature by the most trivial possible action. Its two guards belong here too, because both were found by prototyping the *query* rather than the pixels: **drift requires at least one logged interaction** (last contact is null the day somebody is added, and the naive rule would flag the whole roster on creation day), and **anyone with an event today is never drifting**, however long since the last log — both live since 13 · Piece 4.
+- **Who you are seeing today** — `seenOn()` in [`src/lib/hq/calendar.ts`](../src/lib/hq/calendar.ts), over `event_people` joined to today's `events`. It exists for one caller: the drift guard below.
+- **Drift** — `now - last_contact > cadence_days`, in [`src/lib/hq/drift.ts`](../src/lib/hq/drift.ts), and deliberately **not a flag anybody can set**. A hand-set column was the people lab's own bug: a person 420 days cold never appeared under *Been a while* because nothing had updated their flag. Ordering is by how far past **their own** cadence, not by raw days — sorting by days would silently override every cadence set by hand. **Both of its guards are live since 2026-08-03**: drift requires at least one logged interaction, and *anyone with an event today is never drifting* — the second one was carried as a named hole for a day and a half until `events` existed, because the interaction is not logged until the evening at the earliest and without it the panel spends the whole of the one day it is wrong telling you that you have neglected somebody you are about to have dinner with.
+- **A goal's observation** — `observationFor()` in [`src/lib/hq/goals.ts`](../src/lib/hq/goals.ts), over the `goal_last_done` view plus a 30-day count. *"4 tasks done in the last 30 days"* / *"nothing in 6 weeks"*, and it is the answer to "am I actually spending time on what I said mattered?" — an observation, never a score. **Its cold-start guard is the point**: a goal with no completed tasks says **nothing at all**, because the naive version greets a goal written this morning with *"nothing in 6 weeks"* — false, and an accusation on the surface least entitled to make one. The same bug drift has, arriving from the other direction. Note also what the view deliberately does *not* compute: the 30-day count, whose window needs a date, and `current_date` in Postgres is UTC — so the boundary comes from `localToday()` instead.
+- **A task's lead, and the date it first surfaces** — `leadFor()` / `leadLine()` in [`src/lib/hq/tasks.ts`](../src/lib/hq/tasks.ts). Effort decides *when*, priority decides *how loud*, an explicit `lead_days` beats both, and `low` never shortens a lead — hiding a warning is not a kindness. Pure functions on local-date strings, so the **same** code runs in the editor (where the sentence has to name a date live) and in the action: a rule computed one way on screen and another on the server is a rule nobody can trust, and this one is invisible until a task fails to appear weeks later.
+- **Where a recurring task goes next** — `advance()` in the same file. **Not stored, and not a queue.** `after_completion` counts from the day you *ticked* it, never from the date it was due; `fixed` rolls forward to the first occurrence **strictly after today**, so three weeks away costs one tap rather than four. The occurrences in between leave no rows, because there were never any rows ([ADR 0013](adr/0013-absence-never-accumulates.md)).
+- **The mirror's health** — `staleness()` in [`src/lib/hq/mirror.ts`](../src/lib/hq/mirror.ts), over `calendar_sync`. Not a column and not a badge: it returns **null while the sync is working**, because a permanent "synced 4 minutes ago" is the status line you read once and ignore for ever. ADR-0014 buys its simplicity by introducing exactly one new silent failure — a mirror that has quietly stopped refreshing, on a page whose job is to be trusted — and this is the whole of the price it pays for that.
+- **What is on Today, and what is coming up** — [`src/lib/hq/today.ts`](../src/lib/hq/today.ts). `announces()` decides whether something appears in *Coming up*, and it is a function of the item alone: **there is no window setting anywhere in the feature**, so the list is short because the leads are honest rather than because a dial was turned down. `progressLabel()` is the `1 of 2 done` line, and it **returns null at zero** — `0 of 3 done` is arithmetic about what you have not done, which is the arrears count this page exists not to have. Ordering defers to the calendar's `byTime`, never a second sort.
+- **The writing signal** — `publishedSignal()` in the same file, over `max(published_at)` for **published writing only**. Not stored, so it can never be stale, and not a task: a self-imposed writing commitment turned into an overdue row is the guilt engine HQ exists to prevent. Two things decide its shape and both are facts about the data: `published_at` is honest for essays (50 of 50) and not for quotes (1 of 73) or songs (whose stamp is the import date); and the newest essay is from 2023, so it ships reading *"3 years ago"* — which means the register has to go **quieter** past eight weeks rather than louder. Cold-start guard, third appearance: nothing published means nothing said.
+- **The brief** — `briefsFor()` in [`src/lib/hq/brief.ts`](../src/lib/hq/brief.ts). Four facts from four tables about somebody on today's calendar, assembled at read time and **labelled by source on the page**, because run together they read as a system-written summary of a friendship. Gated on the first query — a day with no tagged event costs one round trip and stops — and capped at three *before* the history is fetched. ⚠ **The drift guard is not computed from it**: a guest the cap dropped is still somebody you are seeing today, so `seenOn()` is asked separately.
+- **A person's next birthday** — `nextOccurrence(birth_month, birth_day)` in [`src/lib/hq/dates.ts`](../src/lib/hq/dates.ts). A month/day pair has **no weekday until the occurrence is resolved**, and it rolls to next year the day after it passes. 29 February falls back to 1 March in a common year: celebrating early is wrong, and skipping drops the person off the page three years out of four.
 
 ## 8. Domain → schema mapping
 
@@ -218,6 +362,17 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 | Subject (tag) | `subjects` + `fragment_subjects` |
 | Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` (facets; display stays in `attribution` / `details`) |
 | Emergent links between constellations | shared membership (no table) |
+| The morning check-in | `daily_checkins`, keyed by local `log_date` (§6b) |
+| A person | `people` row (§6b) |
+| A logged contact | `interactions` + `interaction_people` — participants, never an owner (§6b) |
+| "What they've given me" | `person_works` (two-hop, via `works`) + `person_fragments` (§6b) |
+| Drift | derived from `person_last_contact` and `people.cadence_days` (§7) |
+| A task, and its chore rule | `tasks` — the rule plus ONE materialised date (§6b) |
+| An intention | `goals` — no completion, by design (§6b) |
+| A personal event | `events` — a local date plus optional wall-clock times (§6b) |
+| Who was there | `event_people` — additive over HQ events AND the Google mirror (§6b) |
+| "Did it" / "Skipping it" | a `task_events` row; the only thing that moves a schedule (§6b) |
+| The configured home timezone | `settings.home_timezone` (§6b) |
 | The blog / index | queries over `fragments` by `type` + `occurred_at` |
 
 ## 9. Deferred (not in v1)

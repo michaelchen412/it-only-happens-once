@@ -43,7 +43,7 @@ function observeSentinel() {
     (entries) => {
       if (entries.some((e) => e.isIntersecting)) loadMore();
     },
-    { rootMargin: '600px 0px' }
+    { rootMargin: '600px 0px' },
   );
   io.observe(sentinel);
 }
@@ -178,7 +178,9 @@ function setupSearch() {
 // navigation). The <a> already encodes the resulting URL — server builds the
 // toggle — so we just intercept and swap in place instead of navigating.
 document.addEventListener('click', (e) => {
-  const link = (e.target as Element)?.closest?.('[data-subject-link], [data-subject-clear]') as HTMLAnchorElement | null;
+  const link = (e.target as Element)?.closest?.(
+    '[data-subject-link], [data-subject-clear]',
+  ) as HTMLAnchorElement | null;
   if (!link) return;
   // Let ⌘/Ctrl/Shift/Alt-click (or a non-primary button) open the filtered URL
   // in a new tab, rather than swapping in place.

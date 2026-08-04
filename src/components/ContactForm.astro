@@ -30,11 +30,14 @@ const labelCls = 'font-sans text-xs tracking-wide text-base-content/55';
   </div>
 
   {/* Honeypot — visually hidden (not display:none), off the a11y tree. Bots fill it; people don't. */}
-  <div aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;">
+  <div
+    aria-hidden="true"
+    style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"
+  >
     <label>Company<input name="company" type="text" tabindex="-1" autocomplete="off" /></label>
   </div>
 
-  {sitekey && <div id="contact-turnstile" data-sitekey={sitekey} class="min-h-[65px]"></div>}
+  {sitekey && <div id="contact-turnstile" data-sitekey={sitekey} class="min-h-[65px]" />}
 
   <div class="flex flex-wrap items-center gap-4">
     <button type="submit" class="btn btn-primary btn-sm normal-case">Send message</button>

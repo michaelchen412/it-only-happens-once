@@ -30,7 +30,10 @@ function loadEnv(): Record<string, string> {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
       const i = trimmed.indexOf('=');
-      out[trimmed.slice(0, i).trim()] = trimmed.slice(i + 1).trim().replace(/^["']|["']$/g, '');
+      out[trimmed.slice(0, i).trim()] = trimmed
+        .slice(i + 1)
+        .trim()
+        .replace(/^["']|["']$/g, '');
     }
   }
   return out;
@@ -41,7 +44,10 @@ setup('mint an admin session and find fixtures', async () => {
   const url = env.PUBLIC_SUPABASE_URL;
   const anonKey = env.PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
-  expect(url && anonKey && serviceKey, 'PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY must be in .env.local').toBeTruthy();
+  expect(
+    url && anonKey && serviceKey,
+    'PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY must be in .env.local',
+  ).toBeTruthy();
 
   const service = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
@@ -103,8 +109,8 @@ setup('mint an admin session and find fixtures', async () => {
         origins: [],
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   // ---- fixtures: DISCOVERED, never seeded.
@@ -142,8 +148,8 @@ setup('mint an admin session and find fixtures', async () => {
         constellationId: constellation?.id ?? null,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   // The session has to actually work, or every spec below fails confusingly.

@@ -110,7 +110,7 @@ async function openVersions(page: Page, { pendingRewrite = true } = {}) {
     },
   });
 
-  await page.goto(`/admin#edit=${FRAGMENT}`);
+  await page.goto(`/admin/fragments#edit=${FRAGMENT}`);
   await expect(page.locator('#wsheet')).toBeVisible();
   await expect(page.locator('#ws-editor .tiptap-doc')).toContainText(LIVE_BODY);
   await page.locator('#wsheet [data-tab="versions"]').click();

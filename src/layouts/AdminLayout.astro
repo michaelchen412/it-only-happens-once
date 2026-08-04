@@ -1,13 +1,19 @@
 ---
 /*
-  AdminLayout — chrome for the third room (docs/admin.md §1).
+  AdminLayout — chrome for the Observatory (docs/admin.md §1).
 
-  A private workshop, not a public surface: same dusk tokens, Atkinson chrome,
-  but tuned for speed and density over poetry. Every /admin route is auth-gated
-  by middleware and renders on demand (never cached, never public).
+  Private, not a public surface: same dusk tokens, Atkinson chrome, but tuned
+  for speed and density over poetry. Every /admin route is auth-gated by
+  middleware and renders on demand (never cached, never public).
+
+  ONE BUILDING, PLAIN ROOMS (ADR-0015). "Workshop" named both the whole and one
+  of its parts once /admin stopped being the fragment table, so the building is
+  the Observatory and the rooms keep nouns: Today · People · Agenda ·
+  Fragments · Constellations · Library · About.
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
+import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
@@ -15,39 +21,68 @@ import BackToTop from '../components/BackToTop.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'fragments' | 'constellations' | 'library' | 'about';
+  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'constellations' | 'library' | 'about';
 }
-const { title = 'Workshop', active = 'fragments' } = Astro.props;
+const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
 
+// Today first, and the corpus rooms after the rule: HQ is the daily half, the
+// corpus is the weekly one, and the divider is the boundary of ADR-0012 made
+// visible. `hr` draws it above that entry.
 const nav = [
-  { key: 'fragments', label: 'Fragments', href: '/admin', icon: 'ph:stack' },
-  { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars' },
-  { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books' },
-  { key: 'about', label: 'About page', href: '/admin/about', icon: 'ph:user-circle' },
+  { key: 'today', label: 'Today', href: '/admin', icon: 'ph:sun-horizon', hr: false },
+  { key: 'people', label: 'People', href: '/admin/people', icon: 'ph:users-three', hr: false },
+  // AGENDA, as §9 always intended — since 2026-08-03, when 13 · Piece 4 put a
+  // calendar in it. It shipped as "Tasks" for a day and a half because naming a
+  // room for something not in it is the same mistake 12 · Piece 1 declined to
+  // make with the last-contact line. One room, three surfaces: Calendar, Tasks,
+  // Goals (src/components/admin/AgendaTabs.astro).
+  { key: 'agenda', label: 'Agenda', href: '/admin/agenda', icon: 'ph:calendar-blank', hr: false },
+  // NOTES SITS LAST IN THE DAILY HALF, immediately above the divider — the
+  // position says what it is. Dumping is a daily motion, so it belongs with
+  // Today/People/Agenda; but a dump graduating into a piece is the front of the
+  // corpus pipeline, so it wants to touch Fragments across the line.
+  //
+  // ⚠ It is NOT the old `/admin/fragments?view=notes`, which was deleted with
+  // this room. That was the fragment manager's table with a filter on it —
+  // title column, checkboxes, bulk bar — and it asked you to name a jotting and
+  // then open it to find out what it said. Michael, 2026-08-03: *"I see
+  // untitled, untitled, untitled, and I have to open each one… all I care about
+  // is that I have writing fragments and I have brain dumps."*
+  { key: 'notes', label: 'Notes', href: '/admin/notes', icon: 'ph:note', hr: false },
+  { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
+  { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
+  { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },
+  { key: 'about', label: 'About page', href: '/admin/about', icon: 'ph:user-circle', hr: false },
 ] as const;
 ---
 
-<Base title={`${title} — Workshop`}>
-  {/* The Workshop installs to the home screen (docs/admin.md §9): its own icon,
-      its own window, opening straight into /admin rather than the homepage.
-      Only this layout carries a manifest; the public site is not an app.
+<Base title={`${title} — Observatory`}>
+  {
+    /* The Observatory installs to the home screen (docs/admin.md §9): its own
+      icon, its own window, opening straight into /admin rather than the
+      homepage. Only this layout carries a manifest; the public site is not an
+      app. The file keeps its `workshop` path — it is an internal URL nobody
+      reads, and `id`/`start_url` must not move or an installed app would fork.
 
       It was built to earn iOS's home-screen exemption from the 7-day
       script-storage wipe, protecting an offline outbox. That outbox is gone
       (ADR-0010) and this is now simply a convenience — no service worker, and
-      the workshop needs a connection to load and to save. */}
+      the workshop needs a connection to load and to save. */
+  }
   <Fragment slot="head">
     <link rel="manifest" href="/workshop.webmanifest" />
     {/* iOS reads its home-screen icon from here, never from the manifest. */}
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    {/* Tints the standalone app's status bar. Follows the SYSTEM scheme, not the
+    {
+      /* Tints the standalone app's status bar. Follows the SYSTEM scheme, not the
         theme toggle — a forced theme can leave it a shade out, which is the
-        honest cost of not duplicating the toggle's logic into <head>. */}
+        honest cost of not duplicating the toggle's logic into <head>. */
+    }
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1511" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f6f1" />
   </Fragment>
-  <div class="flex min-h-screen bg-base-100 font-sans">
+  <div class="bg-base-100 flex min-h-screen font-sans">
     {/* Off-canvas backdrop (mobile only) */}
     <div
       id="sb-backdrop"
@@ -55,18 +90,24 @@ const nav = [
     >
     </div>
 
-    {/* Sidebar — fixed to the viewport on desktop (its own scroll + a pinned
-        bottom block); an off-canvas drawer on mobile. */}
+    {
+      /* Sidebar — fixed to the viewport on desktop (its own scroll + a pinned
+        bottom block); an off-canvas drawer on mobile. */
+    }
     <aside
       id="sidebar"
-      class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-base-300 bg-base-100 transition-transform duration-200 md:translate-x-0"
+      class="border-base-300 bg-base-100 fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r transition-transform duration-200 md:translate-x-0"
     >
-      <div class="flex h-14 shrink-0 items-center gap-2 border-b border-base-300 px-4">
+      <div class="border-base-300 flex h-14 shrink-0 items-center gap-2 border-b px-4">
         <a href="/admin" class="flex items-baseline gap-2 whitespace-nowrap">
-          <span class="text-lg leading-none text-primary"><StarMark /></span>
-          <span class="font-display text-lg leading-none">Workshop</span>
+          <span class="text-primary text-lg leading-none"><StarMark /></span>
+          <span class="font-display text-lg leading-none">Observatory</span>
         </a>
-        <button id="sb-close" class="ml-auto rounded-field p-1 text-base-content/50 hover:bg-base-200 hover:text-base-content md:hidden" aria-label="Close menu">
+        <button
+          id="sb-close"
+          class="rounded-field text-base-content/50 hover:bg-base-200 hover:text-base-content ml-auto p-1 md:hidden"
+          aria-label="Close menu"
+        >
           <Icon name="ph:x" class="text-lg" />
         </button>
       </div>
@@ -74,37 +115,44 @@ const nav = [
       <nav class="flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
         {
           nav.map((item) => (
-            <a
-              href={item.href}
-              aria-current={active === item.key ? 'page' : undefined}
-              class:list={[
-                'flex items-center gap-3 rounded-field px-3 py-2 text-sm transition-colors',
-                active === item.key
-                  ? 'bg-base-200 font-medium text-base-content'
-                  : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content',
-              ]}
-            >
-              <Icon name={item.icon} class="text-lg" />
-              {item.label}
-            </a>
+            <>
+              {item.hr && <hr class="border-base-300 mx-3 my-2" />}
+              <a
+                href={item.href}
+                aria-current={active === item.key ? 'page' : undefined}
+                class:list={[
+                  'rounded-field flex items-center gap-3 px-3 py-2 text-sm transition-colors',
+                  active === item.key
+                    ? 'bg-base-200 text-base-content font-medium'
+                    : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content',
+                ]}
+              >
+                <Icon name={item.icon} class="text-lg" />
+                {item.label}
+              </a>
+            </>
           ))
         }
       </nav>
 
-      <div class="shrink-0 space-y-2 border-t border-base-300 p-3">
-        <div class="truncate px-1 text-xs text-base-content/40" title={user?.email}>{user?.email}</div>
-        <div class="flex items-center gap-1 text-xs text-base-content/50">
+      <div class="border-base-300 shrink-0 space-y-2 border-t p-3">
+        <div class="text-base-content/40 truncate px-1 text-xs" title={user?.email}>{user?.email}</div>
+        <div class="text-base-content/50 flex items-center gap-1 text-xs">
           <button
             id="theme-toggle"
-            class="theme-toggle rounded-field p-1.5 hover:bg-base-200 hover:text-base-content"
+            class="theme-toggle rounded-field hover:bg-base-200 hover:text-base-content p-1.5"
             aria-label="Toggle light and dark theme"
             title="Toggle theme"
           >
             <Icon name="ph:sun" class="theme-icon-sun text-base" />
             <Icon name="ph:moon" class="theme-icon-moon text-base" />
           </button>
-          <a href="/" class="rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content" title="View the site">Site ↗</a>
-          <button id="admin-signout" class="ml-auto rounded-field px-2 py-1 hover:bg-base-200 hover:text-base-content">Sign out</button>
+          <a href="/" class="rounded-field hover:bg-base-200 hover:text-base-content px-2 py-1" title="View the site"
+            >Site ↗</a
+          >
+          <button id="admin-signout" class="rounded-field hover:bg-base-200 hover:text-base-content ml-auto px-2 py-1"
+            >Sign out</button
+          >
         </div>
       </div>
     </aside>
@@ -112,11 +160,19 @@ const nav = [
     {/* Main column — padded left of the fixed sidebar on desktop. */}
     <div class="flex min-w-0 flex-1 flex-col md:pl-60">
       {/* Slim top bar — mobile only (desktop uses the full height for content) */}
-      <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur md:hidden">
-        <button id="sb-open" class="-ml-1 rounded-field p-1.5 text-base-content/70 hover:bg-base-200 hover:text-base-content" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+      <header
+        class="border-base-300 bg-base-100/90 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur md:hidden"
+      >
+        <button
+          id="sb-open"
+          class="rounded-field text-base-content/70 hover:bg-base-200 hover:text-base-content -ml-1 p-1.5"
+          aria-label="Open menu"
+          aria-controls="sidebar"
+          aria-expanded="false"
+        >
           <Icon name="ph:list" class="text-xl" />
         </button>
-        <span class="text-lg leading-none text-primary"><StarMark /></span>
+        <span class="text-primary text-lg leading-none"><StarMark /></span>
         <span class="font-display text-base leading-none">{title}</span>
       </header>
 
@@ -127,15 +183,22 @@ const nav = [
   </div>
 
   <ConfirmDialog />
+  {
+    /* The ✚ belongs to the building, not to a room (10-hq §10c) — so it is
+      mounted here, once, and every admin page gets it. */
+  }
+  <CaptureDialog />
   {/* the manager and library run long; the sheets bring their own */}
   <BackToTop />
 
   <script>
+    // Every `<time data-local>` on every admin surface, rewritten into the
+    // reader's own zone. Mounted from the layout rather than per-page on
+    // purpose: "no UTC on screen, anywhere" is a project rule, and a rule that
+    // each page has to remember to opt into is a rule that gets forgotten.
+    import '../scripts/local-time';
     import { createBrowserClient } from '@supabase/ssr';
-    const supabase = createBrowserClient(
-      import.meta.env.PUBLIC_SUPABASE_URL,
-      import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
-    );
+    const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
     document.getElementById('admin-signout')?.addEventListener('click', async () => {
       await supabase.auth.signOut();
       window.location.href = '/';
@@ -161,14 +224,15 @@ const nav = [
     document.addEventListener('keydown', (e) => e.key === 'Escape' && closeSidebar());
 
     const themeBtn = document.getElementById('theme-toggle');
-    const syncThemeBtn = () => themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));
+    const syncThemeBtn = () =>
+      themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));
     syncThemeBtn();
     themeBtn?.addEventListener('click', () => {
       const next = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
       document.documentElement.dataset.theme = next;
       try {
         localStorage.setItem('theme', next);
-      } catch (e) {}
+      } catch {}
       syncThemeBtn();
     });
     // keep other open tabs in sync

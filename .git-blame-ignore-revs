@@ -1,0 +1,20 @@
+# Commits that changed formatting only, and no behaviour. `git blame` skips
+# them so it still reaches the person and the reasoning behind each line.
+#
+# ⚠ THIS FILE IS NOT AUTOMATIC. Turn it on once, per clone:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# (GitHub honours it without any configuration.)
+#
+# ⚠ AND ONLY PUT PURE REFORMATS HERE. The whole value of this file is that
+# every hash in it is guaranteed to contain no logic — one behavioural change
+# smuggled into a listed commit and blame silently lies about that line for
+# ever. If a commit did both, it does not belong here; split it instead.
+#
+# The comments in this codebase are its best feature, and a 194-file whitespace
+# commit would put a wall between every one of them and its reasoning. That is
+# what this file exists to prevent.
+
+# style: prettier across the tree — plan 00 · Piece 10 (2026-08-04), 157 files
+0f9fd68

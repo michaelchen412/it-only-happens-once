@@ -1,0 +1,95 @@
+---
+/*
+  TagSheet — who was there, on a row HQ does not own
+  (docs/plans/13-agenda.md §2 and §5; ADR-0014).
+
+  ⚠ THIS IS THE ONLY WRITE HQ HAS AGAINST A MIRRORED EVENT, and its whole design
+  follows from that. It adds information Google does not have and modifies
+  nothing Google owns, so it is **additive by construction and can never produce
+  a conflict** — which is the mechanism that lets ADR-0014 be a one-way rule
+  rather than a sync.
+
+  ⚠ AND THE TAG ATTACHES TO THE SERIES, NOT THE OCCURRENCE (§2 wrinkle 1). An
+  instance id is not stable — reschedule the series in Google and every
+  annotation keyed on an instance orphans silently. A recurring personal event
+  is a standing arrangement: weekly climbing with Joon has Joon in it every
+  time. "I happened to run into Arun at one of these" is not an event tag at
+  all; it is an interaction, and plan 12 already has a better home for it.
+
+  WHY THIS IS NOT THE EVENT SHEET. That sheet edits an HQ row — title, date,
+  times, place, notes. None of those are ours here, and offering them would be
+  the interface promising a write it cannot perform. What is left is the guest
+  list, so that is the whole dialog: the affordance IS the explanation of what
+  can and cannot be changed (10-hq.md §10i).
+*/
+import { Icon } from 'astro-icon/components';
+import { hueFor, monogram } from '../../lib/hq/people';
+
+interface Props {
+  people: { id: string; display_name: string }[];
+}
+const { people } = Astro.props;
+const FILTER_THRESHOLD = 8;
+---
+
+{
+  people.length > 0 && (
+    <dialog id="tag-sheet" class="drawer-dialog w-full max-w-sm" aria-labelledby="tag-sheet-title">
+      <form id="tag-form" class="flex h-full flex-col overflow-hidden font-sans">
+        <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <h2 id="tag-sheet-title" class="font-display text-xl">
+            Who’s there
+          </h2>
+          <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">
+            ✕
+          </button>
+        </header>
+
+        {/* The event's own name, so you can see what you are tagging. It is
+            read-only text rather than a field: nothing about a mirrored row is
+            editable here, and a disabled input would say the opposite. */}
+        <p class="text-base-content/70 shrink-0 px-6 pt-4 font-serif text-sm" data-tag-title />
+
+        <p id="tag-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4" />
+
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+          {people.length > FILTER_THRESHOLD && (
+            <input
+              type="search"
+              class="sby-filter input input-xs input-bordered mb-2 w-full font-sans"
+              placeholder="Find someone…"
+              aria-label="Filter people"
+            />
+          )}
+          <div class="sby__list">
+            {people.map((p) => (
+              <label class="sby__row" data-search={p.display_name.toLowerCase()}>
+                {/* The name rides on the INPUT, not the row — a row's
+                    textContent also carries the monogram, which is how the
+                    fragment editor's summary once read "MMarisol Quint". */}
+                <input type="checkbox" class="tag-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
+                <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+                  {monogram(p.display_name)}
+                </span>
+                <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+          <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>
+            <Icon name="ph:check" /> Save
+          </button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
+
+<script>
+  import '../../scripts/tag-sheet';
+</script>

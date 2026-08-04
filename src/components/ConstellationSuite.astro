@@ -42,9 +42,10 @@ interface Props {
 const { constellation } = Astro.props;
 
 // the signature marks come from the one map (design.md §2: no second copy)
-const glyph = Object.fromEntries(
-  Object.entries(TYPE_META).map(([k, v]) => [k, v.glyph]),
-) as Record<keyof typeof TYPE_META, string>;
+const glyph = Object.fromEntries(Object.entries(TYPE_META).map(([k, v]) => [k, v.glyph])) as Record<
+  keyof typeof TYPE_META,
+  string
+>;
 // asymmetric offsets (sm+) — the drawn line gets its angles from these
 const INDENTS = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
 
@@ -64,9 +65,11 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
       </Label>
     )
   }
-  {/* `group` spans the mark AND the name: both go home, so hovering either
+  {
+    /* `group` spans the mark AND the name: both go home, so hovering either
       blooms the star. (The bloom IS the hover feedback now — the old opacity
-      dip would only double-dim it.) */}
+      dip would only double-dim it.) */
+  }
   <div class="group flex items-baseline gap-3">
     <a
       href="/"
@@ -74,22 +77,21 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
       style="--glow: 1"
       transition:name={`star-${constellation.slug}`}
       aria-label="All constellations"
-      title="All constellations"
-    ><StarBloom active /></a>
-    {/* The name is the same trigger that opened it — tap again to close
-        (zoom out), popover semantics at page scale. */}
-    <h1
-      class="font-display text-4xl leading-[1.05] font-light sm:text-5xl"
-      transition:name={`c-${constellation.slug}`}
+      title="All constellations"><StarBloom active /></a
     >
-      <a href="/" class="transition-colors hover:text-primary" title="All constellations">
+    {
+      /* The name is the same trigger that opened it — tap again to close
+        (zoom out), popover semantics at page scale. */
+    }
+    <h1 class="font-display text-4xl leading-[1.05] font-light sm:text-5xl" transition:name={`c-${constellation.slug}`}>
+      <a href="/" class="hover:text-primary transition-colors" title="All constellations">
         {constellation.name}
       </a>
     </h1>
   </div>
   {
     constellation.description && (
-      <p class="prose-measure mt-5 border-l border-base-300 pl-5 text-lg text-base-content/55 italic">
+      <p class="prose-measure border-base-300 text-base-content/55 mt-5 border-l pl-5 text-lg italic">
         {constellation.description}
       </p>
     )
@@ -105,13 +107,14 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
           loading="lazy"
           allow="encrypted-media"
           title={`The score — ${constellation.name}`}
-          style="border-radius: var(--radius-box); border: 0"></iframe>
-        <p class="mt-2 font-sans text-xs text-base-content/40">the score — press play, then read</p>
+          style="border-radius: var(--radius-box); border: 0"
+        />
+        <p class="text-base-content/40 mt-2 font-sans text-xs">the score — press play, then read</p>
       </div>
     )
   }
 
-  <div id="suite" class="suite mt-16 flex flex-col gap-16 text-base-content">
+  <div id="suite" class="suite text-base-content mt-16 flex flex-col gap-16">
     {
       constellation.items.map((f, i) => (
         <article
@@ -119,7 +122,7 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
           style={`--indent:${INDENTS[i % INDENTS.length]}`}
         >
           <span
-            class="suite-mark mt-1.5 w-5 shrink-0 text-center font-serif text-base text-base-content/35 select-none"
+            class="suite-mark text-base-content/35 mt-1.5 w-5 shrink-0 text-center font-serif text-base select-none"
             aria-hidden="true"
           >
             {glyph[f.kind]}
@@ -132,17 +135,19 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
     }
   </div>
 
-  {/* The outro always resolves UPWARD to the overview, never sideways. Plain
+  {
+    /* The outro always resolves UPWARD to the overview, never sideways. Plain
       "return" on purpose: "all constellations" read as a breadcrumb in a
       catalogue, but anything more evocative than back/return makes a visitor
       hesitate over what it will do — the one place on this site where being
       ordinary is the point. The arrow leans the way you're about to go, and
       the warm accent is held for hover so a 4xl line isn't burning at rest.
-      (Its generous height is also scroll runway for the lamplight's hand-off.) */}
-  <div class="mt-24 border-t border-base-300 pt-16 pb-10 sm:pt-24">
+      (Its generous height is also scroll runway for the lamplight's hand-off.) */
+  }
+  <div class="border-base-300 mt-24 border-t pt-16 pb-10 sm:pt-24">
     <a
       href="/"
-      class="group return-link inline-flex items-center gap-3 font-display text-3xl font-light transition-colors hover:text-primary sm:text-4xl"
+      class="group return-link font-display hover:text-primary inline-flex items-center gap-3 text-3xl font-light transition-colors sm:text-4xl"
     >
       <svg
         class="return-arrow"
@@ -154,8 +159,8 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <path d="M20 12H4" />
-        <path d="m10.5 5.5-6.5 6.5 6.5 6.5" />
+        <path d="M20 12H4"></path>
+        <path d="m10.5 5.5-6.5 6.5 6.5 6.5"></path>
       </svg>
       return
     </a>
@@ -164,9 +169,17 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
 
 {/* The blog's Reader, verbatim — essays read identically everywhere. */}
 <Reader />
-{writings.map((w) => <template data-reader-content={w.slug}><PostArticle item={w} linkTitle /></template>)}
+{
+  writings.map((w) => (
+    <template data-reader-content={w.slug}>
+      <PostArticle item={w} linkTitle />
+    </template>
+  ))
+}
 
-<a href="/" class="group sky-return" data-sky-return aria-label="All constellations" title="All constellations"><StarBloom /></a>
+<a href="/" class="group sky-return" data-sky-return aria-label="All constellations" title="All constellations"
+  ><StarBloom /></a
+>
 
 <script>
   import { navigate } from 'astro:transitions/client';

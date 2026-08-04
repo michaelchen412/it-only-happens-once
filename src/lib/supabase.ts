@@ -16,21 +16,17 @@ const SUPABASE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
  * from `@supabase/ssr` directly inside a client <script>, so no server code is
  * pulled into the browser bundle.
  */
-export function createSupabaseServerClient(context: {
-  request: Request;
-  cookies: AstroCookies;
-}) {
+export function createSupabaseServerClient(context: { request: Request; cookies: AstroCookies }) {
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
-        return parseCookieHeader(context.request.headers.get('Cookie') ?? '').map(
-          ({ name, value }) => ({ name, value: value ?? '' })
-        );
+        return parseCookieHeader(context.request.headers.get('Cookie') ?? '').map(({ name, value }) => ({
+          name,
+          value: value ?? '',
+        }));
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          context.cookies.set(name, value, options)
-        );
+        cookiesToSet.forEach(({ name, value, options }) => context.cookies.set(name, value, options));
       },
     },
   });

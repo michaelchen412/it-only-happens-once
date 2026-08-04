@@ -1,25 +1,67 @@
 {
   "taxonomy": [
-    { "name": "faith", "definition": "Christianity, God, the Bible, theology, prayer, and the struggle to live a genuine religious life." },
-    { "name": "love", "definition": "The nature of love (romantic and divine), longing, intimacy, and human connection." },
-    { "name": "dating", "definition": "Modern romance, dating apps, choosing a partner, standards and red flags, and romantic rejection." },
-    { "name": "emotion vs reason", "definition": "The tension between the heart's feeling and the mind's rationality in guiding life." },
+    {
+      "name": "faith",
+      "definition": "Christianity, God, the Bible, theology, prayer, and the struggle to live a genuine religious life."
+    },
+    {
+      "name": "love",
+      "definition": "The nature of love (romantic and divine), longing, intimacy, and human connection."
+    },
+    {
+      "name": "dating",
+      "definition": "Modern romance, dating apps, choosing a partner, standards and red flags, and romantic rejection."
+    },
+    {
+      "name": "emotion vs reason",
+      "definition": "The tension between the heart's feeling and the mind's rationality in guiding life."
+    },
     { "name": "meaning", "definition": "Purpose, fulfillment, and what makes a life worth living." },
-    { "name": "free will", "definition": "Determinism, circumstance, and the limits of genuine choice in shaping who we become." },
+    {
+      "name": "free will",
+      "definition": "Determinism, circumstance, and the limits of genuine choice in shaping who we become."
+    },
     { "name": "suffering", "definition": "The inevitability, function, and meaning of pain, hardship, and despair." },
     { "name": "death", "definition": "Mortality, nonexistence, and coming to terms with dying." },
-    { "name": "detachment", "definition": "Letting go, stoic non-attachment, mindful control of thought, and freedom from emotional or social entanglement." },
+    {
+      "name": "detachment",
+      "definition": "Letting go, stoic non-attachment, mindful control of thought, and freedom from emotional or social entanglement."
+    },
     { "name": "identity", "definition": "The self, authenticity, the soul, and who we are (and are not)." },
-    { "name": "self-improvement", "definition": "Personal growth, change, discipline, and becoming a person one can be proud of." },
-    { "name": "uncertainty", "definition": "Epistemic humility, the limits of knowing, false certainty, and embracing the unknown." },
-    { "name": "forgiveness", "definition": "Tolerance, empathy, and giving others the benefit of the doubt for their flaws and circumstances." },
+    {
+      "name": "self-improvement",
+      "definition": "Personal growth, change, discipline, and becoming a person one can be proud of."
+    },
+    {
+      "name": "uncertainty",
+      "definition": "Epistemic humility, the limits of knowing, false certainty, and embracing the unknown."
+    },
+    {
+      "name": "forgiveness",
+      "definition": "Tolerance, empathy, and giving others the benefit of the doubt for their flaws and circumstances."
+    },
     { "name": "conflict", "definition": "Disagreement, debate, criticism, and civil discourse versus antagonism." },
-    { "name": "society", "definition": "Critique of industrial/consumer culture, systems, conformity, and institutions." },
-    { "name": "work", "definition": "Labor, vocation, service jobs, hiring, and the meaning of what we do for a living." },
-    { "name": "technology", "definition": "The internet, social media, texting, convenience, and the dehumanization of interaction." },
-    { "name": "privilege", "definition": "Inequality, social class, oppression, and the uneven distribution of hardship." },
+    {
+      "name": "society",
+      "definition": "Critique of industrial/consumer culture, systems, conformity, and institutions."
+    },
+    {
+      "name": "work",
+      "definition": "Labor, vocation, service jobs, hiring, and the meaning of what we do for a living."
+    },
+    {
+      "name": "technology",
+      "definition": "The internet, social media, texting, convenience, and the dehumanization of interaction."
+    },
+    {
+      "name": "privilege",
+      "definition": "Inequality, social class, oppression, and the uneven distribution of hardship."
+    },
     { "name": "politics", "definition": "Voting, collective decision-making, crowds, and the dangers of the mob." },
-    { "name": "stories", "definition": "Narrative as the core of human meaning, identity, and how we make sense of experience." },
+    {
+      "name": "stories",
+      "definition": "Narrative as the core of human meaning, identity, and how we make sense of experience."
+    },
     { "name": "the practice", "definition": "Valuing process and the journey over outcome, certainty, and perfection." }
   ],
   "tags": {

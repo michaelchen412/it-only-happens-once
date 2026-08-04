@@ -8,7 +8,7 @@ import { fixtures } from './fixtures';
 
 test.describe('draft preview — signed in as the admin', () => {
   test('an unpublished essay renders instead of 404ing', async ({ page }) => {
-    const { draftSlug, draftStatus } = fixtures();
+    const { draftSlug } = fixtures();
     test.skip(!draftSlug, 'no unpublished essay in the database to preview');
 
     const response = await page.goto(`/blog/${draftSlug}`);
@@ -34,7 +34,7 @@ test.describe('draft preview — signed in as the admin', () => {
     await page.evaluate(() => window.scrollTo(0, 2000));
     await expect(bar).toBeInViewport();
 
-    await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', /^\/admin#edit=/);
+    await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', /^\/admin\/fragments#edit=/);
   });
 
   // The one way to get this feature badly wrong: a draft cached at the edge and

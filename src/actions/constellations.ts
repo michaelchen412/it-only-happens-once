@@ -50,7 +50,11 @@ export const constellations = {
           throw fail('The score doesn’t look like a URL', 'BAD_REQUEST');
         }
       }
-      const row: Database['public']['Tables']['constellations']['Update'] = { name: input.name.trim(), slug, status: input.status };
+      const row: Database['public']['Tables']['constellations']['Update'] = {
+        name: input.name.trim(),
+        slug,
+        status: input.status,
+      };
       if (input.description !== undefined) row.description = input.description.trim() || null;
       if (input.score_url !== undefined) row.score_url = scoreUrl || null;
       if (input.color) row.color = input.color;
@@ -59,7 +63,11 @@ export const constellations = {
         if (error) throw fail(error.message);
         return { id: input.id, slug };
       }
-      const { data: last } = await sb.from('constellations').select('sort').order('sort', { ascending: false }).limit(1);
+      const { data: last } = await sb
+        .from('constellations')
+        .select('sort')
+        .order('sort', { ascending: false })
+        .limit(1);
       // A new star should not arrive wearing a neighbour's colour: take the
       // least-used slot, earliest on the ramp breaking ties.
       if (!row.color) {
@@ -93,7 +101,10 @@ export const constellations = {
       const sb = ctx.locals.supabase;
       const ids = input.ids.split(',').filter(Boolean);
       for (let i = 0; i < ids.length; i++) {
-        const { error } = await sb.from('constellations').update({ sort: i + 1 }).eq('id', ids[i]);
+        const { error } = await sb
+          .from('constellations')
+          .update({ sort: i + 1 })
+          .eq('id', ids[i]);
         if (error) throw fail(error.message);
       }
       return { ok: true };
@@ -152,7 +163,12 @@ export const constellations = {
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
-      const want = new Set(input.constellation_ids.split(',').map((s) => s.trim()).filter(Boolean));
+      const want = new Set(
+        input.constellation_ids
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
       const { data: current, error: readErr } = await sb
         .from('fragment_constellations')
         .select('constellation_id')
@@ -176,10 +192,12 @@ export const constellations = {
           .eq('constellation_id', id)
           .order('position', { ascending: false })
           .limit(1);
-        const { error } = await sb.from('fragment_constellations').upsert(
-          { constellation_id: id, fragment_id: input.fragment_id, position: (last?.[0]?.position ?? 0) + 1 },
-          { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
-        );
+        const { error } = await sb
+          .from('fragment_constellations')
+          .upsert(
+            { constellation_id: id, fragment_id: input.fragment_id, position: (last?.[0]?.position ?? 0) + 1 },
+            { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
+          );
         if (error) throw fail(error.message);
       }
       return { ok: true };
@@ -200,7 +218,10 @@ export const constellations = {
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
-      const ids = input.fragment_ids.split(',').map((s) => s.trim()).filter(Boolean);
+      const ids = input.fragment_ids
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (!ids.length) return { ok: true, count: 0 };
 
       if (input.op === 'remove') {
@@ -220,7 +241,11 @@ export const constellations = {
         .order('position', { ascending: false })
         .limit(1);
       let next = (last?.[0]?.position ?? 0) + 1;
-      const rows = ids.map((fragment_id) => ({ constellation_id: input.constellation_id, fragment_id, position: next++ }));
+      const rows = ids.map((fragment_id) => ({
+        constellation_id: input.constellation_id,
+        fragment_id,
+        position: next++,
+      }));
       const { error } = await sb
         .from('fragment_constellations')
         .upsert(rows, { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true });

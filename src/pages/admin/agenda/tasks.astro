@@ -1,0 +1,231 @@
+---
+/*
+  /admin/tasks — THE AGENDA'S FIRST ROOM (docs/plans/13-agenda.md §3 and §4,
+  ADR-0013).
+
+  ⚠ PAST DUE IS FIRST HERE, WHICH IS THE OPPOSITE OF TODAY (10-hq.md §10f).
+  That looks like an inconsistency and is not one: both rooms order by time, and
+  arrears are chronologically first. Today is a summary you read forward, so
+  meeting them last is right there. THIS room is where triage happens, so
+  meeting them first is right here.
+
+  ⚠ AND NOTHING ON THIS PAGE COUNTS WHAT YOU OWE. There is no total, no badge,
+  no streak, and past due can only ever hold as many rows as there are TASKS —
+  never one per missed occurrence, because those occurrences were never rows
+  (ADR-0013). The counts beside the headings say how many things are in a group,
+  which is a fact about a list; "6 overdue" would be a verdict about a person.
+
+  TWO QUERIES, MERGED HERE. The live list is everything unarchived; the second
+  is today's dispositions, which is what lets a ticked row stay on screen struck
+  through until midnight (§10f) even though its date has already moved on. A
+  recurring task appears in both — it is rendered once, at the occurrence it was
+  answered for.
+*/
+import { Icon } from 'astro-icon/components';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
+import DispositionChips from '../../../components/admin/DispositionChips.astro';
+import PageHeader from '../../../components/admin/PageHeader.astro';
+import TaskSheet from '../../../components/admin/TaskSheet.astro';
+import Tick from '../../../components/admin/Tick.astro';
+import { today as hqToday } from '../../../lib/hq/time';
+import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
+import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
+import { liveAndAnswered } from '../../../lib/hq/today-data';
+import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
+import type { Tables } from '../../../lib/database.types';
+
+type Task = Tables<'tasks'>;
+
+const supabase = Astro.locals.supabase;
+const { ymd: todayYmd } = await hqToday(supabase);
+
+const [{ rows, error }, { data: goalData }] = await Promise.all([
+  // The merge Today also does, and it is the SAME function — the two rooms
+  // disagreeing about which occurrence a task is standing on would be invisible
+  // until a recurring chore appeared in one and not the other.
+  liveAndAnswered(supabase, todayYmd),
+  // Only ACTIVE goals are offered: filing a task under something you paused or
+  // let go is how a goal quietly becomes a folder again (§4a).
+  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
+]);
+
+const goals = goalData ?? [];
+const goalNames = new Map(goals.map((g) => [g.id, g.name]));
+
+const grouped = GROUPS.map((g) => ({
+  ...g,
+  items: rows
+    .filter((r) => groupOf(r.shownDueOn, todayYmd) === g.key)
+    .sort((a, b) =>
+      byWhen(
+        { due_on: a.shownDueOn, due_time: a.due_time, title: a.title },
+        { due_on: b.shownDueOn, due_time: b.due_time, title: b.title },
+      ),
+    ),
+})).filter((g) => g.items.length > 0);
+
+/** Which named schedule a stored rule came from — null unless it is `fixed`. */
+const presetFor = (t: Task) => (t.recur_rrule && t.due_on ? presetOf(t.recur_rrule, t.due_on) : null);
+
+/** How the rule reads on the row — the schedule's own words, never its string. */
+function repeatWords(task: Task): string | null {
+  const preset = presetFor(task);
+  return recurrenceWords(task, preset && task.due_on ? presetLabel(preset, task.due_on) : null);
+}
+
+/**
+ * What the editor needs to reopen this task — and note what is NOT in it: the
+ * RRULE. §10i keeps rule mechanics off the page, and the client has no business
+ * with the string in either direction: it picks a preset and the action builds
+ * the rule. Resolving it to a preset here means no RRULE reaches the browser at
+ * all, and one fewer representation to keep in step.
+ */
+const payload = (t: Task) =>
+  JSON.stringify({
+    id: t.id,
+    title: t.title,
+    notes: t.notes,
+    due_on: t.due_on,
+    due_time: t.due_time,
+    priority: t.priority,
+    effort: t.effort,
+    lead_days: t.lead_days,
+    recur_mode: t.recur_mode,
+    preset: presetFor(t),
+    recur_every: t.recur_every,
+    recur_unit: t.recur_unit,
+    goal_id: t.goal_id,
+  });
+---
+
+<AdminLayout title="Tasks" active="agenda">
+  <div class="mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
+    <AgendaTabs active="tasks" />
+
+    <PageHeader title="Tasks" class="pt-1">
+      <button slot="actions" type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
+        <Icon name="ph:plus" /> New
+      </button>
+    </PageHeader>
+
+    {
+      error && (
+        <p class="admin-alert mb-5" role="alert">
+          Couldn’t load the list: {error.message}
+        </p>
+      )
+    }
+    <p hidden role="alert" class="admin-alert mb-5" data-task-error></p>
+
+    {
+      rows.length === 0 ? (
+        /* The room on day one. One line and one button — not a scold, and not an
+           onboarding checklist. */
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
+          <p class="font-serif text-lg">Nothing to do.</p>
+          <button type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber mt-4 gap-1 font-sans">
+            <Icon name="ph:plus" /> Add the first
+          </button>
+        </div>
+      ) : (
+        <div data-task-list>
+          {grouped.map((group) => {
+            const past = group.key === 'past';
+            return (
+              <section class:list={['tgroup', past && 'tgroup--past']} data-group={group.key}>
+                <h2 class="tgroup__k">
+                  {past && <Icon name="ph:warning" />}
+                  {group.title}
+                  <span class="tgroup__n">{group.items.length}</span>
+                </h2>
+                <ul class="tgroup__list">
+                  {group.items.map((t) => {
+                    const eff = effortMeta(t.effort);
+                    const repeat = repeatWords(t);
+                    return (
+                      <li
+                        class:list={[
+                          'task',
+                          `task--${t.priority}`,
+                          t.answeredAs === 'done' && 'task--done',
+                          t.answeredAs === 'skipped' && 'task--skipped',
+                        ]}
+                        data-task={payload(t)}
+                        data-id={t.id}
+                      >
+                        {/* ONE CLICK, AND IT STAYS (§10f). Not on a past-due row:
+                            there the choice IS the interaction, and a circle
+                            beside a "Did it" chip is two paths to one outcome
+                            while saying nothing about the other one. */}
+                        {!past && <Tick answered={!!t.answeredAs} title={t.title} />}
+
+                        <span class="min-w-0 flex-1">
+                          {/* The title IS the edit affordance, so no pencil sits
+                              on every row announcing itself. */}
+                          <button type="button" class="task__t" data-edit-task>
+                            {t.title}
+                          </button>
+                          <span class="task__m">
+                            {past && t.shownDueOn && <span class="task__late">{lateBy(t.shownDueOn, todayYmd)}</span>}
+                            {/* `anytime` earns its place ONLY here, where the
+                                list is time-ordered and a missing time decides
+                                where the row sits. Elsewhere the date says it. */}
+                            {!past && t.shownDueOn && group.key === 'today' && (
+                              <span class="stamp" title={fullDate(t.shownDueOn)}>
+                                <Icon name="ph:clock-light" class="stamp__i" />
+                                {t.due_time ? clockTime(t.due_time) : <em class="task__any">anytime</em>}
+                              </span>
+                            )}
+                            {!past && t.shownDueOn && group.key !== 'today' && (
+                              <span class="stamp" title={fullDate(t.shownDueOn)}>
+                                <Icon name="ph:clock-light" class="stamp__i" />
+                                {dmd(t.shownDueOn, todayYmd)}
+                                {t.due_time ? ` · ${clockTime(t.due_time)}` : ''}
+                              </span>
+                            )}
+                            {repeat && (
+                              <span class="task__rep">
+                                <Icon name="ph:arrows-clockwise" /> {repeat}
+                              </span>
+                            )}
+                            {/* A skip is NOT a tick, so it does not borrow the
+                                line-through — that would read as "did it", and
+                                the whole argument for recording skips is that
+                                they are a different answer. */}
+                            {t.goal_id && goalNames.has(t.goal_id) && (
+                              <span class="task__rep">
+                                <Icon name="ph:target" /> {goalNames.get(t.goal_id)}
+                              </span>
+                            )}
+                            <span class="task__skip">skipped</span>
+                            <span class:list={['eff', `eff--${t.effort}`]}>
+                              <span class="eff__m" aria-hidden="true">
+                                {[1, 2, 3, 4].map((n) => (
+                                  <i class:list={[n <= eff.step && 'on']} />
+                                ))}
+                              </span>
+                              {eff.label}
+                            </span>
+                          </span>
+                        </span>
+
+                        {past && <DispositionChips answered={t.answeredAs} />}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )
+    }
+  </div>
+
+  <TaskSheet today={todayYmd} goals={goals} />
+
+  <script>
+    import '../../../scripts/task-list';
+  </script>
+</AdminLayout>

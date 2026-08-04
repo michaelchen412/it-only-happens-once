@@ -41,69 +41,127 @@ const { subjects, constellations = [] } = Astro.props;
     <input type="hidden" name="body" id="ws-body-field" />
 
     {/* command row + formatting toolbar (always visible; the document scrolls) */}
-    <div class="shrink-0 border-b border-base-300 bg-base-100/95">
+    <div class="border-base-300 bg-base-100/95 shrink-0 border-b">
       <div class="flex items-center gap-3 px-6 py-2">
-        <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
-        <span id="ws-heading" class="flex items-center gap-1.5 font-sans text-xs tracking-widest text-base-content/40 uppercase">
-          <TypeMark type="writing" /> <span id="ws-heading-label">Writing</span>
+        <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
+          >✕</button
+        >
+        <span
+          id="ws-heading"
+          class="text-base-content/40 flex items-center gap-1.5 font-sans text-xs tracking-widest uppercase"
+        >
+          <TypeMark type="writing" />
+          <span id="ws-heading-label">Writing</span>
         </span>
 
-        {/* Membership is a TAB, not a popover, and lives here rather than in
+        {
+          /* Membership is a TAB, not a popover, and lives here rather than in
             the publish dialog: a DRAFT essay never opens that dialog, and
-            placing drafts in piles is what the composing room is for. */}
+            placing drafts in piles is what the composing room is for. */
+        }
         <div class="admin-tabs ml-2 border-b-0" role="tablist" aria-label="Editor sections">
-          <button type="button" role="tab" class="admin-tab" data-tab="doc" aria-selected="true" aria-controls="ws-panel-doc">
+          <button
+            type="button"
+            role="tab"
+            class="admin-tab"
+            data-tab="doc"
+            aria-selected="true"
+            aria-controls="ws-panel-doc"
+          >
             Document
           </button>
-          <button type="button" role="tab" class="admin-tab" data-tab="constellations" aria-selected="false" tabindex="-1" aria-controls="ws-panel-cn">
+          <button
+            type="button"
+            role="tab"
+            class="admin-tab"
+            data-tab="constellations"
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="ws-panel-cn"
+          >
             Constellations<span id="ws-cn-count" class="admin-tab__n"></span>
           </button>
-          {/* The paired song (ADR-0009). A tab for the same reason membership
+          {
+            /* The paired song (ADR-0009). A tab for the same reason membership
               is one: a DRAFT never opens the publish dialog, and pairing a
               song to a piece you're still writing is the whole habit this
-              restores. */}
-          <button type="button" role="tab" class="admin-tab" data-tab="music" aria-selected="false" tabindex="-1" aria-controls="ws-panel-music">
+              restores. */
+          }
+          <button
+            type="button"
+            role="tab"
+            class="admin-tab"
+            data-tab="music"
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="ws-panel-music"
+          >
             Music<span id="ws-music-mark" class="admin-tab__n"></span>
           </button>
           {/* Only published pieces have versions — a draft edits itself. */}
-          <button type="button" role="tab" class="admin-tab" data-tab="versions" hidden aria-selected="false" tabindex="-1" aria-controls="ws-panel-versions">
+          <button
+            type="button"
+            role="tab"
+            class="admin-tab"
+            data-tab="versions"
+            hidden
+            aria-selected="false"
+            tabindex="-1"
+            aria-controls="ws-panel-versions"
+          >
             Versions<span id="ws-ver-count" class="admin-tab__n"></span>
           </button>
         </div>
 
-        {/* Length lives here rather than in its own corner (docs/plans/06): the
+        {
+          /* Length lives here rather than in its own corner (docs/plans/06): the
             row already carries the state of the piece, and length is state.
             `#ws-count` stays neutral while `#ws-status-text` beside it goes
-            warning/error — the number is never the thing shouting. */}
-        <div id="ws-status" class="ml-auto flex items-center gap-2 font-sans text-xs text-base-content/55" aria-live="polite">
-          <span id="ws-count" hidden class="whitespace-nowrap text-base-content/40 tabular-nums"></span>
+            warning/error — the number is never the thing shouting. */
+        }
+        <div
+          id="ws-status"
+          class="text-base-content/55 ml-auto flex items-center gap-2 font-sans text-xs"
+          aria-live="polite"
+        >
+          <span id="ws-count" hidden class="text-base-content/40 whitespace-nowrap tabular-nums"></span>
           <span id="ws-spinner" hidden class="loading loading-spinner loading-xs"></span>
           <span id="ws-status-text">Autosaves as you write</span>
         </div>
 
-        {/* Outside both action groups on purpose: a draft has a real page to
+        {
+          /* Outside both action groups on purpose: a draft has a real page to
             look at now (docs/plans/01), so this button is not a published-only
-            affordance any more. The script relabels it View ↗ / Preview ↗. */}
+            affordance any more. The script relabels it View ↗ / Preview ↗. */
+        }
         <a id="ws-view-link" href="#" target="_blank" hidden class="btn btn-ghost btn-sm normal-case">View ↗</a>
 
         <div id="ws-actions-draft" class="flex items-center gap-2">
-          {/* Notes promote one step at a time — note → draft → published — but
-              nothing stops a finished note going straight out via Publish… */}
-          <button type="button" id="ws-to-draft" hidden class="btn btn-outline btn-sm normal-case">Make it a draft</button>
+          {
+            /* Notes promote one step at a time — note → draft → published — but
+              nothing stops a finished note going straight out via Publish… */
+          }
+          <button type="button" id="ws-to-draft" hidden class="btn btn-outline btn-sm normal-case"
+            >Make it a draft</button
+          >
           <button type="button" id="ws-open-publish" class="btn btn-primary btn-sm normal-case">Publish…</button>
         </div>
         <div id="ws-actions-published" hidden class="flex items-center gap-2">
           <button type="button" id="ws-discard" hidden class="btn btn-ghost btn-sm normal-case">Discard</button>
-          <button type="button" id="ws-save-changes" class="btn btn-primary btn-sm normal-case" disabled>Save changes</button>
+          <button type="button" id="ws-save-changes" class="btn btn-primary btn-sm normal-case" disabled
+            >Save changes</button
+          >
           <button type="button" id="ws-open-details" class="btn btn-ghost btn-sm normal-case">Details…</button>
           <button type="button" id="ws-unpublish" class="btn btn-outline btn-sm normal-case">Unpublish</button>
         </div>
 
-        <button type="button" id="ws-delete" hidden class="font-sans text-sm text-base-content/55 hover:text-error">Delete</button>
+        <button type="button" id="ws-delete" hidden class="text-base-content/55 hover:text-error font-sans text-sm"
+          >Delete</button
+        >
       </div>
       {/* wrapped (not given an id) so EditorToolbar stays shared-as-is */}
       <div id="ws-toolbar">
-        <EditorToolbar class="border-t border-base-300/60 px-6 py-1.5" image />
+        <EditorToolbar class="border-base-300/60 border-t px-6 py-1.5" image />
       </div>
     </div>
 
@@ -114,13 +172,19 @@ const { subjects, constellations = [] } = Astro.props;
           name="title"
           placeholder="Title"
           aria-label="Title"
-          class="w-full border-none bg-transparent font-display text-4xl font-light outline-none placeholder:text-base-content/25"
+          class="font-display placeholder:text-base-content/25 w-full border-none bg-transparent text-4xl font-light outline-none"
         />
         <p id="ws-error" hidden role="alert" class="admin-alert mt-4"></p>
         <div id="ws-editor" class="reading mt-6"></div>
       </div>
 
-      <div id="ws-panel-cn" role="tabpanel" data-tabpanel="constellations" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+      <div
+        id="ws-panel-cn"
+        role="tabpanel"
+        data-tabpanel="constellations"
+        hidden
+        class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24"
+      >
         <h3 class="font-display text-lg">In which constellations</h3>
         <p class="admin-hint mt-1 mb-4">
           The ways of seeing this piece belongs to. Changes apply immediately — no save needed. Adding puts it at the
@@ -129,24 +193,35 @@ const { subjects, constellations = [] } = Astro.props;
         <ConstellationPicker scope="writing" constellations={constellations} />
       </div>
 
-      {/* The paired song (ADR-0009 "paired media", docs/plans/04 Piece 3).
+      {
+        /* The paired song (ADR-0009 "paired media", docs/plans/04 Piece 3).
           Applies IMMEDIATELY like constellation membership — it's a relation,
           not a field of the document, so it must never ride along with the
-          compare-and-set save and risk a rewrite. */}
-      <div id="ws-panel-music" role="tabpanel" data-tabpanel="music" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+          compare-and-set save and risk a rewrite. */
+      }
+      <div
+        id="ws-panel-music"
+        role="tabpanel"
+        data-tabpanel="music"
+        hidden
+        class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24"
+      >
         <h3 class="font-display text-lg">The song that goes with this</h3>
         <p class="admin-hint mt-1 mb-4">
           One song, paired to this piece — it plays at the top, before the words. Changes apply immediately, no save
-          needed. This is the pairing 50 of the imported essays already carried; a constellation's score is a
-          different thing, set in the composer.
+          needed. This is the pairing 50 of the imported essays already carried; a constellation's score is a different
+          thing, set in the composer.
         </p>
         <p id="ws-music-error" hidden role="alert" class="admin-alert mb-3"></p>
 
         {/* What's paired now (or nothing) */}
-        <div id="ws-music-current" class="mb-5 flex items-center gap-3 rounded-box border border-base-300 px-4 py-3">
+        <div id="ws-music-current" class="rounded-box border-base-300 mb-5 flex items-center gap-3 border px-4 py-3">
           <span id="ws-music-none" class="admin-hint italic">Nothing paired yet.</span>
-          <span id="ws-music-name" hidden class="font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]"></span>
-          <button type="button" id="ws-music-clear" hidden class="btn btn-ghost btn-xs ml-auto normal-case text-error">
+          <span
+            id="ws-music-name"
+            hidden
+            class="font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]"></span>
+          <button type="button" id="ws-music-clear" hidden class="btn btn-ghost btn-xs text-error ml-auto normal-case">
             Unpair
           </button>
         </div>
@@ -168,14 +243,22 @@ const { subjects, constellations = [] } = Astro.props;
         </p>
       </div>
 
-      {/* Versions (docs/admin.md §5, plan 07). Editing a published piece writes
+      {
+        /* Versions (docs/admin.md §5, plan 07). Editing a published piece writes
           here, never to the live row — so this panel is both the history and
-          the answer to "where did my unsaved rewrite go". */}
-      <div id="ws-panel-versions" role="tabpanel" data-tabpanel="versions" hidden class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24">
+          the answer to "where did my unsaved rewrite go". */
+      }
+      <div
+        id="ws-panel-versions"
+        role="tabpanel"
+        data-tabpanel="versions"
+        hidden
+        class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24"
+      >
         <h3 class="font-display text-lg">Versions</h3>
         <p class="admin-hint mt-1 mb-4">
-          Editing a published piece never changes what readers see. Your edits are kept here until you promote one —
-          and promoting keeps whatever it replaces, so an opening you liked better is never gone.
+          Editing a published piece never changes what readers see. Your edits are kept here until you promote one — and
+          promoting keeps whatever it replaces, so an opening you liked better is never gone.
         </p>
         <p id="ws-ver-error" hidden role="alert" class="admin-alert mb-3"></p>
         <ol id="ws-ver-list" class="space-y-2"></ol>

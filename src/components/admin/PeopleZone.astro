@@ -1,0 +1,76 @@
+---
+/*
+  PeopleZone — People, on Today (docs/plans/12-people.md §2a and §8).
+
+  ⚠ THE BRIEF IS HERE NOW (13 · Piece 5, 2026-08-03), and it is what this zone
+  was waiting for. §2a's four labelled lines hang off a people-tagged EVENT, and
+  until 13 · Piece 4 there was no `events` table — so Piece 4 shipped birthdays
+  and drift only, and §10 anticipated exactly this: *"Until 13 lands, Piece 4 can
+  key off birthdays and drift only, and gain the event brief later."*
+
+  ⚠ AND BIRTHDAYS HAVE LEFT. They lived here as a placeholder, with a comment
+  saying so: a "Coming up" zone whose only possible content was birthdays would
+  have misrepresented a zone that was about to mean something else. It means
+  something else now, and 13 §6 is explicit that Coming up is driven by each
+  item's own lead — `birthday_lead_days` included. See ComingUpZone.astro.
+
+  So this zone is two things, and the order is the argument: **the brief, then
+  drift.** The brief is a thing to READ before today happens; drift is a thing to
+  notice. Reversing them would open with the observation and bury the payoff —
+  and the payoff is what makes the logging habit survive (§2a).
+*/
+import BeenAWhile from './BeenAWhile.astro';
+import Brief from './Brief.astro';
+import Zone from './Zone.astro';
+import { Icon } from 'astro-icon/components';
+import type { Brief as BriefRow } from '../../lib/hq/brief';
+import { TODAY_DRIFT_CAP, type Drift } from '../../lib/hq/drift';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  briefs: BriefRow[];
+  drifting: Drift[];
+  today: Ymd;
+  photos: Map<string, string>;
+}
+const { briefs, drifting, today, photos } = Astro.props;
+
+// THE CAP IS THE POINT (§8): "the roster is where the full list lives; Today is
+// a nudge, not an inbox." Three is small enough that it can never become a wall
+// on a morning that started badly.
+const shown = drifting.slice(0, TODAY_DRIFT_CAP);
+const more = drifting.length - shown.length;
+---
+
+{
+  (briefs.length > 0 || shown.length > 0) && (
+    <Zone title="People" icon="ph:users-three" accent="cn-azure" order={3} data-people-zone>
+      <a slot="actions" class="zone__act" href="/admin/people" aria-label="Open People">
+        <Icon name="ph:arrow-right" />
+      </a>
+
+      {briefs.length > 0 && (
+        <div class="zone__body pb-1" data-briefs>
+          {briefs.map((brief) => (
+            <Brief brief={brief} today={today} photos={photos} />
+          ))}
+        </div>
+      )}
+
+      {shown.length > 0 && (
+        <div class:list={['zone__body', briefs.length > 0 && 'pt-0']}>
+          <BeenAWhile drifting={shown} today={today} photos={photos} />
+          {more > 0 && (
+            /* Never a fourth row. A count and a door — the room holds the list,
+               and this page stays a nudge. */
+            <p class="admin-hint mt-2 text-xs">
+              <a href="/admin/people" class="hover:underline">
+                {more} more in People →
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+    </Zone>
+  )
+}

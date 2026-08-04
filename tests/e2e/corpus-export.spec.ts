@@ -1,4 +1,10 @@
-// Plan 05·2: the corpus export.
+// Plan 05·2: the personal export.
+//
+// It was the CORPUS export until 2026-08-02, when the first HQ table joined it
+// (ADR-0012) and it became a full personal export instead. That is why the
+// assertions below check the format string and the filename rather than
+// ignoring them as chrome: an importer keying off `format` must fail loudly
+// on the change, not quietly treat a private file as a publishable one.
 //
 // NOT stubbed, unlike the other specs here — and it doesn't need to be, because
 // this endpoint is read-only. It writes nothing, so the harness's read-only
@@ -17,6 +23,10 @@ interface Corpus {
   tables: Record<string, Record<string, unknown>[]>;
 }
 
+// Kept in step with `TABLES` in src/pages/admin/export.json.ts BY HAND, on
+// purpose: the standing rule is that a piece creating an HQ table appends it
+// there, and a spec that derived its list from the same source could never
+// catch a piece that forgot.
 const TABLES = [
   'subjects',
   'authors',
@@ -27,6 +37,7 @@ const TABLES = [
   'fragment_subjects',
   'fragment_constellations',
   'fragment_versions',
+  'settings',
 ];
 
 test.describe('corpus export', () => {
@@ -36,11 +47,16 @@ test.describe('corpus export', () => {
 
     // It's a download, and it must never be cached — the file carries drafts
     // and private notes.
-    expect(res.headers()['content-disposition']).toMatch(/attachment; filename="it-only-happens-once-\d{4}-\d\d-\d\d\.json"/);
+    // `-personal-` is load-bearing: the filename is the only part of this file
+    // visible in a downloads folder six months later.
+    expect(res.headers()['content-disposition']).toMatch(
+      /attachment; filename="it-only-happens-once-personal-\d{4}-\d\d-\d\d\.json"/,
+    );
     expect(res.headers()['cache-control']).toContain('no-store');
 
     const corpus = (await res.json()) as Corpus;
-    expect(corpus.format).toBe('it-only-happens-once/corpus');
+    expect(corpus.format).toBe('it-only-happens-once/personal');
+    expect(corpus.version).toBe(2);
 
     // Every table present, and `counts` agreeing with the rows actually shipped
     // — a count that disagrees with its own payload would be the exact kind of
@@ -56,12 +72,12 @@ test.describe('corpus export', () => {
     // says nothing. Compare against what the admin UI independently reports.
     const corpus = (await (await request.get('/admin/export.json')).json()) as Corpus;
 
-    await page.goto('/admin');
+    await page.goto('/admin/fragments');
     // The manager's "All" chip carries the live fragment total.
     const all = page.locator('[data-type-filter=""] .type-badge__n');
     await expect(all).toBeVisible();
     const shown = Number((await all.textContent())?.trim());
-    expect(shown, 'could not read a fragment count from /admin').toBeGreaterThan(0);
+    expect(shown, 'could not read a fragment count from /admin/fragments').toBeGreaterThan(0);
 
     // The export includes trashed rows (a backup should), so it is >= the
     // manager's live view rather than equal to it.
@@ -112,7 +128,7 @@ test.describe('corpus export', () => {
 
   test('the Library page offers it', async ({ page }) => {
     await page.goto('/admin/library');
-    const link = page.getByRole('link', { name: /export corpus/i });
+    const link = page.getByRole('link', { name: /export everything/i });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', '/admin/export.json');
   });

@@ -1,4 +1,4 @@
-// Host logic for the Fragment Manager (src/pages/admin/index.astro). The
+// Host logic for the Fragment Manager (src/pages/admin/fragments.astro). The
 // table/toolbar mechanics live in fragment-panel.ts (shared with the composer's
 // browser sheet); this file adds what's unique to the page: the bulk-action
 // bar, trash actions, the Add ▾ menu, and routing row-opens to the editor
@@ -19,7 +19,7 @@ const showBulkError = (msg: string) => {
 };
 
 const panel = wireFragmentPanel(root, {
-  historyBase: '/admin',
+  historyBase: '/admin/fragments',
   onOpen(row) {
     if (row.dataset.writing) {
       document.dispatchEvent(new CustomEvent('writing:edit', { detail: row.dataset.writing }));
@@ -73,13 +73,32 @@ bulkBtns.forEach((btn) =>
 function confirmBulk(op: 'trash' | 'purge', n: number) {
   const noun = `${n} fragment${n === 1 ? '' : 's'}`;
   return op === 'purge'
-    ? confirmDialog({ title: 'Delete forever', message: `Permanently delete ${noun}? This cannot be undone.`, confirmLabel: 'Delete forever', danger: true })
-    : confirmDialog({ title: 'Move to trash', message: `Move ${noun} to trash?`, confirmLabel: 'Delete', danger: true });
+    ? confirmDialog({
+        title: 'Delete forever',
+        message: `Permanently delete ${noun}? This cannot be undone.`,
+        confirmLabel: 'Delete forever',
+        danger: true,
+      })
+    : confirmDialog({
+        title: 'Move to trash',
+        message: `Move ${noun} to trash?`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
 }
 
 // --- per-row trash actions --------------------------------------------------
 async function trashAction(op: 'restore' | 'purge', id: string) {
-  if (op === 'purge' && !(await confirmDialog({ title: 'Delete forever', message: 'Permanently delete this fragment? This cannot be undone.', confirmLabel: 'Delete forever', danger: true }))) return;
+  if (
+    op === 'purge' &&
+    !(await confirmDialog({
+      title: 'Delete forever',
+      message: 'Permanently delete this fragment? This cannot be undone.',
+      confirmLabel: 'Delete forever',
+      danger: true,
+    }))
+  )
+    return;
   const fd = new FormData();
   fd.set('id', id);
   const { error } = await (op === 'restore' ? actions.fragments.restore(fd) : actions.fragments.purge(fd));
@@ -89,7 +108,15 @@ async function trashAction(op: 'restore' | 'purge', id: string) {
 
 // --- empty trash ------------------------------------------------------------
 document.getElementById('empty-trash')?.addEventListener('click', async () => {
-  if (!(await confirmDialog({ title: 'Empty trash', message: 'Permanently delete everything in trash? This cannot be undone.', confirmLabel: 'Empty trash', danger: true }))) return;
+  if (
+    !(await confirmDialog({
+      title: 'Empty trash',
+      message: 'Permanently delete everything in trash? This cannot be undone.',
+      confirmLabel: 'Empty trash',
+      danger: true,
+    }))
+  )
+    return;
   const { error } = await actions.fragments.emptyTrash(new FormData());
   if (error) return showBulkError(error.message);
   await panel.refresh();

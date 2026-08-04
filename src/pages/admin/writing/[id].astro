@@ -4,7 +4,12 @@
   the WritingSheet overlay (docs/admin.md §5) so editing never navigates away
   from the list or the constellation composer. Old links still work: they land
   on the Fragment Manager with the sheet auto-opened via the hash.
+
+  The target moved with the manager (`/admin` → `/admin/fragments`, ADR-0015).
+  This redirect is a PRODUCER of that hash and had to be updated at source: a
+  302 from `/admin` could not have carried it, because a hash never leaves the
+  browser.
 */
 const { id } = Astro.params;
-return Astro.redirect(!id || id === 'new' ? '/admin#new-writing' : `/admin#edit=${id}`);
+return Astro.redirect(!id || id === 'new' ? '/admin/fragments#new-writing' : `/admin/fragments#edit=${id}`);
 ---

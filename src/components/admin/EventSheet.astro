@@ -1,0 +1,142 @@
+---
+/*
+  EventSheet — put something in the calendar (docs/plans/13-agenda.md §5).
+
+  A native <dialog>, like every other editor in here. ⚠ And that is also why
+  trap 7 never comes up on this page: the top layer escapes every ancestor's
+  `overflow` and every `z-index`, and each control inside is native — a date
+  input, two time inputs, and a checkbox list.
+
+  ⚠ "ALL DAY" IS THE ABSENCE OF A TIME, not a checkbox beside one. Leave the
+  time blank and the event is all day; the word beside the field says so in one
+  word rather than a sentence under it (10-hq.md §10i). A boolean would be a
+  second thing that can disagree with the times.
+
+  WHO WAS THERE IS THE POINT OF `event_people`, and it is what makes 12's brief
+  possible — the reason to tag an event is that its people show up on the day
+  you are about to see them. It reuses the "Shared by" pattern from the fragment
+  editor: collapsed, because most events have nobody tagged.
+*/
+import { Icon } from 'astro-icon/components';
+import KindBar from './KindBar.astro';
+import { hueFor, monogram } from '../../lib/hq/people';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  today: Ymd;
+  people: { id: string; display_name: string }[];
+}
+const { today, people } = Astro.props;
+const FILTER_THRESHOLD = 8;
+---
+
+<dialog id="event-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="event-sheet-title">
+  <form id="event-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
+      <h2 id="event-sheet-title" class="font-display text-xl">New event</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
+    </header>
+
+    <p id="event-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    {
+      /* Only ever visible when a reading filled this form in (14 · Piece 3) —
+        an event typed by hand is not a judgement anybody made. */
+    }
+    <div class="px-6 pt-4"><KindBar self="event" /></div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <label class="f">
+        <span class="f__k">What <em>required</em></span>
+        <input type="text" name="title" required maxlength="300" placeholder="Dinner with Tobias" />
+      </label>
+
+      <fieldset class="fs mt-4">
+        <legend class="fs__k">When</legend>
+        <div class="flex flex-wrap items-end gap-2">
+          <label class="f">
+            <span class="f__k">Date <em>required</em></span>
+            <input type="date" name="startsOn" class="f--narrow" required data-starts-on />
+          </label>
+          <label class="f">
+            <span class="f__k">From</span>
+            <input type="time" name="startsAt" class="f--narrow" data-starts-at />
+          </label>
+          <label class="f">
+            <span class="f__k">To</span>
+            <input type="time" name="endsAt" class="f--narrow" data-ends-at />
+          </label>
+          <span class="f__h mb-1" data-all-day>all day</span>
+        </div>
+      </fieldset>
+
+      <label class="f mt-4">
+        <span class="f__k">Where</span>
+        <input type="text" name="location" maxlength="300" placeholder="Ottavio" />
+      </label>
+
+      {
+        /* No roster, no field — the same rule SharedByField follows. A "who was
+           there" control over nobody is furniture. */
+        people.length > 0 && (
+          <details class="sby mt-4" data-event-people>
+            <summary>
+              <Icon name="ph:users-three" class="opacity-55" />
+              <span>Who’s there</span>
+              <span class="sby__who" data-who>
+                nobody
+              </span>
+            </summary>
+
+            {people.length > FILTER_THRESHOLD && (
+              <input
+                type="search"
+                class="sby-filter input input-xs input-bordered mt-2 w-full font-sans"
+                placeholder="Find someone…"
+                aria-label="Filter people"
+              />
+            )}
+
+            <div class="sby__list">
+              {people.map((p) => (
+                <label class="sby__row" data-search={p.display_name.toLowerCase()}>
+                  {/* The name rides on the INPUT, not the row: a row's
+                      textContent also carries the monogram, which is how the
+                      fragment editor's summary once read "MMarisol Quint". */}
+                  <input
+                    type="checkbox"
+                    class="ep-check checkbox checkbox-xs"
+                    value={p.id}
+                    data-name={p.display_name}
+                  />
+                  <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+                    {monogram(p.display_name)}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
+                </label>
+              ))}
+            </div>
+          </details>
+        )
+      }
+
+      <label class="f mt-4">
+        <span class="f__k">Notes</span>
+        <textarea name="notes" rows="2" placeholder="Optional. Markdown."></textarea>
+      </label>
+    </div>
+
+    <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+      <button type="button" class="btn btn-ghost btn-sm text-error gap-1 font-sans" data-delete-event hidden>
+        <Icon name="ph:trash" /> Delete
+      </button>
+      <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
+      <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>Add event</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import '../../scripts/event-sheet';
+</script>

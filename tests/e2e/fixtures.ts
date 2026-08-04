@@ -21,6 +21,29 @@ export function fixtures(): Fixtures {
 }
 
 /**
+ * Take Astro's dev toolbar out of the page.
+ *
+ * ⚠ IT SITS BOTTOM-CENTRE AND EATS CLICKS THERE, which is precisely where this
+ * project puts a floating pill — `.bulkbar` since the fragment manager shipped,
+ * `.undo-bar` since 14 · Piece 1. A click on either fails with
+ * "<astro-dev-toolbar> intercepts pointer events" and reads exactly like a
+ * broken control.
+ *
+ * It is a DEV-ONLY element (`astro build` never emits it), so removing it makes
+ * the test match production rather than diverging from it. Call this in any
+ * spec that presses something at the bottom of the viewport.
+ */
+export async function hideDevToolbar(page: Page): Promise<void> {
+  // ⚠ A STYLE RULE, not just a `.remove()`. The toolbar is injected some time
+  // AFTER load, so removing the element right after `goto` reliably wins a race
+  // it then loses again a moment later — which is how this was first "fixed"
+  // and still failed. A rule on the document outlives every re-injection, and
+  // `display: none` takes it out of hit testing rather than merely hiding it.
+  await page.addStyleTag({ content: 'astro-dev-toolbar { display: none !important; }' });
+  await page.evaluate(() => document.querySelector('astro-dev-toolbar')?.remove());
+}
+
+/**
  * Cut the writing composer off from the database for the length of a test.
  *
  * The sheet autosaves a draft 1.2s after you stop typing, and these specs run

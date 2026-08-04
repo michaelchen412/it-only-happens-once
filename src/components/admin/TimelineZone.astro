@@ -1,0 +1,197 @@
+---
+/*
+  TimelineZone — the log box and the entries (docs/plans/12-people.md §4, §6).
+
+  THE LIVING PART OF A PROFILE, and the only part that changes weekly, which is
+  why §4 gives it the main column while About and Shared take the rail.
+
+  THE BOX IS ALWAYS OPEN AT THE HEAD OF THE LIST. §6's argument is the whole
+  design: "if logging always costs opening a document editor, the 15-second jots
+  never happen — and the 15-second jots are most of what makes the brief good."
+  So it is one line tall, it grows as you type, and every field it needs is
+  already defaulted — this person, today, hangout. The controls stay hidden
+  until there are words to attach them to, because an empty box already showing
+  a kind, a date and a people picker is not a box you dash a thought into.
+
+  A TEXTAREA, NOT TIPTAP (settled 2026-08-03, reversing §6). Piece 4 puts this
+  same box on Today, and `src/pages/admin/index.astro` deliberately ships no
+  editor bundle so the page opened on a phone at 7am stays light. It stores the
+  same Markdown either way. `Expand ↗` is the second altitude — the same entry,
+  the same storage, room for the conversation that turned out to matter.
+*/
+import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
+import { renderMarkdown } from '../../lib/markdown';
+import { dmd, fullDate } from '../../lib/hq/dates';
+import { hueFor, monogram, type Person } from '../../lib/hq/people';
+import { KINDS, KIND_ICON, QUICK_DAYS, type Interaction } from '../../lib/hq/interactions';
+import type { Ymd } from '../../lib/hq/time';
+
+export interface TimelineEntry extends Interaction {
+  /** Everyone else who was there — the subject is implicit and excluded. */
+  others: { id: string; display_name: string; slug: string }[];
+}
+
+interface Props {
+  person: Person;
+  entries: TimelineEntry[];
+  /** The rest of the roster, for the `with` picker. */
+  roster: Pick<Person, 'id' | 'display_name' | 'photo_path'>[];
+  today: Ymd;
+}
+const { person, entries, roster, today } = Astro.props;
+---
+
+<Zone title="Timeline" icon="ph:note" accent="cn-sand" data-timeline data-person-id={person.id} data-today={today}>
+  {
+    entries.length > 0 && (
+      <span slot="actions" class="zone__count ml-auto">
+        {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+      </span>
+    )
+  }
+
+  <div class="zone__body pb-2">
+    <div class="logbox" data-logbox>
+      <textarea
+        rows="1"
+        data-log-input
+        placeholder="What happened?"
+        aria-label={`Log an entry about ${person.display_name}`}></textarea>
+
+      <div class="logbox__foot">
+        {
+          /* `popovertarget` rather than a click handler: the browser gets the
+            toggle, Escape, light-dismiss and one-open-at-a-time, and none of
+            those are mine to get wrong. See trap 7 in app.css for why these
+            have to be top-layer popovers at all. */
+        }
+        <div class="logbox__meta" data-log-meta hidden>
+          <button type="button" class="lchip" popovertarget="log-kind" data-kind-open>
+            <span class="lchip__i" data-kind-icon><Icon name="ph:users-three" /></span>
+            <span data-kind-label>Hangout</span>
+            <Icon name="ph:caret-down" class="lchip__caret" />
+          </button>
+
+          <button type="button" class="lchip" popovertarget="log-date" data-date-open>
+            <Icon name="ph:calendar-blank" />
+            <span data-date-label>Today</span>
+          </button>
+
+          {
+            roster.length > 0 && (
+              <button type="button" class="lchip" popovertarget="log-with" data-with-open>
+                <Icon name="ph:plus" />
+                <span data-with-label>with</span>
+              </button>
+            )
+          }
+        </div>
+
+        <div class="logbox__acts">
+          <button type="button" class="btn btn-ghost btn-xs font-sans" data-log-cancel hidden>Cancel</button>
+          <button type="button" class="btn btn-xs zone__cta cn-azure font-sans" data-log-save hidden>Save</button>
+        </div>
+      </div>
+
+      <p data-log-error hidden role="alert" class="admin-alert m-2"></p>
+    </div>
+
+    <div class="pop" popover id="log-kind" data-pop="kind">
+      {
+        KINDS.map((k, i) => (
+          <button type="button" class:list={['pop__row', i === 0 && 'is-on']} data-kind={k.key}>
+            <Icon name={k.icon} />
+            {k.label}
+          </button>
+        ))
+      }
+    </div>
+
+    {
+      /* Three taps for the common cases, then a real date input for anything
+        older. NO TIME FIELD ANYWHERE: `occurred_on` is a local date, and nobody
+        recalls that the dinner started at 7:14. */
+    }
+    <div class="pop" popover id="log-date" data-pop="date">
+      {
+        QUICK_DAYS.map((d, i) => (
+          <button type="button" class:list={['pop__row', i === 0 && 'is-on']} data-day={d.back}>
+            {d.label}
+          </button>
+        ))
+      }
+      <label class="pop__date">
+        <span>Another day</span>
+        <input type="date" max={today} data-date-input />
+      </label>
+    </div>
+
+    {
+      roster.length > 0 && (
+        <div class="pop pop--wide" popover id="log-with" data-pop="with">
+          {roster.map((p) => (
+            <button type="button" class="pop__row" data-with={p.id} data-name={p.display_name}>
+              <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+                {monogram(p.display_name)}
+              </span>
+              {p.display_name}
+              <Icon name="ph:check" class="pop__tick" />
+            </button>
+          ))}
+        </div>
+      )
+    }
+  </div>
+
+  {
+    entries.length === 0 ? (
+      /* Not a skeleton, and not a scold. The box above it is the invitation;
+         this line only says the shelf is empty. */
+      <p class="zone__empty">Nothing logged yet.</p>
+    ) : (
+      <ul class="zone__list pb-2">
+        {entries.map((e) => (
+          <li
+            class="tl"
+            data-entry={e.id}
+            data-entry-kind={e.kind}
+            data-entry-on={e.occurred_on}
+            data-body={e.body}
+            data-entry-with={e.others.map((o) => o.id).join(',')}
+          >
+            <span class="tl__mark">
+              <Icon name={KIND_ICON[e.kind]} />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="tl__meta">
+                <button type="button" class="stamp" title={fullDate(e.occurred_on)}>
+                  <Icon name="ph:clock-light" class="stamp__i" />
+                  {dmd(e.occurred_on, today)}
+                </button>
+                <span class="tl__kind">{e.kind}</span>
+                {e.others.length > 0 && <span>with {e.others.map((o) => o.display_name).join(', ')}</span>}
+              </div>
+              {/* Rendered Markdown, in the serif, because it is writing — and
+                  verbatim, because §2a is explicit that nothing here generates
+                  or condenses your own words. */}
+              <div class="tl__body reading" set:html={renderMarkdown(e.body)} />
+            </div>
+            <span class="tl__acts">
+              <button type="button" class="zone__act" data-edit aria-label="Edit entry">
+                <Icon name="ph:pencil-simple" />
+              </button>
+              <button type="button" class="zone__act" data-delete aria-label="Delete entry">
+                <Icon name="ph:trash" />
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Zone>
+
+<script>
+  import '../../scripts/log-box';
+</script>

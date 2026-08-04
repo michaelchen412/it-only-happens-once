@@ -19,7 +19,6 @@ const constellation = await getConstellation(supabase, slug);
 if (!constellation || constellation.items.length === 0) {
   return Astro.redirect('/', 302);
 }
-
 ---
 
 <SiteLayout

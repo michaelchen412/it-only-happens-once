@@ -124,7 +124,8 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
         : undefined,
     },
   });
-  const getMarkdown = () => (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+  const getMarkdown = () =>
+    (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
 
   // ---- toolbar ----
   // Reassigned below when a link dialog is supplied; a no-op otherwise.
@@ -283,7 +284,8 @@ export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
       attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Text' },
     },
   });
-  const getMarkdown = () => (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+  const getMarkdown = () =>
+    (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
 
   const cmds: Record<string, () => void> = {
     bold: () => editor.chain().focus().toggleBold().run(),

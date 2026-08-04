@@ -68,7 +68,12 @@ if (process.argv[2] === '--closure') {
   for (const [name, info] of [...seen].sort()) {
     console.log(`  ${name.padEnd(24)} v${info.version}${info.esmOnly ? '  [ESM-ONLY]' : ''}`);
   }
-  console.log(`\n${[...seen.keys()].sort().map((n) => `'${n}',`).join('\n')}`);
+  console.log(
+    `\n${[...seen.keys()]
+      .sort()
+      .map((n) => `'${n}',`)
+      .join('\n')}`,
+  );
   process.exit(0);
 }
 
@@ -79,11 +84,46 @@ if (!existsSync(FUNC)) {
 }
 
 const BUILTIN = new Set([
-  'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console', 'constants', 'crypto',
-  'dgram', 'diagnostics_channel', 'dns', 'domain', 'events', 'fs', 'http', 'http2', 'https',
-  'inspector', 'module', 'net', 'os', 'path', 'perf_hooks', 'process', 'punycode', 'querystring',
-  'readline', 'repl', 'stream', 'string_decoder', 'timers', 'tls', 'tty', 'url', 'util', 'v8',
-  'vm', 'wasi', 'worker_threads', 'zlib',
+  'assert',
+  'async_hooks',
+  'buffer',
+  'child_process',
+  'cluster',
+  'console',
+  'constants',
+  'crypto',
+  'dgram',
+  'diagnostics_channel',
+  'dns',
+  'domain',
+  'events',
+  'fs',
+  'http',
+  'http2',
+  'https',
+  'inspector',
+  'module',
+  'net',
+  'os',
+  'path',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'stream',
+  'string_decoder',
+  'timers',
+  'tls',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'vm',
+  'wasi',
+  'worker_threads',
+  'zlib',
 ]);
 
 /**

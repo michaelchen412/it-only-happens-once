@@ -11,28 +11,19 @@ const error = Astro.url.searchParams.get('error');
 <Base title="Sign in — It Only Happens Once">
   <main class="flex min-h-screen items-center justify-center px-6">
     <div class="w-full max-w-sm text-center">
-      <p class="font-sans text-xs tracking-[0.2em] text-base-content/40 uppercase">
-        It Only Happens Once
-      </p>
-      <h1 class="mt-4 font-display text-4xl font-light">Come in.</h1>
-      <p class="prose-measure mx-auto mt-3 text-base-content/60">
-        This door is just for Michael.
-      </p>
+      <p class="text-base-content/40 font-sans text-xs tracking-[0.2em] uppercase">It Only Happens Once</p>
+      <h1 class="font-display mt-4 text-4xl font-light">Come in.</h1>
+      <p class="prose-measure text-base-content/60 mx-auto mt-3">This door is just for Michael.</p>
 
       {
         (denied || error) && (
-          <p class="mt-6 font-sans text-sm text-error">
-            {denied
-              ? 'That account isn’t the admin.'
-              : 'Something went wrong signing in — please try again.'}
+          <p class="text-error mt-6 font-sans text-sm">
+            {denied ? 'That account isn’t the admin.' : 'Something went wrong signing in — please try again.'}
           </p>
         )
       }
 
-      <button
-        id="google"
-        class="btn btn-outline mt-8 w-full gap-2 font-sans normal-case"
-      >
+      <button id="google" class="btn btn-outline mt-8 w-full gap-2 font-sans normal-case">
         Continue with Google
       </button>
     </div>
@@ -41,10 +32,7 @@ const error = Astro.url.searchParams.get('error');
   <script>
     import { createBrowserClient } from '@supabase/ssr';
 
-    const supabase = createBrowserClient(
-      import.meta.env.PUBLIC_SUPABASE_URL,
-      import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-    );
+    const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
 
     document.getElementById('google')?.addEventListener('click', async () => {
       await supabase.auth.signInWithOAuth({

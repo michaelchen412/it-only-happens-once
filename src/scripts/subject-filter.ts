@@ -25,7 +25,10 @@ if (!customElements.get('subject-filter')) {
 
     connectedCallback() {
       this.opts = JSON.parse(this.dataset.options || '[]');
-      this.selected = (this.dataset.value || '').split(',').map((s) => s.trim()).filter(Boolean);
+      this.selected = (this.dataset.value || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       this.innerHTML = '';
 
       this.hiddenInput = document.createElement('input');

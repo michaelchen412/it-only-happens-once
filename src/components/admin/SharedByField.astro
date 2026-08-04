@@ -1,0 +1,80 @@
+---
+/*
+  SharedByField — the corpus's side of the seam (docs/plans/12-people.md §5).
+
+  §5 gives the link BOTH directions: from a profile you attach a work or a
+  fragment, and from here you say who a fragment came from — "so a fragment
+  created first can be attributed after the fact."
+
+  COLLAPSED BY DEFAULT, because it is empty on almost every fragment: most of
+  the corpus came from reading, not from a person. An always-open roster-length
+  checklist would be the tallest thing in the quote form, for a field used a
+  handful of times a year. The summary line carries the answer, so the closed
+  state still tells you everything ("Shared by — Noelle").
+
+  ⚠ THE LABEL IS NEUTRAL, like every system-authored label in HQ (§4,
+  10-hq.md §10e). "Shared by" says what the link means without assuming HQ
+  knows anybody's gender — the people prototype shipped "From him" and would
+  have needed a pronoun column to keep that promise.
+
+  A RELATIONSHIP, NOT A FIELD, so a tick applies IMMEDIATELY — the same
+  contract as ConstellationPicker and for the same reason: attributing a quote
+  must not be able to ride along with a save that could lose a rewrite. The one
+  exception is a fragment that does not exist yet, whose ticks are queued and
+  flushed the moment the first save mints an id.
+*/
+import { Icon } from 'astro-icon/components';
+import { hueFor, monogram } from '../../lib/hq/people';
+
+interface Props {
+  /** Namespaces the ids so the quote form and the song form can each hold one. */
+  scope: string;
+  people: { id: string; display_name: string }[];
+}
+const { scope, people } = Astro.props;
+const FILTER_THRESHOLD = 8; // below this, a filter field is just another control
+---
+
+{
+  /* No roster, no field. A "Shared by" control over nobody is furniture, and
+     it would be the only thing in the fragment editor asking you to go and
+     create data somewhere else first. */
+  people.length > 0 && (
+    <details class="sby" data-sby={scope}>
+      <summary>
+        <Icon name="ph:user-circle" class="opacity-55" />
+        <span>Shared by</span>
+        <span class="sby__who" data-sby-who>
+          nobody
+        </span>
+      </summary>
+
+      {people.length > FILTER_THRESHOLD && (
+        <input
+          type="search"
+          class="sby-filter input input-xs input-bordered mt-2 w-full font-sans"
+          placeholder="Find someone…"
+          aria-label="Filter people"
+        />
+      )}
+
+      <div class="sby__list">
+        {people.map((p) => (
+          <label class="sby__row" data-search={p.display_name.toLowerCase()}>
+            {/* ⚠ The name is carried on the INPUT, not read off the row. The
+                row's `textContent` also contains the monogram, so the summary
+                line rendered "MMarisol Quint" — visible only once a real name
+                was on screen, and caught by the spec rather than by review. */}
+            <input type="checkbox" class="sby-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
+            <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+              {monogram(p.display_name)}
+            </span>
+            <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
+          </label>
+        ))}
+      </div>
+
+      <p class="sby-status admin-hint mt-1 text-xs" role="status" />
+    </details>
+  )
+}

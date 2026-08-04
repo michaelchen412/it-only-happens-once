@@ -1,0 +1,39 @@
+---
+/*
+  DispositionChips — both honest answers to something past its date (§10f).
+
+  ⚠ TWO CHIPS, NOT A TICK. On a past-due row the CHOICE is the interaction:
+  there are two honest things to say to something that has gone by, and a circle
+  beside a "Did it" chip would be two paths to one outcome while saying nothing
+  about the other one. A skip is a recorded answer, never inferred from silence
+  (ADR-0013) — which is the whole reason "Skipping it" is a button at all.
+
+  ⚠ AND ANSWERED, THE TWO BECOME ONE. There is now a single question — "did you
+  mean that?" — so there is a single control. Both states are rendered and
+  `hidden` toggles between them, because `task-list.ts` flips them in place
+  without a reload; building the replacement in JS would lose the styling that
+  Astro's scoped selectors only stamp onto template markup (10-hq.md §10h,
+  trap 3).
+
+  Extracted 2026-08-04 from PastDueZone and the tasks room, which had it twice.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  /** Today's answer, if there is one. */
+  answered: 'done' | 'skipped' | null;
+}
+const { answered } = Astro.props;
+---
+
+<span class="flex shrink-0 gap-1" data-unanswered hidden={!!answered}>
+  <button type="button" class="chip chip--act chip--did" data-dispose="done">
+    <Icon name="ph:check" /> Did it
+  </button>
+  <button type="button" class="chip chip--act chip--skip" data-dispose="skipped">
+    <Icon name="ph:skip-forward" /> Skipping it
+  </button>
+</span>
+<span class="flex shrink-0" data-answered hidden={!answered}>
+  <button type="button" class="chip chip--act" data-undo>Undo</button>
+</span>

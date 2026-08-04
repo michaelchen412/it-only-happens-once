@@ -50,13 +50,19 @@ import BackToTop from './BackToTop.astro';
   // about to hide and pad the page by exactly that width. (scrollbar-gutter was
   // unreliable across browsers, so we compensate explicitly.)
   function lockScroll() {
-    if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = 0; } // reopened mid-close
+    if (unlockTimer) {
+      clearTimeout(unlockTimer);
+      unlockTimer = 0;
+    } // reopened mid-close
     const sbw = window.innerWidth - document.documentElement.clientWidth;
     document.documentElement.style.setProperty('--reader-sbw', `${sbw}px`);
     document.documentElement.classList.add('reader-open');
   }
   function unlockScroll() {
-    if (unlockTimer) { clearTimeout(unlockTimer); unlockTimer = 0; }
+    if (unlockTimer) {
+      clearTimeout(unlockTimer);
+      unlockTimer = 0;
+    }
     document.documentElement.classList.remove('reader-open');
     document.documentElement.style.removeProperty('--reader-sbw');
   }
@@ -65,7 +71,7 @@ import BackToTop from './BackToTop.astro';
     const d = reader();
     if (!d) return false;
     const tpl = document.querySelector(
-      `template[data-reader-content="${CSS.escape(slug)}"]`
+      `template[data-reader-content="${CSS.escape(slug)}"]`,
     ) as HTMLTemplateElement | null;
     const inner = d.querySelector('.reader-inner');
     if (!tpl || !inner) return false; // content isn't on this page
@@ -143,7 +149,7 @@ import BackToTop from './BackToTop.astro';
       const d = reader();
       if (d && d.open && target === d) dismiss(); // click on the backdrop
     },
-    true
+    true,
   );
 
   // Escape on a modal <dialog> is governed by the `cancel` event — a keydown
