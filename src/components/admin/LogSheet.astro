@@ -1,0 +1,139 @@
+---
+/*
+  LogSheet — turn a brain dump into a log entry (14 · Piece 2, plan §5).
+
+  ⚠ WHY THIS EXISTS BESIDE TimelineZone'S LOG BOX, WHICH DOES THE SAME JOB.
+  The difference is one field, and it is not a cosmetic one: **a profile already
+  knows who the entry is about, and the pile does not.** On `/admin/people/x`
+  the person is the page; the box's picker only adds *other* participants. From
+  a dump there is no subject at all until you name one, so the first thing this
+  asks is *who* — and that changes the control from optional to required, and
+  from "with" to "about".
+
+  Extracting a shared component was the alternative and was declined: it would
+  have meant one component carrying two different person models, in service of
+  a surface (12 · Piece 2) that ships with 27 specs and 40 live checks against
+  it. What IS shared is everything that matters — the same action
+  (`interactions.save`), the same six kinds, the same date register, and the
+  same `.lchip` / `.pop` primitives in app.css. If a third caller ever appears,
+  extract then, with two known-good implementations to extract from.
+
+  A <dialog>, like every other editor in HQ, and the pickers inside it are
+  top-layer popovers — trap 7 again. Both are native, so both render above the
+  dialog rather than being clipped by it.
+*/
+import { Icon } from 'astro-icon/components';
+import { KINDS, QUICK_DAYS } from '../../lib/hq/interactions';
+import { hueFor, monogram, type Person } from '../../lib/hq/people';
+import type { Ymd } from '../../lib/hq/time';
+
+interface Props {
+  /**
+   * The roster. **An empty one means this component should not be rendered at
+   * all** — the caller decides, because a picker with nothing in it is a
+   * control that asks a question with no answers (10-hq §10b, and the same rule
+   * TaskSheet applies to its goal field).
+   */
+  roster: Pick<Person, 'id' | 'display_name' | 'photo_path'>[];
+  /** Today in the configured home zone — the date picker measures from it. */
+  today: Ymd;
+}
+const { roster, today } = Astro.props;
+---
+
+<dialog id="log-sheet" class="modal-dialog w-full max-w-lg" aria-labelledby="log-sheet-title">
+  <div class="flex flex-col font-sans" data-log-sheet data-today={today}>
+    <header class="flex shrink-0 items-center justify-between gap-4 border-b border-base-300 px-5 py-3.5">
+      <h2 id="log-sheet-title" class="font-display text-lg">Log an entry</h2>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+    </header>
+
+    <div class="p-5">
+      <div class="logbox cn-azure">
+        {/* Prefilled with the dump, and editable — what you jotted at 11pm is
+            usually the entry, but not always the words you want kept. */}
+        <textarea rows="3" data-log-body aria-label="What happened?" placeholder="What happened?"></textarea>
+
+        <div class="logbox__foot">
+          <div class="logbox__meta">
+            {/* ⚠ WHO COMES FIRST, and it is the only required field here. The
+                kind and the date both have honest defaults; there is no
+                defensible default for whose life this was. */}
+            <button type="button" class="lchip" popovertarget="ls-who" data-who-open>
+              <Icon name="ph:users-three" />
+              <span data-who-label>Who?</span>
+              <Icon name="ph:caret-down" class="lchip__caret" />
+            </button>
+
+            <button type="button" class="lchip" popovertarget="ls-kind" data-kind-open>
+              <span class="lchip__i" data-kind-icon><Icon name="ph:users-three" /></span>
+              <span data-kind-label>Hangout</span>
+              <Icon name="ph:caret-down" class="lchip__caret" />
+            </button>
+
+            <button type="button" class="lchip" popovertarget="ls-date" data-date-open>
+              <Icon name="ph:calendar-blank" />
+              <span data-date-label>Today</span>
+            </button>
+          </div>
+
+          <div class="logbox__acts">
+            <button type="button" class="btn btn-ghost btn-xs font-sans" data-close>Cancel</button>
+            {/* Disabled until somebody is named — the affordance says the field
+                is required, so no sentence has to (10-hq §10i). */}
+            <button type="button" class="btn btn-xs font-sans zone__cta cn-azure" data-log-save disabled>Save</button>
+          </div>
+        </div>
+      </div>
+
+      <p data-log-error hidden role="alert" class="admin-alert mt-3"></p>
+    </div>
+
+    {/* ── the pickers, all top-layer ──────────────────────────────────────── */}
+    <div class="pop pop--wide" popover id="ls-who" data-pop="who">
+      {
+        roster.map((p) => (
+          <button type="button" class="pop__row" data-who={p.id} data-name={p.display_name}>
+            <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+              {monogram(p.display_name)}
+            </span>
+            {p.display_name}
+            <Icon name="ph:check" class="pop__tick" />
+          </button>
+        ))
+      }
+    </div>
+
+    <div class="pop" popover id="ls-kind" data-pop="kind">
+      {
+        KINDS.map((k, i) => (
+          <button type="button" class:list={['pop__row', i === 0 && 'is-on']} data-kind={k.key}>
+            <Icon name={k.icon} />
+            {k.label}
+          </button>
+        ))
+      }
+    </div>
+
+    {/* Three taps for the common cases, then a real date input for anything
+        older. NO TIME FIELD: `occurred_on` is a local date, and the log box
+        settled that argument once already. */}
+    <div class="pop" popover id="ls-date" data-pop="date">
+      {
+        QUICK_DAYS.map((d, i) => (
+          <button type="button" class:list={['pop__row', i === 0 && 'is-on']} data-day={d.back}>
+            {d.label}
+          </button>
+        ))
+      }
+      <label class="pop__date">
+        <span>Another day</span>
+        <input type="date" max={today} data-date-input />
+      </label>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import '../../scripts/log-sheet';
+</script>

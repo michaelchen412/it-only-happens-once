@@ -15,6 +15,7 @@
 // time the phone locked.
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
+import { anchorPopover } from './pop-anchor';
 
 const zone = document.querySelector<HTMLElement>('[data-timeline]');
 
@@ -72,42 +73,14 @@ if (zone) {
   // ── the pickers ──────────────────────────────────────────────────────────
   // Opening, closing, Escape, light-dismiss and one-at-a-time all belong to the
   // browser (`popovertarget` + `popover="auto"`). All that is left is putting
-  // it in the right place, because the top layer has no idea what it is
-  // anchored to. See trap 7 in app.css for why it has to be the top layer.
+  // it in the right place, and that arithmetic — plus the measure-after-open
+  // trap it exists to avoid — moved to `pop-anchor.ts` on 2026-08-03, when the
+  // notes room's triage chooser needed exactly the same thing.
   const pops = $$<HTMLElement>('[data-pop]');
   const closePops = () => pops.forEach((p) => p.matches(':popover-open') && p.hidePopover());
 
-  const GAP = 6;
   for (const pop of pops) {
-    // ⚠ TWO EVENTS, AND IT HAS TO BE TWO. `beforetoggle` fires while the
-    // popover is still `display: none`, so measuring it there returns 0×0 —
-    // and a clamp computed against a width of zero does nothing at all. That is
-    // not a theoretical worry: it put the people picker 23px off the right edge
-    // at 390px, and the version of this code in the lab passed its own mobile
-    // spec by luck, because that trigger happened to sit further left.
-    //
-    // So: hide it before it opens, measure and place it once it HAS opened,
-    // then reveal. `visibility` rather than `hidden`, because the element must
-    // still take part in layout to have a size worth measuring.
-    pop.addEventListener('beforetoggle', (e) => {
-      if ((e as ToggleEvent).newState === 'open') pop.style.visibility = 'hidden';
-    });
-
-    pop.addEventListener('toggle', (e) => {
-      if ((e as ToggleEvent).newState !== 'open') return;
-      const trigger = zone.querySelector<HTMLElement>(`[popovertarget="${pop.id}"]`);
-      if (!trigger) return;
-      const t = trigger.getBoundingClientRect();
-      const { width, height } = pop.getBoundingClientRect();
-
-      // Below by default; above only when below genuinely does not fit.
-      const below = t.bottom + GAP;
-      const fits = below + height <= window.innerHeight - GAP;
-      pop.style.top = `${fits ? below : Math.max(GAP, t.top - GAP - height)}px`;
-      // Clamped horizontally, or the people picker runs off the edge at 390px.
-      pop.style.left = `${Math.min(Math.max(GAP, t.left), Math.max(GAP, window.innerWidth - width - GAP))}px`;
-      pop.style.visibility = '';
-    });
+    anchorPopover(pop, () => zone.querySelector<HTMLElement>(`[popovertarget="${pop.id}"]`));
   }
 
   // kind

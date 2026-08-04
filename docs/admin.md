@@ -28,7 +28,8 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
 | **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one plain textarea that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
-| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. A pencil edits in place; **Make it a piece** flips it to a draft; **Add to a piece…** appends it to an existing writing fragment and consumes it; delete is soft, with an undo strip. Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil edits in place, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. A collapsed **Shared by** field says which person put these words in front of you (§12) — applied immediately, like constellation membership. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
@@ -194,14 +195,32 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   into a textarea in place — reading is the dominant motion there, so a tap
   while scrolling must not put a cursor (and on a phone, a keyboard) into a
   thought you were only passing.
-- **Two ways out, one click each.** **Make it a piece** flips the row to
-  `draft`: same id, same text, same history, no copy. **Add to a piece…** picks
-  an existing writing fragment and appends the dump to the end of its body as
-  Markdown, then consumes the dump — a pile that keeps showing you a thought you
-  have already filed is a pile you stop trusting. That second motion is the only
-  place a body is genuinely copied, which is why it offers a link to where the
-  words went rather than an Undo: reversing it means editing the target back
-  out, and the writing sheet may have saved over it by then.
+- **Four ways out, behind one → chooser.** Reading (a pencil) and discarding (a
+  bin) are direct; the four destinations sit behind one control, because they
+  are not four questions — they are one question, *what kind of thing is this?*,
+  asked once. The menu is a top-layer popover (trap 7) positioned against the
+  card that opened it.
+  - **Make a task** opens the real task sheet with the dump's **first line as
+    the title and the rest as the notes** — a five-line thought in a task title
+    would make the agenda unreadable. You set the date, effort and lead in the
+    same motion; saving creates the task and consumes the dump.
+  - **Log an entry…** opens a sheet that asks **who** first — the one field a
+    profile's log box never needs, because there the person *is* the page. Kind
+    and date have honest defaults; there is no defensible default for whose life
+    this was, so Save stays disabled until somebody is named. **The row is
+    absent entirely when the roster is empty.**
+  - **Make it a piece** flips the row to `draft`: same id, same text, same
+    history, no copy.
+  - **Add to a piece…** picks an existing writing fragment and appends the dump
+    to the end of its body as Markdown, then consumes the dump — a pile that
+    keeps showing you a thought you have already filed is a pile you stop
+    trusting.
+- **What can be undone, and the rule behind it.** A task or an entry is a whole
+  row, so undo deletes it and restores the dump. **An append cannot be undone**,
+  and that is the one exception: reversing it means editing the target's body
+  back out, and the writing sheet may have saved over it by then — an undo that
+  sometimes silently does nothing is worse than none. It offers the way to where
+  the words went instead.
 - **Deleted dumps do not go to the corpus trash.** `?view=trash` excludes them,
   as the working list always has, so scratch cannot reappear beside finished
   work at either end. The pile's own undo strip is the way back; after that the

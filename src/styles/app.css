@@ -1679,6 +1679,24 @@ html.reader-open .sky-return {
 .zone__cta:hover {
   filter: brightness(1.08);
 }
+/* ⚠ A DISABLED CTA HAS TO LOOK DISABLED, and this rule exists because it did
+   not. `background: var(--cn)` above wins over daisyUI's own disabled styling,
+   so LogSheet's Save — which is inert until you name who the entry is about —
+   rendered at full saturation and read as pressable. An inert control that
+   looks live is worse than no control: you press it, nothing happens, and
+   nothing tells you why.
+
+   Found in a screenshot, not by a spec: `toBeDisabled()` passed the whole time,
+   because the button genuinely WAS disabled. Only looking at it showed that
+   nobody could tell. (14 · Piece 2; the general lesson is the board's — after
+   building a surface, look at it.) */
+.zone__cta:disabled,
+.zone__cta:disabled:hover {
+  background: color-mix(in oklch, var(--cn) 28%, transparent);
+  color: color-mix(in oklch, var(--color-base-100) 75%, transparent);
+  filter: none;
+  cursor: not-allowed;
+}
 .zone__body { padding: 0.875rem; }
 .zone__list { padding: 0.25rem 0.875rem; }
 .zone__empty {

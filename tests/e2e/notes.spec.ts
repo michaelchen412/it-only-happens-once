@@ -189,21 +189,26 @@ test.describe('the pile', () => {
     // THE POINT OF THE ROOM. Every card carries its own text, and none of the
     // furniture that made a jotting read as a document is here.
     await expect(cards.first().locator('[data-text]')).not.toBeEmpty();
-    // ⚠ SCOPED TO `main`, not the page. Playwright's selectors pierce open
-    // shadow roots, so an unscoped `input[type=checkbox]` matches two controls
-    // inside Astro's dev toolbar — an element that does not exist in a build.
-    // The assertion looked like a defect in the room and was an artifact of the
-    // harness.
-    await expect(page.locator('main table')).toHaveCount(0);
-    await expect(page.locator('main input[type="checkbox"]')).toHaveCount(0);
-    expect(await page.locator('main').innerText()).not.toContain('untitled');
+    // ⚠ SCOPED TO THE PILE, and it took two goes to get the scope right.
+    // Unscoped, `input[type=checkbox]` matched two controls inside Astro's dev
+    // toolbar, because Playwright's selectors pierce open shadow roots and
+    // `document.querySelectorAll` does not. Scoped to `main`, it then matched
+    // the task sheet's lead-override checkbox once Piece 2 mounted that sheet
+    // in this room. Both looked exactly like a defect in the pile; neither was.
+    // The claim being made is about the PILE, so that is what it asks about.
+    await expect(page.locator('#notes-pile table')).toHaveCount(0);
+    await expect(page.locator('#notes-pile input[type="checkbox"]')).toHaveCount(0);
+    expect(await page.locator('#notes-pile').innerText()).not.toContain('untitled');
   });
 
-  test('the four motions are on every card, at the tap floor', async ({ page }) => {
+  test('three controls on every card, at the tap floor — not six', async ({ page }) => {
     const card = page.locator('.dump').first();
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
 
-    for (const sel of ['[data-edit]', '[data-promote]', '[data-append]', '[data-delete]']) {
+    // Piece 2 added two destinations and did NOT add two icons: the four ways
+    // out are one question, asked once, behind →.
+    await expect(card.locator('.dump__act')).toHaveCount(3);
+    for (const sel of ['[data-edit]', '[data-file]', '[data-delete]']) {
       const btn = card.locator(sel);
       await expect(btn).toBeVisible(); // never hover-only: a phone has no hover
       const box = await btn.boundingBox();
@@ -263,7 +268,8 @@ test.describe('triage — the two ways out of the pile', () => {
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
     const id = await card.getAttribute('data-note');
 
-    await card.locator('[data-promote]').click();
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="piece"]').click();
 
     // ONE ROW, ONE FLIP — no insert, no copy, no second id. This is the whole
     // argument for keeping dumps in the `note` tier rather than a table of
@@ -321,7 +327,8 @@ test.describe('triage — the two ways out of the pile', () => {
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
     const id = await card.getAttribute('data-note');
 
-    await card.locator('[data-append]').click();
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="append"]').click();
     const picker = page.locator('#note-file');
     await expect(picker).toBeVisible();
 
@@ -347,5 +354,235 @@ test.describe('triage — the two ways out of the pile', () => {
     await expect(undo).toContainText('Added to A piece');
     await expect(undo.locator('[data-undo-do]')).toBeHidden();
     await expect(undo.locator('a')).toHaveAttribute('href', `/admin/fragments#edit=${targetId}`);
+  });
+});
+
+test.describe('the chooser — four destinations, one question', () => {
+  test('the log row exists only when there is somebody to log about', async ({ page }) => {
+    // ⚠ THE PROPERTY, NOT THE CURRENT STATE. The roster is empty today, so a
+    // bare `toHaveCount(0)` would pass for ever and prove nothing the day
+    // Michael adds a person. So it reads the roster and asserts the two agree
+    // — 10-hq §10b: a domain that does not exist yet renders nothing at all.
+    await page.goto('/admin/people');
+    const people = await page.locator('[data-person]').count();
+
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    await page.locator('.dump').first().locator('[data-file]').click();
+
+    const logRow = page.locator('#dump-file [data-as="log"]');
+    await expect(logRow).toHaveCount(people > 0 ? 1 : 0);
+    // The other three never depend on anything existing first.
+    for (const as of ['task', 'piece', 'append']) {
+      await expect(page.locator(`#dump-file [data-as="${as}"]`)).toHaveCount(1);
+    }
+  });
+
+  test('opens in the top layer, under the card that asked for it', async ({ page }) => {
+    // Trap 7: a menu anchored inside a card would be clipped or covered, and
+    // inert in a way typecheck, build and a screenshot all pass. This asserts
+    // the two things that would break — that it is actually open, and that it
+    // is positioned against ITS OWN card rather than the first one.
+    await page.goto('/admin/notes');
+    const cards = page.locator('.dump');
+    test.skip((await cards.count()) < 2, 'needs two dumps to tell the anchors apart');
+
+    const second = cards.nth(1);
+    await second.locator('[data-file]').click();
+    const menu = page.locator('#dump-file');
+    await expect(menu).toBeVisible();
+
+    const trigger = await second.locator('[data-file]').boundingBox();
+    const box = await menu.boundingBox();
+    expect(box!.y).toBeGreaterThan(trigger!.y); // below its own trigger…
+    expect(Math.abs(box!.x - trigger!.x)).toBeLessThan(200); // …and beside it
+  });
+
+  test('Escape closes it without filing anything', async ({ page }) => {
+    const seen = await stubActions(page, {});
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    await page.locator('.dump').first().locator('[data-file]').click();
+    await expect(page.locator('#dump-file')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#dump-file')).toBeHidden();
+    expect(seen()).toEqual([]);
+  });
+});
+
+test.describe('note → task', () => {
+  test('opens the real task sheet, with the dump already in it', async ({ page }) => {
+    await stubActions(page, {});
+    await page.goto('/admin/notes');
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    const text = (await card.locator('[data-text]').innerText()).trim();
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="task"]').click();
+
+    const sheet = page.locator('#task-sheet');
+    await expect(sheet).toBeVisible();
+    // THE REAL SHEET, not a smaller copy: the controls that make a task worth
+    // making are all here, which is why this is a sheet and not a one-tap
+    // create.
+    await expect(sheet.locator('[data-due]')).toBeVisible();
+    await expect(sheet.locator('[data-effort]').first()).toBeVisible();
+    // The first line becomes the title — a five-line thought in a title would
+    // make the agenda unreadable.
+    await expect(sheet.locator('input[name="title"]')).toHaveValue(text.split('\n')[0].trim());
+  });
+
+  test('saving files the dump: one task, the note consumed, and a way back', async ({ page }) => {
+    const calls: Array<{ name: string; body: string }> = [];
+    await stubActions(page, {
+      'tasks.save': (req) => {
+        calls.push({ name: 'tasks.save', body: req.postData() ?? '' });
+        return { id: '00000000-0000-4000-8000-00000000beef' };
+      },
+      'fragments.bulk': (req) => {
+        calls.push({ name: 'fragments.bulk', body: req.postData() ?? '' });
+        return { ok: true, count: 1 };
+      },
+      'tasks.remove': (req) => {
+        calls.push({ name: 'tasks.remove', body: req.postData() ?? '' });
+        return { ok: true };
+      },
+    });
+
+    await page.goto('/admin/notes');
+    await hideDevToolbar(page);
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    const id = await card.getAttribute('data-note');
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="task"]').click();
+    await page.locator('#task-sheet [data-submit]').click();
+
+    // ⚠ THE ORDER IS THE ASSERTION. The task is written FIRST and the note is
+    // consumed second — the other way round loses the thought whenever the
+    // second call fails.
+    await expect.poll(() => calls.map((c) => c.name)).toEqual(['tasks.save', 'fragments.bulk']);
+    expect(field(calls[1].body, 'op')).toBe('trash');
+    expect(field(calls[1].body, 'ids')).toBe(id);
+
+    // And unlike an append, this one CAN be taken back — a task is a whole row.
+    const undo = page.locator('#notes-undo');
+    await expect(undo).toContainText('Filed as a task');
+    await expect(undo.locator('a[href="/admin/agenda/tasks"]')).toBeVisible();
+    await undo.locator('[data-undo-do]').click();
+    await expect.poll(() => calls.map((c) => c.name)).toEqual([
+      'tasks.save',
+      'fragments.bulk',
+      'tasks.remove',
+      'fragments.bulk',
+    ]);
+    expect(field(calls[3].body, 'op')).toBe('restore');
+  });
+
+  test('⚠ abandoning the sheet leaves the dump alone', async ({ page }) => {
+    // The failure this guards is a thought deleted by a save that had nothing
+    // to do with it: close on a note, save an unrelated task later, and a
+    // careless implementation consumes the note it was opened for.
+    const seen = await stubActions(page, {});
+    await page.goto('/admin/notes');
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="task"]').click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#task-sheet')).toBeHidden();
+    await expect(card).toBeVisible();
+    await expect(card).not.toHaveClass(/dump--going/);
+    expect(seen()).toEqual([]);
+  });
+});
+
+test.describe('note → log entry', () => {
+  // ⚠ THESE SKIP ON AN EMPTY ROSTER, which is the normal state of this project
+  // today — so read a green run here as "not contradicted", not as "covered".
+  // What actually exercised this path was a live pass: a seeded person, the
+  // real `interactions.save`, a real row with the picked kind and date, and the
+  // undo deleting it again. That is recorded in the plans.
+  const needsRoster = async (page: Page) => {
+    await page.goto('/admin/people');
+    const people = await page.locator('[data-person]').count();
+    test.skip(people === 0, 'no roster — logging is not offered, by design');
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+  };
+
+  test('opens prefilled, and refuses to save until somebody is named — visibly', async ({ page }) => {
+    await stubActions(page, {});
+    await needsRoster(page);
+    const card = page.locator('.dump').first();
+    const text = await card.locator('[data-edit-box]').inputValue();
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="log"]').click();
+
+    const sheet = page.locator('#log-sheet');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('[data-log-body]')).toHaveValue(text);
+
+    const save = sheet.locator('[data-log-save]');
+    await expect(save).toBeDisabled();
+    // ⚠ AND IT HAS TO LOOK IT. `toBeDisabled()` passed for the whole of this
+    // piece's development while the button rendered at full saturation and read
+    // as pressable — `.zone__cta` was overriding daisyUI's disabled styling. A
+    // screenshot caught it; this is what keeps it caught.
+    const off = await save.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await sheet.locator('[data-who-open]').click();
+    await page.locator('#ls-who [data-who]').first().click();
+    await expect(save).toBeEnabled();
+    const on = await save.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(off).not.toBe(on);
+  });
+
+  test('files the entry, consumes the dump, and takes both back', async ({ page }) => {
+    const calls: Array<{ name: string; body: string }> = [];
+    await stubActions(page, {
+      'interactions.save': (req) => {
+        calls.push({ name: 'interactions.save', body: req.postData() ?? '' });
+        return { id: '00000000-0000-4000-8000-0000000000aa' };
+      },
+      'fragments.bulk': (req) => {
+        calls.push({ name: 'fragments.bulk', body: req.postData() ?? '' });
+        return { ok: true, count: 1 };
+      },
+      'interactions.remove': (req) => {
+        calls.push({ name: 'interactions.remove', body: req.postData() ?? '' });
+        return { ok: true };
+      },
+    });
+    await needsRoster(page);
+    await hideDevToolbar(page);
+    const card = page.locator('.dump').first();
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="log"]').click();
+    await page.locator('#log-sheet [data-who-open]').click();
+    await page.locator('#ls-who [data-who]').first().click();
+    await page.locator('#log-sheet [data-log-save]').click();
+
+    // The entry is written FIRST; the dump is consumed only once it exists.
+    await expect.poll(() => calls.map((c) => c.name)).toEqual(['interactions.save', 'fragments.bulk']);
+    expect(field(calls[1].body, 'op')).toBe('trash');
+
+    const undo = page.locator('#notes-undo');
+    await expect(undo).toContainText('Filed as a log entry');
+    // No "Open →": an entry lives on a profile, and which profile depends on
+    // who you picked — so the strip says nothing rather than guessing.
+    await expect(undo.locator('a')).toHaveCount(0);
+    await undo.locator('[data-undo-do]').click();
+    await expect.poll(() => calls.map((c) => c.name)).toEqual([
+      'interactions.save',
+      'fragments.bulk',
+      'interactions.remove',
+      'fragments.bulk',
+    ]);
   });
 });

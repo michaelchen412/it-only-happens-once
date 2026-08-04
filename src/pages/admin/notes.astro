@@ -31,8 +31,11 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import LogSheet from '../../components/admin/LogSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
+import TaskSheet from '../../components/admin/TaskSheet.astro';
 import { elapsedSince } from '../../lib/hq/dates';
+import { homeTimezone, localToday } from '../../lib/hq/time';
 
 const supabase = Astro.locals.supabase;
 
@@ -86,6 +89,33 @@ const pieces = (pieceRows ?? []).map((p) => ({
   title: p.title?.trim() || '(untitled)',
   status: p.status,
 }));
+
+/*
+  TRIAGE'S TWO HQ-WARD DESTINATIONS (14 · Piece 2). Both sheets are the real
+  ones, opened prefilled — 10-hq §11's whole reason for saying triage needed no
+  lab of its own was that it "rides sheets that already exist".
+
+  ⚠ THE ROSTER DECIDES WHETHER LOGGING IS OFFERED AT ALL. An entry needs a
+  person; with nobody on the roster the control would open a picker with
+  nothing in it. So an empty roster renders no row and no sheet, rather than a
+  disabled one beside a sentence explaining why (10-hq §10b, §10i).
+
+  Active goals only, for the same reason the tasks room gives: filing a task
+  under something you paused is how a goal quietly becomes a folder again.
+*/
+const tz = await homeTimezone(supabase);
+const todayYmd = localToday(tz);
+
+const [{ data: goalData }, { data: rosterData }] = await Promise.all([
+  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
+  supabase
+    .from('people')
+    .select('id, display_name, photo_path')
+    .is('archived_at', null)
+    .order('display_name'),
+]);
+const goals = goalData ?? [];
+const roster = rosterData ?? [];
 ---
 
 <AdminLayout title="Notes" active="notes">
@@ -119,19 +149,20 @@ const pieces = (pieceRows ?? []).map((p) => ({
                   scrolling past. */}
               <textarea class="dump__edit" hidden aria-label="Edit this note" data-edit-box>{n.body}</textarea>
 
+              {/* THREE CONTROLS, NOT SIX (14 · Piece 2). Piece 1 shipped four —
+                  edit, two ways out, delete — and Piece 2 adds two more ways
+                  out. Six grey glyphs under a card that might hold three words
+                  is the "many elements competing for attention" smell, and the
+                  four destinations are not four questions anyway: they are one
+                  question, asked once. So reading (✎) and discarding (🗑) stay
+                  direct, and → opens the chooser. */}
               <div class="dump__foot">
                 <time class="dump__stamp" datetime={n.updatedAt} data-ago>{n.ago}</time>
                 <button type="button" class="dump__act" data-edit title="Edit" aria-label="Edit">
                   <Icon name="ph:pencil-simple" />
                 </button>
-                {/* The two ways out of the pile, and the only two this piece
-                    ships. Task and log-entry triage is 14 · Piece 2 — it needs
-                    a sheet each, and neither belongs on a card this quiet. */}
-                <button type="button" class="dump__act" data-promote title="Make it a piece" aria-label="Make it a piece">
-                  <Icon name="ph:pen-nib" />
-                </button>
-                <button type="button" class="dump__act" data-append title="Add to a piece…" aria-label="Add to a piece">
-                  <Icon name="ph:article" />
+                <button type="button" class="dump__act" data-file title="Turn it into…" aria-label="Turn it into">
+                  <Icon name="ph:arrow-right" />
                 </button>
                 <button type="button" class="dump__act dump__act--danger" data-delete title="Delete" aria-label="Delete">
                   <Icon name="ph:trash" />
@@ -142,6 +173,38 @@ const pieces = (pieceRows ?? []).map((p) => ({
         </ul>
       )
     }
+  </div>
+
+  {/* The chooser — ONE menu for the whole pile, positioned against whichever
+      card's → opened it (scripts/pop-anchor.ts).
+
+      ⚠ A TOP-LAYER POPOVER, and it has to be: trap 7. A menu anchored inside a
+      card would be clipped or covered, and it would be inert in a way typecheck,
+      build and a screenshot all pass. `popover="auto"` also hands Escape,
+      light-dismiss and one-open-at-a-time to the browser.
+
+      THE ORDER IS FREQUENCY, NOT SYMMETRY. A dump is far more often an errand
+      than an essay seed, so the task is first — the same rule the interaction
+      kinds follow (`KINDS` in lib/hq/interactions.ts). */}
+  <div class="pop pop--wide" popover id="dump-file" data-pop="file">
+    <button type="button" class="pop__row" data-as="task">
+      <Icon name="ph:check-circle" /> Make a task
+    </button>
+    {/* ⚠ ABSENT ENTIRELY WHEN THERE IS NOBODY TO LOG ABOUT (10-hq §10b, and the
+        rule TaskSheet applies to its goal picker). An entry needs a person, so
+        with an empty roster this row could only ever open a picker with nothing
+        in it — a control that asks a question with no answers. */}
+    {roster.length > 0 && (
+      <button type="button" class="pop__row" data-as="log">
+        <Icon name="ph:note-pencil" /> Log an entry…
+      </button>
+    )}
+    <button type="button" class="pop__row" data-as="piece">
+      <Icon name="ph:pen-nib" /> Make a piece
+    </button>
+    <button type="button" class="pop__row" data-as="append">
+      <Icon name="ph:article" /> Add to a piece…
+    </button>
   </div>
 
   {/* ONE PICKER, MANY CARDS — the TaskSheet rule. The room lists dozens of
@@ -186,6 +249,12 @@ const pieces = (pieceRows ?? []).map((p) => ({
       <p id="note-file-none" class="px-5 pb-4 text-sm text-base-content/55" hidden>Nothing matches.</p>
     </div>
   </dialog>
+
+  {/* The real sheets, opened prefilled — not smaller copies of them. A task
+      made from a dump gets the same date, effort, lead and recurrence controls
+      as one typed in the Agenda room, because it is the same form. */}
+  <TaskSheet today={todayYmd} goals={goals} />
+  {roster.length > 0 && <LogSheet roster={roster} today={todayYmd} />}
 
   {/* The way back from a one-tap action. Lives outside the list so a card
       leaving the pile cannot take its own undo with it. */}

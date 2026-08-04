@@ -63,6 +63,12 @@ if (sheet && form) {
   }
 
   let editing: string | null = null;
+  /**
+   * The brain dump this task is being made out of, when the sheet was opened
+   * from the notes room (14 · Piece 2). Null everywhere else, which is what
+   * keeps the agenda room's behaviour — save, then reload — exactly as it was.
+   */
+  let filingNote: string | null = null;
 
   const showError = (message: string | null) => {
     if (!errorEl) return;
@@ -216,6 +222,31 @@ if (sheet && form) {
       if (preset && goalSel) goalSel.value = preset;
     }),
   );
+
+  /**
+   * Opened from the notes room with a brain dump in hand (14 · Piece 2).
+   *
+   * The whole sheet rather than a one-tap create, because a dump that says
+   * *"call the dentist Friday"* wants Friday set in the same motion — and this
+   * is the form where a date, an effort and a lead already live. Until
+   * [14 · Piece 3] exists to read the sentence, you type them; after it, this
+   * is the form it fills in.
+   *
+   * **The dump's FIRST LINE becomes the title and the rest becomes the notes.**
+   * A task title is a row you scan on a Tuesday morning; a five-line thought
+   * pasted into it would make the agenda unreadable, and dropping the rest
+   * would lose what you actually wrote.
+   */
+  document.addEventListener('hq:task-open', (e) => {
+    const detail = (e as CustomEvent<{ noteId: string; text: string }>).detail;
+    open();
+    const [first, ...rest] = detail.text.split('\n');
+    titleInput.value = first.trim().slice(0, 200);
+    notesInput.value = rest.join('\n').trim();
+    filingNote = detail.noteId;
+    heading.textContent = 'Make a task';
+    titleInput.select(); // the likeliest thing to fix is the title it guessed
+  });
   // Delegated: the rows are re-rendered by a reload, and a listener per row
   // would need re-binding every time.
   document.addEventListener('click', (e) => {
@@ -226,6 +257,13 @@ if (sheet && form) {
   });
 
   form.querySelectorAll<HTMLElement>('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
+  // ⚠ Abandoning the sheet must forget the dump it was opened for. Without
+  // this, closing on a note and later saving an unrelated task from the same
+  // page would consume a note nobody filed — a thought deleted by a save that
+  // had nothing to do with it. `close` fires for Escape and the backdrop too.
+  sheet.addEventListener('close', () => {
+    filingNote = null;
+  });
 
   // ── wiring ────────────────────────────────────────────────────────────────
   group('effort').forEach((b) => b.addEventListener('click', () => (pick('effort', b.dataset.effort!), paintLead())));
@@ -257,7 +295,7 @@ if (sheet && form) {
     submitBtn.textContent = 'Saving…';
 
     try {
-      const { error } = await actions.tasks.save({
+      const { data, error } = await actions.tasks.save({
         id: editing ?? undefined,
         title: titleInput.value.trim(),
         notes: notesInput.value.trim(),
@@ -273,10 +311,29 @@ if (sheet && form) {
         goalId: goalSel?.value ?? '',
       });
       if (error) throw new Error(error.message);
-      // Reload rather than patching: which GROUP a task belongs to, how late it
+
+      // ⚠ TWO ENDINGS, because the two rooms need opposite things.
+      //
+      // In the agenda room: reload. Which GROUP a task belongs to, how late it
       // is, and the counts beside every heading are all functions of the row
-      // that just changed. Re-deriving four of them by hand is four chances to
-      // disagree with the database.
+      // that just changed, and re-deriving four of them by hand is four chances
+      // to disagree with the database.
+      //
+      // In the notes room: DON'T. A reload there would throw away the pile's
+      // undo strip at the exact moment it has something to offer — and nothing
+      // on that page is derived from the task at all. So the sheet announces
+      // what happened and lets the pile do the tidying (scripts/notes.ts).
+      if (filingNote) {
+        const noteId = filingNote;
+        filingNote = null;
+        sheet!.close();
+        document.dispatchEvent(
+          new CustomEvent('hq:note-filed', {
+            detail: { noteId, what: 'a task', href: '/admin/agenda/tasks', undo: { kind: 'task', id: data?.id } },
+          }),
+        );
+        return;
+      }
       location.reload();
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning

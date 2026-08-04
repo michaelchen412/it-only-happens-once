@@ -4,19 +4,28 @@
 // its concurrency token and its slug; there is no JavaScript copy of the pile
 // beside the pile.
 //
-// FOUR MOTIONS, and the whole room is these four:
+// SIX MOTIONS, and the whole room is these six:
 //   · edit in place        — the words change, nothing else does
+//   · delete               — soft, with a way back
+//   …and four ways OUT, behind the → chooser (14 · Piece 2):
+//   · make a task          — the real TaskSheet, prefilled
+//   · log an entry         — a sheet that asks who first
 //   · make it a piece      — one status flip: same row, no copy (14 §3)
 //   · add to a piece       — the one genuine copy, so the dump is consumed
-//   · delete               — soft, with a way back
 //
 // ⚠ READING IS THE DOMINANT MOTION HERE, which is why the text is a `<div>` and
 // the pencil is what turns it into a `<textarea>`. The alternative — a pile of
 // live textareas, always editable — was better on paper and worse in the hand:
 // on a phone, every tap while scrolling past a thought would put a cursor in it
 // and throw the keyboard up over the pile you were trying to read.
+//
+// THE TWO SHEET-BASED DESTINATIONS ANNOUNCE RATHER THAN TIDY. `hq:note-filed`
+// arrives from task-sheet.ts and log-sheet.ts; consuming the dump, collapsing
+// the card and offering the way back all happen here — so "a dump left the
+// pile" has exactly one implementation rather than one per destination.
 import { actions } from 'astro:actions';
 import { elapsedSince } from '../lib/hq/dates';
+import { anchorPopover } from './pop-anchor';
 
 const pile = document.getElementById('notes-pile');
 const undoBar = document.getElementById('notes-undo');
@@ -43,6 +52,7 @@ if (undoBar) {
    */
   function showUndo(text: string, card: HTMLElement, undo: (() => Promise<void>) | null) {
     finish(); // any previous window closes now — one strip, one pending thing
+    undoBar!.querySelectorAll('a').forEach((a) => a.remove()); // and its way onward
     pending = { card, undo };
     card.classList.add('dump--going');
     undoText.textContent = text;
@@ -61,6 +71,20 @@ if (undoBar) {
     // The empty state is server-rendered, so an emptied pile would otherwise
     // sit here as a blank page rather than saying so.
     if (pile && !pile.querySelector('.dump')) window.location.reload();
+  }
+
+  /**
+   * A way ONWARD on the strip, beside (or instead of) the way back. Added
+   * imperatively because only some motions have somewhere to point, and it is
+   * removed on the same clock as the strip so a dead link never outlives it.
+   */
+  function addStripLink(href: string, label: string) {
+    const link = document.createElement('a');
+    link.href = href;
+    link.className = 'btn btn-xs btn-ghost font-sans';
+    link.textContent = label;
+    undoBtn.after(link);
+    window.setTimeout(() => link.remove(), UNDO_MS);
   }
 
   undoBtn.addEventListener('click', async () => {
@@ -172,6 +196,102 @@ if (undoBar) {
     if (error) throw new Error(error.message);
   }
 
+  /**
+   * Make it a piece — the one destination that writes nothing new.
+   *
+   * `note → draft` on the row you already typed: same id, same text, same
+   * history. This is the motion that decided 14 §3's storage fork, so it stays
+   * a single status flip and never grows into a copy.
+   */
+  async function promote(card: HTMLElement) {
+    const id = card.dataset.note!;
+    try {
+      await bulk(id, 'draft');
+    } catch {
+      stampOf(card).textContent = 'could not promote it';
+      return;
+    }
+    showUndo('Now a draft', card, () => bulk(id, 'note'));
+    addStripLink(`/admin/fragments#edit=${id}`, 'Open →');
+  }
+
+  /* ── the chooser ────────────────────────────────────────────────────────── */
+
+  const chooser = document.getElementById('dump-file');
+  /** Which card's → is open. The menu is one element shared by the whole pile. */
+  let choosing: HTMLElement | null = null;
+  if (chooser) anchorPopover(chooser, () => choosing?.querySelector<HTMLElement>('[data-file]'));
+
+  const textOfCard = (card: HTMLElement) => boxOf(card).value;
+
+  chooser?.addEventListener('click', (e) => {
+    const row = (e.target as Element).closest<HTMLElement>('[data-as]');
+    if (!row || !choosing) return;
+    const card = choosing;
+    chooser.hidePopover();
+
+    switch (row.dataset.as) {
+      case 'task':
+        // The sheets are opened by event rather than by calling into them: this
+        // file has no business knowing how a task form fills itself in, and the
+        // sheet has no business knowing what a pile is.
+        document.dispatchEvent(
+          new CustomEvent('hq:task-open', { detail: { noteId: card.dataset.note, text: textOfCard(card) } }),
+        );
+        break;
+      case 'log':
+        document.dispatchEvent(
+          new CustomEvent('hq:log-open', { detail: { noteId: card.dataset.note, text: textOfCard(card) } }),
+        );
+        break;
+      case 'piece':
+        void promote(card);
+        break;
+      case 'append':
+        openFiler(card);
+        break;
+    }
+  });
+
+  /**
+   * A dump filed into a sheet's destination. The sheet has already written the
+   * row; what is left is the half only the pile can do.
+   *
+   * ⚠ THE NOTE IS CONSUMED AFTER the destination exists, never before. The other
+   * order loses a thought whenever the second call fails, and the failure this
+   * order leaves behind is a dump still sitting in the pile — which you can see
+   * and delete.
+   */
+  document.addEventListener('hq:note-filed', async (e) => {
+    const { noteId, what, href, undo } = (e as CustomEvent<{
+      noteId: string;
+      what: string;
+      href: string | null;
+      undo: { kind: 'task' | 'interaction'; id?: string };
+    }>).detail;
+    const card = pile?.querySelector<HTMLElement>(`[data-note="${noteId}"]`);
+    if (!card) return;
+
+    try {
+      await bulk(noteId, 'trash');
+    } catch {
+      stampOf(card).textContent = `filed as ${what}, but still here`;
+      return;
+    }
+
+    // Undoable, unlike an append: a task or an entry is a whole row, so putting
+    // things back is deleting it and restoring the note — no words to unpick
+    // out of somebody else's paragraph.
+    showUndo(`Filed as ${what}`, card, async () => {
+      if (undo.id) {
+        if (undo.kind === 'task') await actions.tasks.remove({ id: undo.id });
+        else await actions.interactions.remove({ id: undo.id });
+      }
+      await bulk(noteId, 'restore');
+    });
+    if (href) addStripLink(href, 'Open →');
+  });
+
   /* ── the picker ─────────────────────────────────────────────────────────── */
 
   const fileDialog = document.getElementById('note-file') as HTMLDialogElement | null;
@@ -233,13 +353,7 @@ if (undoBar) {
       // over it — an "undo" that sometimes silently does nothing is worse than
       // none. The honest offer is the way to where the words went.
       showUndo(`Added to ${data.title || '(untitled)'}`, card, null);
-      const link = document.createElement('a');
-      link.href = `/admin/fragments#edit=${btn.dataset.piece}`;
-      link.className = 'btn btn-xs font-sans';
-      link.textContent = 'Open →';
-      undoBtn.hidden = true;
-      undoBtn.after(link);
-      window.setTimeout(() => link.remove(), 8000);
+      addStripLink(`/admin/fragments#edit=${btn.dataset.piece}`, 'Open →');
     } catch {
       stampOf(card).textContent = 'could not add it';
     }
@@ -248,7 +362,7 @@ if (undoBar) {
   /* ── wiring ─────────────────────────────────────────────────────────────── */
 
   pile?.addEventListener('click', async (e) => {
-    const el = (e.target as Element).closest<HTMLElement>('[data-edit], [data-more], [data-promote], [data-append], [data-delete]');
+    const el = (e.target as Element).closest<HTMLElement>('[data-edit], [data-more], [data-file], [data-delete]');
     if (!el) return;
     const card = el.closest<HTMLElement>('[data-note]');
     if (!card) return;
@@ -271,25 +385,11 @@ if (undoBar) {
     // Everything below moves the card out of the pile, so flush any edit first.
     if (editing === card) await leaveEdit(card);
 
-    if (el.hasAttribute('data-promote')) {
-      try {
-        await bulk(id, 'draft');
-      } catch {
-        stampOf(card).textContent = 'could not promote it';
-        return;
-      }
-      showUndo('Now a draft', card, () => bulk(id, 'note'));
-      const link = document.createElement('a');
-      link.href = `/admin/fragments#edit=${id}`;
-      link.className = 'btn btn-xs btn-ghost font-sans';
-      link.textContent = 'Open →';
-      undoBtn.after(link);
-      window.setTimeout(() => link.remove(), UNDO_MS);
-      return;
-    }
-
-    if (el.hasAttribute('data-append')) {
-      openFiler(card);
+    if (el.hasAttribute('data-file')) {
+      // The menu is one element for the whole pile, so it has to be told which
+      // card it belongs to before it opens — that is what positions it, too.
+      choosing = card;
+      chooser?.showPopover();
       return;
     }
 
