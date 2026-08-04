@@ -13,6 +13,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
+import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
@@ -20,7 +21,7 @@ import BackToTop from '../components/BackToTop.astro';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'today' | 'people' | 'agenda' | 'fragments' | 'constellations' | 'library' | 'about';
+  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -37,6 +38,18 @@ const nav = [
   // make with the last-contact line. One room, three surfaces: Calendar, Tasks,
   // Goals (src/components/admin/AgendaTabs.astro).
   { key: 'agenda', label: 'Agenda', href: '/admin/agenda', icon: 'ph:calendar-blank', hr: false },
+  // NOTES SITS LAST IN THE DAILY HALF, immediately above the divider — the
+  // position says what it is. Dumping is a daily motion, so it belongs with
+  // Today/People/Agenda; but a dump graduating into a piece is the front of the
+  // corpus pipeline, so it wants to touch Fragments across the line.
+  //
+  // ⚠ It is NOT the old `/admin/fragments?view=notes`, which was deleted with
+  // this room. That was the fragment manager's table with a filter on it —
+  // title column, checkboxes, bulk bar — and it asked you to name a jotting and
+  // then open it to find out what it said. Michael, 2026-08-03: *"I see
+  // untitled, untitled, untitled, and I have to open each one… all I care about
+  // is that I have writing fragments and I have brain dumps."*
+  { key: 'notes', label: 'Notes', href: '/admin/notes', icon: 'ph:note', hr: false },
   { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },
@@ -148,6 +161,9 @@ const nav = [
   </div>
 
   <ConfirmDialog />
+  {/* The ✚ belongs to the building, not to a room (10-hq §10c) — so it is
+      mounted here, once, and every admin page gets it. */}
+  <CaptureDialog />
   {/* the manager and library run long; the sheets bring their own */}
   <BackToTop />
 

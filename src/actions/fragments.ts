@@ -457,6 +457,85 @@ export const fragments = {
     },
   }),
 
+  /**
+   * Triage a brain dump INTO an existing piece (14 · Piece 1, §5).
+   *
+   * The other motion out of the pile — *make it a piece* — is a status flip on
+   * the row you already typed: no copy, no second row, nothing to keep in step.
+   * This one cannot be. You are merging two texts, so the words are genuinely
+   * copied, and that is exactly why the dump is CONSUMED rather than left
+   * behind: a pile that keeps showing you a thought you have already filed is a
+   * pile you stop trusting, and two copies of one paragraph is the sync problem
+   * ADR-0010 paid to delete.
+   *
+   * ⚠ COMPARE-AND-SET ON THE TARGET, not a blind append — and it is worth
+   * being exact about what that does and does not buy, because the obvious
+   * reading is wrong. This is a read-modify-write: the body is fetched, the
+   * dump is concatenated onto it, the result is written back. The `.eq` closes
+   * THAT window — two appends racing, or a save landing between the read and
+   * the write, which would otherwise silently drop one of them.
+   *
+   * What protects against the other direction — a writing sheet open in another
+   * tab, holding a copy of the body from before this append — is not here at
+   * all. It is `saveWriting`'s own `base_updated_at` guard, and this write
+   * arms it by moving `updated_at`: the stale tab's next autosave matches zero
+   * rows and surfaces as CONFLICT rather than as a silent overwrite.
+   *
+   * Bodies are Markdown, so the join is a blank line and nothing more. No
+   * separator, no timestamp, no "— from a note" marker: the dump becomes the
+   * last paragraph of the piece and you move it where it belongs in the editor.
+   * A marker would be a thing to delete every single time.
+   */
+  appendToPiece: defineAction({
+    input: z.object({ noteId: z.string().uuid(), targetId: z.string().uuid() }),
+    handler: async ({ noteId, targetId }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+
+      const { data: note } = await sb
+        .from('fragments')
+        .select('id, body')
+        .eq('id', noteId)
+        .eq('status', 'note') // only a dump can be filed this way
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (!note) throw fail('That note is no longer in the pile', 'NOT_FOUND');
+      if (!note.body?.trim()) throw fail('There’s nothing in that note to add', 'BAD_REQUEST');
+
+      const { data: target } = await sb
+        .from('fragments')
+        .select('id, title, slug, body, updated_at')
+        .eq('id', targetId)
+        .eq('type', 'writing')
+        .neq('status', 'note') // a dump is not a destination
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (!target) throw fail('That piece no longer exists', 'NOT_FOUND');
+
+      const joined = [target.body?.replace(/\s+$/, ''), note.body.trim()].filter(Boolean).join('\n\n');
+      const { data: written, error } = await sb
+        .from('fragments')
+        .update({ body: joined })
+        .eq('id', targetId)
+        .eq('updated_at', target.updated_at)
+        .select('id')
+        .maybeSingle();
+      if (error) throw fail(error.message);
+      if (!written) throw fail('That piece changed while this was open — open the pile again', 'CONFLICT');
+
+      // Soft, so the undo strip has something to restore. Only once the append
+      // is known to have landed: the reverse order could eat a thought on a
+      // failed write.
+      const { error: delErr } = await sb
+        .from('fragments')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', noteId);
+      if (delErr) throw fail(delErr.message);
+
+      return { title: target.title ?? '', slug: target.slug };
+    },
+  }),
+
   /** Bulk actions over a comma-joined id list. */
   bulk: defineAction({
     accept: 'form',

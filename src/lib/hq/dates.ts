@@ -25,6 +25,38 @@ import { ymdOf, ymdToUtc, type Ymd } from './time';
 
 const CAL = { timeZone: 'UTC' } as const;
 
+/**
+ * `just now` · `20m ago` · `3h ago` · `2d ago` — elapsed time from an INSTANT.
+ *
+ * `since()` in interactions.ts answers the same question from a calendar date,
+ * and the two are deliberately separate rather than one function with a flag.
+ * A logged interaction knows only what day it happened, so its finest honest
+ * bucket is "yesterday"; a brain dump knows the second it was typed, and on the
+ * pile the useful distinction is between one you jotted before breakfast and
+ * one from last week. Making a date pretend to a clock is how you get "0 days
+ * ago" on a row from this morning.
+ *
+ * ⚠ AND A DURATION IS ZONE-INDEPENDENT, which is why this one may be rendered
+ * on the server without breaking the no-UTC-on-screen rule (scripts/local-time)
+ * — "3h ago" is 3h ago in every zone on earth. Only the exact instant behind it
+ * needs the device's zone, and that lives in the stamp's hover title.
+ */
+export function elapsedSince(iso: string, now: number = Date.now()): string {
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return '';
+  const mins = Math.max(0, (now - at) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${Math.floor(mins)}m ago`;
+  const hours = mins / 60;
+  if (hours < 24) return `${Math.floor(hours)}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  if (days < 60) return `${Math.round(days / 7)}w ago`;
+  if (days < 365) return `${Math.round(days / 30)}mo ago`;
+  const years = days / 365;
+  return years < 1.75 ? 'over a year ago' : `${Math.round(years)}y ago`;
+}
+
 /** 1st/2nd/3rd — but 11th/12th/13th, then 21st/22nd/23rd/31st. */
 export function ordinal(n: number): string {
   const rem100 = n % 100;

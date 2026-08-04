@@ -27,6 +27,8 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, the **timeline** in the main column with its log box open at the head, **About** and **Shared** in the rail, and a pencil on the block it edits. On a phone the order inverts: About first, because you open a profile there to remember who somebody is, not to scroll a year of entries. |
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
+| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one plain textarea that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. A pencil edits in place; **Make it a piece** flips it to a draft; **Add to a piece…** appends it to an existing writing fragment and consumes it; delete is soft, with an undo strip. Replaced `?view=notes` on 2026-08-03, which now redirects here. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) and **attribution** are required (marked, and they gate Save). Optional source metadata (title/author/work-year/page/citation/link) is tucked in a collapsible group. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. A collapsed **Shared by** field says which person put these words in front of you (§12) — applied immediately, like constellation membership. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
@@ -152,32 +154,72 @@ with the live anon key — empty array, including through an embedded join.
 **Retention:** keep everything. At ~125 fragments this is fine for years;
 revisit only if it stops being.
 
-## 5b. Notes — the tier below a draft
+## 5b. Notes — the brain dump, and its room
 
-A **note** is a private fragment: a thought that isn't a draft yet. It's a
+A **note** is a private fragment: a thought that isn't a piece yet. It's a
 `status`, not a type, so `note → draft → published` is one linear promotion
 rather than a migration between kinds — private thought graduating into public
 piece, which is the whole shape of this site. See
-[plan 09](plans/09-offline-and-notes.md) Piece 2.
+[plan 09](plans/09-offline-and-notes.md) Piece 2 for the tier and
+[plan 14](plans/14-capture.md) for the room that reads it.
+
+**⚠ The interface around this tier was rebuilt on 2026-08-03, and the reason is
+worth keeping.** Notes shipped in July as a *view of the fragment manager*: a
+table row per note, with a title column, a checkbox and an open action. But a
+jotting has no title, so the room read `untitled, untitled, untitled` and every
+thought cost a click to find out what it said. That is a document interface
+wrapped around something that is not a document, and it made the tier feel like
+an uncomfortable third thing between a piece of writing and a scratch line.
+
+**There are exactly two things now: writing fragments, and brain dumps.**
 
 - **Private by construction.** `fragments_select_published` is an *allowlist*
   (`status = 'published' and deleted_at is null`), so a new tier is unreadable
   by anon with no policy edit and no way to leak by omission. Verified against
   live PostgREST with the real anon key on 2026-07-30 — 0 rows by id, by slug,
   by status, and through the constellation join.
-- **Its own room, not a filter.** Notes live at `/admin/fragments?view=notes`, reached
-  from a button beside Trash. A view can't be accidentally cleared into showing
-  scratch work beside finished pieces, and the view's scope is shared by the
-  rows *and* the type-count badges, so the numbers can never disagree with the
-  table.
+- **One door, from every room.** The **✚** at the bottom-right of every
+  Observatory page opens a plain textarea that saves itself on a 700ms debounce
+  — shorter than the writing sheet's 1200ms, because a dump box is not a
+  document you sit in and the pause before *Saved* is the whole reassurance.
+  **＋ New** (or ⌘/Ctrl+Enter) parks the thought under its own id and hands over
+  a blank. An empty box is never a row. It is a `<dialog>`, so you keep the room
+  you were standing in, and there is no title field anywhere.
+- **⚠ It must stay a plain `<textarea>`.** Dictation software types into any
+  text field, so voice capture works for free — provided nothing gets clever
+  with the input handling. That is a constraint on future changes, not a
+  feature.
+- **Its own room, showing the words.** `/admin/notes` renders each dump as its
+  own text, newest-touched first, with an elapsed stamp. A pencil turns the card
+  into a textarea in place — reading is the dominant motion there, so a tap
+  while scrolling must not put a cursor (and on a phone, a keyboard) into a
+  thought you were only passing.
+- **Two ways out, one click each.** **Make it a piece** flips the row to
+  `draft`: same id, same text, same history, no copy. **Add to a piece…** picks
+  an existing writing fragment and appends the dump to the end of its body as
+  Markdown, then consumes the dump — a pile that keeps showing you a thought you
+  have already filed is a pile you stop trusting. That second motion is the only
+  place a body is genuinely copied, which is why it offers a link to where the
+  words went rather than an Undo: reversing it means editing the target back
+  out, and the writing sheet may have saved over it by then.
+- **Deleted dumps do not go to the corpus trash.** `?view=trash` excludes them,
+  as the working list always has, so scratch cannot reappear beside finished
+  work at either end. The pile's own undo strip is the way back; after that the
+  row survives in the database and in the nightly backup, which is the right
+  amount of ceremony for a jotting.
+- **No new table, deliberately.** A `captures` table of its own would buy an
+  honest model — no slug, no title, ever — and pay for it with a migration and,
+  worse, with *make it a piece* becoming an insert-plus-delete across two
+  tables. The motion that matters most is free precisely because a dump and a
+  piece are the same row at different stages. The slug is minted once on insert
+  (the column is `NOT NULL`) and never shown.
 - **Where it sorts is load-bearing.** `'note'` was added to the enum **before**
   `'draft'`, because the manager sorts `.order('status')` — so the list reads in
   the same order the pipeline runs. Enum ordering can't be changed later without
   recreating the type.
-- **Creating and promoting.** *Add ▾ → Note*, or `#new-note`. A note autosaves
-  exactly like a draft. **Make it a draft** in the sheet promotes one; the notes
-  view's bulk bar promotes many. The working list can send pieces the other way
-  with **Make notes**.
+- **A piece can still be sent back down.** **Make notes** in the bulk bar is a
+  demotion, and it stays. What went is *Add ▾ → Note* — a second front door that
+  opened a titled sheet for something with no title.
 - **Every fragment type can be a note** — a jotted quote is a real thing. But
   constellations can't: `constellations.status` is a plain `text` column, not the
   enum, so the Zod schema is deliberately split into `fragmentStatus` and

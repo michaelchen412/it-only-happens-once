@@ -25,6 +25,14 @@ import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
 import { allFragmentPeople } from '../../lib/hq/links';
 
 const supabase = Astro.locals.supabase;
+
+// `?view=notes` was this room's third view until 2026-08-03 (14 · Piece 1).
+// Brain dumps have their own room now, and a jotting rendered as a table row
+// with an empty title column was the thing that made a note feel like a
+// document it never was. Redirect rather than 404: the old URL is in browser
+// history and on the old capture lab's header.
+if (Astro.url.searchParams.get('view') === 'notes') return Astro.redirect('/admin/notes', 302);
+
 const params = parseListParams(Astro.url.searchParams);
 params.constellation = null; // pick-mode concern; never used here
 const data = await queryFragmentList(supabase, params);
@@ -53,11 +61,9 @@ const linkPerson = personSlug
   : null;
 const autoNew = linkPerson && Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
 
-const TITLES = { list: 'Fragments', notes: 'Notes', trash: 'Trash' } as const;
+const TITLES = { list: 'Fragments', trash: 'Trash' } as const;
 const SUBTITLES = {
   list: undefined,
-  notes:
-    'The scratch tier: thoughts before they are drafts. Never public — the site only ever reads published rows. Promote one to a draft when it starts becoming a piece.',
   trash:
     'Deleted fragments wait here until you empty them. Anything placed in a constellation leaves that suite while it sits in the trash.',
 } as const;
@@ -80,14 +86,9 @@ const SUBTITLES = {
             <>
               {view === 'list' && (
                 <>
-                  {/* Notes get their own room rather than a filter on this one:
-                      scratch work shouldn't sit beside finished pieces, and a
-                      view can't be accidentally cleared into showing them. */}
-                  <a href="/admin/fragments?view=notes" class="btn btn-ghost btn-sm gap-1.5 font-sans">
-                    <Icon name="ph:note" />
-                    Notes
-                    <span class="rounded-full bg-base-300 px-1.5 text-xs text-base-content/70 empty:hidden">{data.noteCount || ''}</span>
-                  </a>
+                  {/* No Notes button, and no `?view=notes` behind it — brain
+                      dumps are a room in the sidebar now (14 · Piece 1). This
+                      room is pieces: drafts and published, nothing else. */}
                   <a href="/admin/fragments?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
                     <Icon name="ph:trash" />
                     Trash
@@ -100,7 +101,13 @@ const SUBTITLES = {
                   <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
                 </button>
                 <div id="add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
-                  <button data-new-note role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><Icon name="ph:note" class="text-base-content/50" /> Note</button>
+                  {/* ⚠ NO "Note" ITEM. It opened a near-fullscreen sheet with a
+                      title field for something that has no title — the exact
+                      door 14 §2 was written to replace ("today a note costs
+                      Add ▾ → Note"). The ✚ in the corner is the only way to
+                      write one now, from any room. A piece can still be sent
+                      DOWN to the pile: that is the bulk bar's "Make notes",
+                      which is a demotion rather than a second front door. */}
                   <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
                   <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
                   <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
@@ -124,13 +131,6 @@ const SUBTITLES = {
           <>
             <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">Restore</button>
             <button data-bulk="purge" class="btn btn-xs btn-ghost normal-case text-error">Delete forever</button>
-          </>
-        ) : view === 'notes' ? (
-          <>
-            {/* Promotion, the one motion this tier exists for: a note becomes a
-                draft and joins the working list. */}
-            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">Make drafts</button>
-            <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
           </>
         ) : (
           <>

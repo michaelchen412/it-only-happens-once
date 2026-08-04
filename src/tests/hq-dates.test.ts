@@ -13,7 +13,7 @@
 // below are what keep that true, because the failure only appears on a server
 // in a different zone from the developer's laptop.
 import { describe, expect, it } from 'vitest';
-import { dmd, headerDate, monthGrid, monthTitle, nextOccurrence, ordinal, shiftMonth } from '../lib/hq/dates';
+import { dmd, elapsedSince, headerDate, monthGrid, monthTitle, nextOccurrence, ordinal, shiftMonth } from '../lib/hq/dates';
 import { deviceZoneNote, isValidTimezone, localToday, parseYmd, shiftYmd, ymdOf } from '../lib/hq/time';
 
 describe('ordinal', () => {
@@ -210,5 +210,41 @@ describe('deviceZoneNote', () => {
 describe('ymdOf', () => {
   it('reads a UTC-midnight Date back as the date it stands for', () => {
     expect(ymdOf(new Date(Date.UTC(2026, 7, 1)))).toBe('2026-08-01');
+  });
+});
+
+// The pile's stamp (14 · Piece 1). A dump knows the second it was typed, which
+// is why this exists beside `since()` in interactions.ts rather than reusing it:
+// that one takes a calendar date, so its finest honest bucket is "yesterday",
+// and a thought jotted twenty minutes ago would read as "today".
+describe('elapsedSince', () => {
+  const NOW = Date.UTC(2026, 7, 3, 12, 0, 0);
+  const back = (ms: number) => new Date(NOW - ms).toISOString();
+  const MIN = 60_000;
+  const HOUR = 60 * MIN;
+  const DAY = 24 * HOUR;
+
+  it('reads the minutes and hours a dump pile actually cares about', () => {
+    expect(elapsedSince(back(20_000), NOW)).toBe('just now');
+    expect(elapsedSince(back(20 * MIN), NOW)).toBe('20m ago');
+    expect(elapsedSince(back(3 * HOUR), NOW)).toBe('3h ago');
+    expect(elapsedSince(back(2 * DAY), NOW)).toBe('2d ago');
+  });
+
+  it('widens as it recedes, because the question changes', () => {
+    expect(elapsedSince(back(10 * DAY), NOW)).toBe('1w ago');
+    expect(elapsedSince(back(90 * DAY), NOW)).toBe('3mo ago');
+    expect(elapsedSince(back(400 * DAY), NOW)).toBe('over a year ago');
+    expect(elapsedSince(back(800 * DAY), NOW)).toBe('2y ago');
+  });
+
+  it('never reports the future as elapsed time', () => {
+    // A clock a few seconds ahead of the server's must not print "-1m ago".
+    expect(elapsedSince(new Date(NOW + 5 * MIN).toISOString(), NOW)).toBe('just now');
+  });
+
+  it('says nothing at all for a value that is not a timestamp', () => {
+    expect(elapsedSince('', NOW)).toBe('');
+    expect(elapsedSince('not a date', NOW)).toBe('');
   });
 });

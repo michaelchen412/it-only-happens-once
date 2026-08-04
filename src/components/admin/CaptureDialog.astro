@@ -1,0 +1,85 @@
+---
+/*
+  CaptureDialog — the ✚ and the box behind it (docs/plans/14-capture.md §4,
+  10-hq.md §10c).
+
+  ONE DOOR, EVERY ROOM. Mounted from AdminLayout rather than from a page, so
+  the thought can be dumped from wherever you happen to be standing. That is
+  10-hq §10c as written: *"a global control (the ✚, bottom-right) reachable
+  from every room, plus its own room for the pile."*
+
+  ⚠ AND IT IS DELIBERATELY NOT A CARD ON TODAY, which is what 14 §4 originally
+  said. The two plans disagreed and §10c is the newer thought, decided after
+  six rounds on the Today lab: *"the daily summary and the dumping ground are
+  two separate concerns."* Today answers *what is my day*; a dump box on it
+  would be a zone that answers nothing about today, sitting among five that do.
+
+  A <dialog>, so you keep your place. The alternative was navigating to the
+  Notes room to type — which costs you whatever room you were in, and the whole
+  premise here is *as few decisions as possible between the thought and the
+  saving of it*. Escape puts you back exactly where you were.
+
+  ⚠ THE BOX MUST STAY A PLAIN <textarea>. Wispr Flow dictates into any text
+  field, so voice capture works for free — but only while nothing gets clever
+  with the input handling. That is a constraint on future changes, not a
+  feature: no rich editor here, ever. (14 §4.)
+
+  THE PILE IS NOT IN HERE. The room shows what you jotted; this shows a place
+  to jot. Putting a recent list under the box would make the dialog a second,
+  smaller version of the room — and two surfaces that both half-do the reading
+  job is exactly the middle ground this workstream deleted.
+*/
+import { Icon } from 'astro-icon/components';
+---
+
+{/* Bottom-right, above the content and below the sidebar drawer (z-30 vs the
+    sidebar's z-40) so an open mobile menu covers it rather than floating over
+    it. BackToTop sits at the same corner but only appears once you have
+    scrolled, and it offsets itself when this is present — see app.css. */}
+<button
+  id="cap-open"
+  type="button"
+  class="cap-fab"
+  aria-label="Write something down"
+  title="Write something down"
+  aria-haspopup="dialog"
+>
+  <Icon name="ph:plus" class="text-2xl" />
+</button>
+
+<dialog id="cap-dialog" class="modal-dialog w-full max-w-xl" aria-label="Write something down">
+  <div class="cap-shell font-sans">
+    {/*
+      No title on the dialog and no instructions in it. The box says what it is
+      by being a box with a cursor already in it (10-hq §10i: if a sentence
+      exists to justify a design decision, it belongs in the plan, not on the
+      screen).
+    */}
+    <textarea
+      id="cap-box"
+      class="cap-box"
+      rows="5"
+      placeholder="Write it down…"
+      aria-label="What are you thinking?"></textarea>
+
+    <div class="cap-foot">
+      {/*
+        ⚠ EMPTY UNTIL THERE IS SOMETHING TRUE TO SAY, and empty again after.
+        The lab shipped this with the word "Saved" already in the markup at
+        opacity-0: it lied to screen readers, and it satisfied an e2e assertion
+        for a save that had not happened. A whole class of bug — never pre-fill
+        a status element with the success case.
+      */}
+      <span id="cap-status" class="cap-status" aria-live="polite"></span>
+      <a href="/admin/notes" class="cap-link">Notes →</a>
+      <button id="cap-new" type="button" class="btn btn-sm font-sans" title="Park this and start another (⌘/Ctrl + Enter)">
+        <Icon name="ph:plus" /> New
+      </button>
+      <button id="cap-done" type="button" class="btn btn-primary btn-sm font-sans">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import '../../scripts/capture';
+</script>

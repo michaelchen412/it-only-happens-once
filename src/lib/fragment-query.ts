@@ -13,12 +13,20 @@ const SORT_COL: Record<string, string> = { title: 'title', posted: 'occurred_at'
 
 export interface FragmentListParams {
   /**
-   * Which slice of the corpus. Notes are a VIEW rather than a filter you can
-   * clear (docs/plans/09 Piece 2): the working list excludes them by
-   * construction, so no default can be cleared into showing scratch work
-   * beside finished pieces. Same shape as `trash`, and for the same reason.
+   * Which slice of the corpus.
+   *
+   * ⚠ THERE IS NO `notes` VIEW ANY MORE (removed 2026-08-03 by 14 · Piece 1).
+   * The manager holds drafts and published; brain dumps have their own room at
+   * `/admin/notes`, where a dump renders as its own text rather than as a row
+   * with an empty title column. The manager is for pieces, and a jotting was
+   * never a piece — see the header of src/pages/admin/notes.astro.
+   *
+   * What did NOT change is the exclusion: the working list still filters notes
+   * out by construction rather than by a default anyone can clear, and `trash`
+   * now does the same, so scratch cannot reappear beside finished work at
+   * either end.
    */
-  view: 'list' | 'notes' | 'trash';
+  view: 'list' | 'trash';
   type: (typeof TYPES)[number] | null;
   subjectSlugs: string[];
   q: string;
@@ -40,7 +48,7 @@ export interface FragmentListParams {
 
 export function parseListParams(sp: URLSearchParams): FragmentListParams {
   const viewParam = sp.get('view');
-  const view = viewParam === 'trash' ? 'trash' : viewParam === 'notes' ? 'notes' : 'list';
+  const view = viewParam === 'trash' ? 'trash' : 'list';
   const typeParam = TYPES.find((t) => t === sp.get('type')) ?? null;
   const subjectSlugs = (sp.get('subject') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const q = (sp.get('q') ?? '').trim();
@@ -91,8 +99,6 @@ export interface FragmentListData {
   typeCounts: Record<string, number>;
   totalCount: number;
   trashCount: number;
-  /** Live notes — the pill on the Notes button, like `trashCount`. */
-  noteCount: number;
   /** fragment ids already placed in params.constellation (empty set otherwise) */
   placedIds: Set<string>;
 }
@@ -148,12 +154,17 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   const workFilterId = p.workSlug ? (allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—' : null;
 
   // The view's scope, shared by the list query AND the per-type counts — so the
-  // badge numbers can never disagree with the rows underneath them. Trash is
-  // any status; the working list and the notes list partition what's left.
+  // badge numbers can never disagree with the rows underneath them.
+  //
+  // ⚠ NOTES ARE OUT OF BOTH VIEWS, including trash. Trash used to be "any
+  // status", so a discarded jotting went and sat among deleted essays — the
+  // same middle ground the notes room was, arriving from the other end. A
+  // deleted dump is reversible from the pile's own undo strip and after that it
+  // is simply gone from the interface; the row survives in the database and in
+  // the nightly backup, which is the right amount of ceremony for scratch.
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
-    if (p.view === 'trash') return qb.not('deleted_at', 'is', null) as T;
-    const live = qb.is('deleted_at', null);
-    return (p.view === 'notes' ? live.eq('status', 'note') : live.neq('status', 'note')) as T;
+    const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
+    return live.neq('status', 'note') as T;
   };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort
@@ -212,12 +223,12 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   }
 
   const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
-  const { count: trashCount } = await supabase.from('fragments').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null);
-  const { count: noteCount } = await supabase
+  // Notes excluded here too, so the pill agrees with the room it opens.
+  const { count: trashCount } = await supabase
     .from('fragments')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'note')
-    .is('deleted_at', null);
+    .not('deleted_at', 'is', null)
+    .neq('status', 'note');
 
   // pick mode: which of these fragments already live in the target constellation
   const placedIds = new Set<string>();
@@ -242,7 +253,6 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     typeCounts,
     totalCount: (typeRows ?? []).length,
     trashCount: trashCount ?? 0,
-    noteCount: noteCount ?? 0,
     placedIds,
   };
 }
