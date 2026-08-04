@@ -59,6 +59,59 @@ export interface CalendarItem {
   href?: string;
 }
 
+/** The `events` columns an item needs. Written out so both callers agree. */
+export interface EventRow {
+  id: string;
+  starts_on: string;
+  starts_at: string | null;
+  ends_at?: string | null;
+  title: string;
+  location: string | null;
+  notes?: string | null;
+  event_people?: { people: { id: string; display_name: string } | null }[] | null;
+}
+
+/**
+ * An `events` row as a grid item.
+ *
+ * ⚠ IT SETS NO `href`, and that is the type's own rule kept rather than bent:
+ * routing belongs to the page. Today sends an event to the day panel, the
+ * calendar is already *in* the day panel and sends it nowhere. Callers spread
+ * their own door on: `{ ...eventItem(e), href: … }`.
+ *
+ * Extracted 2026-08-04 because Today and the calendar had each written this
+ * out — including the same `event_people → people` filter with the same type
+ * predicate, twice — and two copies of "who is on this event" is exactly the
+ * kind of thing that gets fixed in one of them.
+ */
+export function eventItem(row: EventRow): CalendarItem {
+  return {
+    kind: 'event',
+    id: row.id,
+    on: row.starts_on as Ymd,
+    title: row.title,
+    at: row.starts_at ? row.starts_at.slice(0, 5) : null,
+    endAt: row.ends_at ? row.ends_at.slice(0, 5) : null,
+    location: row.location,
+    notes: row.notes ?? null,
+    people: (row.event_people ?? [])
+      .map((ep) => ep.people)
+      .filter((p): p is { id: string; display_name: string } => !!p)
+      .map((p) => ({ id: p.id, name: p.display_name })),
+  };
+}
+
+/**
+ * A birthday as a grid item — derived, never a row (12-people.md §8).
+ *
+ * Which is why it takes a name and an id rather than a table row: there is no
+ * `birthdays` table to select from, and pretending there is would be the first
+ * step toward one.
+ */
+export function birthdayItem(person: { id: string; display_name: string }, on: Ymd): CalendarItem {
+  return { kind: 'birthday', id: person.id, on, title: person.display_name, at: null };
+}
+
 /**
  * The order items sit in on a day, and it is the same order everywhere — the
  * grid, the week column and the day panel — because they are one union, not

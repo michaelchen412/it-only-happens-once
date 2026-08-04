@@ -24,9 +24,19 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../components/admin/AgendaTabs.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
 import TagSheet from '../../components/admin/TagSheet.astro';
-import { today as hqToday, parseYmd, type Ymd } from '../../lib/hq/time';
+import { today as hqToday, parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
 import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
-import { CELL_ROWS, KINDS, byDay, byTime, legendFor, mirroredBetween, type CalendarItem } from '../../lib/hq/calendar';
+import {
+  CELL_ROWS,
+  KINDS,
+  birthdayItem,
+  byDay,
+  byTime,
+  eventItem,
+  legendFor,
+  mirroredBetween,
+  type CalendarItem,
+} from '../../lib/hq/calendar';
 import { staleness } from '../../lib/hq/mirror';
 
 const supabase = Astro.locals.supabase;
@@ -39,17 +49,19 @@ const week = Astro.url.searchParams.get('view') === 'week';
 // The 42 cells, Sunday-first — the same helper the date bar's popover uses.
 const cells = monthGrid(anchor);
 
-/** Week view: the seven days around the anchor, same union, never a second model. */
-const weekStart = (() => {
-  const d = new Date(`${anchor}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
-  return d.toISOString().slice(0, 10) as Ymd;
-})();
-const weekCells = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date(`${weekStart}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + i);
-  return d.toISOString().slice(0, 10) as Ymd;
-});
+/**
+ * Week view: the seven days around the anchor, same union, never a second model.
+ *
+ * ⚠ THROUGH `time.ts`, NOT `new Date(\`${ymd}T00:00:00Z\`)`. This page built its
+ * own calendar arithmetic in four places while importing `parseYmd` from the
+ * module that already had it — and `time.ts` opens by explaining why that is
+ * the one thing not to do: *"the moment two surfaces each derive it slightly
+ * differently, the check-in, 'due today' and 'overdue' start disagreeing at
+ * midnight and nobody notices for a week."* The second derivation happened to
+ * agree. That is luck, not design.
+ */
+const weekStart = shiftYmd(anchor, -ymdToUtc(anchor).getUTCDay());
+const weekCells = Array.from({ length: 7 }, (_, i) => shiftYmd(weekStart, i));
 
 const from = week ? weekCells[0] : cells[0].ymd;
 const to = week ? weekCells[6] : cells[41].ymd;
@@ -90,20 +102,8 @@ const stale = staleness(syncState ?? null);
 const answered = new Set((answeredRows ?? []).map((r) => r.task_id));
 
 const items: CalendarItem[] = [
-  ...(eventRows ?? []).map((e) => ({
-    kind: 'event' as const,
-    id: e.id,
-    on: e.starts_on,
-    title: e.title,
-    at: e.starts_at ? e.starts_at.slice(0, 5) : null,
-    endAt: e.ends_at ? e.ends_at.slice(0, 5) : null,
-    location: e.location,
-    notes: e.notes,
-    people: (e.event_people ?? [])
-      .map((ep) => ep.people)
-      .filter((p): p is { id: string; display_name: string } => !!p)
-      .map((p) => ({ id: p.id, name: p.display_name })),
-  })),
+  // No `href`: this page IS the day panel, so an event's door is already here.
+  ...(eventRows ?? []).map(eventItem),
   ...(taskRows ?? []).map((t) => ({
     kind: 'task' as const,
     id: t.id,
@@ -119,13 +119,9 @@ const items: CalendarItem[] = [
     .filter((p) => !p.archived_at && p.birth_month && p.birth_day)
     .map((p) => ({ person: p, ymd: nextOccurrence(p.birth_month!, p.birth_day!, from) }))
     .filter((b) => b.ymd >= from && b.ymd <= to)
-    .map((b) => ({
-      kind: 'birthday' as const,
-      id: b.person.id,
-      on: b.ymd,
-      title: b.person.display_name,
-      at: null,
-    })),
+    // No door either: there is no row to open, and the profile is a click away
+    // in People. Today offers one because Today is a summary you read out of.
+    .map((b) => birthdayItem(b.person, b.ymd)),
   // Google's copy. Its rows carry `href` — the event on Google — which is the
   // whole of their read-only explanation: the one door a mirrored row offers
   // leads to the only place it can be changed.
@@ -157,12 +153,10 @@ const roster = (peopleRows ?? [])
   .map((p) => ({ id: p.id, display_name: p.display_name }));
 const taggable = roster.length > 0;
 
-const stepWeek = (n: number) => {
-  const d = new Date(`${weekStart}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n * 7);
-  return d.toISOString().slice(0, 10) as Ymd;
-};
+const stepWeek = (n: number) => shiftYmd(weekStart, n * 7);
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** The weekday name for a local date — via `ymdToUtc`, like everything else. */
+const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
 ---
 
 <AdminLayout title="Agenda" active="agenda">
@@ -260,7 +254,7 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           {weekCells.map((ymd) => (
             <div class:list={['wkcol', ymd === todayYmd && 'wkcol--today']}>
               <a class="wkcol__h" href={href({ day: ymd })}>
-                <span class="wkcol__d">{DOW[new Date(`${ymd}T00:00:00Z`).getUTCDay()]}</span>
+                <span class="wkcol__d">{dowOf(ymd)}</span>
                 <span class="wkcol__n">{Number(ymd.slice(8))}</span>
               </a>
               <div class="wkcol__b">

@@ -25,9 +25,10 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
-import { today as hqToday, type Ymd } from '../../../lib/hq/time';
+import { today as hqToday } from '../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
 import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
+import { liveAndAnswered } from '../../../lib/hq/today-data';
 import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
 import type { Tables } from '../../../lib/database.types';
 
@@ -36,12 +37,11 @@ type Task = Tables<'tasks'>;
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = await hqToday(supabase);
 
-const [{ data: liveData, error }, { data: eventData, error: eventError }, { data: goalData }] = await Promise.all([
-  supabase.from('tasks').select('*').is('archived_at', null),
-  // The embedded task row rather than a second lookup: a one-off answered this
-  // morning is already archived, so it is NOT in the query above — and it still
-  // has to stay on screen until midnight.
-  supabase.from('task_events').select('for_due_on, outcome, tasks(*)').eq('occurred_on', todayYmd),
+const [{ rows, error }, { data: goalData }] = await Promise.all([
+  // The merge Today also does, and it is the SAME function — the two rooms
+  // disagreeing about which occurrence a task is standing on would be invisible
+  // until a recurring chore appeared in one and not the other.
+  liveAndAnswered(supabase, todayYmd),
   // Only ACTIVE goals are offered: filing a task under something you paused or
   // let go is how a goal quietly becomes a folder again (§4a).
   supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
@@ -49,22 +49,6 @@ const [{ data: liveData, error }, { data: eventData, error: eventError }, { data
 
 const goals = goalData ?? [];
 const goalNames = new Map(goals.map((g) => [g.id, g.name]));
-
-const answered = new Map(
-  (eventData ?? [])
-    .filter((e): e is typeof e & { tasks: Task } => !!e.tasks)
-    .map((e) => [e.tasks.id, { outcome: e.outcome, forDueOn: e.for_due_on }]),
-);
-
-/** A task as the list shows it: at the occurrence it is standing on. */
-type Row = Task & { answeredAs: 'done' | 'skipped' | null; shownDueOn: Ymd | null };
-
-const rows: Row[] = [
-  ...(liveData ?? []).filter((t) => !answered.has(t.id)).map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
-  ...(eventData ?? [])
-    .filter((e): e is typeof e & { tasks: Task } => !!e.tasks)
-    .map((e) => ({ ...e.tasks, answeredAs: e.outcome, shownDueOn: e.for_due_on })),
-];
 
 const grouped = GROUPS.map((g) => ({
   ...g,
@@ -124,9 +108,9 @@ const payload = (t: Task) =>
     </header>
 
     {
-      (error || eventError) && (
+      error && (
         <p class="admin-alert mb-5" role="alert">
-          Couldn’t load the list: {(error ?? eventError)!.message}
+          Couldn’t load the list: {error.message}
         </p>
       )
     }

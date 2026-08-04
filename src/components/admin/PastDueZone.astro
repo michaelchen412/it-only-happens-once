@@ -30,14 +30,10 @@ import { Icon } from 'astro-icon/components';
 import { lateBy } from '../../lib/hq/tasks';
 import { PAST_DUE_CAP } from '../../lib/hq/today';
 import type { Ymd } from '../../lib/hq/time';
-
-export interface PastDueRow {
-  id: string;
-  title: string;
-  dueOn: Ymd;
-  priority: string;
-  answeredAs: 'done' | 'skipped' | null;
-}
+// The shape comes from the loader that builds it rather than being described a
+// second time here: a zone that declares its own row type is a zone that can
+// disagree with the query feeding it.
+import type { PastDueRow } from '../../lib/hq/today-data';
 
 interface Props {
   rows: PastDueRow[];

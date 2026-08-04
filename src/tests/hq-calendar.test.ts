@@ -6,7 +6,7 @@
 // that has nothing in it, which is 10-hq.md §10b applied to the one piece of
 // chrome §5 says earns itself.
 import { describe, expect, it } from 'vitest';
-import { KINDS, byDay, byTime, legendFor, type CalendarItem } from '../lib/hq/calendar';
+import { KINDS, birthdayItem, byDay, byTime, eventItem, legendFor, type CalendarItem } from '../lib/hq/calendar';
 
 const item = (over: Partial<CalendarItem> & { kind: CalendarItem['kind']; title: string }): CalendarItem => ({
   id: over.title,
@@ -96,5 +96,68 @@ describe('the authority table', () => {
     // A birthday is not a row anywhere, so it is not read-only — it is
     // unwritable in principle.
     expect(KINDS.birthday.writable).toBe(false);
+  });
+});
+
+// ── the item builders (plans/00-groundwork.md · Piece 4) ────────────────────
+// Extracted 2026-08-04 from two pages that had each written them out. What is
+// worth pinning is the `event_people` unwrapping — a two-level embed whose
+// inner side is nullable, which is exactly the shape that reads fine and throws
+// on the one event whose guest was deleted.
+describe('eventItem', () => {
+  const row = {
+    id: 'e1',
+    starts_on: '2026-08-19',
+    starts_at: '19:30:00',
+    ends_at: '21:00:00',
+    title: 'Dinner',
+    location: 'Bar Tartine',
+    notes: 'book a table',
+  };
+
+  it('trims wall-clock times to HH:MM — seconds are noise on a grid', () => {
+    const it_ = eventItem(row);
+    expect(it_.at).toBe('19:30');
+    expect(it_.endAt).toBe('21:00');
+  });
+
+  it('is all-day when there is no start time', () => {
+    expect(eventItem({ ...row, starts_at: null, ends_at: null }).at).toBeNull();
+  });
+
+  it('names whoever is tagged, and drops a tag whose person is gone', () => {
+    const item_ = eventItem({
+      ...row,
+      event_people: [
+        { people: { id: 'p1', display_name: 'Ada' } },
+        { people: null },
+        { people: { id: 'p2', display_name: 'Grace' } },
+      ],
+    });
+    expect(item_.people).toEqual([
+      { id: 'p1', name: 'Ada' },
+      { id: 'p2', name: 'Grace' },
+    ]);
+  });
+
+  it('has no people and no door when nothing is embedded', () => {
+    const item_ = eventItem(row);
+    expect(item_.people).toEqual([]);
+    // ⚠ Routing belongs to the page — Today sends an event to the day panel,
+    // the calendar is already there. A default here would be one of them wrong.
+    expect(item_.href).toBeUndefined();
+  });
+});
+
+describe('birthdayItem', () => {
+  it('is an all-day item on the date it was resolved to', () => {
+    const item_ = birthdayItem({ id: 'p1', display_name: 'Ada' }, '2026-11-02');
+    expect(item_).toMatchObject({ kind: 'birthday', id: 'p1', title: 'Ada', on: '2026-11-02', at: null });
+  });
+
+  it('carries the PERSON’s id, because a birthday is not a row', () => {
+    // 12-people.md §8: derived from birth_month/birth_day. The only id it could
+    // carry is the person's, and the only door it can offer leads to them.
+    expect(birthdayItem({ id: 'p9', display_name: 'Grace' }, '2026-01-01').id).toBe('p9');
   });
 });

@@ -1,0 +1,277 @@
+// What Today and the tasks room ASK FOR, separated from what they decide
+// (docs/plans/00-groundwork.md · Piece 3).
+//
+// ⚠ WHY THIS IS NOT IN `today.ts`. That module holds the RULES — `announces`,
+// `progressLabel`, `PAST_DUE_CAP` — and opens by promising **NO SUPABASE
+// IMPORT**, as `tasks.ts` does. Both promises are load-bearing: `tasks.ts`
+// reaches the browser through `task-sheet.ts`, and keeping the rule modules
+// free of a client is what lets the editor and the server run the same
+// functions. So the fetching lives here, one layer out, and imports them.
+//
+// The split to hold on to: **`today.ts` decides, `today-data.ts` gathers, the
+// page renders.** Before this file existed the middle job was done in
+// `admin/index.astro` — ~170 lines of it — which meant the most important page
+// in the application had its data logic reachable only through Playwright.
+//
+// ⚠ AND THE TASK MERGE WAS WRITTEN TWICE. `admin/index.astro` and
+// `admin/agenda/tasks.astro` each ran the same two queries and each built the
+// same `Row` shape, comment for comment. `liveAndAnswered` is that merge, once
+// — which is the rule `today.ts` states in its own header: *no zone invents its
+// own answer.*
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+import type { Database, Tables } from '../database.types';
+import { birthdayItem, eventItem, mirroredBetween, seenOn, type CalendarItem } from './calendar';
+import { briefsFor, type Brief } from './brief';
+import { driftList, type Drift } from './drift';
+import { OBSERVATION_DAYS, observationFor, type Observation } from './goals';
+import { lastContactMap } from './interactions';
+import { signPhotos, upcomingBirthday, type Person } from './people';
+import { staleness, type Staleness } from './mirror';
+import { announces, publishedSignal, type Signal } from './today';
+import { shiftYmd, type Ymd } from './time';
+import type { Outcome } from './tasks';
+
+type DB = SupabaseClient<Database>;
+type Task = Tables<'tasks'>;
+
+/**
+ * A task as a room shows it: the row, plus WHICH occurrence it is standing on
+ * and whether that occurrence has already been answered for.
+ *
+ * `shownDueOn` is not always `due_on`. Answering a recurring task advances the
+ * row's date immediately, so the only honest record of what you ticked is
+ * `task_events.for_due_on` — which is why an answered row is rebuilt from the
+ * event rather than from the task.
+ */
+export type TaskRow = Task & {
+  answeredAs: Outcome | null;
+  shownDueOn: string | null;
+};
+
+/**
+ * Every task a room needs for `today`, in one shape — and every task appears
+ * exactly once.
+ *
+ * TWO QUERIES, MERGED. The live list is everything unarchived; the second is
+ * today's dispositions, and it carries the embedded task row rather than a
+ * second lookup **because a one-off answered this morning is already archived**
+ * and so is missing from the first query — while still having to stay on screen
+ * until midnight (10-hq.md §10f).
+ *
+ * `answeredToday` is returned alongside because the zones want it keyed by id
+ * on its own, and deriving it twice from `rows` is how the two fall out of step.
+ *
+ * ⚠ `error` IS RETURNED RATHER THAN THROWN, and the tasks room is why: it puts
+ * "Couldn't load the list: …" above the page and carries on. A throw here would
+ * turn a failed read into a 500 on a surface whose whole job is to still be
+ * there on a bad morning. Today ignores it and renders empty zones, which is
+ * the same answer that page gives to a quiet day.
+ */
+export async function liveAndAnswered(
+  sb: DB,
+  today: Ymd,
+): Promise<{ rows: TaskRow[]; answeredToday: Map<string, Outcome>; error: PostgrestError | null }> {
+  const [{ data: live, error: liveErr }, { data: events, error: eventErr }] = await Promise.all([
+    sb.from('tasks').select('*').is('archived_at', null),
+    sb.from('task_events').select('for_due_on, outcome, tasks(*)').eq('occurred_on', today),
+  ]);
+
+  const answered = (events ?? []).filter((e): e is typeof e & { tasks: Task } => !!e.tasks);
+  const answeredIds = new Set(answered.map((e) => e.tasks.id));
+
+  const rows: TaskRow[] = [
+    ...(live ?? [])
+      .filter((t) => !answeredIds.has(t.id))
+      .map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
+    ...answered.map((e) => ({ ...e.tasks, answeredAs: e.outcome, shownDueOn: e.for_due_on })),
+  ];
+
+  return {
+    rows,
+    answeredToday: new Map(answered.map((e) => [e.tasks.id, e.outcome])),
+    error: liveErr ?? eventErr ?? null,
+  };
+}
+
+/** A past-due row, as the zone renders it. */
+export interface PastDueRow {
+  id: string;
+  title: string;
+  dueOn: Ymd;
+  priority: string;
+  answeredAs: Outcome | null;
+}
+
+/** A goal with something worth observing — the ones with nothing are dropped. */
+export interface GoalSignal {
+  id: string;
+  name: string;
+  slug: string;
+  observation: Observation;
+}
+
+/** Everything the five zones on Today render. */
+export interface TodayData {
+  dayItems: CalendarItem[];
+  comingItems: CalendarItem[];
+  pastDue: PastDueRow[];
+  answeredToday: Map<string, Outcome>;
+  briefs: Brief[];
+  drifting: Drift[];
+  peoplePhotos: Map<string, string>;
+  published: Signal | null;
+  goalSignals: GoalSignal[];
+  stale: Staleness | null;
+}
+
+/**
+ * Today, gathered.
+ *
+ * ⚠ CALL THIS ONLY FOR TODAY ITSELF. Every zone it fills is a statement about
+ * *now* — "past due", "been a while" and "last published" are all false on a
+ * Tuesday last March — so the page calls it conditionally rather than this
+ * function guarding internally. That is deliberate: the guard belongs where the
+ * decision is (`admin/index.astro`'s `offToday`), and hiding it in here would
+ * quietly turn "one query when you step off today" into "thirteen behind an
+ * `if`", which is the optimisation the page's own header is proud of.
+ */
+export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
+  const since30 = shiftYmd(today, -OBSERVATION_DAYS);
+
+  const [
+    { data: eventRows },
+    tasks,
+    { data: everyone },
+    lastContact,
+    seenToday,
+    briefs,
+    { data: goalRows },
+    { data: lastDone },
+    { data: recentDone },
+    { data: lastWriting },
+    mirroredToday,
+    { data: syncState },
+  ] = await Promise.all([
+    sb.from('events').select('*, event_people(person_id, people(id, display_name))').eq('starts_on', today),
+    liveAndAnswered(sb, today),
+    sb.from('people').select('*').is('archived_at', null),
+    lastContactMap(sb),
+    // GUARD 2 (12-people.md §8): anyone with an event today is never drifting.
+    // Asked separately from the brief even though both read today's tags — the
+    // brief drops archived people and caps at three, and a guard computed from
+    // a capped list would silently stop guarding on a busy evening.
+    seenOn(sb, today),
+    briefsFor(sb, today),
+    sb.from('goals').select('id, name, slug').eq('status', 'active').order('created_at'),
+    sb.from('goal_last_done').select('*'),
+    sb.from('task_events').select('tasks!inner(goal_id)').eq('outcome', 'done').gte('occurred_on', since30),
+    // ⚠ WRITING ONLY. `published_at` is stamped on every published essay and is
+    // honest for them; only 1 of 73 quotes carries one, and every song's stamp
+    // is the day the catalogue was imported. A "last published" over all three
+    // would report an import as an act of writing.
+    sb
+      .from('fragments')
+      .select('published_at')
+      .eq('type', 'writing')
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .not('published_at', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(1),
+    // 13 · Piece 3. Google's copy of today — a flight, a reservation, whatever
+    // somebody else put there. It arrives read-only and joins the same union.
+    mirroredBetween(sb, today, today),
+    sb.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
+  ]);
+
+  const roster: Person[] = everyone ?? [];
+
+  /* ── tasks: one query, three zones ─────────────────────────────────────── */
+  const pastDue: PastDueRow[] = tasks.rows
+    .filter((t) => t.shownDueOn && t.shownDueOn < today)
+    .sort((a, b) => a.shownDueOn!.localeCompare(b.shownDueOn!) || a.title.localeCompare(b.title))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      dueOn: t.shownDueOn as Ymd,
+      priority: t.priority,
+      answeredAs: t.answeredAs,
+    }));
+
+  const taskItem = (t: TaskRow): CalendarItem => ({
+    kind: 'task',
+    id: t.id,
+    on: t.shownDueOn as Ymd,
+    title: t.title,
+    at: t.due_time ? t.due_time.slice(0, 5) : null,
+  });
+
+  /* ── birthdays: today's belong to the day, the rest to Coming up ─────────
+     Derived from `birth_month`/`birth_day` (12-people.md §8), which is why one
+     can never be ticked and why the only thing it offers is a door to the
+     person. */
+  const birthdays = roster
+    .map((person) => ({ person, birthday: upcomingBirthday(person, today) }))
+    .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday);
+
+  // The door is set HERE rather than in `birthdayItem` because it is this
+  // page's routing: the calendar renders the same birthdays and opens nothing.
+  const withDoor = (person: Person, on: Ymd): CalendarItem => ({
+    ...birthdayItem(person, on),
+    href: `/admin/people/${person.slug}`,
+  });
+
+  const dayItems: CalendarItem[] = [
+    ...(eventRows ?? []).map((e) => ({ ...eventItem(e), href: `/admin/agenda?day=${e.starts_on}#day` })),
+    ...mirroredToday,
+    ...tasks.rows.filter((t) => t.shownDueOn === today).map(taskItem),
+    ...birthdays.filter((b) => b.birthday.days === 0).map((b) => withDoor(b.person, today)),
+  ];
+
+  const comingItems: CalendarItem[] = [
+    ...tasks.rows.filter((t) => !t.answeredAs && announces({ ...t, due_on: t.shownDueOn }, today)).map(taskItem),
+    ...birthdays.filter((b) => b.birthday.days > 0).map((b) => withDoor(b.person, b.birthday.ymd)),
+  ];
+
+  /* ── people ─────────────────────────────────────────────────────────────── */
+  const drifting = roster.length ? driftList(roster, lastContact, today, seenToday) : [];
+
+  // One round trip for every face the zone can show, and no more: signing the
+  // whole roster would mint URLs for people who are not on this page.
+  const shown = [...briefs.map((b) => b.person), ...drifting.map((d) => d.person)];
+  const peoplePhotos = shown.length
+    ? await signPhotos(
+        sb,
+        shown.map((p) => p.photo_path),
+      )
+    : new Map<string, string>();
+
+  /* ── practice ───────────────────────────────────────────────────────────── */
+  const published = publishedSignal((lastWriting?.[0]?.published_at ?? null)?.slice(0, 10) as Ymd | null, today);
+
+  const lastById = new Map((lastDone ?? []).map((r) => [r.goal_id, r.last_done_on]));
+  const doneIn30 = new Map<string, number>();
+  for (const row of recentDone ?? []) {
+    const id = (row.tasks as { goal_id: string | null } | null)?.goal_id;
+    if (id) doneIn30.set(id, (doneIn30.get(id) ?? 0) + 1);
+  }
+  const goalSignals = (goalRows ?? [])
+    .map((g) => ({ ...g, observation: observationFor(doneIn30.get(g.id) ?? 0, lastById.get(g.id) ?? null, today) }))
+    .filter((g): g is GoalSignal => !!g.observation);
+
+  return {
+    dayItems,
+    comingItems,
+    pastDue,
+    answeredToday: tasks.answeredToday,
+    briefs,
+    drifting,
+    peoplePhotos,
+    published,
+    goalSignals,
+    // ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). Today is the page that would be
+    // confidently wrong if the mirror went quietly stale, so it is one of the
+    // two places that says so — and says nothing at all the rest of the time.
+    stale: staleness(syncState ?? null),
+  };
+}
