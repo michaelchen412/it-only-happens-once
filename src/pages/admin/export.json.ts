@@ -58,6 +58,17 @@ const TABLES = [
   // 13 · Piece 4. `event_people` carries a key into BOTH `events` above and
   // `people` far above, so it lands after each of them.
   'events',
+  // 13 · Piece 3. The Google mirror. It owns no foreign key at all — the tags
+  // that reference it do so by TEXT (`event_people.external_id` is a series id,
+  // deliberately not an FK) — so its only ordering requirement is to precede
+  // `event_people`, which reads better anyway.
+  //
+  // ⚠ IT IS EXPORTED EVEN THOUGH IT IS A COPY, and the reason is the tags: an
+  // export holding the annotations without the rows they hang off would restore
+  // to a set of person tags pointing at nothing until the next sync.
+  'external_events',
+  // The cursor and the mirror's health. One row.
+  'calendar_sync',
   'event_people',
   // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
   // — `works` and `fragments`, already listed far above — as well as into

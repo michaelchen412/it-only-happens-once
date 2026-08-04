@@ -3445,6 +3445,12 @@ a.row__t:hover { color: var(--cn); }
 }
 .pseg--wrap { flex-wrap: wrap; }
 .pseg--wrap .pseg__b { flex: 1 1 auto; }
+/* ⚠ `flex: 1 1 0` GIVES EVERY SEGMENT THE SAME WIDTH, which is right for a
+   full-width control on a sheet and wrong for a two-word switch in a header:
+   Month and Week get equal boxes, Month does not fit its own, and the room
+   rendered `Mon…` for a day. Found in a screenshot, not by a spec — the
+   assertions here read `aria-pressed`, which is true of a truncated label. */
+.pseg--fit .pseg__b { flex: 0 0 auto; }
 
 /* ── goals: intentions, not projects (13 · Piece 2, §4a) ───────────────────
    Graduated from the lab unchanged. What matters here is what is ABSENT: there
@@ -3590,13 +3596,13 @@ a.row__t:hover { color: var(--cn); }
   overflow: hidden;
   background: var(--color-base-100);
 }
-.cal__dow {
+.month__dow {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--color-base-300);
   background: var(--color-base-200);
 }
-.cal__dow span {
+.month__dow span {
   padding: 0.375rem 0.5rem;
   font-family: var(--font-sans);
   font-size: 0.625rem;
@@ -3607,7 +3613,7 @@ a.row__t:hover { color: var(--cn); }
 }
 /* ⚠ SIX ROWS, ALWAYS — 42 cells whatever the month. A grid that changes height
    makes the page jump and moves the row under your cursor while you step. */
-.cal__grid {
+.month__grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: minmax(6.25rem, auto);
@@ -4027,3 +4033,21 @@ a.row__t:hover { color: var(--cn); }
 }
 a.sig:hover .sig__k { color: var(--color-base-content); }
 .sig--cold .sig__v { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
+
+/* ── the mirror's one word (13 · Piece 3, ADR-0014) ────────────────────────
+   ⚠ ABSENT WHILE THE SYNC IS WORKING. A one-way mirror buys its simplicity by
+   introducing exactly one new silent failure — "if the feed stops refreshing,
+   Today is confidently wrong" — and ADR-0014 asks for this in exchange. So it
+   is a line that does not exist on a normal morning and appears when it has
+   something true and unwelcome to say.
+
+   Warning, not error: the page is stale, not broken, and everything on it that
+   HQ owns is still exactly right. */
+.mstale {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  color: color-mix(in oklch, var(--color-warning) 70%, var(--color-base-content));
+}

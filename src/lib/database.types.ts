@@ -46,6 +46,33 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_sync: {
+        Row: {
+          id: boolean
+          last_error: string | null
+          last_error_at: string | null
+          sync_token: string | null
+          synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          sync_token?: string | null
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          sync_token?: string | null
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       constellations: {
         Row: {
           color: string
@@ -211,6 +238,54 @@ export type Database = {
           starts_on?: string
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      external_events: {
+        Row: {
+          cancelled: boolean
+          ends_at: string | null
+          ends_on: string | null
+          event_type: string | null
+          external_id: string
+          id: string
+          location: string | null
+          series_id: string
+          starts_at: string | null
+          starts_on: string
+          synced_at: string
+          title: string | null
+          url: string | null
+        }
+        Insert: {
+          cancelled?: boolean
+          ends_at?: string | null
+          ends_on?: string | null
+          event_type?: string | null
+          external_id: string
+          id?: string
+          location?: string | null
+          series_id: string
+          starts_at?: string | null
+          starts_on: string
+          synced_at?: string
+          title?: string | null
+          url?: string | null
+        }
+        Update: {
+          cancelled?: boolean
+          ends_at?: string | null
+          ends_on?: string | null
+          event_type?: string | null
+          external_id?: string
+          id?: string
+          location?: string | null
+          series_id?: string
+          starts_at?: string | null
+          starts_on?: string
+          synced_at?: string
+          title?: string | null
+          url?: string | null
         }
         Relationships: []
       }

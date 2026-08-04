@@ -52,7 +52,8 @@ import { today as hqToday, parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '
 import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
 import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
 import type { CalendarItem } from '../../lib/hq/calendar';
-import { seenOn } from '../../lib/hq/calendar';
+import { mirroredBetween, seenOn } from '../../lib/hq/calendar';
+import { staleness, type Staleness } from '../../lib/hq/mirror';
 import { briefsFor, type Brief } from '../../lib/hq/brief';
 import { signPhotos, upcomingBirthday, type Person } from '../../lib/hq/people';
 import { lastContactMap } from '../../lib/hq/interactions';
@@ -131,6 +132,7 @@ let drifting: Drift[] = [];
 let peoplePhotos = new Map<string, string>();
 let published: Signal | null = null;
 let goalSignals: { id: string; name: string; slug: string; observation: Observation }[] = [];
+let stale: Staleness | null = null;
 
 if (!offToday) {
   const since30 = shiftYmd(todayYmd, -OBSERVATION_DAYS);
@@ -147,6 +149,8 @@ if (!offToday) {
     { data: lastDone },
     { data: recentDone },
     { data: lastWriting },
+    mirroredToday,
+    { data: syncState },
   ] = await Promise.all([
     supabase
       .from('events')
@@ -181,7 +185,16 @@ if (!offToday) {
       .not('published_at', 'is', null)
       .order('published_at', { ascending: false })
       .limit(1),
+    // 13 · Piece 3. Google's copy of today — a flight, a reservation, whatever
+    // somebody else put there. It arrives read-only and joins the same union.
+    mirroredBetween(supabase, todayYmd, todayYmd),
+    supabase.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
   ]);
+
+  // ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). Today is the page that would be
+  // confidently wrong if the mirror went quietly stale, so it is one of the two
+  // places that says so — and it says nothing at all the rest of the time.
+  stale = staleness(syncState ?? null);
 
   briefs = briefRows;
 
@@ -260,6 +273,7 @@ if (!offToday) {
 
   dayItems = [
     ...eventItems,
+    ...mirroredToday,
     ...taskRows.filter((t) => t.shownDueOn === todayYmd).map(taskItem),
     ...birthdays.filter((b) => b.birthday.days === 0).map((b) => birthdayItem(b.person, todayYmd)),
   ];
@@ -388,6 +402,17 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
         dismissals. The zones themselves are read-only. */}
     <p hidden role="alert" class="admin-alert mb-4" data-task-error></p>
 
+    {
+      /* ⚠ ADR-0014'S ONE DEMAND. A one-way mirror buys its simplicity by
+         introducing a new silent failure: if the sync stops, this page is
+         confidently wrong about the day. It says so — and only then. */
+      stale && (
+        <p class="mstale mb-4" data-stale>
+          <Icon name="ph:warning" /> {stale.text}
+        </p>
+      )
+    }
+
     {/* ⚠ THE ORDER IS §10c's, AND THE `o-*` CLASSES ARE WHY IT SURVIVES A PHONE.
         The wrappers go `display: contents` when narrow, so these five zones
         collapse into one stack and `order` resequences them — People outranks
@@ -428,6 +453,9 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     // The tick, and the two dismissals on a drift row. Both are the rooms' own
     // scripts, reused verbatim rather than reimplemented for this page.
     import '../../scripts/task-list';
+    // Render first, then ask Google (13 · Piece 3). Today is drawn from the
+    // mirror immediately and never waits on the network.
+    import '../../scripts/calendar-sync';
 
     // The travel note (docs/plans/11-checkin.md §2). Client-side because the
     // server has no business asking what the device thinks the zone is — and

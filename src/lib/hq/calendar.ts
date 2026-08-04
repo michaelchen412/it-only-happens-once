@@ -23,6 +23,7 @@
 // browser bundle without dragging a client into it.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types';
+import { spans } from './mirror';
 import type { Ymd } from './time';
 
 export type ItemKind = 'event' | 'task' | 'mirror' | 'birthday';
@@ -118,6 +119,75 @@ export function legendFor(items: CalendarItem[]): { kind: ItemKind; label: strin
 export const CELL_ROWS = 3;
 
 /**
+ * Everything mirrored from Google that touches `[from, to]` (13 · Piece 3).
+ *
+ * ⚠ CANCELLED ROWS ARE FILTERED HERE, NOT DELETED THERE. ADR-0014's mirror
+ * marks and never removes, so that an annotation written on an event somebody
+ * later cancelled stays legible instead of vanishing. The consequence is that
+ * every reader has to remember to exclude them, which is exactly why there is
+ * one reader.
+ *
+ * ⚠ AND A MULTI-DAY ROW BECOMES ONE ITEM PER DAY IT COVERS. A four-night hotel
+ * stay is not an event on the day you checked in; it is where you are all week,
+ * and the grid's question is "what is my day". Two of the nine real events on
+ * the live calendar are exactly this.
+ */
+export async function mirroredBetween(
+  sb: SupabaseClient<Database>,
+  from: Ymd,
+  to: Ymd,
+): Promise<CalendarItem[]> {
+  const { data } = await sb
+    .from('external_events')
+    .select('*')
+    .eq('cancelled', false)
+    .lte('starts_on', to)
+    // Either it ends inside the window, or it is a single-day row inside it.
+    .or(`ends_on.gte.${from},and(ends_on.is.null,starts_on.gte.${from})`);
+
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  // Who has been tagged on them — keyed on the SERIES, which is what a tag
+  // attaches to (§2 wrinkle 1).
+  const { data: tags } = await sb
+    .from('event_people')
+    .select('external_id, people(id, display_name)')
+    .in('external_id', [...new Set(rows.map((r) => r.series_id))]);
+
+  const bySeries = new Map<string, { id: string; name: string }[]>();
+  for (const t of tags ?? []) {
+    const p = t.people as unknown as { id: string; display_name: string } | null;
+    if (!t.external_id || !p) continue;
+    const list = bySeries.get(t.external_id) ?? [];
+    list.push({ id: p.id, name: p.display_name });
+    bySeries.set(t.external_id, list);
+  }
+
+  return rows.flatMap((row) =>
+    spans(row)
+      .filter((day) => day >= from && day <= to)
+      .map((day) => ({
+        kind: 'mirror' as const,
+        // The series, so the day panel's tag control has the right subject
+        // without the row having to carry a second identifier.
+        id: row.series_id,
+        on: day,
+        title: row.title ?? '(untitled)',
+        // A multi-day event only has its time on the day it starts; in the
+        // middle of a hotel stay there is no o'clock to show.
+        at: day === row.starts_on ? row.starts_at?.slice(0, 5) ?? null : null,
+        endAt: day === row.starts_on ? row.ends_at?.slice(0, 5) ?? null : null,
+        location: row.location,
+        // ⚠ THE ROW'S ONE DOOR IS GOOGLE ITSELF, which is a better explanation
+        // of "not yours to change" than any label (10-hq.md §10i).
+        href: row.url ?? undefined,
+        people: bySeries.get(row.series_id) ?? [],
+      })),
+  );
+}
+
+/**
  * Who is on the calendar today — the drift guard's one question.
  *
  * ⚠ THIS IS THE HOLE `12 · Piece 4` COULD NOT CLOSE, and it was carried on the
@@ -127,12 +197,30 @@ export const CELL_ROWS = 3;
  * the one day it is wrong on telling you that you have neglected somebody you
  * are about to have dinner with.
  *
+ * ⚠ IT ASKS BOTH CALENDARS. A tag on a mirrored event is the one write HQ has
+ * against Google's copy, and the entire reason to make it is that the people on
+ * it show up. A guard that only knew about HQ-native events would quietly stop
+ * guarding for exactly the dinners somebody else organised — which is most of
+ * them.
+ *
  * Never throws. A failure here should cost the guard, not the page.
  */
 export async function seenOn(sb: SupabaseClient<Database>, ymd: Ymd): Promise<Set<string>> {
-  const { data } = await sb
-    .from('event_people')
-    .select('person_id, events!inner(starts_on)')
-    .eq('events.starts_on', ymd);
-  return new Set((data ?? []).map((r) => r.person_id));
+  const [{ data: own }, { data: mirrored }] = await Promise.all([
+    sb.from('event_people').select('person_id, events!inner(starts_on)').eq('events.starts_on', ymd),
+    sb
+      .from('external_events')
+      .select('series_id')
+      .eq('cancelled', false)
+      .lte('starts_on', ymd)
+      .or(`ends_on.gte.${ymd},and(ends_on.is.null,starts_on.gte.${ymd})`),
+  ]);
+
+  const seen = new Set((own ?? []).map((r) => r.person_id));
+  const series = [...new Set((mirrored ?? []).map((r) => r.series_id))];
+  if (series.length) {
+    const { data } = await sb.from('event_people').select('person_id').in('external_id', series);
+    for (const r of data ?? []) seen.add(r.person_id);
+  }
+  return seen;
 }

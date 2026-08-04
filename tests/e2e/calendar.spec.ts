@@ -19,12 +19,12 @@ const visibleText = async (page: Page) => (await page.locator('body').innerText(
 test.describe('the month grid', () => {
   test('⚠ is always six rows, so the page never jumps between months', async ({ page }) => {
     await calendar(page);
-    await expect(page.locator('.cal__grid .cell')).toHaveCount(42);
+    await expect(page.locator('.month__grid .cell')).toHaveCount(42);
     // And it is still 42 in a month that starts on a Sunday, and in February.
     await calendar(page, '?date=2027-02-01');
-    await expect(page.locator('.cal__grid .cell')).toHaveCount(42);
+    await expect(page.locator('.month__grid .cell')).toHaveCount(42);
     await calendar(page, '?date=2026-11-01');
-    await expect(page.locator('.cal__grid .cell')).toHaveCount(42);
+    await expect(page.locator('.month__grid .cell')).toHaveCount(42);
   });
 
   test('marks today exactly once, and only in the month it is in', async ({ page }) => {
@@ -48,7 +48,7 @@ test.describe('the month grid', () => {
 
   test('⚠ FILL MEANS WRITABLE — and it is the loudest distinction on the grid', async ({ page }) => {
     await calendar(page);
-    const items = page.locator('.cal__grid .ev');
+    const items = page.locator('.month__grid .ev');
     test.skip((await items.count()) === 0, 'nothing on the calendar this month');
 
     const fill = async (sel: string) => {
@@ -71,11 +71,11 @@ test.describe('the month grid', () => {
 
   test('a read-only row carries a lock; a writable one does not', async ({ page }) => {
     await calendar(page);
-    const ro = page.locator('.cal__grid .ev--ro');
+    const ro = page.locator('.month__grid .ev--ro');
     test.skip((await ro.count()) === 0, 'nothing read-only on the grid — no mirror yet, and no birthdays');
     await expect(ro.first().locator('.ev__lock')).toBeAttached();
-    await expect(page.locator('.cal__grid .ev--event .ev__lock')).toHaveCount(0);
-    await expect(page.locator('.cal__grid .ev--task .ev__lock')).toHaveCount(0);
+    await expect(page.locator('.month__grid .ev--event .ev__lock')).toHaveCount(0);
+    await expect(page.locator('.month__grid .ev--task .ev__lock')).toHaveCount(0);
   });
 
   test('⚠ the legend never keys a source with nothing in it', async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe('the month grid', () => {
     expect(text).not.toContain('Mirrored');
     // And a one-source month gets no key at all: a legend over one thing is
     // the repeated label §5 cut, wearing a different hat.
-    const kinds = await page.locator('.cal__grid .ev').evaluateAll((els) =>
+    const kinds = await page.locator('.month__grid .ev').evaluateAll((els) =>
       [...new Set(els.map((e) => [...e.classList].find((c) => c.startsWith('ev--') && c !== 'ev--ro')))].length,
     );
     if (kinds <= 1) await expect(page.locator('.legend')).toHaveCount(0);
@@ -96,7 +96,7 @@ test.describe('the month grid', () => {
 test.describe('the day panel', () => {
   const openADay = async (page: Page) => {
     await calendar(page);
-    const item = page.locator('.cal__grid .ev').first();
+    const item = page.locator('.month__grid .ev').first();
     if ((await item.count()) === 0) return false;
     await item.click();
     await expect(page.locator('[data-day]')).toBeVisible();
@@ -226,6 +226,6 @@ test.describe('the Agenda room', () => {
   test('week is the same union, not a second data model', async ({ page }) => {
     await calendar(page, '?view=week');
     await expect(page.locator('.wkcol')).toHaveCount(7);
-    await expect(page.locator('.cal__grid')).toHaveCount(0);
+    await expect(page.locator('.month__grid')).toHaveCount(0);
   });
 });

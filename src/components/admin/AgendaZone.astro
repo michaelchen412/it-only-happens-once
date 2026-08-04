@@ -96,10 +96,20 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
               </span>
 
               <span class="min-w-0 flex-1">
+                {/* A mirrored row's door leads OUT — to the event on Google,
+                    which is the only place it can be changed. New tab, because
+                    leaving Today to read somebody else's calendar entry and
+                    losing your morning is not a trade anybody wants. */}
                 {it.href ? (
-                  <a class="row__t row-open" href={it.href}>
+                  <a
+                    class="row__t row-open"
+                    href={it.href}
+                    target={it.kind === 'mirror' ? '_blank' : undefined}
+                    rel={it.kind === 'mirror' ? 'noreferrer' : undefined}
+                  >
                     {it.kind === 'birthday' && <Icon name="ph:cake" class="row__i" />}
                     {it.title}
+                    {it.kind === 'mirror' && <Icon name="ph:arrow-up-right" class="row__i" />}
                   </a>
                 ) : (
                   <span class="row__t">{it.title}</span>

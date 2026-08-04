@@ -26,6 +26,7 @@ import { drift } from './drift';
 import { tasks } from './tasks';
 import { goals } from './goals';
 import { events } from './events';
+import { calendar } from './calendar';
 
 export const server = {
   fragments,
@@ -53,6 +54,11 @@ export const server = {
   goals,
   // The calendar's writable half (13 · Piece 4). `tag` is the ONE write HQ has
   // against a mirrored row, and it is additive by construction, so it can never
-  // create a conflict with Google (ADR-0014, in draft).
+  // create a conflict with Google (ADR-0014).
   events,
+  // The Google mirror (13 · Piece 3). ⚠ NOTE WHAT IS NOT HERE: nothing that
+  // writes to Google. `sync` pulls, and the credential it uses carries only
+  // `calendar.events.readonly` — so the one-way rule is enforced by the token,
+  // not by this list.
+  calendar,
 };

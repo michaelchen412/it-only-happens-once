@@ -23,9 +23,11 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../components/admin/AgendaTabs.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
+import TagSheet from '../../components/admin/TagSheet.astro';
 import { today as hqToday, parseYmd, type Ymd } from '../../lib/hq/time';
 import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
-import { CELL_ROWS, KINDS, byDay, byTime, legendFor, type CalendarItem } from '../../lib/hq/calendar';
+import { CELL_ROWS, KINDS, byDay, byTime, legendFor, mirroredBetween, type CalendarItem } from '../../lib/hq/calendar';
+import { staleness } from '../../lib/hq/mirror';
 import { upcomingBirthday } from '../../lib/hq/people';
 
 const supabase = Astro.locals.supabase;
@@ -53,7 +55,14 @@ const weekCells = Array.from({ length: 7 }, (_, i) => {
 const from = week ? weekCells[0] : cells[0].ymd;
 const to = week ? weekCells[6] : cells[41].ymd;
 
-const [{ data: eventRows, error }, { data: taskRows }, { data: peopleRows }, { data: answeredRows }] = await Promise.all([
+const [
+  { data: eventRows, error },
+  { data: taskRows },
+  { data: peopleRows },
+  { data: answeredRows },
+  mirrored,
+  { data: syncState },
+] = await Promise.all([
   supabase
     .from('events')
     .select('*, event_people(person_id, people(id, display_name))')
@@ -62,7 +71,17 @@ const [{ data: eventRows, error }, { data: taskRows }, { data: peopleRows }, { d
   supabase.from('tasks').select('id, title, due_on, due_time').is('archived_at', null).gte('due_on', from).lte('due_on', to),
   supabase.from('people').select('id, display_name, birth_month, birth_day, birthday_lead_days, archived_at'),
   supabase.from('task_events').select('task_id').eq('occurred_on', todayYmd),
+  // 13 · Piece 3. The fourth source finally has a producer — until now `mirror`
+  // was a kind of row nothing could create.
+  mirroredBetween(supabase, from, to),
+  supabase.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
 ]);
+
+// ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). A permanent "synced 4 minutes ago"
+// is the status line you read once and ignore for ever; a mirror that has gone
+// quietly stale is the one silent failure this integration introduced. So this
+// is null almost always, and says one sentence when it matters.
+const stale = staleness(syncState ?? null);
 
 const answered = new Set((answeredRows ?? []).map((r) => r.task_id));
 
@@ -103,6 +122,10 @@ const items: CalendarItem[] = [
       title: b.person.display_name,
       at: null,
     })),
+  // Google's copy. Its rows carry `href` — the event on Google — which is the
+  // whole of their read-only explanation: the one door a mirrored row offers
+  // leads to the only place it can be changed.
+  ...mirrored,
 ];
 
 const days = byDay(items);
@@ -123,6 +146,10 @@ const href = (params: Record<string, string | null>) => {
   const q = url.toString();
   return `/admin/agenda${q ? `?${q}` : ''}${params.day ? '#day' : ''}`;
 };
+
+/** No roster, no tag control — the same rule the "who was there" field follows. */
+const roster = (peopleRows ?? []).filter((p) => !p.archived_at).map((p) => ({ id: p.id, display_name: p.display_name }));
+const taggable = roster.length > 0;
 
 const stepWeek = (n: number) => {
   const d = new Date(`${weekStart}T00:00:00Z`);
@@ -156,7 +183,7 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         )
       }
       <span class="ml-auto flex items-center gap-2">
-        <span class="pseg" role="group" aria-label="View">
+        <span class="pseg pseg--fit" role="group" aria-label="View">
           <a class="pseg__b" href={href({ view: null })} aria-pressed={!week}>Month</a>
           <a class="pseg__b" href={href({ view: 'week' })} aria-pressed={week}>Week</a>
         </span>
@@ -170,6 +197,18 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     {/* One alert for both writes on this page: the sheet's, and the day
         panel's tick, which is the tasks room's script reused verbatim. */}
     <p hidden role="alert" class="admin-alert mb-4" data-event-error data-task-error></p>
+
+    {
+      /* ⚠ THE ONE THING ADR-0014 ASKED FOR IN EXCHANGE FOR ITS SIMPLICITY: a
+         mirror that has gone stale must not render quietly, because a calendar
+         that is confidently wrong is worse than one that admits it. Absent
+         while the sync is working — see `staleness`. */
+      stale && (
+        <p class="mstale" data-stale>
+          <Icon name="ph:warning" /> {stale.text}
+        </p>
+      )
+    }
 
     {
       /* Four sources on one grid is genuinely ambiguous, and a four-word key is
@@ -220,9 +259,9 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           ))}
         </div>
       ) : (
-        <div class="cal">
-          <div class="cal__dow">{DOW.map((d) => <span>{d}</span>)}</div>
-          <div class="cal__grid">
+        <div class="month">
+          <div class="month__dow">{DOW.map((d) => <span>{d}</span>)}</div>
+          <div class="month__grid">
             {cells.map((cell) => {
               const list = days.get(cell.ymd) ?? [];
               return (
@@ -302,10 +341,20 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                     {it.endAt && <span class="drow__e">→ {clockTime(it.endAt)}</span>}
                   </span>
                   <span class="min-w-0 flex-1">
-                    <span class="drow__x">
-                      {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
-                      {it.title}
-                    </span>
+                    {/* A mirrored row's title is a link to Google — the only
+                        place it can actually be changed. That door IS the
+                        explanation of read-only, and it cannot go stale. */}
+                    {it.kind === 'mirror' && it.href ? (
+                      <a class="drow__x row-open" href={it.href} target="_blank" rel="noreferrer">
+                        {it.title}
+                        <Icon name="ph:arrow-up-right" class="ev__i" />
+                      </a>
+                    ) : (
+                      <span class="drow__x">
+                        {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                        {it.title}
+                      </span>
+                    )}
                     {it.location && <span class="drow__l">{it.location}</span>}
                     {!!it.people?.length && (
                       <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>
@@ -321,6 +370,23 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                       <Icon name="ph:check" /> Did it
                     </button>
                   )}
+                  {/* ⚠ THE ONE WRITE HQ HAS AGAINST GOOGLE'S COPY, and it is
+                      additive by construction — it adds what Google does not
+                      know and changes nothing Google owns, so it can never
+                      produce a conflict (ADR-0014). No Edit here, ever: the
+                      row's own affordances are the whole statement of what is
+                      and is not ours. */}
+                  {it.kind === 'mirror' && taggable && (
+                    <button
+                      type="button"
+                      class="chip chip--act shrink-0"
+                      data-tag={it.id}
+                      data-tag-title={it.title}
+                      data-tag-people={(it.people ?? []).map((p) => p.id).join(',')}
+                    >
+                      <Icon name="ph:users-three" /> {it.people?.length ? 'Who’s there' : 'Tag someone'}
+                    </button>
+                  )}
                   {/* A birthday offers nothing. There is no row to open. */}
                 </li>
               ))}
@@ -331,14 +397,15 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     }
   </div>
 
-  <EventSheet
-    today={todayYmd}
-    people={(peopleRows ?? []).filter((p) => !p.archived_at).map((p) => ({ id: p.id, display_name: p.display_name }))}
-  />
+  <EventSheet today={todayYmd} people={roster} />
+  <TagSheet people={roster} />
 
   <script>
     // The tick in the day panel is the same control as the one in the tasks
     // room, so it is the same script: `[data-task-list]` is what it binds to.
     import '../../scripts/task-list';
+    // Render first, then ask Google. This page is never blocked on the network
+    // — a slow or dead one costs freshness and nothing else (ADR-0014).
+    import '../../scripts/calendar-sync';
   </script>
 </AdminLayout>

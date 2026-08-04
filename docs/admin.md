@@ -557,7 +557,7 @@ The contents are a union of four sources, and only two of them can be changed he
 |---|---|---|
 | **HQ event** | solid fill | yours, and the most present thing on the grid |
 | **Task** | lighter fill + `○` | yours, but not an event — it ticks off |
-| **Google mirror** | hairline, no fill | a copy of something that lives elsewhere |
+| **Google mirror** | hairline, no fill | a copy of something that lives elsewhere — its title links out to Google |
 | **Birthday** | no body at all, a cake and a name | not a row anywhere |
 
 **The first draft got this wrong in a way worth recording:** tasks were given an outline ring, which put them in the same visual class as the Google rows — so the loudest distinction on the grid became *event vs everything else* rather than **yours vs not yours**, which is the one the whole treatment exists to make. Fill is now the writable signal and nothing else uses it.
@@ -568,7 +568,7 @@ Two reinforcements, neither a word: read-only rows **do not lift on hover** and 
 
 ### The day panel is where read-only is explained
 
-Clicking any item opens the day, and **the affordance is the whole explanation**. An HQ event offers *Edit*; a task offers *Did it*; a mirrored row offers only **`+ Tag someone`**, the one write HQ has against Google's copy; a birthday offers nothing at all, because there is no row to open. **No footer, no per-row note, no summary line** — all three were drafted and cut, and the summary earned its removal twice.
+Clicking any item opens the day, and **the affordance is the whole explanation**. An HQ event offers *Edit*; a task offers *Did it*; a mirrored row offers **no Edit at all** — its title is a link out to Google, the only place it *can* be changed — plus **Tag someone**, the one write HQ has against Google's copy; a birthday offers nothing at all, because there is no row to open. **No footer, no per-row note, no summary line** — all three were drafted and cut, and the summary earned its removal twice.
 
 **Every control on this page is a real link.** The month steps, the view switches and the day opens through `?date=` / `?view=` / `?day=`, all rendered server-side, so the page works before a byte of JavaScript runs — and so the day panel survives a reload and a back button. It is also how the whole grid avoids the trap that bit the Today prototype: a calendar built with `createElement` silently gets none of its scoped hover, cursor or focus rules.
 
@@ -577,6 +577,28 @@ Clicking any item opens the day, and **the affordance is the whole explanation**
 **Who was there is the point.** An event's people are what make the People zone's brief possible, and tagging is additive by construction — it never has to live inside Google's copy, so it cannot create a conflict.
 
 It also closes something: *anyone with an event today is never drifting*. That guard was named in [§12](#12-people--the-roster) and unenforceable for a day and a half, because it needs an events table. The interaction will not be logged until the evening at the earliest, so without it the "Been a while" panel spends the whole of the one day it is wrong telling you that you have neglected somebody you are about to have dinner with.
+
+
+### The mirror — what Google puts there ([ADR 0014](adr/0014-calendar-is-one-way.md))
+
+*Live since 2026-08-03.* The fourth source on the grid finally has a producer.
+
+**It is one direction, and the credential enforces it.** The token carries `calendar.events.readonly` — narrower than `calendar.readonly` — so "HQ never writes to Google" is not a convention the code observes but the only thing the credential permits.
+
+**What it actually carries is not what the plan assumed.** Read end to end before it was built, the live calendar held 48 events: 31 auto-generated birthdays, 9 Gmail-extracted bookings (flights, hotel stays, restaurant and cinema reservations), and 8 test events. **One was created by anybody else.** So the mirror's value is *things Michael did not type and would never type into HQ* — roughly one a month, each of them exactly what you want on the day. The correction is recorded in the ADR rather than quietly fixed, because it changes what "this stopped being worth it" would look like later.
+
+**Google's birthdays are dropped at ingest** — 31 of those 48. HQ derives birthdays from `people` and draws them as a mark rather than a row, so importing Google's would put two differently-drawn entries on the same day, which reads as a bug.
+
+**Two things the API's shape decides, both of them silent if you get them wrong:**
+
+- **Google's all-day end date is exclusive.** A two-night stay reads `29 → 31`. Stored verbatim it puts you in the hotel a night longer than you were, on every stay, for ever.
+- **A multi-day row is on every day it covers.** A four-night hotel is not an event on the day you checked in; it is where you are all week, and the grid's question is *what is my day*.
+
+**It refreshes when you open a page that shows it**, throttled to ten minutes, not on a schedule. There is no scheduler in this repository, and a calendar that changes monthly does not earn push channels renewed weekly. The page renders from the mirror first and asks Google after paint, so a slow or dead network costs freshness and nothing else. The cost is stated plainly rather than hidden: **the mirror is only ever as fresh as your last visit.**
+
+**Staleness is the one thing that speaks.** A one-way mirror buys its simplicity by introducing exactly one new silent failure — if the sync stops, Today is confidently wrong. So Today and the Agenda room carry a quiet line **only when it has gone a day without reaching Google, or has failed**; the rest of the time they say nothing at all, because a permanent "synced 4 minutes ago" is the status line you read once and ignore for ever.
+
+**A `410 GONE` is an instruction, not an error.** It means the incremental cursor is dead; the sync drops it and does a full one rather than logging and carrying on with a stale mirror. That full sync **upserts and marks** — it never truncates and reloads, because a reload leaves a window in which the mirror is empty.
 
 ---
 
