@@ -20,6 +20,7 @@
   hidden, which is navigation. It is never a score and never coloured.
 */
 import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
 import type { Shared, SharedFragment } from '../../lib/hq/links';
 import type { Person } from '../../lib/hq/people';
 
@@ -37,14 +38,10 @@ const MARK: Record<SharedFragment['type'], string> = {
 };
 ---
 
-<section class="zone cn-gold" data-shared data-person-id={person.id}>
-  <div class="zone__head">
-    <span class="zone__chip"><Icon name="ph:books" /></span>
-    <h2 class="zone__title">Shared</h2>
-    <button type="button" class="zone__act" data-open-link-sheet aria-label="Link a book or a fragment">
-      <Icon name="ph:plus" />
-    </button>
-  </div>
+<Zone title="Shared" icon="ph:books" accent="cn-gold" data-shared data-person-id={person.id}>
+  <button slot="actions" type="button" class="zone__act" data-open-link-sheet aria-label="Link a book or a fragment">
+    <Icon name="ph:plus" />
+  </button>
 
   {
     /* Unlinking happens with the sheet CLOSED, so its failure cannot be
@@ -148,4 +145,4 @@ const MARK: Record<SharedFragment['type'], string> = {
       </div>
     )
   }
-</section>
+</Zone>

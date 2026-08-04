@@ -32,6 +32,7 @@
   matters more than what is approaching (§10b).
 */
 import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
 import type { CalendarItem } from '../../lib/hq/calendar';
 import { clockTime, dmd, fullDate } from '../../lib/hq/dates';
 import { byDayThenTime } from '../../lib/hq/today';
@@ -47,16 +48,10 @@ const rows = [...items].sort(byDayThenTime);
 
 {
   rows.length > 0 && (
-    <section class="zone cn-amber o-4" data-coming-up>
-      <div class="zone__head">
-        <span class="zone__chip">
-          <Icon name="ph:clock-light" />
-        </span>
-        <h2 class="zone__title">Coming up</h2>
-        <a class="zone__act" href="/admin/agenda/tasks" aria-label="Open tasks">
-          <Icon name="ph:arrow-right" />
-        </a>
-      </div>
+    <Zone title="Coming up" icon="ph:clock-light" accent="cn-amber" order={4} data-coming-up>
+      <a slot="actions" class="zone__act" href="/admin/agenda/tasks" aria-label="Open tasks">
+        <Icon name="ph:arrow-right" />
+      </a>
 
       <div class="zone__body">
         {rows.map((it) => (
@@ -80,6 +75,6 @@ const rows = [...items].sort(byDayThenTime);
           </div>
         ))}
       </div>
-    </section>
+    </Zone>
   )
 }

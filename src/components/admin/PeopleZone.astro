@@ -21,6 +21,7 @@
 */
 import BeenAWhile from './BeenAWhile.astro';
 import Brief from './Brief.astro';
+import Zone from './Zone.astro';
 import { Icon } from 'astro-icon/components';
 import type { Brief as BriefRow } from '../../lib/hq/brief';
 import { TODAY_DRIFT_CAP, type Drift } from '../../lib/hq/drift';
@@ -43,16 +44,10 @@ const more = drifting.length - shown.length;
 
 {
   (briefs.length > 0 || shown.length > 0) && (
-    <section class="zone cn-azure o-3" data-people-zone>
-      <div class="zone__head">
-        <span class="zone__chip">
-          <Icon name="ph:users-three" />
-        </span>
-        <h2 class="zone__title">People</h2>
-        <a class="zone__act" href="/admin/people" aria-label="Open People">
-          <Icon name="ph:arrow-right" />
-        </a>
-      </div>
+    <Zone title="People" icon="ph:users-three" accent="cn-azure" order={3} data-people-zone>
+      <a slot="actions" class="zone__act" href="/admin/people" aria-label="Open People">
+        <Icon name="ph:arrow-right" />
+      </a>
 
       {briefs.length > 0 && (
         <div class="zone__body pb-1" data-briefs>
@@ -76,6 +71,6 @@ const more = drifting.length - shown.length;
           )}
         </div>
       )}
-    </section>
+    </Zone>
   )
 }

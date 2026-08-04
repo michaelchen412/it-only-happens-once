@@ -20,6 +20,7 @@
   the same storage, room for the conversation that turned out to matter.
 */
 import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
 import { renderMarkdown } from '../../lib/markdown';
 import { dmd, fullDate } from '../../lib/hq/dates';
 import { hueFor, monogram, type Person } from '../../lib/hq/people';
@@ -41,18 +42,14 @@ interface Props {
 const { person, entries, roster, today } = Astro.props;
 ---
 
-<section class="zone cn-sand" data-timeline data-person-id={person.id} data-today={today}>
-  <div class="zone__head">
-    <span class="zone__chip"><Icon name="ph:note" /></span>
-    <h2 class="zone__title">Timeline</h2>
-    {
-      entries.length > 0 && (
-        <span class="zone__count ml-auto">
-          {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
-        </span>
-      )
-    }
-  </div>
+<Zone title="Timeline" icon="ph:note" accent="cn-sand" data-timeline data-person-id={person.id} data-today={today}>
+  {
+    entries.length > 0 && (
+      <span slot="actions" class="zone__count ml-auto">
+        {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+      </span>
+    )
+  }
 
   <div class="zone__body pb-2">
     <div class="logbox" data-logbox>
@@ -193,7 +190,7 @@ const { person, entries, roster, today } = Astro.props;
       </ul>
     )
   }
-</section>
+</Zone>
 
 <script>
   import '../../scripts/log-box';

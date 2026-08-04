@@ -26,6 +26,7 @@
   said.
 */
 import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
 import type { Observation } from '../../lib/hq/goals';
 import type { Signal } from '../../lib/hq/today';
 
@@ -38,14 +39,7 @@ const { published, goals } = Astro.props;
 
 {
   (published || goals.length > 0) && (
-    <section class="zone cn-rose o-5" data-practice>
-      <div class="zone__head">
-        <span class="zone__chip">
-          <Icon name="ph:pen-nib" />
-        </span>
-        <h2 class="zone__title">Practice</h2>
-      </div>
-
+    <Zone title="Practice" icon="ph:pen-nib" accent="cn-rose" order={5} data-practice>
       <div class="zone__body">
         {published && (
           <div class:list={['sig', published.cold && 'sig--cold']} data-signal="published">
@@ -67,6 +61,6 @@ const { published, goals } = Astro.props;
           </a>
         ))}
       </div>
-    </section>
+    </Zone>
   )
 }

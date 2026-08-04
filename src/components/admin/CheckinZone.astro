@@ -22,6 +22,7 @@
   Everything that moves between them is `src/scripts/checkin.ts`.
 */
 import { Icon } from 'astro-icon/components';
+import Zone from './Zone.astro';
 import {
   DREAMS,
   LATENCIES,
@@ -83,24 +84,23 @@ const TRACKS = [
 ] as const;
 ---
 
-<section
-  class="zone cn-violet o-1"
+<Zone
+  title="Morning"
+  icon="ph:moon-stars"
+  accent="cn-violet"
+  order={1}
   data-checkin
   data-log-date={logDate}
   data-writable={writable ? 'true' : 'false'}
   data-panel-initial={writable ? panel : answered ? 'done' : 'closed'}
 >
-  <div class="zone__head">
-    <span class="zone__chip"><Icon name="ph:moon-stars" /></span>
-    <h2 class="zone__title">Morning</h2>
-    {
-      writable && (
-        <button type="button" class="zone__act" data-edit hidden aria-label="Edit this check-in">
-          <Icon name="ph:pencil-simple" />
-        </button>
-      )
-    }
-  </div>
+  {
+    writable && (
+      <button slot="actions" type="button" class="zone__act" data-edit hidden aria-label="Edit this check-in">
+        <Icon name="ph:pencil-simple" />
+      </button>
+    )
+  }
 
   {/* ════════════ ASK ════════════ */}
   <div
@@ -464,6 +464,6 @@ const TRACKS = [
       </div>
     )
   }
-</section>
+</Zone>
 
 {!writable && !answered && <p class="admin-hint mt-2 text-xs">Check-ins can only be filled in for the last 3 days.</p>}

@@ -1,0 +1,68 @@
+---
+/*
+  Zone — the card every HQ surface is made of (docs/plans/00-groundwork.md ·
+  Piece 5).
+
+  Eight components had written out the same twelve lines of chrome: the
+  `<section class="zone cn-… o-…">`, the chip, the title, and whatever sits at
+  the right-hand end. This owns that, and NOTHING else.
+
+  ⚠ THIN ON PURPOSE, AND THE ALTERNATIVE THAT LOST WAS A CONFIG ARRAY. Driving
+  all eight zones from one `zones.ts` table — hue, icon, order, action, per
+  key — was drafted and cut. The chrome is genuinely identical; the CONTENT is
+  genuinely not, and several zones carry rendering decisions in their markup
+  that a table cannot hold: the empty `tick` box that has to be *visibly*
+  missing beside an event, the divider that appears only when there is prose
+  under it, the two `zone__body` blocks People needs. A config array would have
+  meant either eight special cases inside one component or eight zones losing
+  the thing that makes them right.
+
+  So: if a prop would be used by exactly one zone, it belongs in that zone's
+  markup, not here.
+
+  ⚠ AND THE BODY IS THE CALLER'S. This renders the section and the head, then
+  slots. Callers keep their own `<div class="zone__body">` — because several
+  need two of them, or need one with extra padding, and a wrapper that owned
+  the body would have to grow a prop for each.
+
+  ⚠ `order` IS A PROP, NEVER A LOOKUP. Two zones' comments state that they carry
+  their own narrow-stack order (10-hq.md §10c) so it "must not have to be known
+  in two places". A table in here mapping zone name → order would be that second
+  place, arriving through the back door.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  title: string;
+  /** A Phosphor name — and it must be in astro.config's `include` allowlist. */
+  icon: string;
+  /** The domain hue: `cn-violet` sleep, `cn-amber` agenda, `cn-azure` people… */
+  accent?: string;
+  /** Narrow-stack position (§10c). Omitted where the zone is not in the stack. */
+  order?: number;
+  /**
+   * The one semantic chip: past due's warm one. Semantic, not a domain hue —
+   * red means pressing here and nowhere means "belongs to the agenda" (§10a).
+   */
+  chip?: 'warn';
+  class?: string;
+}
+
+// Rest props land on the <section>, which is how each zone keeps its own
+// `data-*` hooks (`data-checkin`, `data-past-due`, …) without this component
+// needing to know a single one of their names.
+const { title, icon, accent, order, chip, class: className, ...attrs } = Astro.props;
+---
+
+<section class:list={['zone', accent, order && `o-${order}`, className]} {...attrs}>
+  <div class="zone__head">
+    <span class:list={['zone__chip', chip && `zone__chip--${chip}`]}>
+      <Icon name={icon} />
+    </span>
+    <h2 class="zone__title">{title}</h2>
+    {/* Counts, arrows, pencils — whatever this zone offers, or nothing. */}
+    <slot name="actions" />
+  </div>
+
+  <slot />
+</section>

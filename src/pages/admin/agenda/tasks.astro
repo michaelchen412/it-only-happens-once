@@ -24,7 +24,9 @@
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
+import DispositionChips from '../../../components/admin/DispositionChips.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
+import Tick from '../../../components/admin/Tick.astro';
 import { today as hqToday } from '../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
 import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
@@ -156,18 +158,7 @@ const payload = (t: Task) =>
                             there the choice IS the interaction, and a circle
                             beside a "Did it" chip is two paths to one outcome
                             while saying nothing about the other one. */}
-                        {!past && (
-                          <button
-                            type="button"
-                            class="tick"
-                            data-dispose={t.answeredAs ? undefined : 'done'}
-                            data-undo={t.answeredAs ? '' : undefined}
-                            aria-label={t.answeredAs ? `Undo “${t.title}”` : `Mark “${t.title}” done`}
-                          >
-                            <Icon name="ph:circle" class="tick__o" />
-                            <Icon name="ph:check-circle" class="tick__x" />
-                          </button>
-                        )}
+                        {!past && <Tick answered={!!t.answeredAs} title={t.title} />}
 
                         <span class="min-w-0 flex-1">
                           {/* The title IS the edit affordance, so no pencil sits
@@ -219,25 +210,7 @@ const payload = (t: Task) =>
                           </span>
                         </span>
 
-                        {past && (
-                          <>
-                            <span class="flex shrink-0 gap-1" data-unanswered hidden={!!t.answeredAs}>
-                              <button type="button" class="chip chip--act chip--did" data-dispose="done">
-                                <Icon name="ph:check" /> Did it
-                              </button>
-                              <button type="button" class="chip chip--act chip--skip" data-dispose="skipped">
-                                <Icon name="ph:skip-forward" /> Skipping it
-                              </button>
-                            </span>
-                            {/* Answered, the two chips become the way back — one
-                                control, because there is now one question. */}
-                            <span class="flex shrink-0" data-answered hidden={!t.answeredAs}>
-                              <button type="button" class="chip chip--act" data-undo>
-                                Undo
-                              </button>
-                            </span>
-                          </>
-                        )}
+                        {past && <DispositionChips answered={t.answeredAs} />}
                       </li>
                     );
                   })}

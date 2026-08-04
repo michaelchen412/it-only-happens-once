@@ -27,6 +27,8 @@
   and its goal query off the page opened on a phone at 7am.
 */
 import { Icon } from 'astro-icon/components';
+import Tick from './Tick.astro';
+import Zone from './Zone.astro';
 import { byTime, type CalendarItem } from '../../lib/hq/calendar';
 import { clockTime } from '../../lib/hq/dates';
 import { progressLabel } from '../../lib/hq/today';
@@ -45,19 +47,15 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
 
 {
   rows.length > 0 && (
-    <section class="zone cn-amber o-2" data-agenda-zone>
-      <div class="zone__head">
-        <span class="zone__chip">
-          <Icon name="ph:calendar-blank" />
-        </span>
-        <h2 class="zone__title">Today</h2>
+    <Zone title="Today" icon="ph:calendar-blank" accent="cn-amber" order={2} data-agenda-zone>
+      <Fragment slot="actions">
         <span class="zone__count ml-auto" data-progress hidden={!progress}>
           {progress}
         </span>
         <a class="zone__act" href="/admin/agenda" aria-label="Open the calendar">
           <Icon name="ph:arrow-right" />
         </a>
-      </div>
+      </Fragment>
 
       <div class="zone__body" data-task-list data-progress-total={tasks.length}>
         {rows.map((it) => {
@@ -70,16 +68,7 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
               data-task={it.kind === 'task' ? '' : undefined}
             >
               {it.kind === 'task' ? (
-                <button
-                  type="button"
-                  class="tick"
-                  data-dispose={state ? undefined : 'done'}
-                  data-undo={state ? '' : undefined}
-                  aria-label={state ? `Undo “${it.title}”` : `Mark “${it.title}” done`}
-                >
-                  <Icon name="ph:circle" class="tick__o" />
-                  <Icon name="ph:check-circle" class="tick__x" />
-                </button>
+                <Tick answered={!!state} title={it.title} />
               ) : (
                 /* The same box, empty. Alignment is not the reason — the reason
                    is that the missing circle has to be visible as missing. */
@@ -122,6 +111,6 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
           );
         })}
       </div>
-    </section>
+    </Zone>
   )
 }
