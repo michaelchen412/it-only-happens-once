@@ -29,6 +29,7 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
 | **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one plain textarea that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
 | **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil edits in place, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5c). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`. **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
@@ -200,10 +201,9 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   are not four questions — they are one question, *what kind of thing is this?*,
   asked once. The menu is a top-layer popover (trap 7) positioned against the
   card that opened it.
-  - **Make a task** opens the real task sheet with the dump's **first line as
-    the title and the rest as the notes** — a five-line thought in a task title
-    would make the agenda unreadable. You set the date, effort and lead in the
-    same motion; saving creates the task and consumes the dump.
+  - **Add to the Agenda…** reads the sentence first (§5c) and opens whichever
+    sheet the reading calls for — a task or an event — already filled in.
+    Saving creates the row and consumes the dump.
   - **Log an entry…** opens a sheet that asks **who** first — the one field a
     profile's log box never needs, because there the person *is* the page. Kind
     and date have honest defaults; there is no defensible default for whose life
@@ -715,3 +715,74 @@ Beside it sit the active goals' observations (§14), which keep their own cold-s
 ### Today reads; the rooms write
 
 A row's title is plain text here, where in the tasks room it opens the sheet. An event's title is a link to the day panel. **No `TaskSheet`, no `EventSheet`, no TipTap** — this is the page opened on a phone at 7am, and the editors stay in the rooms that need them. The only writes on the page are the tick and drift's two dismissals, and both reuse their room's script verbatim.
+
+## 5c. Reading a task out of a sentence
+
+*The parser, [plan 14](plans/14-capture.md) §6. Claude Haiku 4.5, structured
+output, Zod-validated — the same pattern as ✦ Suggest with AI
+([ADR 0007](adr/0007-ai-subject-tagging.md)), and the same rule: the model
+proposes, the person disposes.*
+
+**Add to the Agenda…** on a brain dump sends the sentence to the model and opens
+the sheet it belongs in, filled. *"I have an appointment with the dentist every
+Thursday at 4:00 p.m. Please warn me one day ahead. This is a very important
+task! And leave a note that I should bring a gift every single time."* becomes a
+task titled *Appointment with the dentist*, due the coming Thursday at 4:00 PM,
+repeating weekly, warning one day ahead, at high priority, with the gift as its
+notes.
+
+**Why a model rather than a date library.** `chrono` handles *"tomorrow at
+4:30pm"* and falls over on *"warn me three days in advance"* and *"every third
+Monday"* — those are not date parsing, they are this system's own concepts. And
+separating a task's **title** from its **scheduling words** is exactly what a
+language model is good at and a regex is not.
+
+### What makes it safe
+
+- **The output schema is the system's own enums.** `recurrence` is
+  `z.enum(PRESETS)`, so the model **cannot** propose a schedule the database has
+  no way to store. Asked for *"water the plants every three weeks"* it returns no
+  recurrence and says *"can't schedule that: every three weeks"* — the failure
+  where a parser invents a rule and something downstream rounds it to the
+  nearest one is closed by construction, not by review.
+- **Every filled field carries the words it was read from.** *"2026-08-06 — read
+  from 'every Thursday'"* can be judged at a glance; a date on its own cannot be
+  judged at all, and a silently misparsed date is worse than no parse.
+- **Today and the timezone are passed in**, from `localToday()` over the
+  `settings` table — never the browser, never the server's clock. *"4:30pm
+  tomorrow"* is meaningless without both.
+- **It never makes triage worse by existing.** No key, a dead model, a slow
+  network: the sheet opens anyway with the first line as the title and the rest
+  as the notes, which is exactly what shipped before the parser. No error is
+  shown, because nothing is wrong.
+- **Three contradictions are settled in code, not asked of the model**, because
+  each one is arithmetic and each was seen to fail live: a weekly rule whose
+  weekday disagrees with its date; an *event* carrying a repeat or a lead, which
+  `events` has no column for; and a repeat with no first date to anchor it.
+
+### Which row it picks, and why that is not the router §4.21 banned
+
+**[10-hq §4.21](plans/10-hq.md) forbids a model deciding what a captured thought
+IS**, and the recorded reason is that a router's failure is *silent* — a thought
+filed as the wrong kind disappears into the wrong room. **That ban stands** for
+task vs log entry vs piece.
+
+Event vs task is the one pair it does not reach, for a structural reason:
+**events and tasks share every surface.** Both render on the calendar grid, both
+appear on Today. A wrong guess is the wrong *shape* somewhere you are already
+looking, never a disappearance. And most of the call is capability rather than
+taste — a repeat or a lead **cannot** be an event.
+
+So the model picks, and the **kind bar** at the top of the sheet says which and
+why, with the other shape one tap away. The switch carries the whole reading
+across rather than asking again. **The reason on that bar is derived from the
+fields, never written by the model**: asked to explain itself, it justified a
+correct answer with a repeat the sentence never mentioned and its own fields did
+not contain.
+
+**The line it does not remove:** the same appointment phrased two ways can land
+in two different rows — *"dentist appointment Thursday at 4pm"* is an event,
+*"dentist every Thursday, remind me"* is a task. Both are right, and the second
+is the only one the database could hold. The decision does not disappear; it
+moves out of your head and into the sentence, where the bar can show you what it
+did with it.

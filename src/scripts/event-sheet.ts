@@ -9,6 +9,7 @@
 // The DOM is the state: the checked boxes ARE the guest list, and the date input
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
+import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
 const form = document.querySelector<HTMLFormElement>('#event-form');
@@ -98,6 +99,18 @@ if (sheet && form) {
     syncWho();
   };
 
+  /**
+   * The brain dump this event is being made out of (14 · Piece 3). Null
+   * everywhere else, which leaves the Agenda room's behaviour — save, then
+   * reload — exactly as 13 · Piece 4 shipped it.
+   */
+  let filingNote: string | null = null;
+
+  /** Says which row this is, and offers the other one. See KindBar.astro. */
+  const setKindBar = mountKindBar(form, (detail, to) =>
+    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
+  );
+
   const open = (row?: EventRow, on?: string) => {
     showError(null);
     if (row) fill(row);
@@ -115,6 +128,35 @@ if (sheet && form) {
     btn.addEventListener('click', () => open(undefined, btn.dataset.openEventSheet)),
   );
 
+  /**
+   * Opened from the notes room, with a dump already read into fields.
+   *
+   * ⚠ WHAT AN EVENT CANNOT HOLD IS DROPPED BEFORE IT GETS HERE: `parse-task.ts`
+   * forces the kind back to `task` whenever a repeat or a lead is present,
+   * because `events` has neither column. So this handler never has to decide
+   * what to do with a recurrence — it cannot receive one.
+   */
+  document.addEventListener('hq:event-open', (e) => {
+    const detail = (e as CustomEvent<FilingDetail>).detail;
+    open();
+    filingNote = detail.noteId;
+    heading.textContent = 'Make an event';
+
+    const p = detail.parsed;
+    const [first, ...rest] = detail.text.split('\n');
+    titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
+    notesInput.value = (p?.notes ?? rest.join('\n')).trim();
+    if (p) {
+      dateInput.value = p.due_on?.value ?? (form.dataset.today ?? '');
+      startInput.value = timeValue(p.due_time);
+      showFrom(form, 'due_on', p.due_on);
+      showFrom(form, 'due_time', p.due_time);
+      syncAllDay();
+    }
+    setKindBar(detail);
+    titleInput.select();
+  });
+
   // Delegated: the day panel is server-rendered per request, so a listener per
   // row would need rebinding on every navigation.
   document.addEventListener('click', (e) => {
@@ -125,6 +167,12 @@ if (sheet && form) {
   });
 
   form.querySelectorAll<HTMLElement>('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
+  // Abandoning the sheet forgets the dump it was opened for — otherwise saving
+  // an unrelated event later would consume a thought nobody filed.
+  sheet.addEventListener('close', () => {
+    filingNote = null;
+    setKindBar(null);
+  });
   startInput.addEventListener('input', syncAllDay);
   form.addEventListener('change', (e) => {
     if ((e.target as HTMLElement).classList.contains('ep-check')) syncWho();
@@ -146,7 +194,7 @@ if (sheet && form) {
     submitBtn.textContent = 'Saving…';
 
     try {
-      const { error } = await actions.events.save({
+      const { data, error } = await actions.events.save({
         id: editing ?? undefined,
         title: titleInput.value.trim(),
         startsOn: dateInput.value,
@@ -157,8 +205,23 @@ if (sheet && form) {
         personIds: checks().filter((c) => c.checked).map((c) => c.value),
       });
       if (error) throw new Error(error.message);
-      // Reload rather than patching: which CELL a row lands in, the legend, and
-      // the day panel are all functions of the row that just changed.
+
+      // ⚠ TWO ENDINGS, as the task sheet has. In the Agenda room: reload, since
+      // which CELL a row lands in, the legend and the day panel are all
+      // functions of the row that changed. In the notes room: don't — a reload
+      // would throw away the pile's undo strip at the moment it has something
+      // to offer, and nothing on that page is derived from this event.
+      if (filingNote) {
+        const noteId = filingNote;
+        filingNote = null;
+        sheet.close();
+        document.dispatchEvent(
+          new CustomEvent('hq:note-filed', {
+            detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: data?.id } },
+          }),
+        );
+        return;
+      }
       location.reload();
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning

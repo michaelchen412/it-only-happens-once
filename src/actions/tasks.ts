@@ -19,6 +19,7 @@
 // morning.
 // ============================================================================
 import { defineAction } from 'astro:actions';
+import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { fail, requireAdmin, type DB } from './_shared';
 import { homeTimezone, localToday, parseYmd } from '../lib/hq/time';
@@ -108,6 +109,52 @@ async function loadTask(sb: DB, id: string) {
 }
 
 export const tasks = {
+  /**
+   * Read a jotted sentence into task fields (14 · Piece 3, §6). **Read-only —
+   * it writes nothing.** The fields are handed to the sheet, and the person
+   * saves or discards them, which is §6.2's human-in-the-loop rule made
+   * structural rather than promised.
+   *
+   * ⚠ TODAY AND THE ZONE COME FROM THE SETTINGS TABLE, not from the browser and
+   * not from the server's clock. "4:30pm tomorrow" is meaningless without both,
+   * and `localToday()` is the one place in HQ that answers what day it is.
+   *
+   * ⚠ AND IT DEGRADES RATHER THAN FAILS. No key, a dead network, a refusal from
+   * the model — every one of those comes back as `{ parsed: null }` with a
+   * reason, never a thrown error, because the caller's fallback is to open the
+   * sheet unparsed and that must always be reachable. §6.4: capture must never
+   * depend on the model.
+   */
+  parse: defineAction({
+    accept: 'json',
+    input: z.object({ text: z.string().trim().min(1).max(2_000) }),
+    handler: async ({ text }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase as DB;
+      const apiKey = getSecret('ANTHROPIC_API_KEY');
+      if (!apiKey) return { parsed: null, why: null, meta: null, error: 'No ANTHROPIC_API_KEY is configured.' };
+
+      const tz = await homeTimezone(sb);
+      const today = localToday(tz);
+      try {
+        const { parseTask } = await import('../lib/hq/parse-task');
+        const { parsed, why, meta } = await parseTask(text, today, tz, apiKey, Date.now());
+        return { parsed, why, meta, error: null };
+      } catch (e) {
+        // The API's own words, when it gave any. `suggestSubjects` learned this
+        // the expensive way: it reported a 400 that said "your credit balance is
+        // too low" as "couldn't reach the model", which sends you to look at
+        // your network for a billing problem. This action is admin-gated, so
+        // the message is safe to show and is the only thing that says where to
+        // go.
+        const err = e as { status?: number; error?: { error?: { message?: string } } } | null;
+        const detail = err?.error?.error?.message;
+        console.error('[tasks.parse] model call failed', err?.status ?? '', detail ?? e);
+        return { parsed: null, why: null, meta: null, error: detail ?? 'Couldn’t reach the model.' };
+      }
+    },
+  }),
+
   /** Write a task down, or change it. */
   save: defineAction({
     accept: 'json',

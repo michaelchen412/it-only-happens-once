@@ -31,6 +31,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import EventSheet from '../../components/admin/EventSheet.astro';
 import LogSheet from '../../components/admin/LogSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TaskSheet from '../../components/admin/TaskSheet.astro';
@@ -187,8 +188,14 @@ const roster = rosterData ?? [];
       than an essay seed, so the task is first — the same rule the interaction
       kinds follow (`KINDS` in lib/hq/interactions.ts). */}
   <div class="pop pop--wide" popover id="dump-file" data-pop="file">
-    <button type="button" class="pop__row" data-as="task">
-      <Icon name="ph:check-circle" /> Make a task
+    {/* ⚠ ONE ROW, NOT TWO — and it does not say "task", because it does not
+        always make one. Michael, 2026-08-04: *"I don't want the cognitive
+        expenditure of thinking: is this more of an event or more of a task?"*
+        The reading decides, the sheet that opens says which and why, and the
+        other shape is one tap away. Both live in the Agenda room, which is
+        what this row can honestly promise. */}
+    <button type="button" class="pop__row" data-as="agenda">
+      <Icon name="ph:calendar-blank" /> Add to the Agenda…
     </button>
     {/* ⚠ ABSENT ENTIRELY WHEN THERE IS NOBODY TO LOG ABOUT (10-hq §10b, and the
         rule TaskSheet applies to its goal picker). An entry needs a person, so
@@ -254,6 +261,11 @@ const roster = rosterData ?? [];
       made from a dump gets the same date, effort, lead and recurrence controls
       as one typed in the Agenda room, because it is the same form. */}
   <TaskSheet today={todayYmd} goals={goals} />
+  {/* The event sheet rides along for the half of readings that come back
+      event-shaped. It takes the roster so a dinner can be tagged with who was
+      there in the same motion — the one thing an event does that a task
+      cannot, and the thing the drift guard reads (10-hq §10g). */}
+  <EventSheet today={todayYmd} people={roster} />
   {roster.length > 0 && <LogSheet roster={roster} today={todayYmd} />}
 
   {/* The way back from a one-tap action. Lives outside the list so a card

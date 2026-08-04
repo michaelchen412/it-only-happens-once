@@ -8,7 +8,7 @@
 //   · edit in place        — the words change, nothing else does
 //   · delete               — soft, with a way back
 //   …and four ways OUT, behind the → chooser (14 · Piece 2):
-//   · make a task          — the real TaskSheet, prefilled
+//   · add to the Agenda    — READ first, then a task or an event (14 · Piece 3)
 //   · log an entry         — a sheet that asks who first
 //   · make it a piece      — one status flip: same row, no copy (14 §3)
 //   · add to a piece       — the one genuine copy, so the dump is consumed
@@ -19,10 +19,11 @@
 // on a phone, every tap while scrolling past a thought would put a cursor in it
 // and throw the keyboard up over the pile you were trying to read.
 //
-// THE TWO SHEET-BASED DESTINATIONS ANNOUNCE RATHER THAN TIDY. `hq:note-filed`
-// arrives from task-sheet.ts and log-sheet.ts; consuming the dump, collapsing
-// the card and offering the way back all happen here — so "a dump left the
-// pile" has exactly one implementation rather than one per destination.
+// THE SHEET-BASED DESTINATIONS ANNOUNCE RATHER THAN TIDY. `hq:note-filed`
+// arrives from task-sheet.ts, event-sheet.ts and log-sheet.ts; consuming the
+// dump, collapsing the card and offering the way back all happen here — so "a
+// dump left the pile" has exactly one implementation rather than one per
+// destination.
 import { actions } from 'astro:actions';
 import { elapsedSince } from '../lib/hq/dates';
 import { anchorPopover } from './pop-anchor';
@@ -215,6 +216,57 @@ if (undoBar) {
     addStripLink(`/admin/fragments#edit=${id}`, 'Open →');
   }
 
+  /**
+   * A dump on its way to the Agenda — read first, then handed to whichever
+   * sheet the reading says it belongs in (14 · Piece 3, §6).
+   *
+   * ⚠ ONE ROW IN THE CHOOSER, NOT TWO, and that is the whole point. Michael,
+   * 2026-08-04: *"I don't want the cognitive expenditure of thinking: is this
+   * more of an event or more of a task?"* Tasks and events share every surface
+   * — the calendar grid, Today — so the question is about shape, not about
+   * where a thought goes, and much of it is not judgement at all: a repeat or a
+   * lead CANNOT be an event, because the table has neither column.
+   *
+   * ⚠ BUT NEVER SILENTLY. The sheet that opens says which it chose and why, and
+   * offers the other in one tap. That is 10-hq §4.21's ban narrowed rather than
+   * broken: the model still never decides between a task, a log entry and a
+   * piece — only between two rows that live in the same room, in front of you,
+   * before anything is written.
+   *
+   * ⚠ AND IT DEGRADES. No key, a dead model, a slow network: the sheet opens
+   * anyway with the naive first-line split, which is exactly what shipped in
+   * Piece 2. Nothing here can ever be worse than not having the parser.
+   */
+  async function toAgenda(card: HTMLElement) {
+    const text = textOfCard(card);
+    const stamp = stampOf(card);
+    const wasSaying = stamp.textContent;
+    stamp.textContent = 'reading…';
+
+    let parsed: Record<string, unknown> | null = null;
+    let why = '';
+    try {
+      const { data } = await actions.tasks.parse({ text });
+      parsed = (data?.parsed as Record<string, unknown> | null) ?? null;
+      why = data?.why ?? '';
+    } catch {
+      // Silence is the correct handling: the fallback below IS the behaviour
+      // this room had yesterday, and an error message in front of a working
+      // motion would be the parser making things worse by existing.
+    }
+    stamp.textContent = wasSaying;
+
+    const kind = parsed?.kind === 'event' ? 'hq:event-open' : 'hq:task-open';
+    document.dispatchEvent(new CustomEvent(kind, { detail: { noteId: card.dataset.note, text, parsed, why } }));
+  }
+
+  // The switch in either sheet comes back here, so one place decides which
+  // sheet opens and both sheets stay ignorant of each other.
+  document.addEventListener('hq:kind-switch', (e) => {
+    const detail = (e as CustomEvent<{ to: 'task' | 'event' }>).detail;
+    document.dispatchEvent(new CustomEvent(detail.to === 'event' ? 'hq:event-open' : 'hq:task-open', { detail }));
+  });
+
   /* ── the chooser ────────────────────────────────────────────────────────── */
 
   const chooser = document.getElementById('dump-file');
@@ -231,13 +283,8 @@ if (undoBar) {
     chooser.hidePopover();
 
     switch (row.dataset.as) {
-      case 'task':
-        // The sheets are opened by event rather than by calling into them: this
-        // file has no business knowing how a task form fills itself in, and the
-        // sheet has no business knowing what a pile is.
-        document.dispatchEvent(
-          new CustomEvent('hq:task-open', { detail: { noteId: card.dataset.note, text: textOfCard(card) } }),
-        );
+      case 'agenda':
+        void toAgenda(card);
         break;
       case 'log':
         document.dispatchEvent(
@@ -267,7 +314,7 @@ if (undoBar) {
       noteId: string;
       what: string;
       href: string | null;
-      undo: { kind: 'task' | 'interaction'; id?: string };
+      undo: { kind: 'task' | 'interaction' | 'event'; id?: string };
     }>).detail;
     const card = pile?.querySelector<HTMLElement>(`[data-note="${noteId}"]`);
     if (!card) return;
@@ -285,6 +332,7 @@ if (undoBar) {
     showUndo(`Filed as ${what}`, card, async () => {
       if (undo.id) {
         if (undo.kind === 'task') await actions.tasks.remove({ id: undo.id });
+        else if (undo.kind === 'event') await actions.events.remove({ id: undo.id });
         else await actions.interactions.remove({ id: undo.id });
       }
       await bulk(noteId, 'restore');

@@ -20,6 +20,7 @@ import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
 import { ordinal } from '../lib/hq/dates';
 import { ymdToUtc, type Ymd } from '../lib/hq/time';
+import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#task-sheet');
 const form = document.querySelector<HTMLFormElement>('#task-form');
@@ -69,6 +70,15 @@ if (sheet && form) {
    * keeps the agenda room's behaviour — save, then reload — exactly as it was.
    */
   let filingNote: string | null = null;
+
+  /**
+   * The bar that says which row this is and offers the other in one tap.
+   * The switch goes back to the pile rather than to the event sheet directly:
+   * this file has no business knowing that an event sheet exists.
+   */
+  const setKindBar = mountKindBar(form, (detail, to) =>
+    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
+  );
 
   const showError = (message: string | null) => {
     if (!errorEl) return;
@@ -238,14 +248,60 @@ if (sheet && form) {
    * would lose what you actually wrote.
    */
   document.addEventListener('hq:task-open', (e) => {
-    const detail = (e as CustomEvent<{ noteId: string; text: string }>).detail;
+    const detail = (e as CustomEvent<FilingDetail>).detail;
     open();
-    const [first, ...rest] = detail.text.split('\n');
-    titleInput.value = first.trim().slice(0, 200);
-    notesInput.value = rest.join('\n').trim();
     filingNote = detail.noteId;
     heading.textContent = 'Make a task';
-    titleInput.select(); // the likeliest thing to fix is the title it guessed
+
+    const p = detail.parsed;
+    // ⚠ THE FALLBACK IS THE SHIPPED BEHAVIOUR, not an error state. No key, a
+    // dead model, a slow network — you get Piece 2's naive split and no message
+    // about it, because a parser that makes the motion worse when it is absent
+    // has failed at the one thing §6.4 asks of it.
+    const [first, ...rest] = detail.text.split('\n');
+    titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
+    notesInput.value = (p?.notes ?? rest.join('\n')).trim();
+
+    if (p) {
+      dueInput.value = p.due_on?.value ?? '';
+      timeInput.value = timeValue(p.due_time);
+      if (p.effort) pick('effort', p.effort.value);
+      if (p.priority) pick('prio', p.priority.value);
+
+      // ⚠ THE LEAD IS A PAIR, AND FILLING ONLY THE NUMBER DOES NOTHING. The
+      // override is a checkbox AND a count; without the tick, `leadDays` is
+      // sent blank and effort's default lead silently wins. "Warn me one day
+      // ahead" would have warned three days ahead, for ever, with nothing on
+      // screen disagreeing.
+      if (p.lead_days) {
+        overrideOn.checked = true;
+        overrideN.disabled = false;
+        overrideN.value = String(p.lead_days.value);
+      }
+
+      // A preset, never a rule string — 13 · Piece 1's contract, and the reason
+      // the model was given the preset names as an enum rather than asked for
+      // an RRULE it could invent.
+      if (p.recurrence) {
+        pick('rep', 'fixed');
+        presetSel.value = p.recurrence.value;
+      }
+
+      showFrom(form, 'due_on', p.due_on);
+      showFrom(form, 'due_time', p.due_time);
+      const warn = form.querySelector<HTMLElement>('[data-parsed-warn]');
+      if (warn) {
+        // One line, not two: the schedule it could not express and the phrase
+        // that reads two ways are both "this is not quite what you said".
+        const note = p.unschedulable ? `Couldn’t schedule “${p.unschedulable}”` : p.ambiguous ? p.ambiguous : '';
+        warn.textContent = note;
+        warn.hidden = !note;
+      }
+      repaint(); // the lead sentence and the schedule preview are now stale
+    }
+
+    setKindBar(detail);
+    titleInput.select(); // the likeliest thing to fix is the title it read
   });
   // Delegated: the rows are re-rendered by a reload, and a listener per row
   // would need re-binding every time.
@@ -263,6 +319,7 @@ if (sheet && form) {
   // had nothing to do with it. `close` fires for Escape and the backdrop too.
   sheet.addEventListener('close', () => {
     filingNote = null;
+    setKindBar(null);
   });
 
   // ── wiring ────────────────────────────────────────────────────────────────

@@ -1,0 +1,43 @@
+---
+/*
+  KindBar — "this is a task, and here is how to make it an event instead"
+  (14 · Piece 3, §6; 10-hq §4.21 as narrowed on 2026-08-04).
+
+  ⚠ THIS IS WHAT KEEPS A ROUTER HONEST. 10-hq §4.21 forbids a model deciding
+  what a captured thought IS, and the recorded reason is that a router's failure
+  is SILENT — a thought filed as the wrong kind disappears into the wrong room.
+  Event vs task is the one pair that argument does not cover: both render on the
+  same calendar grid and both appear on Today, so a wrong guess is the wrong
+  shape somewhere you are already looking.
+
+  This bar is the rest of the answer. The guess is never silent: it is named, it
+  is explained, and the other shape is one tap away — before anything is
+  written. Take this bar away and the feature becomes the thing §4.21 refused.
+
+  ⚠ THE REASON IS DERIVED, NEVER WRITTEN BY THE MODEL. Asked to explain itself,
+  it fabricated: "renew the passport before the end of the month" was correctly
+  called a task and justified with *"it repeats annually and asks to be warned
+  in advance"* — nothing the sentence said, and contradicting the empty
+  recurrence field it had just returned. Tightening the instruction did not fix
+  it; removing the question did. `whyKind()` composes this line from the fields,
+  so it cannot disagree with them (10-hq §10i — derived summaries beat written
+  ones).
+
+  Hidden unless a parse opened the sheet. Typing a task by hand in the Agenda
+  room is not a judgement anybody made, so there is nothing to explain.
+*/
+interface Props {
+  /** Which sheet this instance lives in — the switch offers the other one. */
+  self: 'task' | 'event';
+}
+const { self } = Astro.props;
+const other = self === 'task' ? 'event' : 'task';
+---
+
+<div class="kindbar" data-kindbar data-self={self} hidden>
+  <span class="kindbar__what">{self === 'task' ? 'Task' : 'Event'}</span>
+  <span class="kindbar__why" data-kind-why></span>
+  <button type="button" class="kindbar__switch" data-kind-switch>
+    Make it {other === 'event' ? 'an event' : 'a task'} instead
+  </button>
+</div>

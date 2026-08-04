@@ -373,7 +373,7 @@ test.describe('the chooser — four destinations, one question', () => {
     const logRow = page.locator('#dump-file [data-as="log"]');
     await expect(logRow).toHaveCount(people > 0 ? 1 : 0);
     // The other three never depend on anything existing first.
-    for (const as of ['task', 'piece', 'append']) {
+    for (const as of ['agenda', 'piece', 'append']) {
       await expect(page.locator(`#dump-file [data-as="${as}"]`)).toHaveCount(1);
     }
   });
@@ -410,7 +410,7 @@ test.describe('the chooser — four destinations, one question', () => {
   });
 });
 
-test.describe('note → task', () => {
+test.describe('note → the Agenda', () => {
   test('opens the real task sheet, with the dump already in it', async ({ page }) => {
     await stubActions(page, {});
     await page.goto('/admin/notes');
@@ -419,7 +419,7 @@ test.describe('note → task', () => {
     const text = (await card.locator('[data-text]').innerText()).trim();
 
     await card.locator('[data-file]').click();
-    await page.locator('#dump-file [data-as="task"]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
 
     const sheet = page.locator('#task-sheet');
     await expect(sheet).toBeVisible();
@@ -457,7 +457,8 @@ test.describe('note → task', () => {
     const id = await card.getAttribute('data-note');
 
     await card.locator('[data-file]').click();
-    await page.locator('#dump-file [data-as="task"]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
     await page.locator('#task-sheet [data-submit]').click();
 
     // ⚠ THE ORDER IS THE ASSERTION. The task is written FIRST and the note is
@@ -491,12 +492,18 @@ test.describe('note → task', () => {
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
 
     await card.locator('[data-file]').click();
-    await page.locator('#dump-file [data-as="task"]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
     await page.keyboard.press('Escape');
     await expect(page.locator('#task-sheet')).toBeHidden();
     await expect(card).toBeVisible();
     await expect(card).not.toHaveClass(/dump--going/);
-    expect(seen()).toEqual([]);
+    // ⚠ "NOTHING WAS WRITTEN", not "nothing was called". Since 14 · Piece 3 the
+    // read-only `tasks.parse` fires on the way to the sheet, and an assertion
+    // that counts every request would call that a write. This is the same trap
+    // that has four check-in specs red: `/admin` syncs the Google mirror after
+    // paint, and those specs count it as an answer to the check-in.
+    expect(seen().filter((n) => n !== 'tasks.parse')).toEqual([]);
   });
 });
 
@@ -584,5 +591,121 @@ test.describe('note → log entry', () => {
       'interactions.remove',
       'fragments.bulk',
     ]);
+  });
+});
+
+test.describe('the parser (14 · Piece 3)', () => {
+  // ⚠ THE MODEL IS STUBBED IN ALL OF THESE. What they prove is that the client
+  // does the right thing with a given reading — the filling, the lead PAIR, the
+  // kind bar, the fallback. Whether the reading itself is any good was settled
+  // in `/admin/parse-lab` against the real model and recorded in the plans; the
+  // lab is deleted, and this is what survives it.
+  const READING = {
+    parsed: {
+      kind: 'task',
+      title: 'Appointment with the dentist',
+      notes: 'bring a gift every single time',
+      due_on: { value: '2026-08-06', from: 'every Thursday' },
+      due_time: { value: '16:00', from: '4:00 p.m.' },
+      lead_days: { value: 1, from: 'warn me one day ahead' },
+      recurrence: { value: 'weekly', from: 'every Thursday' },
+      effort: null,
+      priority: { value: 'high', from: 'very important' },
+      unschedulable: null,
+      ambiguous: null,
+    },
+    why: 'it repeats, and an event cannot',
+    meta: { ms: 900, inputTokens: 10, outputTokens: 10 },
+    error: null,
+  };
+
+  test('fills the whole sheet, and ticks the lead override with the number', async ({ page }) => {
+    await stubActions(page, { 'tasks.parse': () => READING });
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    await page.locator('.dump').first().locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
+    const s = page.locator('#task-sheet');
+
+    await expect(s.locator('input[name="title"]')).toHaveValue('Appointment with the dentist');
+    await expect(s.locator('textarea[name="notes"]')).toHaveValue('bring a gift every single time');
+    await expect(s.locator('[data-due]')).toHaveValue('2026-08-06');
+    await expect(s.locator('[data-time]')).toHaveValue('16:00');
+    await expect(s.locator('[data-prio][aria-pressed="true"]')).toHaveAttribute('data-prio', 'high');
+
+    // ⚠ THE PAIR. The lead override is a checkbox AND a count; filling only the
+    // number sends `leadDays` blank and effort's default (3 days) silently
+    // wins — "warn me one day ahead" would warn three days ahead for ever,
+    // with nothing on screen disagreeing.
+    await expect(s.locator('[data-override-on]')).toBeChecked();
+    await expect(s.locator('[data-override-n]')).toHaveValue('1');
+
+    // A preset, never a rule string — 13 · Piece 1's contract.
+    await expect(s.locator('[data-rep][aria-pressed="true"]')).toHaveAttribute('data-rep', 'fixed');
+    await expect(s.locator('[data-preset]')).toHaveValue('weekly');
+
+    // §6.3: which words produced the date. A date alone cannot be judged.
+    await expect(s.locator('[data-parsed-from="due_on"]')).toContainText('every Thursday');
+  });
+
+  test('the kind is stated, never silent, and reversible in one tap', async ({ page }) => {
+    await stubActions(page, { 'tasks.parse': () => READING });
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    await page.locator('.dump').first().locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
+
+    // This bar is what keeps a router honest (10-hq §4.21): the guess is named,
+    // explained from the fields, and undoable before anything is written.
+    const bar = page.locator('#task-sheet [data-kindbar]');
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText('Task');
+    await expect(bar).toContainText('it repeats, and an event cannot');
+
+    await bar.locator('[data-kind-switch]').click();
+    await page.waitForSelector('#event-sheet[open]');
+    // The whole parse moves across — a one-tap correction must not re-read the
+    // sentence, which would cost another call and could answer differently.
+    await expect(page.locator('#event-sheet input[name="title"]')).toHaveValue('Appointment with the dentist');
+    await expect(page.locator('#event-sheet [data-kindbar]')).toContainText('Make it a task instead');
+  });
+
+  test('⚠ a dead model leaves the motion exactly as it was without the parser', async ({ page }) => {
+    // §6.4. The parser may never make triage worse by existing — no error, no
+    // empty sheet, just Piece 2's naive split.
+    await stubActions(page, { 'tasks.parse': () => ({ parsed: null, why: null, meta: null, error: 'no credit' }) });
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    const card = page.locator('.dump').first();
+    const first = (await card.locator('[data-edit-box]').inputValue()).split('\n')[0].trim();
+
+    await card.locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
+
+    await expect(page.locator('#task-sheet input[name="title"]')).toHaveValue(first);
+    await expect(page.locator('#task-sheet [data-kindbar]')).toBeHidden(); // nothing was judged
+    await expect(page.locator('#task-error')).toBeHidden(); // and nothing is wrong
+  });
+
+  test('a reading it cannot honour is said out loud', async ({ page }) => {
+    await stubActions(page, {
+      'tasks.parse': () => ({
+        ...READING,
+        parsed: { ...READING.parsed, recurrence: null, unschedulable: 'every three weeks' },
+      }),
+    });
+    await page.goto('/admin/notes');
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+    await page.locator('.dump').first().locator('[data-file]').click();
+    await page.locator('#dump-file [data-as="agenda"]').click();
+    await page.waitForSelector('#task-sheet[open]');
+    // Never rounded to the nearest preset — the schema cannot express it, so
+    // the sheet says so rather than storing something close.
+    await expect(page.locator('#task-sheet [data-parsed-warn]')).toContainText('every three weeks');
   });
 });

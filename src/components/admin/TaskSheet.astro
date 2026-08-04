@@ -25,6 +25,7 @@
   sentence explaining why (10-hq.md §10i).
 */
 import { Icon } from 'astro-icon/components';
+import KindBar from './KindBar.astro';
 import { EFFORTS, PRIORITIES } from '../../lib/hq/tasks';
 import { PRESETS, presetLabel } from '../../lib/hq/recurrence';
 import type { Ymd } from '../../lib/hq/time';
@@ -54,6 +55,10 @@ const { today, goals = [] } = Astro.props;
     <p id="task-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      {/* Only ever visible when a reading filled this form in (14 · Piece 3).
+          A task typed by hand is not a judgement anybody made. */}
+      <KindBar self="task" />
+
       <label class="f">
         <span class="f__k">What <em>required</em></span>
         <input type="text" name="title" required maxlength="300" placeholder="Deep clean the bathroom" />
@@ -80,6 +85,12 @@ const { today, goals = [] } = Astro.props;
               field rather than a paragraph under it (§10i). */}
           <span class="f__h mb-1" data-anytime>anytime</span>
         </div>
+        {/* WHICH WORDS PRODUCED THIS DATE (§6.3). A date on its own cannot be
+            judged; "read from 'every Thursday'" can be judged at a glance, and
+            a silently misparsed date is worse than no parse at all (§6.2). */}
+        <p class="f__h mt-1" data-parsed-from="due_on" hidden></p>
+        <p class="f__h" data-parsed-from="due_time" hidden></p>
+        <p class="f__h u-warn mt-1 inline-block rounded-field px-2" data-parsed-warn hidden></p>
       </fieldset>
 
       <fieldset class="fs">
