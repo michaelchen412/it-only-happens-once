@@ -9,6 +9,7 @@
 // distinction and cannot get it wrong — the same trick the tasks room plays
 // with RRULEs, where the client only ever handles a preset.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 
 const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
 const form = document.querySelector<HTMLFormElement>('#tag-form');
@@ -70,7 +71,7 @@ if (sheet && form) {
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — without this the button sticks disabled.
-      showError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      showError(formatActionError(err));
       submitBtn.disabled = false;
     }
   });

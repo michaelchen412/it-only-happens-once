@@ -10,6 +10,7 @@
 // Greying out `Active` would say "no" without saying why, on a control whose
 // whole point is that letting go is a visible, dignified move.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 
 const sheet = document.querySelector<HTMLDialogElement>('#goal-sheet');
 const form = document.querySelector<HTMLFormElement>('#goal-form');
@@ -76,7 +77,7 @@ if (sheet && form) {
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — without this the button sticks on "Saving…".
-      showError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      showError(formatActionError(err));
       submitBtn.disabled = false;
       submitBtn.textContent = submitLabel;
     }
@@ -100,7 +101,7 @@ if (sheet && form) {
       if (error) throw new Error(error.message);
       location.href = '/admin/agenda/goals';
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Couldn’t delete that — check your connection.');
+      showError(formatActionError(err));
     }
   });
 }
@@ -131,7 +132,7 @@ if (header) {
         if (error) throw new Error(error.message);
       } catch (err) {
         buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === previous)));
-        showPageError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+        showPageError(formatActionError(err));
       } finally {
         buttons.forEach((b) => (b.disabled = false));
       }

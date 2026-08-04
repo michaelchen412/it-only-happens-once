@@ -85,7 +85,7 @@ portraitInput.addEventListener('change', async () => {
     portraitRemove.classList.remove('hidden');
     markDirty();
   } catch (e) {
-    showError(e instanceof Error ? e.message : 'Photo upload failed.');
+    showError(formatActionError(e));
   } finally {
     spinner.hidden = true;
     portraitInput.value = '';

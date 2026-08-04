@@ -11,7 +11,8 @@
 // each one can fail on its own, which is why a failed upload leaves you with a
 // created person and a sentence rather than a lost form.
 import { actions } from 'astro:actions';
-import { uploadPrivateImage, UploadError } from './upload';
+import { formatActionError } from './action-error';
+import { uploadPrivateImage } from './upload';
 import { photoPath } from '../lib/hq/people';
 
 const sheet = document.querySelector<HTMLDialogElement>('#person-sheet');
@@ -140,12 +141,11 @@ if (sheet && form) {
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }`, and an upload can throw an `UploadError` carrying a
-      // sentence written for exactly this box.
-      showError(
-        err instanceof UploadError || err instanceof Error
-          ? err.message
-          : 'Could not save — check your connection.',
-      );
+      // sentence written for exactly this box. `formatActionError` passes both
+      // through — it only overrides the message when the failure is
+      // connectivity, which is the one case where `UploadError`'s own wording
+      // ("Upload failed: …") would be describing a symptom rather than a cause.
+      showError(formatActionError(err));
       submitBtn.disabled = false;
       submitBtn.textContent = submitLabel;
     }

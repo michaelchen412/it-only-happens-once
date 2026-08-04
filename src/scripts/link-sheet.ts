@@ -6,6 +6,7 @@
 // resolution of a work's fragments, and re-deriving any of that in the browser
 // is how the saved shape and the shown shape start to disagree.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 
 type Mode = 'work' | 'fragment';
@@ -140,7 +141,7 @@ if (sheet && personId) {
       // `{ error }`, so the catch is not optional — a swallowed failure here
       // leaves the button stuck saying "Linking…" forever, which is the exact
       // bug the check-in shipped with and its own spec caught.
-      show(sheetError, err instanceof Error ? err.message : 'Could not link that — check your connection.');
+      show(sheetError, formatActionError(err));
       saveBtn.disabled = false;
       saveBtn.textContent = label;
     }
@@ -173,7 +174,7 @@ zone?.querySelectorAll<HTMLButtonElement>('[data-unlink]').forEach((btn) =>
       if (error) throw new Error(error.message);
       location.reload();
     } catch (err) {
-      show(zoneError, err instanceof Error ? err.message : 'Could not unlink that — check your connection.');
+      show(zoneError, formatActionError(err));
       btn.disabled = false;
     }
   }),

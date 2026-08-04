@@ -11,6 +11,7 @@
 // scroll you back to the top of a room you were reading. When the last row
 // goes, the panel goes with it — an empty warm box is furniture.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 
 const panel = document.querySelector<HTMLElement>('[data-been-a-while]');
 const errorEl = panel?.querySelector<HTMLElement>('[data-drift-error]');
@@ -52,7 +53,7 @@ panel?.addEventListener('click', async (e) => {
     // `astro:actions` THROWS on a dead network rather than returning
     // `{ error }`. Without this catch the row would simply sit there with two
     // dead buttons — the swallowed-save shape, twice paid for.
-    show(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+    show(formatActionError(err));
     both.forEach((b) => (b.disabled = false));
   }
 });

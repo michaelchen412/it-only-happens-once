@@ -11,6 +11,7 @@
 // every motion — so there is exactly one implementation of "a dump left the
 // pile" rather than one per destination.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 import { anchorPopover } from './pop-anchor';
 import { shiftYmd } from '../lib/hq/time';
 
@@ -174,7 +175,7 @@ if (root && sheet) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — without this catch the button sticks on "Saving…" and the
       // sheet silently swallows the entry.
-      showError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      showError(formatActionError(err));
       saveBtn.disabled = false;
       saveBtn.textContent = label;
     }

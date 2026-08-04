@@ -15,6 +15,7 @@
 // also scroll you back to the top of a list you were reading — on the one
 // surface designed for a sweep down the page.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 
 // ⚠ EVERY LIST, NOT THE FIRST ONE. The tasks room has exactly one and this was a
 // `querySelector` for a day; Today has three — the day itself, Coming up and
@@ -96,7 +97,7 @@ for (const list of lists) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }`. Without this the row would sit there with dead controls
       // and a tick that never happened — the swallowed-save shape.
-      show(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      show(formatActionError(err));
     } finally {
       buttons.forEach((b) => (b.disabled = false));
     }

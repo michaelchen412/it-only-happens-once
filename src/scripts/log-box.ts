@@ -14,6 +14,7 @@
 // finish, and a debounce would mean a half-typed sentence became a row every
 // time the phone locked.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { anchorPopover } from './pop-anchor';
 
@@ -217,7 +218,7 @@ if (zone) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — the trap that once left a button stuck on "Thinking…"
       // for the life of the page.
-      showError(err instanceof Error ? err.message : 'Couldn’t save — check your connection.');
+      showError(formatActionError(err));
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save';
     }

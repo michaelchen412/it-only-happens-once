@@ -16,6 +16,7 @@
 // `aria-pressed`, the date lives in the date input. There is no JavaScript copy
 // of the form beside the form.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
 import { ordinal } from '../lib/hq/dates';
@@ -396,7 +397,7 @@ if (sheet && form) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — without this catch the button sticks on "Saving…" and the
       // sheet silently swallows the task.
-      showError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      showError(formatActionError(err));
       submitBtn.disabled = false;
       submitBtn.textContent = label;
     }
@@ -422,7 +423,7 @@ if (sheet && form) {
       if (error) throw new Error(error.message);
       location.reload();
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Couldn’t delete that — check your connection.');
+      showError(formatActionError(err));
       deleteBtn.disabled = false;
     }
   });

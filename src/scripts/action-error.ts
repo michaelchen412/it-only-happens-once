@@ -9,6 +9,16 @@ import { isInputError } from 'astro:actions';
  * network surfaces as a bare `TypeError: Failed to fetch` from the fetch
  * underneath, and that string must never reach a human — it reads like a bug
  * when it's just a missing connection.
+ *
+ * ⚠ CALL THIS. DO NOT HAND-ROLL `err instanceof Error ? err.message : '…'`.
+ * That idiom looks equivalent and is the exact bug this function exists to
+ * prevent: **`TypeError` extends `Error`**, so a dead network takes the *first*
+ * branch and prints `Failed to fetch`, while the friendly fallback written for
+ * the offline case is unreachable in precisely the case it was written for.
+ * Every HQ save path shipped with that idiom between 2026-08-02 and 2026-08-04
+ * and none of them could ever say the sentence they carried. Found by audit,
+ * not by use — which is the point: it only misfires when the network is down,
+ * which is never while you are testing.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatActionError(error: any): string {

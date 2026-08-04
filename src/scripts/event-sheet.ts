@@ -9,6 +9,7 @@
 // The DOM is the state: the checked boxes ARE the guest list, and the date input
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
+import { formatActionError } from './action-error';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
@@ -226,7 +227,7 @@ if (sheet && form) {
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }` — without this the button sticks on "Saving…".
-      showError(err instanceof Error ? err.message : 'Couldn’t save that — check your connection.');
+      showError(formatActionError(err));
       submitBtn.disabled = false;
       submitBtn.textContent = label;
     }
@@ -250,7 +251,7 @@ if (sheet && form) {
     } catch (err) {
       // The sheet is about to close on success, so a failure has to be visible
       // where the eye already is.
-      showError(err instanceof Error ? err.message : 'Couldn’t delete that — check your connection.');
+      showError(formatActionError(err));
       if (pageError) {
         pageError.textContent = 'Couldn’t delete that event.';
         pageError.hidden = false;
