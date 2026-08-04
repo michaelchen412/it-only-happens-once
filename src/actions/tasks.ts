@@ -96,6 +96,12 @@ function recurrenceOf(v: Input, dueOn: string | null): RecurrenceColumns {
   };
 }
 
+/** Postgres `unique_violation`. Named so the check below reads as what it is. */
+const UNIQUE_VIOLATION = '23505';
+
+/** Said in two places — the pre-check and the race — so it is written once. */
+const ALREADY_ANSWERED = 'You’ve already answered for this one today.';
+
 /** Read the columns a disposition needs, or say the task is gone. */
 async function loadTask(sb: DB, id: string) {
   const { data, error } = await sb
@@ -217,9 +223,15 @@ export const tasks = {
       const task = await loadTask(sb, v.id);
       const today = localToday(await homeTimezone(sb));
 
-      // One answer per day. Without this a double-tap on a slow connection
-      // writes two rows and advances the schedule twice — silently, and by
-      // exactly the amount that makes a fortnightly chore look monthly.
+      // ⚠ ONE ANSWER PER DAY, AND IT TAKES BOTH HALVES. This read is the
+      // MESSAGE — a sentence a person can read — and it is not the guarantee:
+      // a read followed by a write is exactly the shape that fails under the
+      // double-tap it defends against, because both requests see zero rows and
+      // both insert. The guarantee is the unique index on
+      // (task_id, occurred_on), added 2026-08-04.
+      //
+      // DO NOT DELETE EITHER ONE AS REDUNDANT. Without the index the guarantee
+      // is gone; without this read the common case answers in SQLSTATE.
       const { data: already, error: dupErr } = await sb
         .from('task_events')
         .select('id')
@@ -227,13 +239,16 @@ export const tasks = {
         .eq('occurred_on', today)
         .limit(1);
       if (dupErr) throw fail(dupErr.message);
-      if (already?.length) throw fail('You’ve already answered for this one today.', 'CONFLICT');
+      if (already?.length) throw fail(ALREADY_ANSWERED, 'CONFLICT');
 
       const { data: event, error } = await sb
         .from('task_events')
         .insert({ task_id: v.id, occurred_on: today, for_due_on: task.due_on, outcome: v.outcome })
         .select('id')
         .single();
+      // The loser of a genuine race says the same thing the pre-check says —
+      // it lost by microseconds, not by doing anything different.
+      if (error?.code === UNIQUE_VIOLATION) throw fail(ALREADY_ANSWERED, 'CONFLICT');
       if (error) throw fail(error.message);
 
       const next = advance(task, task.due_on, today);
