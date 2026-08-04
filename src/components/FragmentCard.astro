@@ -34,17 +34,7 @@ interface Props {
   meta?: string; // e.g. read time
   class?: string;
 }
-const {
-  type,
-  title,
-  body,
-  attribution,
-  date,
-  updated,
-  precision = 'day',
-  meta,
-  class: className = '',
-} = Astro.props;
+const { type, title, body, attribution, date, updated, precision = 'day', meta, class: className = '' } = Astro.props;
 
 // glyph/label/tone come from TYPE_META (the one map); the card adds only what
 // is its own business — the hover border and which date word it uses.
@@ -58,7 +48,7 @@ const cfg = { ...TYPE_META[type], ...CARD };
 
 <article
   class:list={[
-    'flex h-full flex-col rounded-box border border-base-300 bg-base-200 p-5 transition-colors',
+    'rounded-box border-base-300 bg-base-200 flex h-full flex-col border p-5 transition-colors',
     cfg.hover,
     className,
   ]}
@@ -75,28 +65,15 @@ const cfg = { ...TYPE_META[type], ...CARD };
       ) : (
         <>
           {title && <h3 class="line-clamp-1 text-xl leading-snug">{title}</h3>}
-          {body && <p class="mt-1 line-clamp-2 text-base-content/60">{body}</p>}
+          {body && <p class="text-base-content/60 mt-1 line-clamp-2">{body}</p>}
         </>
       )
     }
-    {
-      attribution && (
-        <p class="mt-2 line-clamp-1 font-sans text-sm text-base-content/50">{attribution}</p>
-      )
-    }
+    {attribution && <p class="text-base-content/50 mt-2 line-clamp-1 font-sans text-sm">{attribution}</p>}
   </div>
 
-  <footer class="mt-4 flex items-center gap-1 font-sans text-xs text-base-content/30">
-    {
-      date && (
-        <Timestamp
-          date={date}
-          updated={updated}
-          kind={cfg.kind as 'posted' | 'added'}
-          precision={precision}
-        />
-      )
-    }
+  <footer class="text-base-content/30 mt-4 flex items-center gap-1 font-sans text-xs">
+    {date && <Timestamp date={date} updated={updated} kind={cfg.kind as 'posted' | 'added'} precision={precision} />}
     {meta && <span>· {meta}</span>}
   </footer>
 </article>

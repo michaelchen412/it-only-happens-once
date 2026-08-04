@@ -52,11 +52,11 @@ const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
   {
     !item ? (
       <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
-        <p class="font-serif text-2xl text-base-content/70">This piece isn’t here.</p>
-        <p class="mt-2 font-sans text-sm text-base-content/45">
+        <p class="text-base-content/70 font-serif text-2xl">This piece isn’t here.</p>
+        <p class="text-base-content/45 mt-2 font-sans text-sm">
           It may have been unpublished, or the link is off by a letter.
         </p>
-        <a href="/blog" class="mt-6 inline-flex items-center gap-1 font-sans text-sm text-primary hover:underline">
+        <a href="/blog" class="text-primary mt-6 inline-flex items-center gap-1 font-sans text-sm hover:underline">
           <Icon name="ph:caret-left" class="size-3.5" /> Back to the blog
         </a>
       </div>
@@ -64,7 +64,7 @@ const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
         <a
           href="/blog"
-          class="inline-flex items-center gap-1 font-sans text-sm text-base-content/45 transition-colors hover:text-base-content"
+          class="text-base-content/45 hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
         >
           <Icon name="ph:caret-left" class="size-3.5" /> The blog
         </a>

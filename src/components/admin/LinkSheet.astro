@@ -44,18 +44,21 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
 
 <dialog id="link-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="link-sheet-title">
   <div class="flex h-full flex-col overflow-hidden font-sans">
-    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
       <h2 id="link-sheet-title" class="font-display text-xl">Shared by {personName}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <p id="link-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-      {/* The same segmented control as the circle picker, and it carries the
+      {
+        /* The same segmented control as the circle picker, and it carries the
           same 44px floor for the same reason: this sheet is opened from a
           phone. TRAP 6 is handled in `.pseg__b` — the selected segment keeps
-          its fill under the cursor. */}
+          its fill under the cursor. */
+      }
       <div class="pseg mb-4" role="group" aria-label="What to link">
         <button type="button" class="pseg__b cn-gold" data-mode="work" aria-pressed={true}>
           <Icon name="ph:book-open" /> A work
@@ -75,7 +78,10 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
           works.length === 0 ? (
             <p class="picker__none">
               No works yet — they’re created from a quote’s Work field, or in{' '}
-              <a href="/admin/library" class="underline">Library</a>.
+              <a href="/admin/library" class="underline">
+                Library
+              </a>
+              .
             </p>
           ) : (
             works.map((w) => (
@@ -121,12 +127,14 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
         <p class="picker__none" data-none hidden>Nothing by that name.</p>
       </div>
 
-      {/* THE FLOW MICHAEL NAMED (§5), placed where you discover you need it:
+      {
+        /* THE FLOW MICHAEL NAMED (§5), placed where you discover you need it:
           you came here to attach the quote they said out loud, searched for
           it, and it is not in the corpus because you never wrote it down. A
           real link rather than an overlay — the quote editor is TipTap, and
           both Piece 1 and Piece 2 kept that bundle off this page on purpose.
-          The fragments room opens the quote sheet already linked to them. */}
+          The fragments room opens the quote sheet already linked to them. */
+      }
       <p class="admin-hint mt-2 text-xs" data-add-quote hidden>
         Not written down yet?{' '}
         <a href={`/admin/fragments?person=${personSlug}&new=quote`} class="underline">
@@ -134,18 +142,20 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
         </a>
       </p>
 
-      {/* §5 keeps free text instead of an enum of link kinds: "recommended,
+      {
+        /* §5 keeps free text instead of an enum of link kinds: "recommended,
           Mar 2024" says more than a dropdown of three verbs, and a taxonomy
-          invented before there is data to shape it is wrong in a month. */}
+          invented before there is data to shape it is wrong in a month. */
+      }
       <label class="f mt-4">
         <span>Note</span>
         <input type="text" maxlength="280" data-link-note placeholder="recommended, Mar 2024" />
       </label>
     </div>
 
-    <footer class="flex shrink-0 justify-end gap-2 border-t border-base-300 px-6 py-4">
+    <footer class="border-base-300 flex shrink-0 justify-end gap-2 border-t px-6 py-4">
       <button type="button" class="btn btn-ghost btn-sm font-sans" data-close>Cancel</button>
-      <button type="button" class="btn btn-sm font-sans zone__cta cn-gold" data-link-save disabled>Link</button>
+      <button type="button" class="btn btn-sm zone__cta cn-gold font-sans" data-link-save disabled>Link</button>
     </footer>
   </div>
 </dialog>

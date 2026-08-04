@@ -126,7 +126,9 @@ async function put(file: File, bucket: 'site' | 'hq', opts: UploadImageOptions):
     );
   }
   if (file.size > MAX_INPUT_BYTES) {
-    throw new UploadError(`That file is ${(file.size / 1e6).toFixed(1)} MB — too large to process. Export it smaller first.`);
+    throw new UploadError(
+      `That file is ${(file.size / 1e6).toFixed(1)} MB — too large to process. Export it smaller first.`,
+    );
   }
 
   const { blob, contentType } = await downscale(file, opts.maxEdge ?? MAX_EDGE);

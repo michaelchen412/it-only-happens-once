@@ -53,7 +53,11 @@ export async function listConstellations(supabase: DB): Promise<ConstellationRef
   const [{ data: cs }, { data: links }] = await Promise.all([
     // The overview always shows the PUBLIC truth — even to the admin, whose
     // session could otherwise see drafts (draft preview lives on /{slug}).
-    supabase.from('constellations').select('name, slug, description, sort, color').eq('status', 'published').order('sort'),
+    supabase
+      .from('constellations')
+      .select('name, slug, description, sort, color')
+      .eq('status', 'published')
+      .order('sort'),
     supabase
       .from('fragment_constellations')
       .select('constellations!inner(slug), fragments!inner(status, deleted_at)')
@@ -67,9 +71,7 @@ export async function listConstellations(supabase: DB): Promise<ConstellationRef
     counts.set(slug, (counts.get(slug) ?? 0) + 1);
   }
 
-  return (cs ?? [])
-    .map((c) => ({ ...c, count: counts.get(c.slug) ?? 0 }))
-    .filter((c) => c.count > 0); // an empty constellation isn't in the sky yet
+  return (cs ?? []).map((c) => ({ ...c, count: counts.get(c.slug) ?? 0 })).filter((c) => c.count > 0); // an empty constellation isn't in the sky yet
 }
 
 /** One constellation with its composed suite, in authored position order. */
@@ -84,7 +86,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   const { data: rows } = await supabase
     .from('fragment_constellations')
     .select(
-      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`
+      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
     )
     .eq('constellation_id', c.id)
     .eq('fragments.status', 'published')

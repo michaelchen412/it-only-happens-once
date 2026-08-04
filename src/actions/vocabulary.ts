@@ -16,7 +16,10 @@ export const subjects = {
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
-      const { error } = await sb.from('subjects').update({ name: input.name.trim(), slug, definition: input.definition ?? null }).eq('id', input.id);
+      const { error } = await sb
+        .from('subjects')
+        .update({ name: input.name.trim(), slug, definition: input.definition ?? null })
+        .eq('id', input.id);
       if (error) throw fail(error.message);
       return { ok: true };
     },
@@ -38,7 +41,12 @@ export const subjects = {
       if (input.from === input.into) throw fail('Pick two different subjects', 'BAD_REQUEST');
       const { data: links } = await sb.from('fragment_subjects').select('fragment_id').eq('subject_id', input.from);
       for (const l of links ?? []) {
-        await sb.from('fragment_subjects').upsert({ fragment_id: l.fragment_id, subject_id: input.into }, { onConflict: 'fragment_id,subject_id', ignoreDuplicates: true });
+        await sb
+          .from('fragment_subjects')
+          .upsert(
+            { fragment_id: l.fragment_id, subject_id: input.into },
+            { onConflict: 'fragment_id,subject_id', ignoreDuplicates: true },
+          );
       }
       await sb.from('fragment_subjects').delete().eq('subject_id', input.from);
       const { error } = await sb.from('subjects').delete().eq('id', input.from);
@@ -55,7 +63,10 @@ export const authors = {
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
-      const { error } = await sb.from('authors').update({ name: input.name.trim(), slug, note: input.note ?? null }).eq('id', input.id);
+      const { error } = await sb
+        .from('authors')
+        .update({ name: input.name.trim(), slug, note: input.note ?? null })
+        .eq('id', input.id);
       if (error) throw fail(error.message);
       return { ok: true };
     },
@@ -87,13 +98,25 @@ export const authors = {
 export const works = {
   update: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid(), title: z.string().min(1), author_id: optText, year: optInt, kind: optText }),
+    input: z.object({
+      id: z.string().uuid(),
+      title: z.string().min(1),
+      author_id: optText,
+      year: optInt,
+      kind: optText,
+    }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const slug = await uniqueSlug(sb, slugify(input.title), input.id).catch(() => slugify(input.title));
       const { error } = await sb
         .from('works')
-        .update({ title: input.title.trim(), slug, author_id: input.author_id ?? null, year: input.year ?? null, kind: input.kind ?? null })
+        .update({
+          title: input.title.trim(),
+          slug,
+          author_id: input.author_id ?? null,
+          year: input.year ?? null,
+          kind: input.kind ?? null,
+        })
         .eq('id', input.id);
       if (error) throw fail(error.message);
       return { ok: true };

@@ -158,9 +158,18 @@ describe('wordFor', () => {
 
 describe('hasAnswers', () => {
   const empty = {
-    bed_at: null, woke_at: null, sleep_latency: null, awakenings: null,
-    sleep_quality: null, restedness: null, valence: null, arousal: null,
-    dream_recall: null, dream_intensity: null, dream_body: null, note: null,
+    bed_at: null,
+    woke_at: null,
+    sleep_latency: null,
+    awakenings: null,
+    sleep_quality: null,
+    restedness: null,
+    valence: null,
+    arousal: null,
+    dream_recall: null,
+    dream_intensity: null,
+    dream_body: null,
+    note: null,
   } as never;
 
   it('is false for a row with nothing in it', () => {

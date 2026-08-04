@@ -44,14 +44,16 @@ if (sheet && form) {
       form.querySelector<HTMLInputElement>('input[name="displayName"]')?.focus();
     }),
   );
-  form.querySelectorAll<HTMLElement>('[data-close]').forEach((btn) => btn.addEventListener('click', () => sheet.close()));
+  form
+    .querySelectorAll<HTMLElement>('[data-close]')
+    .forEach((btn) => btn.addEventListener('click', () => sheet.close()));
 
   // ── the circle segmented control ──────────────────────────────────────────
   form.querySelectorAll<HTMLButtonElement>('[data-circle]').forEach((btn) =>
     btn.addEventListener('click', () => {
-      form.querySelectorAll<HTMLButtonElement>('[data-circle]').forEach((o) =>
-        o.setAttribute('aria-pressed', String(o === btn)),
-      );
+      form
+        .querySelectorAll<HTMLButtonElement>('[data-circle]')
+        .forEach((o) => o.setAttribute('aria-pressed', String(o === btn)));
       circleValue.value = btn.dataset.circle!;
     }),
   );

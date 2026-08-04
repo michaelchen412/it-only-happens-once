@@ -32,10 +32,12 @@
 import { Icon } from 'astro-icon/components';
 ---
 
-{/* Bottom-right, above the content and below the sidebar drawer (z-30 vs the
+{
+  /* Bottom-right, above the content and below the sidebar drawer (z-30 vs the
     sidebar's z-40) so an open mobile menu covers it rather than floating over
     it. BackToTop sits at the same corner but only appears once you have
-    scrolled, and it offsets itself when this is present — see app.css. */}
+    scrolled, and it offsets itself when this is present — see app.css. */
+}
 <button
   id="cap-open"
   type="button"
@@ -49,30 +51,35 @@ import { Icon } from 'astro-icon/components';
 
 <dialog id="cap-dialog" class="modal-dialog w-full max-w-xl" aria-label="Write something down">
   <div class="cap-shell font-sans">
-    {/*
+    {
+      /*
       No title on the dialog and no instructions in it. The box says what it is
       by being a box with a cursor already in it (10-hq §10i: if a sentence
       exists to justify a design decision, it belongs in the plan, not on the
       screen).
-    */}
-    <textarea
-      id="cap-box"
-      class="cap-box"
-      rows="5"
-      placeholder="Write it down…"
-      aria-label="What are you thinking?"></textarea>
+    */
+    }
+    <textarea id="cap-box" class="cap-box" rows="5" placeholder="Write it down…" aria-label="What are you thinking?"
+    ></textarea>
 
     <div class="cap-foot">
-      {/*
+      {
+        /*
         ⚠ EMPTY UNTIL THERE IS SOMETHING TRUE TO SAY, and empty again after.
         The lab shipped this with the word "Saved" already in the markup at
         opacity-0: it lied to screen readers, and it satisfied an e2e assertion
         for a save that had not happened. A whole class of bug — never pre-fill
         a status element with the success case.
-      */}
+      */
+      }
       <span id="cap-status" class="cap-status" aria-live="polite"></span>
       <a href="/admin/notes" class="cap-link">Notes →</a>
-      <button id="cap-new" type="button" class="btn btn-sm font-sans" title="Park this and start another (⌘/Ctrl + Enter)">
+      <button
+        id="cap-new"
+        type="button"
+        class="btn btn-sm font-sans"
+        title="Park this and start another (⌘/Ctrl + Enter)"
+      >
         <Icon name="ph:plus" /> New
       </button>
       <button id="cap-done" type="button" class="btn btn-primary btn-sm font-sans">Done</button>

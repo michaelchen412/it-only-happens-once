@@ -35,7 +35,11 @@ const FILTER_THRESHOLD = 8; // below this, a filter field is just another contro
   {
     constellations.length === 0 ? (
       <p class="admin-hint">
-        No constellations yet — make one in <a href="/admin/constellations" class="underline">Constellations</a>.
+        No constellations yet — make one in{' '}
+        <a href="/admin/constellations" class="underline">
+          Constellations
+        </a>
+        .
       </p>
     ) : (
       <>
@@ -50,12 +54,12 @@ const FILTER_THRESHOLD = 8; // below this, a filter field is just another contro
         <ul class="cn-list space-y-0.5">
           {constellations.map((c) => (
             <li class="cn-row" data-search={`${c.name} ${c.description ?? ''}`.toLowerCase()}>
-              <label class="flex cursor-pointer items-start gap-2.5 rounded-field px-2 py-2 hover:bg-base-200">
+              <label class="rounded-field hover:bg-base-200 flex cursor-pointer items-start gap-2.5 px-2 py-2">
                 <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
                 <span class="min-w-0 grow">
                   <span class="block truncate text-sm leading-snug">{c.name}</span>
                   {c.description && (
-                    <span class="mt-0.5 block line-clamp-4 font-sans text-xs leading-snug text-base-content/55">
+                    <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
                       {c.description}
                     </span>
                   )}
@@ -64,7 +68,9 @@ const FILTER_THRESHOLD = 8; // below this, a filter field is just another contro
             </li>
           ))}
         </ul>
-        <p class="cn-empty admin-hint mt-1" hidden>Nothing matches.</p>
+        <p class="cn-empty admin-hint mt-1" hidden>
+          Nothing matches.
+        </p>
       </>
     )
   }

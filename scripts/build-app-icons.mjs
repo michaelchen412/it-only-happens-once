@@ -63,7 +63,9 @@ console.log('✓ public/favicon.svg');
 // ---- favicon.ico: for anything that probes /favicon.ico by convention ------
 // A single 32×32 PNG in an ICO container — valid, and what every current
 // browser reads. Written by hand because sharp has no .ico encoder.
-const ico32 = await sharp(Buffer.from(star(LAMPLIGHT, 32))).png({ compressionLevel: 9 }).toBuffer();
+const ico32 = await sharp(Buffer.from(star(LAMPLIGHT, 32)))
+  .png({ compressionLevel: 9 })
+  .toBuffer();
 const dir = Buffer.alloc(22);
 dir.writeUInt16LE(0, 0); // reserved
 dir.writeUInt16LE(1, 2); // type: icon
@@ -83,7 +85,10 @@ console.log('✓ public/favicon.ico');
 // Rendered large then TRIMMED to the mark's true bounding box before centring:
 // the star's reach is deliberately uneven, so centring its viewBox would leave
 // it visibly off-centre inside the OS mask.
-const glyph = await sharp(Buffer.from(star(LAMPLIGHT, 1024))).trim({ threshold: 1 }).png().toBuffer();
+const glyph = await sharp(Buffer.from(star(LAMPLIGHT, 1024)))
+  .trim({ threshold: 1 })
+  .png()
+  .toBuffer();
 
 const icons = [
   { file: 'icons/workshop-192.png', size: 192 },

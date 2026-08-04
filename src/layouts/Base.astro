@@ -18,8 +18,10 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
 <html lang="en" data-theme="dusk" transition:name="root" transition:animate="none">
   <head>
     <meta charset="utf-8" />
-    {/* Pick the theme before paint (no flash): a saved choice wins; otherwise
-        follow the system preference; otherwise default to dusk (dark). */}
+    {
+      /* Pick the theme before paint (no flash): a saved choice wins; otherwise
+        follow the system preference; otherwise default to dusk (dark). */
+    }
     <script is:inline>
       try {
         const t = localStorage.getItem('theme');
@@ -35,8 +37,10 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />
     {transitions && <ClientRouter />}
-    {/* A room's own <head> additions — the Observatory puts its web-app
-        manifest here (AdminLayout). Last, so a room can override a default. */}
+    {
+      /* A room's own <head> additions — the Observatory puts its web-app
+        manifest here (AdminLayout). Last, so a room can override a default. */
+    }
     <slot name="head" />
   </head>
   <body class="bg-base-100 text-base-content">

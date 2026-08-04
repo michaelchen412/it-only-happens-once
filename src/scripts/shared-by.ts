@@ -26,7 +26,10 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
   let fragmentId: string | null = null;
   let inFlight: Promise<unknown> = Promise.resolve();
 
-  const selected = () => boxes().filter((b) => b.checked).map((b) => b.value);
+  const selected = () =>
+    boxes()
+      .filter((b) => b.checked)
+      .map((b) => b.value);
 
   function say(msg: string, isError = false) {
     if (!status) return;

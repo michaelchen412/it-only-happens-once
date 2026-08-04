@@ -58,7 +58,8 @@ const { windows: bodyWindows, more: moreMatches } =
   term && r.type === 'writing' && r.body ? excerpts(toPlain(r.body), term) : { windows: [], more: 0 };
 
 // A quote's fuller identity for the citation line: "— Author, Work".
-const quoteWork = r.type === 'quote' ? String((r.details as Record<string, unknown> | null)?.source_title ?? '').trim() : '';
+const quoteWork =
+  r.type === 'quote' ? String((r.details as Record<string, unknown> | null)?.source_title ?? '').trim() : '';
 
 // The primary line. A quote's body is Markdown → strip it to plain text for the row.
 const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
@@ -89,7 +90,7 @@ const editorData =
 
 <tr
   class:list={[
-    'fragment-row border-b border-base-300 last:border-0',
+    'fragment-row border-base-300 border-b last:border-0',
     !trash && !placed && 'hover:bg-base-200/40',
     pick && placed && 'opacity-45',
   ]}
@@ -128,14 +129,22 @@ const editorData =
         </button>
       )
     }
-    {r.attribution && (
-      <div class="truncate font-sans text-xs text-base-content/60">
-        {r.type === 'quote' && '— '}<Highlighted text={r.attribution} term={term} />{quoteWork && (<>, <span class="italic">{quoteWork}</span></>)}
-      </div>
-    )}
+    {
+      r.attribution && (
+        <div class="text-base-content/60 truncate font-sans text-xs">
+          {r.type === 'quote' && '— '}
+          <Highlighted text={r.attribution} term={term} />
+          {quoteWork && (
+            <>
+              , <span class="italic">{quoteWork}</span>
+            </>
+          )}
+        </div>
+      )
+    }
     {
       bodyWindows.length > 0 && (
-        <div class="mt-1 space-y-0.5 font-sans text-xs leading-relaxed text-base-content/60">
+        <div class="text-base-content/60 mt-1 space-y-0.5 font-sans text-xs leading-relaxed">
           {bodyWindows.map((ex) => (
             <p>
               {ex.lead && '… '}
@@ -144,7 +153,9 @@ const editorData =
             </p>
           ))}
           {moreMatches > 0 && (
-            <p class="text-base-content/45">+{moreMatches} more match{moreMatches === 1 ? '' : 'es'}</p>
+            <p class="text-base-content/45">
+              +{moreMatches} more match{moreMatches === 1 ? '' : 'es'}
+            </p>
           )}
         </div>
       )
@@ -171,17 +182,21 @@ const editorData =
   <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
     <StatusChip status={r.status} />
   </td>
-  <td class="hidden px-3 pt-2.5 text-right align-top font-sans text-xs text-base-content/65 md:table-cell whitespace-nowrap">
+  <td
+    class="text-base-content/65 hidden px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap md:table-cell"
+  >
     {shortDate(r.occurred_at)}
   </td>
-  <td class="px-3 pt-2.5 text-right align-top font-sans text-xs text-base-content/65 whitespace-nowrap">
+  <td class="text-base-content/65 px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap">
     {shortDate(r.updated_at)}
   </td>
   {
     pick && (
       <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
         {placed ? (
-          <span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase"><StarMark /> placed</span>
+          <span class="text-primary/70 font-sans text-[0.65rem] tracking-wide uppercase">
+            <StarMark /> placed
+          </span>
         ) : (
           <button
             type="button"
@@ -199,8 +214,12 @@ const editorData =
   {
     trash && (
       <td class="px-3 pt-2.5 text-right align-top whitespace-nowrap" data-noedit>
-        <button class="font-sans text-xs text-base-content/70 hover:text-primary" data-act="restore" data-id={r.id}>Restore</button>
-        <button class="ml-3 font-sans text-xs text-base-content/70 hover:text-error" data-act="purge" data-id={r.id}>Delete</button>
+        <button class="text-base-content/70 hover:text-primary font-sans text-xs" data-act="restore" data-id={r.id}>
+          Restore
+        </button>
+        <button class="text-base-content/70 hover:text-error ml-3 font-sans text-xs" data-act="purge" data-id={r.id}>
+          Delete
+        </button>
       </td>
     )
   }

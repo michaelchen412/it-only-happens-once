@@ -30,7 +30,9 @@ test.describe('the admin at 390px', () => {
         scroll: document.documentElement.scrollWidth,
         client: document.documentElement.clientWidth,
       }));
-      expect(doc.scroll, 'the whole page scrolling sideways is the failure mode to look for').toBeLessThanOrEqual(doc.client + 1);
+      expect(doc.scroll, 'the whole page scrolling sideways is the failure mode to look for').toBeLessThanOrEqual(
+        doc.client + 1,
+      );
     });
   }
 
@@ -102,7 +104,7 @@ test.describe('the admin at 390px', () => {
     const row = await overflowOf(page, '#wsheet form > div > div.flex.items-center');
     expect(
       row.over,
-      `command row overflows its drawer by ${row.over}px at 390px (content ${row.scroll}px in ${row.client}px)`
+      `command row overflows its drawer by ${row.over}px at 390px (content ${row.scroll}px in ${row.client}px)`,
     ).toBeLessThanOrEqual(0);
   });
 
@@ -125,7 +127,7 @@ test.describe('the admin at 390px', () => {
     const table = await overflowOf(page, '#fbrowser table');
     expect(
       table.over,
-      `browser table overflows by ${table.over}px at 390px (content ${table.scroll}px in ${table.client}px)`
+      `browser table overflows by ${table.over}px at 390px (content ${table.scroll}px in ${table.client}px)`,
     ).toBeLessThanOrEqual(0);
   });
 
@@ -139,7 +141,9 @@ test.describe('the admin at 390px', () => {
     // Reported rather than hard-failed at first: this is an audit, and the
     // number is the finding. Tighten to a hard assertion once it's fixed.
     if (publish && publish.height < 44) {
-      test.info().annotations.push({ type: 'finding', description: `Publish… is ${Math.round(publish.height)}px tall (<44px)` });
+      test
+        .info()
+        .annotations.push({ type: 'finding', description: `Publish… is ${Math.round(publish.height)}px tall (<44px)` });
     }
   });
 });

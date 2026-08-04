@@ -56,14 +56,19 @@ const { person, entries, roster, today } = Astro.props;
 
   <div class="zone__body pb-2">
     <div class="logbox" data-logbox>
-      <textarea rows="1" data-log-input placeholder="What happened?" aria-label={`Log an entry about ${person.display_name}`}
-      ></textarea>
+      <textarea
+        rows="1"
+        data-log-input
+        placeholder="What happened?"
+        aria-label={`Log an entry about ${person.display_name}`}></textarea>
 
       <div class="logbox__foot">
-        {/* `popovertarget` rather than a click handler: the browser gets the
+        {
+          /* `popovertarget` rather than a click handler: the browser gets the
             toggle, Escape, light-dismiss and one-open-at-a-time, and none of
             those are mine to get wrong. See trap 7 in app.css for why these
-            have to be top-layer popovers at all. */}
+            have to be top-layer popovers at all. */
+        }
         <div class="logbox__meta" data-log-meta hidden>
           <button type="button" class="lchip" popovertarget="log-kind" data-kind-open>
             <span class="lchip__i" data-kind-icon><Icon name="ph:users-three" /></span>
@@ -88,7 +93,7 @@ const { person, entries, roster, today } = Astro.props;
 
         <div class="logbox__acts">
           <button type="button" class="btn btn-ghost btn-xs font-sans" data-log-cancel hidden>Cancel</button>
-          <button type="button" class="btn btn-xs font-sans zone__cta cn-azure" data-log-save hidden>Save</button>
+          <button type="button" class="btn btn-xs zone__cta cn-azure font-sans" data-log-save hidden>Save</button>
         </div>
       </div>
 
@@ -106,9 +111,11 @@ const { person, entries, roster, today } = Astro.props;
       }
     </div>
 
-    {/* Three taps for the common cases, then a real date input for anything
+    {
+      /* Three taps for the common cases, then a real date input for anything
         older. NO TIME FIELD ANYWHERE: `occurred_on` is a local date, and nobody
-        recalls that the dinner started at 7:14. */}
+        recalls that the dinner started at 7:14. */
+    }
     <div class="pop" popover id="log-date" data-pop="date">
       {
         QUICK_DAYS.map((d, i) => (

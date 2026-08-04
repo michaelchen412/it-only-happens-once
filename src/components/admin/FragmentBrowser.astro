@@ -38,37 +38,73 @@ const { constellation, constellationName, constellationDescription, constellatio
   aria-labelledby="fb-title"
 >
   <div class="flex h-full flex-col">
-    <header class="flex shrink-0 items-center gap-3 border-b border-base-300 px-6 py-3">
+    <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">
-        <h2 id="fb-title" class="truncate font-display text-xl">
+        <h2 id="fb-title" class="font-display truncate text-xl">
           Add to <span class="text-primary">{constellationName}</span>
         </h2>
-        {constellationDescription && (
-          <p class="admin-hint line-clamp-1" title={constellationDescription}>{constellationDescription}</p>
-        )}
+        {
+          constellationDescription && (
+            <p class="admin-hint line-clamp-1" title={constellationDescription}>
+              {constellationDescription}
+            </p>
+          )
+        }
       </div>
       <p id="fb-error" hidden role="alert" class="admin-alert px-2 py-1 text-xs"></p>
       <div class="relative ml-auto">
-        <button id="fb-add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
+        <button
+          id="fb-add-btn"
+          class="btn btn-primary btn-sm gap-1 font-sans"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
           <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
         </button>
-        <div id="fb-add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
-          <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
-          <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
-          <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
+        <div
+          id="fb-add-menu"
+          hidden
+          role="menu"
+          aria-label="Add a fragment"
+          class="rounded-box border-base-300 bg-base-100 absolute right-0 z-30 mt-1 w-40 overflow-hidden border py-1 shadow-lg"
+        >
+          <button
+            data-new-writing
+            role="menuitem"
+            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+            ><TypeMark type="writing" /> Writing</button
+          >
+          <button
+            data-new="quote"
+            role="menuitem"
+            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+            ><TypeMark type="quote" /> Quote</button
+          >
+          <button
+            data-new="song"
+            role="menuitem"
+            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+            ><TypeMark type="song" /> Song</button
+          >
         </div>
       </div>
-      <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
+        >✕</button
+      >
     </header>
 
     <div id="fb-panel" class="grow overflow-y-auto overscroll-contain px-6 py-4">
-      <p class="font-sans text-sm text-base-content/50">Loading fragments…</p>
+      <p class="text-base-content/50 font-sans text-sm">Loading fragments…</p>
     </div>
 
     <BackToTop scroller="#fb-panel" inDialog class="bottom-20" />
 
     {/* bulk place bar — appears once something is checked */}
-    <footer id="fb-bulkbar" hidden class="flex shrink-0 items-center gap-3 border-t border-base-300 bg-base-200 px-6 py-2.5 font-sans text-sm">
+    <footer
+      id="fb-bulkbar"
+      hidden
+      class="border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
+    >
       <span id="fb-bulkcount" class="text-base-content/70">0 selected</span>
       <button id="fb-place-selected" class="btn btn-primary btn-xs normal-case">Place in constellation</button>
     </footer>
@@ -123,8 +159,7 @@ const { constellation, constellationName, constellationDescription, constellatio
     }
     const cell = row.querySelector('[data-act="place"]')?.closest('td');
     if (cell)
-      cell.innerHTML =
-        `<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">${starMarkHtml()} placed</span>`;
+      cell.innerHTML = `<span class="font-sans text-[0.65rem] tracking-wide text-primary/70 uppercase">${starMarkHtml()} placed</span>`;
 
     // Keep the membership column honest without a refetch: drop the "none"
     // chip if this was an orphan, and add this constellation's own chip.
@@ -149,9 +184,12 @@ const { constellation, constellationName, constellationDescription, constellatio
   }
 
   async function loadPanel() {
-    const res = await fetch(`/admin/fragments-panel?mode=pick&constellation=${cid}`, { headers: { 'X-Requested-With': 'fetch' } });
+    const res = await fetch(`/admin/fragments-panel?mode=pick&constellation=${cid}`, {
+      headers: { 'X-Requested-With': 'fetch' },
+    });
     if (!res.ok) {
-      panelHost.innerHTML = '<p class="font-sans text-sm text-error">Couldn’t load the fragments — close and try again.</p>';
+      panelHost.innerHTML =
+        '<p class="font-sans text-sm text-error">Couldn’t load the fragments — close and try again.</p>';
       return;
     }
     panelHost.innerHTML = await res.text();
@@ -216,7 +254,9 @@ const { constellation, constellationName, constellationDescription, constellatio
     if (placedAny) location.reload();
   }
 
-  document.querySelectorAll<HTMLElement>('[data-browse]').forEach((btn) => btn.addEventListener('click', () => openBrowser()));
+  document
+    .querySelectorAll<HTMLElement>('[data-browse]')
+    .forEach((btn) => btn.addEventListener('click', () => openBrowser()));
   browser.querySelector('[data-fb-close]')?.addEventListener('click', () => closeBrowser());
   browser.addEventListener('cancel', (e) => {
     e.preventDefault(); // Escape → still refresh the suite if we placed things

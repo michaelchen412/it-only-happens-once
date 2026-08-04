@@ -62,7 +62,9 @@ if (sheet && form) {
   /** The summary line, so the closed state still tells you who is coming. */
   const syncWho = () => {
     if (!whoEl) return;
-    const names = checks().filter((c) => c.checked).map((c) => c.dataset.name!);
+    const names = checks()
+      .filter((c) => c.checked)
+      .map((c) => c.dataset.name!);
     whoEl.textContent = names.length === 0 ? 'nobody' : names.length <= 3 ? names.join(', ') : `${names.length} people`;
   };
 
@@ -125,9 +127,9 @@ if (sheet && form) {
     titleInput.focus();
   };
 
-  document.querySelectorAll<HTMLElement>('[data-open-event-sheet]').forEach((btn) =>
-    btn.addEventListener('click', () => open(undefined, btn.dataset.openEventSheet)),
-  );
+  document
+    .querySelectorAll<HTMLElement>('[data-open-event-sheet]')
+    .forEach((btn) => btn.addEventListener('click', () => open(undefined, btn.dataset.openEventSheet)));
 
   /**
    * Opened from the notes room, with a dump already read into fields.
@@ -148,7 +150,7 @@ if (sheet && form) {
     titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
     notesInput.value = (p?.notes ?? rest.join('\n')).trim();
     if (p) {
-      dateInput.value = p.due_on?.value ?? (form.dataset.today ?? '');
+      dateInput.value = p.due_on?.value ?? form.dataset.today ?? '';
       startInput.value = timeValue(p.due_time);
       showFrom(form, 'due_on', p.due_on);
       showFrom(form, 'due_time', p.due_time);
@@ -203,7 +205,9 @@ if (sheet && form) {
         endsAt: endInput.value,
         location: locationInput.value.trim(),
         notes: notesInput.value.trim(),
-        personIds: checks().filter((c) => c.checked).map((c) => c.value),
+        personIds: checks()
+          .filter((c) => c.checked)
+          .map((c) => c.value),
       });
       if (error) throw new Error(error.message);
 

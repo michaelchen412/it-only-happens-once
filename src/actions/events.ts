@@ -17,7 +17,13 @@ import { fail, requireAdmin, type DB } from './_shared';
 import { homeTimezone, localToday, parseYmd } from '../lib/hq/time';
 
 const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
-const hhmm = z.preprocess(blankToUndef, z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM').optional());
+const hhmm = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM')
+    .optional(),
+);
 
 const input = z.object({
   /** Absent on create. */

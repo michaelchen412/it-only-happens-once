@@ -94,7 +94,10 @@ export interface Page<T> {
 
 /** PostgREST `.or()` values can't contain its delimiters; strip them from search. */
 function sanitizeQuery(q: string): string {
-  return q.replace(/[%,()\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  return q
+    .replace(/[%,()\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -181,7 +184,7 @@ export function pairedMediaOf(row: PairedRow): PairedMedia | null {
  *  keeps the most-used tags — with name as the tiebreak; without it, by name. */
 function subjectsOf(
   row: { fragment_subjects?: { subjects: SubjectRef | null }[] | null },
-  rank?: Map<string, number>
+  rank?: Map<string, number>,
 ): SubjectRef[] {
   const subs = (row.fragment_subjects ?? []).map((fs) => fs.subjects).filter((s): s is SubjectRef => !!s);
   return rank
@@ -202,7 +205,10 @@ async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<st
   if (!subs || subs.length !== wanted.length) return []; // a slug didn't resolve → AND impossible
   const ids = subs.map((s) => s.id);
 
-  const { data: links } = await supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', ids);
+  const { data: links } = await supabase
+    .from('fragment_subjects')
+    .select('fragment_id, subject_id')
+    .in('subject_id', ids);
   // A fragment satisfies the AND iff it links to all selected subjects. Track a
   // Set per fragment so a duplicate link can never fake a match.
   const perFragment = new Map<string, Set<string>>();
@@ -220,7 +226,7 @@ async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<st
  *  subjects and/or a search term. */
 export async function listWriting(
   supabase: DB,
-  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {}
+  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {},
 ): Promise<Page<WritingItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const q = opts.q ? sanitizeQuery(opts.q) : '';
@@ -238,7 +244,7 @@ export async function listWriting(
     .from('fragments')
     .select(
       `id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`,
-      { count: 'exact' }
+      { count: 'exact' },
     )
     .eq('type', 'writing')
     .eq('status', 'published')
@@ -278,7 +284,7 @@ export async function listWriting(
  *  subjects and/or a search term. */
 export async function listQuotes(
   supabase: DB,
-  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {}
+  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {},
 ): Promise<Page<QuoteItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const searchTerm = opts.q ? sanitizeQuery(opts.q) : '';
@@ -294,9 +300,12 @@ export async function listQuotes(
   const from = (page - 1) * QUOTES_PAGE_SIZE;
   let query = supabase
     .from('fragments')
-    .select('id, slug, body, attribution, source_url, occurred_at, date_precision, fragment_subjects(subjects(name, slug))', {
-      count: 'exact',
-    })
+    .select(
+      'id, slug, body, attribution, source_url, occurred_at, date_precision, fragment_subjects(subjects(name, slug))',
+      {
+        count: 'exact',
+      },
+    )
     .eq('type', 'quote')
     .eq('status', 'published')
     .is('deleted_at', null)
@@ -349,12 +358,12 @@ export interface WritingPost extends WritingItem {
 export async function getWritingBySlug(
   supabase: DB,
   slug: string,
-  opts: { includeUnpublished?: boolean } = {}
+  opts: { includeUnpublished?: boolean } = {},
 ): Promise<WritingPost | null> {
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`
+      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`,
     )
     .eq('type', 'writing')
     .is('deleted_at', null)
@@ -399,7 +408,7 @@ type FragmentType = 'writing' | 'quote' | 'song';
 export async function listSubjects(
   supabase: DB,
   type: FragmentType,
-  opts: { selected?: string[]; q?: string | null } = {}
+  opts: { selected?: string[]; q?: string | null } = {},
 ): Promise<RailSubject[]> {
   const selected = Array.from(new Set((opts.selected ?? []).filter(Boolean)));
   const q = opts.q ? sanitizeQuery(opts.q) : '';

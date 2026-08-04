@@ -164,9 +164,11 @@ test.describe('the add sheet', () => {
 
     const days = page.locator('[data-birth-day] option');
     const enabled = async () =>
-      (await days.evaluateAll((opts) =>
-        opts.filter((o) => !(o as HTMLOptionElement).disabled).map((o) => (o as HTMLOptionElement).value),
-      )).filter(Boolean);
+      (
+        await days.evaluateAll((opts) =>
+          opts.filter((o) => !(o as HTMLOptionElement).disabled).map((o) => (o as HTMLOptionElement).value),
+        )
+      ).filter(Boolean);
 
     await page.locator('[data-birth-month]').selectOption('4'); // April
     expect(await enabled()).not.toContain('31');

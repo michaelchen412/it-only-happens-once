@@ -127,7 +127,10 @@ export function lateBy(dueOn: Ymd, today: Ymd): string {
  * and nowhere else, because the date already says it and the lab showed the
  * label on six rows out of eight — which is not information, it is texture.
  */
-export function byWhen<T extends { due_on: string | null; due_time: string | null; title: string }>(a: T, b: T): number {
+export function byWhen<T extends { due_on: string | null; due_time: string | null; title: string }>(
+  a: T,
+  b: T,
+): number {
   if (a.due_on !== b.due_on) return (a.due_on ?? '') < (b.due_on ?? '') ? -1 : 1;
   if (!!a.due_time !== !!b.due_time) return a.due_time ? -1 : 1;
   if (a.due_time && b.due_time && a.due_time !== b.due_time) return a.due_time < b.due_time ? -1 : 1;

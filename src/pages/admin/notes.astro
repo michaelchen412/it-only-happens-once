@@ -109,11 +109,7 @@ const todayYmd = localToday(tz);
 
 const [{ data: goalData }, { data: rosterData }] = await Promise.all([
   supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
-  supabase
-    .from('people')
-    .select('id, display_name, photo_path')
-    .is('archived_at', null)
-    .order('display_name'),
+  supabase.from('people').select('id, display_name, photo_path').is('archived_at', null).order('display_name'),
 ]);
 const goals = goalData ?? [];
 const roster = rosterData ?? [];
@@ -128,7 +124,7 @@ const roster = rosterData ?? [];
         /* A room with nothing in it says one plain sentence and offers the way
            in — never an empty skeleton of the cards that would be here
            (10-hq §10b). */
-        <p class="font-sans text-sm text-base-content/55">
+        <p class="text-base-content/55 font-sans text-sm">
           Nothing here yet. The <span class="text-base-content/80">✚</span> in the corner is the way in — from any room.
         </p>
       ) : (
@@ -138,7 +134,9 @@ const roster = rosterData ?? [];
               {/* `pre-wrap` in the stylesheet, so the line breaks you typed are
                   the line breaks you see. A dump's shape is part of what it
                   says. */}
-              <div class:list={['dump__text', n.long && 'dump__text--clamped']} data-text>{n.body}</div>
+              <div class:list={['dump__text', n.long && 'dump__text--clamped']} data-text>
+                {n.body}
+              </div>
               {n.long && (
                 <button type="button" class="dump__more" data-more>
                   more
@@ -148,7 +146,9 @@ const roster = rosterData ?? [];
                   the dominant motion in this room, so a tap must not put a
                   cursor (and on a phone, a keyboard) into a card you were only
                   scrolling past. */}
-              <textarea class="dump__edit" hidden aria-label="Edit this note" data-edit-box>{n.body}</textarea>
+              <textarea class="dump__edit" hidden aria-label="Edit this note" data-edit-box>
+                {n.body}
+              </textarea>
 
               {/* THREE CONTROLS, NOT SIX (14 · Piece 2). Piece 1 shipped four —
                   edit, two ways out, delete — and Piece 2 adds two more ways
@@ -158,14 +158,22 @@ const roster = rosterData ?? [];
                   question, asked once. So reading (✎) and discarding (🗑) stay
                   direct, and → opens the chooser. */}
               <div class="dump__foot">
-                <time class="dump__stamp" datetime={n.updatedAt} data-ago>{n.ago}</time>
+                <time class="dump__stamp" datetime={n.updatedAt} data-ago>
+                  {n.ago}
+                </time>
                 <button type="button" class="dump__act" data-edit title="Edit" aria-label="Edit">
                   <Icon name="ph:pencil-simple" />
                 </button>
                 <button type="button" class="dump__act" data-file title="Turn it into…" aria-label="Turn it into">
                   <Icon name="ph:arrow-right" />
                 </button>
-                <button type="button" class="dump__act dump__act--danger" data-delete title="Delete" aria-label="Delete">
+                <button
+                  type="button"
+                  class="dump__act dump__act--danger"
+                  data-delete
+                  title="Delete"
+                  aria-label="Delete"
+                >
                   <Icon name="ph:trash" />
                 </button>
               </div>
@@ -176,7 +184,8 @@ const roster = rosterData ?? [];
     }
   </div>
 
-  {/* The chooser — ONE menu for the whole pile, positioned against whichever
+  {
+    /* The chooser — ONE menu for the whole pile, positioned against whichever
       card's → opened it (scripts/pop-anchor.ts).
 
       ⚠ A TOP-LAYER POPOVER, and it has to be: trap 7. A menu anchored inside a
@@ -186,26 +195,33 @@ const roster = rosterData ?? [];
 
       THE ORDER IS FREQUENCY, NOT SYMMETRY. A dump is far more often an errand
       than an essay seed, so the task is first — the same rule the interaction
-      kinds follow (`KINDS` in lib/hq/interactions.ts). */}
+      kinds follow (`KINDS` in lib/hq/interactions.ts). */
+  }
   <div class="pop pop--wide" popover id="dump-file" data-pop="file">
-    {/* ⚠ ONE ROW, NOT TWO — and it does not say "task", because it does not
+    {
+      /* ⚠ ONE ROW, NOT TWO — and it does not say "task", because it does not
         always make one. Michael, 2026-08-04: *"I don't want the cognitive
         expenditure of thinking: is this more of an event or more of a task?"*
         The reading decides, the sheet that opens says which and why, and the
         other shape is one tap away. Both live in the Agenda room, which is
-        what this row can honestly promise. */}
+        what this row can honestly promise. */
+    }
     <button type="button" class="pop__row" data-as="agenda">
       <Icon name="ph:calendar-blank" /> Add to the Agenda…
     </button>
-    {/* ⚠ ABSENT ENTIRELY WHEN THERE IS NOBODY TO LOG ABOUT (10-hq §10b, and the
+    {
+      /* ⚠ ABSENT ENTIRELY WHEN THERE IS NOBODY TO LOG ABOUT (10-hq §10b, and the
         rule TaskSheet applies to its goal picker). An entry needs a person, so
         with an empty roster this row could only ever open a picker with nothing
-        in it — a control that asks a question with no answers. */}
-    {roster.length > 0 && (
-      <button type="button" class="pop__row" data-as="log">
-        <Icon name="ph:note-pencil" /> Log an entry…
-      </button>
-    )}
+        in it — a control that asks a question with no answers. */
+    }
+    {
+      roster.length > 0 && (
+        <button type="button" class="pop__row" data-as="log">
+          <Icon name="ph:note-pencil" /> Log an entry…
+        </button>
+      )
+    }
     <button type="button" class="pop__row" data-as="piece">
       <Icon name="ph:pen-nib" /> Make a piece
     </button>
@@ -214,15 +230,19 @@ const roster = rosterData ?? [];
     </button>
   </div>
 
-  {/* ONE PICKER, MANY CARDS — the TaskSheet rule. The room lists dozens of
+  {
+    /* ONE PICKER, MANY CARDS — the TaskSheet rule. The room lists dozens of
       dumps and 60 destinations; rendering a dialog per card would be 60 lists
       in the DOM to keep in step. The card being filed is written onto the
-      dialog when it opens. */}
+      dialog when it opens. */
+  }
   <dialog id="note-file" class="modal-dialog w-full max-w-md" aria-labelledby="note-file-title">
     <div class="flex max-h-[80vh] flex-col overflow-hidden font-sans">
-      <header class="flex shrink-0 items-center justify-between gap-4 border-b border-base-300 px-5 py-3.5">
+      <header class="border-base-300 flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3.5">
         <h2 id="note-file-title" class="font-display text-lg">Add to a piece</h2>
-        <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+        <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
+          >✕</button
+        >
       </header>
 
       <div class="shrink-0 px-5 py-3">
@@ -236,40 +256,48 @@ const roster = rosterData ?? [];
       </div>
 
       <ul id="note-file-list" class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {pieces.map((p) => (
-          <li>
-            <button
-              type="button"
-              class="flex w-full items-baseline gap-2 rounded-field px-3 py-2 text-left text-sm hover:bg-base-200"
-              data-piece={p.id}
-              data-title={p.title}
-            >
-              <span class="min-w-0 flex-1 truncate">{p.title}</span>
-              {/* A draft and a published piece are different places to put a
+        {
+          pieces.map((p) => (
+            <li>
+              <button
+                type="button"
+                class="rounded-field hover:bg-base-200 flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm"
+                data-piece={p.id}
+                data-title={p.title}
+              >
+                <span class="min-w-0 flex-1 truncate">{p.title}</span>
+                {/* A draft and a published piece are different places to put a
                   loose paragraph, and the chip is the whole explanation. */}
-              {p.status === 'draft' && <span class="chip chip--off shrink-0">draft</span>}
-            </button>
-          </li>
-        ))}
-        {pieces.length === 0 && <li class="px-3 py-2 text-sm text-base-content/55">No writing yet.</li>}
+                {p.status === 'draft' && <span class="chip chip--off shrink-0">draft</span>}
+              </button>
+            </li>
+          ))
+        }
+        {pieces.length === 0 && <li class="text-base-content/55 px-3 py-2 text-sm">No writing yet.</li>}
       </ul>
-      <p id="note-file-none" class="px-5 pb-4 text-sm text-base-content/55" hidden>Nothing matches.</p>
+      <p id="note-file-none" class="text-base-content/55 px-5 pb-4 text-sm" hidden>Nothing matches.</p>
     </div>
   </dialog>
 
-  {/* The real sheets, opened prefilled — not smaller copies of them. A task
+  {
+    /* The real sheets, opened prefilled — not smaller copies of them. A task
       made from a dump gets the same date, effort, lead and recurrence controls
-      as one typed in the Agenda room, because it is the same form. */}
+      as one typed in the Agenda room, because it is the same form. */
+  }
   <TaskSheet today={todayYmd} goals={goals} />
-  {/* The event sheet rides along for the half of readings that come back
+  {
+    /* The event sheet rides along for the half of readings that come back
       event-shaped. It takes the roster so a dinner can be tagged with who was
       there in the same motion — the one thing an event does that a task
-      cannot, and the thing the drift guard reads (10-hq §10g). */}
+      cannot, and the thing the drift guard reads (10-hq §10g). */
+  }
   <EventSheet today={todayYmd} people={roster} />
   {roster.length > 0 && <LogSheet roster={roster} today={todayYmd} />}
 
-  {/* The way back from a one-tap action. Lives outside the list so a card
-      leaving the pile cannot take its own undo with it. */}
+  {
+    /* The way back from a one-tap action. Lives outside the list so a card
+      leaving the pile cannot take its own undo with it. */
+  }
   <div id="notes-undo" class="undo-bar" role="status" aria-live="polite">
     <span data-undo-text></span>
     <button type="button" class="btn btn-xs font-sans" data-undo-do>Undo</button>

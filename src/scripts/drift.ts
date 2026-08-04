@@ -44,9 +44,7 @@ panel?.addEventListener('click', async (e) => {
   both.forEach((b) => (b.disabled = true));
 
   try {
-    const { error } = reaching
-      ? await actions.drift.reachedOut({ personId })
-      : await actions.drift.mute({ personId });
+    const { error } = reaching ? await actions.drift.reachedOut({ personId }) : await actions.drift.mute({ personId });
     if (error) throw new Error(error.message);
     if (row) retire(row);
   } catch (err) {

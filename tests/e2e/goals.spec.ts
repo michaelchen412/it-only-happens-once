@@ -53,7 +53,10 @@ test.describe('the goals room', () => {
 
   test('the empty room names the first goal rather than onboarding you', async ({ page }) => {
     await room(page);
-    test.skip((await page.locator('.gcard').count()) > 0 || (await page.locator('.row').count()) > 0, 'the room has goals in it');
+    test.skip(
+      (await page.locator('.gcard').count()) > 0 || (await page.locator('.row').count()) > 0,
+      'the room has goals in it',
+    );
     await expect(page.getByText('Nothing you’re working toward yet.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Name the first' })).toBeVisible();
     await expect(page.getByText(/get started|welcome|tip:/i)).toHaveCount(0);
@@ -65,7 +68,9 @@ test.describe('the goals room', () => {
     test.skip((await cold.count()) === 0, 'nothing has gone cold');
     // The moment it turns amber it becomes a debt, which is the one thing §4a
     // will not let a goal be.
-    const [colour, style] = await cold.first().evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).fontStyle]);
+    const [colour, style] = await cold
+      .first()
+      .evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).fontStyle]);
     expect(style).toBe('italic');
     expect(colour).not.toMatch(/rgb\(2[0-9]{2}, [0-9]{1,2}, [0-9]{1,2}\)/);
   });

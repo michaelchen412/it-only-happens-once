@@ -76,14 +76,17 @@ function filePart(body: Buffer, contentTypeHeader: string): { type: string; byte
   const boundary = contentTypeHeader.match(/boundary=(.+)$/)?.[1];
   if (!boundary) throw new Error(`no boundary in ${contentTypeHeader}`);
   const sep = Buffer.from(`--${boundary}`);
-  for (let i = body.indexOf(sep); i !== -1; ) {
+  for (let i = body.indexOf(sep); i !== -1;) {
     const next = body.indexOf(sep, i + sep.length);
     if (next === -1) break;
     const part = body.subarray(i + sep.length, next);
     i = next;
     const headEnd = part.indexOf('\r\n\r\n');
     if (headEnd === -1) continue;
-    const type = part.subarray(0, headEnd).toString('latin1').match(/content-type:\s*([^\r\n]+)/i)?.[1];
+    const type = part
+      .subarray(0, headEnd)
+      .toString('latin1')
+      .match(/content-type:\s*([^\r\n]+)/i)?.[1];
     if (type) return { type: type.trim(), bytes: part.subarray(headEnd + 4, part.length - 2) };
   }
   throw new Error('no file part in the upload body');
@@ -260,7 +263,9 @@ test.describe('images in essays', () => {
 
     const chooser = page.waitForEvent('filechooser');
     await page.locator('#ws-toolbar [data-cmd="image"]').click();
-    await (await chooser).setFiles({
+    await (
+      await chooser
+    ).setFiles({
       name: 'logo.svg',
       mimeType: 'image/svg+xml',
       buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),

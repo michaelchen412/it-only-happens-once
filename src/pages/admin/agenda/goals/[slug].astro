@@ -71,7 +71,12 @@ const pickable = (activeGoals ?? []).some((g) => g.id === goal.id)
 const tasks: Task[] = taskData ?? [];
 const scheduled = tasks
   .filter((t) => t.due_on)
-  .sort((a, b) => byWhen({ due_on: a.due_on, due_time: a.due_time, title: a.title }, { due_on: b.due_on, due_time: b.due_time, title: b.title }));
+  .sort((a, b) =>
+    byWhen(
+      { due_on: a.due_on, due_time: a.due_time, title: a.title },
+      { due_on: b.due_on, due_time: b.due_time, title: b.title },
+    ),
+  );
 const unscheduled = tasks.filter((t) => !t.due_on).sort((a, b) => a.title.localeCompare(b.title));
 
 const done = (doneData ?? []).filter((e): e is typeof e & { tasks: { id: string; title: string } } => !!e.tasks);
@@ -113,15 +118,26 @@ const payload = (t: Task) =>
       <div class="min-w-0 flex-1">
         <p class="ghead__k"><Icon name="ph:target" /> {horizonLabel(goal.horizon)}</p>
         <h1 class="font-display text-3xl font-light">{goal.name}</h1>
-        {why && <div class="reading mt-2 max-w-xl font-serif text-base leading-relaxed text-base-content/80" set:html={why} />}
-        {/* The one number a goal gets, and only when there is something to
-            observe. No bar, no percent, no "3 of 7". */}
+        {
+          why && (
+            <div
+              class="reading text-base-content/80 mt-2 max-w-xl font-serif text-base leading-relaxed"
+              set:html={why}
+            />
+          )
+        }
+        {
+          /* The one number a goal gets, and only when there is something to
+            observe. No bar, no percent, no "3 of 7". */
+        }
         {observation && <p class:list={['ghead__o', observation.cold && 'gcard__o--cold']}>{observation.text}</p>}
       </div>
       <div class="flex shrink-0 items-center gap-1" data-goal={goal.id}>
-        {/* Four ways for a goal to stand, and letting go is one of them —
+        {
+          /* Four ways for a goal to stand, and letting go is one of them —
             beside the others, not hidden behind a delete. One tap, no dialog:
-            it is reversible and it destroys nothing. */}
+            it is reversible and it destroys nothing. */
+        }
         <div class="pseg" role="group" aria-label="Status">
           {
             STATUSES.map((s) => (
@@ -160,7 +176,9 @@ const payload = (t: Task) =>
                       <Icon name="ph:check-circle" class="tick__x" />
                     </button>
                     <span class="min-w-0 flex-1">
-                      <button type="button" class="task__t" data-edit-task>{t.title}</button>
+                      <button type="button" class="task__t" data-edit-task>
+                        {t.title}
+                      </button>
                       <span class="task__m">
                         <span class="stamp" title={fullDate(t.due_on!)}>
                           <Icon name="ph:clock-light" class="stamp__i" />
@@ -175,7 +193,9 @@ const payload = (t: Task) =>
                         <span class="task__skip">skipped</span>
                         <span class:list={['eff', `eff--${t.effort}`]}>
                           <span class="eff__m" aria-hidden="true">
-                            {[1, 2, 3, 4].map((n) => <i class:list={[n <= effortMeta(t.effort).step && 'on']} />)}
+                            {[1, 2, 3, 4].map((n) => (
+                              <i class:list={[n <= effortMeta(t.effort).step && 'on']} />
+                            ))}
                           </span>
                           {effortMeta(t.effort).label}
                         </span>
@@ -193,9 +213,16 @@ const payload = (t: Task) =>
             <span class="zone__chip"><Icon name="ph:dots-three" /></span>
             <h2 class="zone__title">Not scheduled yet</h2>
             <span class="zone__count ml-auto">{unscheduled.length}</span>
-            {/* The value is this goal's id: a task added from here belongs to
-                it until you say otherwise. */}
-            <button type="button" class="zone__act ml-1" data-open-task-sheet={goal.id} aria-label="Add a task to this goal">
+            {
+              /* The value is this goal's id: a task added from here belongs to
+                it until you say otherwise. */
+            }
+            <button
+              type="button"
+              class="zone__act ml-1"
+              data-open-task-sheet={goal.id}
+              aria-label="Add a task to this goal"
+            >
               <Icon name="ph:plus" />
             </button>
           </div>
@@ -211,10 +238,14 @@ const payload = (t: Task) =>
                       <Icon name="ph:check-circle" class="tick__x" />
                     </button>
                     <span class="min-w-0 flex-1">
-                      <button type="button" class="task__t" data-edit-task>{t.title}</button>
+                      <button type="button" class="task__t" data-edit-task>
+                        {t.title}
+                      </button>
                     </span>
                     {/* The affordance says what this section is for. */}
-                    <button type="button" class="chip chip--act shrink-0" data-edit-task>Give it a date</button>
+                    <button type="button" class="chip chip--act shrink-0" data-edit-task>
+                      Give it a date
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -236,7 +267,9 @@ const payload = (t: Task) =>
               <ul class="zone__list pb-2">
                 {done.map((e) => (
                   <li class="row">
-                    <span class="row__mark"><Icon name="ph:check-circle" /></span>
+                    <span class="row__mark">
+                      <Icon name="ph:check-circle" />
+                    </span>
                     <span class="min-w-0 flex-1 text-sm opacity-80">{e.tasks.title}</span>
                     <span class="stamp admin-hint shrink-0 text-xs" title={fullDate(e.occurred_on)}>
                       {dmd(e.occurred_on, todayYmd)}

@@ -147,7 +147,9 @@ if (!COMMIT) {
   // 1) subjects from the reviewed taxonomy
   const { taxonomy, tags } = JSON.parse(fs.readFileSync('scripts/reflections-subjects.json', 'utf8'));
   const subjectRows = taxonomy.map((t) => ({ name: t.name, slug: slugify(t.name) }));
-  const { error: subErr } = await sb.from('subjects').upsert(subjectRows, { onConflict: 'slug', ignoreDuplicates: true });
+  const { error: subErr } = await sb
+    .from('subjects')
+    .upsert(subjectRows, { onConflict: 'slug', ignoreDuplicates: true });
   if (subErr) throw subErr;
   const { data: subjectList, error: selErr } = await sb.from('subjects').select('id, slug');
   if (selErr) throw selErr;
@@ -180,7 +182,10 @@ if (!COMMIT) {
 
     // 3) subjects for this fragment (replace to stay idempotent)
     const names = tags[p.slug] ?? [];
-    const links = names.map((n) => subjectIdBySlug[slugify(n)]).filter(Boolean).map((subject_id) => ({ fragment_id: frag.id, subject_id }));
+    const links = names
+      .map((n) => subjectIdBySlug[slugify(n)])
+      .filter(Boolean)
+      .map((subject_id) => ({ fragment_id: frag.id, subject_id }));
     await sb.from('fragment_subjects').delete().eq('fragment_id', frag.id);
     if (links.length) {
       const { error: linkErr } = await sb.from('fragment_subjects').insert(links);
@@ -189,5 +194,7 @@ if (!COMMIT) {
     inserted++;
     process.stdout.write(`\r  imported ${inserted}/${posts.length}`);
   }
-  console.log(`\n✓ Done. ${inserted}/${posts.length} reflections imported (published, original dates, subjects linked).`);
+  console.log(
+    `\n✓ Done. ${inserted}/${posts.length} reflections imported (published, original dates, subjects linked).`,
+  );
 }

@@ -114,8 +114,10 @@ const TRACKS = [
       <p class="admin-hint mt-0.5 text-xs">About 40 seconds · you can skip</p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-ghost btn-sm font-sans" data-skip>{isToday ? 'Skip' : 'Skip this day'}</button>
-      <button type="button" class="btn btn-sm font-sans zone__cta" data-go="fill">Start</button>
+      <button type="button" class="btn btn-ghost btn-sm font-sans" data-skip
+        >{isToday ? 'Skip' : 'Skip this day'}</button
+      >
+      <button type="button" class="btn btn-sm zone__cta font-sans" data-go="fill">Start</button>
     </div>
   </div>
 
@@ -125,8 +127,10 @@ const TRACKS = [
     <button type="button" class="btn btn-ghost btn-sm mt-3 font-sans" data-unskip>Fill it in anyway</button>
   </div>
 
-  {/* ════════════ CLOSED ════════════ a past date outside the window, with
-      nothing on it. It is simply absent — never a failure, never a prompt. */}
+  {
+    /* ════════════ CLOSED ════════════ a past date outside the window, with
+      nothing on it. It is simply absent — never a failure, never a prompt. */
+  }
   <div class="zone__body" data-panel="closed" hidden>
     <p class="admin-hint text-sm">Nothing recorded.</p>
   </div>
@@ -134,11 +138,13 @@ const TRACKS = [
   {/* ════════════ DONE ════════════ */}
   <div class="zone__body" data-panel="done" hidden>
     <div class="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
-      {/* The night, and everything that qualifies it. The dream badge and the
+      {
+        /* The night, and everything that qualifies it. The dream badge and the
           save stamp live HERE rather than in a strip of their own below a
           divider — on an ordinary morning, with no dream text and no note, that
           strip was a mostly empty band carrying two small things (Michael,
-          2026-08-02). A divider now appears only when there is prose under it. */}
+          2026-08-02). A divider now appears only when there is prose under it. */
+      }
       <div class="flex flex-col gap-2">
         {
           summary && (
@@ -150,7 +156,9 @@ const TRACKS = [
                 {times.bed && times.woke ? `${t12(times.bed)} → ${t12(times.woke)}` : ''}
               </p>
               {summary.asleep !== null && (
-                <p class="admin-hint mt-0.5 text-xs">≈{hm(summary.asleep)} asleep · {summary.efficiency}%</p>
+                <p class="admin-hint mt-0.5 text-xs">
+                  ≈{hm(summary.asleep)} asleep · {summary.efficiency}%
+                </p>
               )}
             </div>
           )
@@ -170,7 +178,10 @@ const TRACKS = [
                NEVER UTC: the server renders the configured home zone and
                `local-time.ts` rewrites it into the device's. */
             <p class="admin-hint text-xs" data-src="daily_checkins.updated_at">
-              Saved <time datetime={row.updated_at} data-local="time">{clockIn(row.updated_at, tz)}</time>
+              Saved{' '}
+              <time datetime={row.updated_at} data-local="time">
+                {clockIn(row.updated_at, tz)}
+              </time>
             </p>
           )
         }
@@ -200,7 +211,9 @@ const TRACKS = [
                 <dt class="rate__label">{t.label}</dt>
                 <dd class="flex items-center gap-2" data-src={`daily_checkins.${t.field}`}>
                   <span class="track">
-                    {[1, 2, 3, 4, 5].map((n) => <i class:list={['track__t', n === row[t.field] && 'track__t--on']} />)}
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <i class:list={['track__t', n === row[t.field] && 'track__t--on']} />
+                    ))}
                   </span>
                   <span class="admin-hint text-xs">{wordFor(t.field, row[t.field])}</span>
                 </dd>
@@ -211,21 +224,23 @@ const TRACKS = [
       </dl>
     </div>
 
-    {/* Below the divider: only what you actually wrote. On a morning with
-        neither, there is no divider and no band — the card just ends. */}
+    {
+      /* Below the divider: only what you actually wrote. On a morning with
+        neither, there is no divider and no band — the card just ends. */
+    }
     {
       (row?.dream_body || row?.note) && (
-        <div class="mt-4 space-y-2 border-t border-base-300 pt-3">
+        <div class="border-base-300 mt-4 space-y-2 border-t pt-3">
           {row.dream_body && (
             <div
-              class="reading font-serif text-sm text-base-content/75"
+              class="reading text-base-content/75 font-serif text-sm"
               data-src="daily_checkins.dream_body (Markdown)"
               set:html={renderMarkdown(row.dream_body)}
             />
           )}
           {row.note && (
             <div
-              class="reading font-serif text-sm text-base-content/75"
+              class="reading text-base-content/75 font-serif text-sm"
               data-src="daily_checkins.note"
               set:html={renderMarkdown(row.note)}
             />
@@ -258,7 +273,7 @@ const TRACKS = [
                 type="button"
                 class:list={['opt', `opt--${d.key}`]}
                 data-dream={d.key}
-                aria-pressed={row?.dream_recall === d.key ? "true" : "false"}
+                aria-pressed={row?.dream_recall === d.key ? 'true' : 'false'}
               >
                 <Icon name={d.icon} class="opt__i" />
                 {d.label}
@@ -284,7 +299,9 @@ const TRACKS = [
                   </button>
                 ))}
               </span>
-              <span class="mark__w" data-w-for="dream_intensity">{wordFor('dream_intensity', row?.dream_intensity ?? null)}</span>
+              <span class="mark__w" data-w-for="dream_intensity">
+                {wordFor('dream_intensity', row?.dream_intensity ?? null)}
+              </span>
             </div>
             {/* The one field that summons a keyboard at 7am, so it is behind a
                 tap. Optional, and skipping it is the normal case. */}
@@ -297,7 +314,10 @@ const TRACKS = [
               hidden={!row?.dream_body}
               data-field="dream_body"
               placeholder="What you remember."
-              data-src="daily_checkins.dream_body (Markdown)">{row?.dream_body ?? ''}</textarea>
+              data-src="daily_checkins.dream_body (Markdown)"
+            >
+              {row?.dream_body ?? ''}
+            </textarea>
           </div>
         </fieldset>
 
@@ -310,7 +330,9 @@ const TRACKS = [
               <span class="tm__k">In bed</span>
               <input type="time" data-field="bed" value={bedValue} />
             </label>
-            <span class="tm__arrow" aria-hidden="true">→</span>
+            <span class="tm__arrow" aria-hidden="true">
+              →
+            </span>
             <label class="tm">
               <span class="tm__k">Woke</span>
               <input type="time" data-field="woke" value={wokeValue} />
@@ -334,7 +356,7 @@ const TRACKS = [
                   type="button"
                   class="opt opt--sm"
                   data-lat={l.key}
-                  aria-pressed={row?.sleep_latency === l.key ? "true" : "false"}
+                  aria-pressed={row?.sleep_latency === l.key ? 'true' : 'false'}
                 >
                   {l.label}
                 </button>
@@ -350,7 +372,7 @@ const TRACKS = [
                   type="button"
                   class="opt opt--sm"
                   data-wake={w.key}
-                  aria-pressed={row?.awakenings === w.key ? "true" : "false"}
+                  aria-pressed={row?.awakenings === w.key ? 'true' : 'false'}
                 >
                   {w.label}
                 </button>
@@ -377,7 +399,9 @@ const TRACKS = [
                   </button>
                 ))}
               </span>
-              <span class="mark__w" data-w-for={s.field}>{wordFor(s.field, row?.[s.field] ?? null)}</span>
+              <span class="mark__w" data-w-for={s.field}>
+                {wordFor(s.field, row?.[s.field] ?? null)}
+              </span>
             </div>
           ))}
         </fieldset>
@@ -404,7 +428,9 @@ const TRACKS = [
                   </button>
                 ))}
               </span>
-              <span class="mark__w" data-w-for={t.field}>{wordFor(t.field, row?.[t.field] ?? null)}</span>
+              <span class="mark__w" data-w-for={t.field}>
+                {wordFor(t.field, row?.[t.field] ?? null)}
+              </span>
             </div>
           ))}
 
@@ -417,7 +443,10 @@ const TRACKS = [
             hidden={!row?.note}
             data-field="note"
             placeholder="Anything at all."
-            data-src="daily_checkins.note">{row?.note ?? ''}</textarea>
+            data-src="daily_checkins.note"
+          >
+            {row?.note ?? ''}
+          </textarea>
         </fieldset>
 
         {/* No submit. One row per date, upserted — "Done" only closes the card. */}
@@ -425,16 +454,16 @@ const TRACKS = [
           <button type="button" class="btn btn-ghost btn-sm font-sans" data-skip>
             {isToday ? 'Skip today' : 'Skip this day'}
           </button>
-          <span class="admin-hint text-xs" data-saved>Saves as you go</span>
-          <button type="button" class="btn btn-sm font-sans zone__cta" data-done>Done</button>
+          <span class="admin-hint text-xs" data-saved>
+            Saves as you go
+          </span>
+          <button type="button" class="btn btn-sm zone__cta font-sans" data-done>
+            Done
+          </button>
         </div>
       </div>
     )
   }
 </section>
 
-{
-  !writable && !answered && (
-    <p class="admin-hint mt-2 text-xs">Check-ins can only be filled in for the last 3 days.</p>
-  )
-}
+{!writable && !answered && <p class="admin-hint mt-2 text-xs">Check-ins can only be filled in for the last 3 days.</p>}

@@ -33,9 +33,10 @@ const editing = !!goal;
 
 <dialog id="goal-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="goal-sheet-title">
   <form id="goal-form" class="flex h-full flex-col overflow-hidden font-sans" data-id={goal?.id}>
-    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
       <h2 id="goal-sheet-title" class="font-display text-xl">{editing ? 'Edit goal' : 'New goal'}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <p id="goal-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
@@ -66,7 +67,12 @@ const editing = !!goal;
 
       <label class="f mt-4">
         <span class="f__k">Why</span>
-        <textarea name="why" rows="4" placeholder="Not a number on a scale. Being able to do the Tahoe hike in September without hating it.">{goal?.why}</textarea>
+        <textarea
+          name="why"
+          rows="4"
+          placeholder="Not a number on a scale. Being able to do the Tahoe hike in September without hating it."
+          >{goal?.why}</textarea
+        >
       </label>
 
       {
@@ -85,16 +91,16 @@ const editing = !!goal;
       }
     </div>
 
-    <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
+    <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
       {
         editing && (
-          <button type="button" class="btn btn-ghost btn-sm gap-1 font-sans text-error" data-delete-goal>
+          <button type="button" class="btn btn-ghost btn-sm text-error gap-1 font-sans" data-delete-goal>
             <Icon name="ph:trash" /> Delete
           </button>
         )
       }
       <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
-      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>
+      <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>
         {editing ? 'Save' : 'Add goal'}
       </button>
     </div>

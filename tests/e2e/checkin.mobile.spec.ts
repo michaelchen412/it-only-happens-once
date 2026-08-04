@@ -59,21 +59,23 @@ test.describe('the check-in at 390px', () => {
         const cs = getComputedStyle(zone);
         const right = box.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
         const left = box.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
-        return [...zone.querySelectorAll('*')]
-          // Only what is actually drawn — see the note in
-          // admin-layout.mobile.spec.ts. A hidden panel and an SVG sprite both
-          // report an all-zero rect, which reads as an overflow of exactly the
-          // zone's left inset on every single element.
-          .filter((el) => el.getClientRects().length > 0 && !el.closest('svg'))
-          .map((el) => {
-            const r = el.getBoundingClientRect();
-            return {
-              what: `${el.tagName.toLowerCase()}.${String(el.className)}`.slice(0, 60),
-              text: (el.textContent ?? '').trim().slice(0, 24),
-              over: Math.round(Math.max(r.right - right, left - r.left)),
-            };
-          })
-          .filter((x) => x.over > 1);
+        return (
+          [...zone.querySelectorAll('*')]
+            // Only what is actually drawn — see the note in
+            // admin-layout.mobile.spec.ts. A hidden panel and an SVG sprite both
+            // report an all-zero rect, which reads as an overflow of exactly the
+            // zone's left inset on every single element.
+            .filter((el) => el.getClientRects().length > 0 && !el.closest('svg'))
+            .map((el) => {
+              const r = el.getBoundingClientRect();
+              return {
+                what: `${el.tagName.toLowerCase()}.${String(el.className)}`.slice(0, 60),
+                text: (el.textContent ?? '').trim().slice(0, 24),
+                over: Math.round(Math.max(r.right - right, left - r.left)),
+              };
+            })
+            .filter((x) => x.over > 1)
+        );
       }),
     );
     expect(escaping, `content escaping its card at 390px: ${JSON.stringify(escaping)}`).toHaveLength(0);

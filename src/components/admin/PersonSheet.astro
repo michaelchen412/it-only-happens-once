@@ -48,19 +48,22 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
     data-mode={editing ? 'edit' : 'add'}
     data-id={person?.id}
   >
-    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
       <h2 id="person-sheet-title" class="font-display text-xl">{title}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <p id="person-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
       <div class="flex items-start gap-4">
-        {/* The camera-roll path, and it has to work from a phone on day one:
+        {
+          /* The camera-roll path, and it has to work from a phone on day one:
             a roster of monograms is a roster that never gets its photos.
             `accept="image/*"` is what makes iOS offer Photo Library / Take
-            Photo / Choose File — the whole mobile path, from one attribute. */}
+            Photo / Choose File — the whole mobile path, from one attribute. */
+        }
         <label class:list={['photowell', photoUrl && 'photowell--set']} data-photowell>
           <img src={photoUrl ?? undefined} hidden={!photoUrl} alt="" data-photo-preview />
           <span class="grid place-items-center gap-1" hidden={!!photoUrl} data-photo-empty>
@@ -73,12 +76,21 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
         <div class="min-w-0 flex-1 space-y-3">
           <label class="f">
             <span class="f__k">Name <em>required</em></span>
-            <input type="text" name="displayName" required maxlength="120" placeholder="What you call them" value={person?.display_name} />
+            <input
+              type="text"
+              name="displayName"
+              required
+              maxlength="120"
+              placeholder="What you call them"
+              value={person?.display_name}
+            />
           </label>
 
-          {/* A three-way segmented control, not a dropdown: three options that
+          {
+            /* A three-way segmented control, not a dropdown: three options that
               are the shape of the whole roster should be visible without a
-              click. The hidden input is what actually submits. */}
+              click. The hidden input is what actually submits. */
+          }
           <div class="f">
             <span class="f__k">Circle <em>required</em></span>
             <div class="pseg" role="group" aria-label="Circle">
@@ -97,7 +109,13 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
 
       <label class="f mt-4">
         <span class="f__k">In a line</span>
-        <input type="text" name="epithet" maxlength="280" placeholder="college roommate, now in Seattle" value={person?.epithet ?? ''} />
+        <input
+          type="text"
+          name="epithet"
+          maxlength="280"
+          placeholder="college roommate, now in Seattle"
+          value={person?.epithet ?? ''}
+        />
         <span class="f__h">Shows on their card.</span>
       </label>
 
@@ -142,7 +160,13 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
 
         <label class="f">
           <span class="f__k">Known since</span>
-          <input type="text" inputmode="numeric" name="knownSinceYear" placeholder="2013" value={person?.known_since_year ?? ''} />
+          <input
+            type="text"
+            inputmode="numeric"
+            name="knownSinceYear"
+            placeholder="2013"
+            value={person?.known_since_year ?? ''}
+          />
         </label>
 
         <label class="f">
@@ -150,8 +174,10 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
           <input type="text" name="location" maxlength="120" placeholder="Seattle" value={person?.location ?? ''} />
         </label>
 
-        {/* In MONTHS, because nobody thinks in days (§10). The conversion is
-            365.25/12 so 12 ⇄ 365 round-trips exactly — see `monthsToDays`. */}
+        {
+          /* In MONTHS, because nobody thinks in days (§10). The conversion is
+            365.25/12 so 12 ⇄ 365 round-trips exactly — see `monthsToDays`. */
+        }
         <label class="f">
           <span class="f__k">Nudge me after</span>
           <span class="flex items-center gap-2">
@@ -166,9 +192,9 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
       <p class="admin-hint mt-5 text-xs">No phone or email — those live on your phone.</p>
     </div>
 
-    <div class="flex shrink-0 justify-end gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
+    <div class="border-base-300 bg-base-200 flex shrink-0 justify-end gap-2 border-t px-6 py-3">
       <button type="button" data-close class="btn btn-ghost btn-sm font-sans">Cancel</button>
-      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-azure" data-submit>{submitLabel}</button>
+      <button type="submit" class="btn btn-sm zone__cta cn-azure gap-1 font-sans" data-submit>{submitLabel}</button>
     </div>
   </form>
 </dialog>

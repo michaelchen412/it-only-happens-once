@@ -50,7 +50,9 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
   // the fresh numbers from the fetched partial.
   function syncCounts(doc: Document) {
     doc.querySelectorAll<HTMLElement>('.type-badge').forEach((src) => {
-      const dst = root.querySelector<HTMLElement>(`.type-badge[data-type-filter="${src.dataset.typeFilter ?? ''}"] .type-badge__n`);
+      const dst = root.querySelector<HTMLElement>(
+        `.type-badge[data-type-filter="${src.dataset.typeFilter ?? ''}"] .type-badge__n`,
+      );
       const val = src.querySelector('.type-badge__n')?.textContent;
       if (dst && val != null) dst.textContent = val;
     });
@@ -199,7 +201,10 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
   return {
     root,
     refresh: applyFilters,
-    getSelected: () => checkList().filter((c) => c.checked).map((c) => c.value),
+    getSelected: () =>
+      checkList()
+        .filter((c) => c.checked)
+        .map((c) => c.value),
     clearSelection: () => {
       checkList().forEach((c) => (c.checked = false));
       refreshSelection();

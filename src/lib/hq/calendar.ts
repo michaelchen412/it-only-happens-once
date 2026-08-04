@@ -132,11 +132,7 @@ export const CELL_ROWS = 3;
  * and the grid's question is "what is my day". Two of the nine real events on
  * the live calendar are exactly this.
  */
-export async function mirroredBetween(
-  sb: SupabaseClient<Database>,
-  from: Ymd,
-  to: Ymd,
-): Promise<CalendarItem[]> {
+export async function mirroredBetween(sb: SupabaseClient<Database>, from: Ymd, to: Ymd): Promise<CalendarItem[]> {
   const { data } = await sb
     .from('external_events')
     .select('*')
@@ -176,8 +172,8 @@ export async function mirroredBetween(
         title: row.title ?? '(untitled)',
         // A multi-day event only has its time on the day it starts; in the
         // middle of a hotel stay there is no o'clock to show.
-        at: day === row.starts_on ? row.starts_at?.slice(0, 5) ?? null : null,
-        endAt: day === row.starts_on ? row.ends_at?.slice(0, 5) ?? null : null,
+        at: day === row.starts_on ? (row.starts_at?.slice(0, 5) ?? null) : null,
+        endAt: day === row.starts_on ? (row.ends_at?.slice(0, 5) ?? null) : null,
         location: row.location,
         // ⚠ THE ROW'S ONE DOOR IS GOOGLE ITSELF, which is a better explanation
         // of "not yours to change" than any label (10-hq.md §10i).

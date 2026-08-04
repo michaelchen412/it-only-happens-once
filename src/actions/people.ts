@@ -37,13 +37,10 @@ const nullableText = (max: number) =>
 
 /** Same rule for a number: blank clears it. */
 const nullableInt = (min: number, max: number) =>
-  z.preprocess(
-    (v) => {
-      const s = typeof v === 'string' ? v.trim() : v;
-      return s === '' || s == null ? null : s;
-    },
-    z.coerce.number().int().min(min).max(max).nullable(),
-  );
+  z.preprocess((v) => {
+    const s = typeof v === 'string' ? v.trim() : v;
+    return s === '' || s == null ? null : s;
+  }, z.coerce.number().int().min(min).max(max).nullable());
 
 const facts = z.object({
   /** Absent on create. The client does not mint ids here — the database does. */
@@ -209,11 +206,7 @@ export const people = {
         throw fail('That photo doesn’t belong to this person.', 'BAD_REQUEST');
       }
 
-      const { data: before, error: readErr } = await sb
-        .from('people')
-        .select('photo_path')
-        .eq('id', v.id)
-        .single();
+      const { data: before, error: readErr } = await sb.from('people').select('photo_path').eq('id', v.id).single();
       if (readErr) throw fail(readErr.message);
 
       const { data, error } = await sb

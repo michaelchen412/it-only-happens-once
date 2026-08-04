@@ -207,7 +207,13 @@ export interface ParseResult {
   meta: { ms: number; inputTokens: number; outputTokens: number };
 }
 
-export async function parseTask(text: string, today: Ymd, tz: string, apiKey: string, at: number): Promise<ParseResult> {
+export async function parseTask(
+  text: string,
+  today: Ymd,
+  tz: string,
+  apiKey: string,
+  at: number,
+): Promise<ParseResult> {
   const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()];
   const client = new Anthropic({ apiKey });
   const message = await client.messages.parse({

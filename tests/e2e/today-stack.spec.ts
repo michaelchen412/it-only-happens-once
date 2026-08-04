@@ -122,7 +122,11 @@ test.describe('Practice — the one zone you cannot act on', () => {
       const value = page.locator('[data-signal="published"] .sig__v');
       const [colour, error, warning] = await value.evaluate((el) => {
         const root = getComputedStyle(document.documentElement);
-        return [getComputedStyle(el).color, root.getPropertyValue('--color-error').trim(), root.getPropertyValue('--color-warning').trim()];
+        return [
+          getComputedStyle(el).color,
+          root.getPropertyValue('--color-error').trim(),
+          root.getPropertyValue('--color-warning').trim(),
+        ];
       });
       expect(colour).not.toBe(error);
       expect(colour).not.toBe(warning);
@@ -170,7 +174,9 @@ test.describe('the stack', () => {
     // rows that look editable in the rooms — the assertion is that none of the
     // sheets came with them.
     await expect(page.locator('#wsheet, #fsheet, #task-sheet, #event-sheet, #goal-sheet')).toHaveCount(0);
-    const scripts = await page.locator('script[src]').evaluateAll((els) => els.map((e) => (e as HTMLScriptElement).src));
+    const scripts = await page
+      .locator('script[src]')
+      .evaluateAll((els) => els.map((e) => (e as HTMLScriptElement).src));
     expect(scripts.filter((s) => /tiptap|prosemirror/i.test(s))).toHaveLength(0);
   });
 });

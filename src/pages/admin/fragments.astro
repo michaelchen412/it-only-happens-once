@@ -79,7 +79,11 @@ const SUBTITLES = {
       <Fragment slot="actions">
         {
           view === 'trash' ? (
-            <button id="empty-trash" class="btn btn-outline btn-sm gap-1.5 font-sans text-error" disabled={data.rows.length === 0}>
+            <button
+              id="empty-trash"
+              class="btn btn-outline btn-sm text-error gap-1.5 font-sans"
+              disabled={data.rows.length === 0}
+            >
               <Icon name="ph:trash" class="text-base" /> Empty trash
             </button>
           ) : (
@@ -92,15 +96,31 @@ const SUBTITLES = {
                   <a href="/admin/fragments?view=trash" class="btn btn-ghost btn-sm gap-1.5 font-sans">
                     <Icon name="ph:trash" />
                     Trash
-                    <span id="trash-count" class="rounded-full bg-base-300 px-1.5 text-xs text-base-content/70 empty:hidden">{data.trashCount || ''}</span>
+                    <span
+                      id="trash-count"
+                      class="bg-base-300 text-base-content/70 rounded-full px-1.5 text-xs empty:hidden"
+                    >
+                      {data.trashCount || ''}
+                    </span>
                   </a>
                 </>
               )}
               <div class="relative">
-                <button id="add-btn" class="btn btn-primary btn-sm gap-1 font-sans" aria-haspopup="menu" aria-expanded="false">
+                <button
+                  id="add-btn"
+                  class="btn btn-primary btn-sm gap-1 font-sans"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                >
                   <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
                 </button>
-                <div id="add-menu" hidden role="menu" aria-label="Add a fragment" class="absolute right-0 z-30 mt-1 w-40 overflow-hidden rounded-box border border-base-300 bg-base-100 py-1 shadow-lg">
+                <div
+                  id="add-menu"
+                  hidden
+                  role="menu"
+                  aria-label="Add a fragment"
+                  class="rounded-box border-base-300 bg-base-100 absolute right-0 z-30 mt-1 w-40 overflow-hidden border py-1 shadow-lg"
+                >
                   {/* ⚠ NO "Note" ITEM. It opened a near-fullscreen sheet with a
                       title field for something that has no title — the exact
                       door 14 §2 was written to replace ("today a note costs
@@ -108,9 +128,27 @@ const SUBTITLES = {
                       write one now, from any room. A piece can still be sent
                       DOWN to the pile: that is the bulk bar's "Make notes",
                       which is a demotion rather than a second front door. */}
-                  <button data-new-writing role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="writing" /> Writing</button>
-                  <button data-new="quote" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="quote" /> Quote</button>
-                  <button data-new="song" role="menuitem" class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"><TypeMark type="song" /> Song</button>
+                  <button
+                    data-new-writing
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="writing" /> Writing
+                  </button>
+                  <button
+                    data-new="quote"
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="quote" /> Quote
+                  </button>
+                  <button
+                    data-new="song"
+                    role="menuitem"
+                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  >
+                    <TypeMark type="song" /> Song
+                  </button>
                 </div>
               </div>
             </>
@@ -129,23 +167,35 @@ const SUBTITLES = {
       {
         view === 'trash' ? (
           <>
-            <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">Restore</button>
-            <button data-bulk="purge" class="btn btn-xs btn-ghost normal-case text-error">Delete forever</button>
+            <button data-bulk="restore" class="btn btn-xs btn-ghost normal-case">
+              Restore
+            </button>
+            <button data-bulk="purge" class="btn btn-xs btn-ghost text-error normal-case">
+              Delete forever
+            </button>
           </>
         ) : (
           <>
             {/* Elevate a selection into the sky — the bulk half of the
                 fragment→constellation view (docs/admin.md §2). */}
             <div class="relative">
-              <button id="bulk-cn-btn" class="btn btn-xs btn-ghost gap-1 normal-case" aria-haspopup="menu" aria-expanded="false">
-                <span class="text-primary"><StarMark /></span> Constellation <span aria-hidden="true">▾</span>
+              <button
+                id="bulk-cn-btn"
+                class="btn btn-xs btn-ghost gap-1 normal-case"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <span class="text-primary">
+                  <StarMark />
+                </span>{' '}
+                Constellation <span aria-hidden="true">▾</span>
               </button>
               <div
                 id="bulk-cn-menu"
                 hidden
                 role="menu"
                 aria-label="Add to or remove from a constellation"
-                class="absolute bottom-full left-0 z-40 mb-1 max-h-96 w-96 overflow-y-auto rounded-box border border-base-300 bg-base-100 py-1 shadow-lg"
+                class="rounded-box border-base-300 bg-base-100 absolute bottom-full left-0 z-40 mb-1 max-h-96 w-96 overflow-y-auto border py-1 shadow-lg"
               >
                 {/* The full description (4-line cap): you're about to elevate a
                     whole selection, so "what is this constellation for" should
@@ -155,31 +205,52 @@ const SUBTITLES = {
                   <button role="menuitem" class="add-item block w-full px-3 py-2 text-left" data-cn-add={c.id}>
                     <span class="block truncate text-sm leading-snug">{c.name}</span>
                     {c.description && (
-                      <span class="mt-0.5 block line-clamp-4 text-xs leading-snug text-base-content/55">{c.description}</span>
+                      <span class="text-base-content/55 mt-0.5 line-clamp-4 block text-xs leading-snug">
+                        {c.description}
+                      </span>
                     )}
                   </button>
                 ))}
-                <p id="bulk-cn-remove-label" class="admin-label mt-1 border-t border-base-300 px-3 pt-2" hidden>Remove from</p>
+                <p id="bulk-cn-remove-label" class="admin-label border-base-300 mt-1 border-t px-3 pt-2" hidden>
+                  Remove from
+                </p>
                 {data.allConstellations.map((c) => (
-                  <button role="menuitem" hidden class="add-item block w-full truncate px-3 py-1.5 text-left text-sm text-error/80" data-cn-remove={c.id}>
+                  <button
+                    role="menuitem"
+                    hidden
+                    class="add-item text-error/80 block w-full truncate px-3 py-1.5 text-left text-sm"
+                    data-cn-remove={c.id}
+                  >
                     {c.name}
                   </button>
                 ))}
-                {data.allConstellations.length === 0 && (
-                  <p class="admin-hint px-3 py-2">No constellations yet.</p>
-                )}
+                {data.allConstellations.length === 0 && <p class="admin-hint px-3 py-2">No constellations yet.</p>}
               </div>
             </div>
-            <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">Publish</button>
-            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">Unpublish</button>
-            <button data-bulk="note" class="btn btn-xs btn-ghost normal-case">Make notes</button>
-            <button data-bulk="trash" class="btn btn-xs btn-ghost normal-case text-error">Delete</button>
+            <button data-bulk="publish" class="btn btn-xs btn-ghost normal-case">
+              Publish
+            </button>
+            <button data-bulk="draft" class="btn btn-xs btn-ghost normal-case">
+              Unpublish
+            </button>
+            <button data-bulk="note" class="btn btn-xs btn-ghost normal-case">
+              Make notes
+            </button>
+            <button data-bulk="trash" class="btn btn-xs btn-ghost text-error normal-case">
+              Delete
+            </button>
           </>
         )
       }
     </div>
   </div>
-  <p id="bulk-error" hidden role="alert" class="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-field border border-error/40 bg-base-200 px-3 py-1.5 font-sans text-xs text-error shadow"></p>
+  <p
+    id="bulk-error"
+    hidden
+    role="alert"
+    class="rounded-field border-error/40 bg-base-200 text-error fixed bottom-20 left-1/2 z-40 -translate-x-1/2 border px-3 py-1.5 font-sans text-xs shadow"
+  >
+  </p>
 
   <FragmentSheet
     subjects={subjectNames}

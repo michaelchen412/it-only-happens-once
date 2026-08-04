@@ -142,7 +142,10 @@ test.describe('the quiet card marker', () => {
     // NOTHING ELSE. The card must not grow a badge, and the person is already
     // named once in the panel above — the marker exists so scanning a section
     // still tells you, not so drift is announced twice.
-    const card = page.locator('[data-person]').filter({ has: page.locator('.is-drifting') }).first();
+    const card = page
+      .locator('[data-person]')
+      .filter({ has: page.locator('.is-drifting') })
+      .first();
     await expect(card.locator('.chip')).toHaveCount(0);
     await expect(card.getByText('overdue', { exact: false })).toHaveCount(0);
   });

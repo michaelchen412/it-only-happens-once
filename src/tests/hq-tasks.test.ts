@@ -162,7 +162,10 @@ describe('advance', () => {
 describe('recurrenceWords', () => {
   it('says the interval in the row‘s own words, singular and plural', () => {
     const after = (every: number, unit: 'days' | 'weeks' | 'months') =>
-      recurrenceWords({ recur_mode: 'after_completion', recur_rrule: null, recur_every: every, recur_unit: unit }, null);
+      recurrenceWords(
+        { recur_mode: 'after_completion', recur_rrule: null, recur_every: every, recur_unit: unit },
+        null,
+      );
     expect(after(2, 'weeks')).toBe('every 2 weeks after I do it');
     expect(after(1, 'week' as 'weeks')).toBe('every week after I do it');
     expect(after(1, 'months')).toBe('every month after I do it');
@@ -170,12 +173,19 @@ describe('recurrenceWords', () => {
   });
 
   it('uses the schedule‘s name, never its rule string', () => {
-    const fixed = { recur_mode: 'fixed', recur_rrule: 'FREQ=MONTHLY;BYDAY=3MO', recur_every: null, recur_unit: null } as const;
+    const fixed = {
+      recur_mode: 'fixed',
+      recur_rrule: 'FREQ=MONTHLY;BYDAY=3MO',
+      recur_every: null,
+      recur_unit: null,
+    } as const;
     expect(recurrenceWords(fixed, 'Monthly, on the 3rd Monday')).toBe('monthly, on the 3rd monday');
     expect(recurrenceWords(fixed, null)).not.toMatch(/FREQ/);
   });
 
   it('says nothing at all about a one-off', () => {
-    expect(recurrenceWords({ recur_mode: null, recur_rrule: null, recur_every: null, recur_unit: null }, null)).toBeNull();
+    expect(
+      recurrenceWords({ recur_mode: null, recur_rrule: null, recur_every: null, recur_unit: null }, null),
+    ).toBeNull();
   });
 });

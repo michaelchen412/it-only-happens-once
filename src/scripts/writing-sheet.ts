@@ -555,7 +555,9 @@ cnPanel.addEventListener('change', () => {
 // ---- opening ----
 const setHash = (h: string) => history.replaceState(null, '', location.pathname + location.search + h);
 const setSubjects = (v: string) =>
-  (document.querySelector('#publish-dialog tag-input') as HTMLElement & { setTags?: (v: string) => void })?.setTags?.(v);
+  (document.querySelector('#publish-dialog tag-input') as HTMLElement & { setTags?: (v: string) => void })?.setTags?.(
+    v,
+  );
 
 interface Loaded {
   id: string;
@@ -696,8 +698,7 @@ async function requestClose() {
       } else {
         const ok = await confirmDialog({
           title: 'Discard changes?',
-          message:
-            'These edits haven’t reached the server, so they aren’t stored anywhere else. Close without saving?',
+          message: 'These edits haven’t reached the server, so they aren’t stored anywhere else. Close without saving?',
           confirmLabel: 'Discard',
           danger: true,
         });
@@ -967,8 +968,12 @@ document.addEventListener('writing:edit', (e) => {
   const id = (e as CustomEvent).detail;
   if (typeof id === 'string' && id) void openEdit(id);
 });
-document.querySelectorAll<HTMLElement>('[data-new-writing]').forEach((btn) => btn.addEventListener('click', () => openNew()));
-document.querySelectorAll<HTMLElement>('[data-new-note]').forEach((btn) => btn.addEventListener('click', () => openNew(false, true)));
+document
+  .querySelectorAll<HTMLElement>('[data-new-writing]')
+  .forEach((btn) => btn.addEventListener('click', () => openNew()));
+document
+  .querySelectorAll<HTMLElement>('[data-new-note]')
+  .forEach((btn) => btn.addEventListener('click', () => openNew(false, true)));
 
 const m = location.hash.match(/^#edit=([0-9a-f][0-9a-f-]{30,40})$/i);
 if (m) void openEdit(m[1], true);

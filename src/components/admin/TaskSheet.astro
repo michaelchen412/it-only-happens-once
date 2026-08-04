@@ -47,16 +47,19 @@ const { today, goals = [] } = Astro.props;
 
 <dialog id="task-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="task-sheet-title">
   <form id="task-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
-    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
       <h2 id="task-sheet-title" class="font-display text-xl">New task</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <p id="task-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-      {/* Only ever visible when a reading filled this form in (14 · Piece 3).
-          A task typed by hand is not a judgement anybody made. */}
+      {
+        /* Only ever visible when a reading filled this form in (14 · Piece 3).
+          A task typed by hand is not a judgement anybody made. */
+      }
       <KindBar self="task" />
 
       <label class="f">
@@ -81,16 +84,20 @@ const { today, goals = [] } = Astro.props;
             <input type="time" name="dueTime" class="f--narrow" data-time />
           </label>
           <button type="button" class="btn btn-ghost btn-xs mb-1 font-sans" data-clear-time>Clear</button>
-          {/* Nullable time is not a shrug (§3) — but it is ONE WORD beside the
-              field rather than a paragraph under it (§10i). */}
+          {
+            /* Nullable time is not a shrug (§3) — but it is ONE WORD beside the
+              field rather than a paragraph under it (§10i). */
+          }
           <span class="f__h mb-1" data-anytime>anytime</span>
         </div>
-        {/* WHICH WORDS PRODUCED THIS DATE (§6.3). A date on its own cannot be
+        {
+          /* WHICH WORDS PRODUCED THIS DATE (§6.3). A date on its own cannot be
             judged; "read from 'every Thursday'" can be judged at a glance, and
-            a silently misparsed date is worse than no parse at all (§6.2). */}
+            a silently misparsed date is worse than no parse at all (§6.2). */
+        }
         <p class="f__h mt-1" data-parsed-from="due_on" hidden></p>
         <p class="f__h" data-parsed-from="due_time" hidden></p>
-        <p class="f__h u-warn mt-1 inline-block rounded-field px-2" data-parsed-warn hidden></p>
+        <p class="f__h u-warn rounded-field mt-1 inline-block px-2" data-parsed-warn hidden></p>
       </fieldset>
 
       <fieldset class="fs">
@@ -100,7 +107,13 @@ const { today, goals = [] } = Astro.props;
             <div class="pseg" role="group" aria-label="Effort">
               {
                 EFFORTS.map((e) => (
-                  <button type="button" class="pseg__b" data-effort={e.key} title={e.hint} aria-pressed={e.key === 'sitting'}>
+                  <button
+                    type="button"
+                    class="pseg__b"
+                    data-effort={e.key}
+                    title={e.hint}
+                    aria-pressed={e.key === 'sitting'}
+                  >
                     {e.label}
                   </button>
                 ))
@@ -121,15 +134,25 @@ const { today, goals = [] } = Astro.props;
           </div>
         </div>
 
-        {/* The lead rule is invisible machinery until it names a date. ONE line,
+        {
+          /* The lead rule is invisible machinery until it names a date. ONE line,
             and only the outcome — a second line naming which rule fired taught
-            the mechanic instead of stating the result. */}
+            the mechanic instead of stating the result. */
+        }
         <div class="lead" data-dated hidden>
           <p class="lead__l"><Icon name="ph:calendar-blank" /> <span data-lead-line></span></p>
           <label class="lead__o">
             <input type="checkbox" data-override-on />
             <span>Warn me</span>
-            <input type="text" inputmode="numeric" class="f--n" value="3" data-override-n disabled aria-label="Days ahead" />
+            <input
+              type="text"
+              inputmode="numeric"
+              class="f--n"
+              value="3"
+              data-override-n
+              disabled
+              aria-label="Days ahead"
+            />
             <span>days ahead instead</span>
           </label>
         </div>
@@ -159,10 +182,12 @@ const { today, goals = [] } = Astro.props;
         </div>
 
         <div class="mt-3" data-rep-panel="fixed" hidden>
-          {/* Nobody hand-writes RRULE (§4), so the schedule is picked by name —
+          {
+            /* Nobody hand-writes RRULE (§4), so the schedule is picked by name —
               and the names are rebuilt from the date, because "every Monday" is
               only true while the date is a Monday. The rule string itself is
-              storage, not interface, and never appears. */}
+              storage, not interface, and never appears. */
+          }
           <div class="f">
             <select name="preset" data-preset aria-label="Schedule">
               {PRESETS.map((p) => <option value={p}>{presetLabel(p, today)}</option>)}
@@ -182,7 +207,9 @@ const { today, goals = [] } = Astro.props;
             <div class="f">
               <select name="goalId" data-goal-id aria-label="Goal">
                 <option value="">— none —</option>
-                {goals.map((g) => <option value={g.id}>{g.name}</option>)}
+                {goals.map((g) => (
+                  <option value={g.id}>{g.name}</option>
+                ))}
               </select>
             </div>
           </fieldset>
@@ -190,12 +217,12 @@ const { today, goals = [] } = Astro.props;
       }
     </div>
 
-    <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
-      <button type="button" class="btn btn-ghost btn-sm gap-1 font-sans text-error" data-delete hidden>
+    <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+      <button type="button" class="btn btn-ghost btn-sm text-error gap-1 font-sans" data-delete hidden>
         <Icon name="ph:trash" /> Delete
       </button>
       <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
-      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>Add task</button>
+      <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>Add task</button>
     </div>
   </form>
 </dialog>

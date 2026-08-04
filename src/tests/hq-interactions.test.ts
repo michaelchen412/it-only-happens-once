@@ -64,7 +64,15 @@ describe('byLastContact', () => {
 
   it('floats the most recent to the top', () => {
     const people = [person('a', 'Anwen'), person('b', 'Bram'), person('c', 'Cyrek')];
-    const sorted = [...people].sort(byLastContact(map([['a', '2026-01-01'], ['b', '2026-08-01'], ['c', '2026-05-01']])));
+    const sorted = [...people].sort(
+      byLastContact(
+        map([
+          ['a', '2026-01-01'],
+          ['b', '2026-08-01'],
+          ['c', '2026-05-01'],
+        ]),
+      ),
+    );
     expect(sorted.map((p) => p.id)).toEqual(['b', 'c', 'a']);
   });
 

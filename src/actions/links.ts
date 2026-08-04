@@ -70,11 +70,7 @@ export const links = {
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
-      const { error } = await sb
-        .from('person_works')
-        .delete()
-        .eq('person_id', v.personId)
-        .eq('work_id', v.workId);
+      const { error } = await sb.from('person_works').delete().eq('person_id', v.personId).eq('work_id', v.workId);
       if (error) throw fail(error.message);
       return { ok: true };
     },

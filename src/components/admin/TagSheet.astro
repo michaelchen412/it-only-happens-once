@@ -36,8 +36,10 @@ const FILTER_THRESHOLD = 8;
   people.length > 0 && (
     <dialog id="tag-sheet" class="drawer-dialog w-full max-w-sm" aria-labelledby="tag-sheet-title">
       <form id="tag-form" class="flex h-full flex-col overflow-hidden font-sans">
-        <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
-          <h2 id="tag-sheet-title" class="font-display text-xl">Who’s there</h2>
+        <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
+          <h2 id="tag-sheet-title" class="font-display text-xl">
+            Who’s there
+          </h2>
           <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">
             ✕
           </button>
@@ -46,7 +48,7 @@ const FILTER_THRESHOLD = 8;
         {/* The event's own name, so you can see what you are tagging. It is
             read-only text rather than a field: nothing about a mirrored row is
             editable here, and a disabled input would say the opposite. */}
-        <p class="shrink-0 px-6 pt-4 font-serif text-sm text-base-content/70" data-tag-title />
+        <p class="text-base-content/70 shrink-0 px-6 pt-4 font-serif text-sm" data-tag-title />
 
         <p id="tag-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4" />
 
@@ -75,9 +77,11 @@ const FILTER_THRESHOLD = 8;
           </div>
         </div>
 
-        <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
-          <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
-          <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>
+        <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+          <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>
             <Icon name="ph:check" /> Save
           </button>
         </div>

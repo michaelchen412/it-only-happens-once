@@ -49,7 +49,13 @@ test.describe('the stack on a phone', () => {
     const morning = await topOf(page, '[data-checkin]');
     expect(morning).not.toBeNull();
 
-    for (const sel of ['[data-agenda-zone]', '[data-people-zone]', '[data-coming-up]', '[data-practice]', '[data-past-due]']) {
+    for (const sel of [
+      '[data-agenda-zone]',
+      '[data-people-zone]',
+      '[data-coming-up]',
+      '[data-practice]',
+      '[data-past-due]',
+    ]) {
       const top = await topOf(page, sel);
       if (top !== null) expect(top, `${sel} came before the check-in`).toBeGreaterThan(morning!);
     }
@@ -86,7 +92,9 @@ test.describe('the stack on a phone', () => {
     // value label off the check-in card at 390px and was invisible to three
     // plausible assertions. The general form of the check is cheap: no zone may
     // be wider than the page.
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
     expect(overflow, 'the page scrolls sideways').toBeLessThanOrEqual(1);
   });
 });

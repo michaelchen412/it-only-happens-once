@@ -27,14 +27,7 @@ import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
 import { today as hqToday, type Ymd } from '../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
-import {
-  GROUPS,
-  byWhen,
-  effortMeta,
-  groupOf,
-  lateBy,
-  recurrenceWords,
-} from '../../../lib/hq/tasks';
+import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
 import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
 import type { Tables } from '../../../lib/database.types';
 
@@ -67,9 +60,7 @@ const answered = new Map(
 type Row = Task & { answeredAs: 'done' | 'skipped' | null; shownDueOn: Ymd | null };
 
 const rows: Row[] = [
-  ...(liveData ?? [])
-    .filter((t) => !answered.has(t.id))
-    .map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
+  ...(liveData ?? []).filter((t) => !answered.has(t.id)).map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
   ...(eventData ?? [])
     .filter((e): e is typeof e & { tasks: Task } => !!e.tasks)
     .map((e) => ({ ...e.tasks, answeredAs: e.outcome, shownDueOn: e.for_due_on })),
@@ -79,7 +70,12 @@ const grouped = GROUPS.map((g) => ({
   ...g,
   items: rows
     .filter((r) => groupOf(r.shownDueOn, todayYmd) === g.key)
-    .sort((a, b) => byWhen({ due_on: a.shownDueOn, due_time: a.due_time, title: a.title }, { due_on: b.shownDueOn, due_time: b.due_time, title: b.title })),
+    .sort((a, b) =>
+      byWhen(
+        { due_on: a.shownDueOn, due_time: a.due_time, title: a.title },
+        { due_on: b.shownDueOn, due_time: b.due_time, title: b.title },
+      ),
+    ),
 })).filter((g) => g.items.length > 0);
 
 /** Which named schedule a stored rule came from — null unless it is `fixed`. */
@@ -122,23 +118,27 @@ const payload = (t: Task) =>
 
     <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
       <h1 class="font-display text-2xl font-light">Tasks</h1>
-      <button type="button" data-open-task-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
+      <button type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
         <Icon name="ph:plus" /> New
       </button>
     </header>
 
-    {(error || eventError) && (
-      <p class="admin-alert mb-5" role="alert">Couldn’t load the list: {(error ?? eventError)!.message}</p>
-    )}
+    {
+      (error || eventError) && (
+        <p class="admin-alert mb-5" role="alert">
+          Couldn’t load the list: {(error ?? eventError)!.message}
+        </p>
+      )
+    }
     <p hidden role="alert" class="admin-alert mb-5" data-task-error></p>
 
     {
       rows.length === 0 ? (
         /* The room on day one. One line and one button — not a scold, and not an
            onboarding checklist. */
-        <div class="rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
           <p class="font-serif text-lg">Nothing to do.</p>
-          <button type="button" data-open-task-sheet class="btn btn-sm mt-4 gap-1 font-sans zone__cta cn-amber">
+          <button type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Add the first
           </button>
         </div>
@@ -188,7 +188,9 @@ const payload = (t: Task) =>
                         <span class="min-w-0 flex-1">
                           {/* The title IS the edit affordance, so no pencil sits
                               on every row announcing itself. */}
-                          <button type="button" class="task__t" data-edit-task>{t.title}</button>
+                          <button type="button" class="task__t" data-edit-task>
+                            {t.title}
+                          </button>
                           <span class="task__m">
                             {past && t.shownDueOn && <span class="task__late">{lateBy(t.shownDueOn, todayYmd)}</span>}
                             {/* `anytime` earns its place ONLY here, where the
@@ -224,7 +226,9 @@ const payload = (t: Task) =>
                             <span class="task__skip">skipped</span>
                             <span class:list={['eff', `eff--${t.effort}`]}>
                               <span class="eff__m" aria-hidden="true">
-                                {[1, 2, 3, 4].map((n) => <i class:list={[n <= eff.step && 'on']} />)}
+                                {[1, 2, 3, 4].map((n) => (
+                                  <i class:list={[n <= eff.step && 'on']} />
+                                ))}
                               </span>
                               {eff.label}
                             </span>
@@ -244,7 +248,9 @@ const payload = (t: Task) =>
                             {/* Answered, the two chips become the way back — one
                                 control, because there is now one question. */}
                             <span class="flex shrink-0" data-answered hidden={!t.answeredAs}>
-                              <button type="button" class="chip chip--act" data-undo>Undo</button>
+                              <button type="button" class="chip chip--act" data-undo>
+                                Undo
+                              </button>
                             </span>
                           </>
                         )}

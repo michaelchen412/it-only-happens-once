@@ -50,7 +50,10 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
   const viewParam = sp.get('view');
   const view = viewParam === 'trash' ? 'trash' : 'list';
   const typeParam = TYPES.find((t) => t === sp.get('type')) ?? null;
-  const subjectSlugs = (sp.get('subject') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const subjectSlugs = (sp.get('subject') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const q = (sp.get('q') ?? '').trim();
   // sort = "<field>_<dir>". Drafts are always pinned to the top (secondary sort).
   const sortMatch = (sp.get('sort') ?? 'edited_desc').match(/^(title|posted|edited)_(asc|desc)$/);
@@ -112,7 +115,10 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     if (!subIds.length) {
       subjectFilterIds = [];
     } else {
-      const { data: links } = await supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', subIds);
+      const { data: links } = await supabase
+        .from('fragment_subjects')
+        .select('fragment_id, subject_id')
+        .in('subject_id', subIds);
       const bySet: Record<string, Set<string>> = {};
       for (const l of links ?? []) (bySet[l.fragment_id] ??= new Set()).add(l.subject_id);
       subjectFilterIds = Object.entries(bySet)
@@ -150,8 +156,8 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   const { data: allWorks } = await supabase.from('works').select('id, title, slug, author_id').order('title');
   const authorNameById = Object.fromEntries((allAuthors ?? []).map((a) => [a.id, a.name]));
   const workTitleById = Object.fromEntries((allWorks ?? []).map((w) => [w.id, w.title]));
-  const authorFilterId = p.authorSlug ? (allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—' : null;
-  const workFilterId = p.workSlug ? (allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—' : null;
+  const authorFilterId = p.authorSlug ? ((allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—') : null;
+  const workFilterId = p.workSlug ? ((allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—') : null;
 
   // The view's scope, shared by the list query AND the per-type counts — so the
   // badge numbers can never disagree with the rows underneath them.
@@ -172,8 +178,10 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   if (p.type) query = query.eq('type', p.type);
   if (authorFilterId) query = query.eq('author_id', authorFilterId);
   if (workFilterId) query = query.eq('work_id', workFilterId);
-  if (subjectFilterIds) query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
-  if (membershipFilterIds) query = query.in('id', membershipFilterIds.length ? membershipFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  if (subjectFilterIds)
+    query = query.in('id', subjectFilterIds.length ? subjectFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  if (membershipFilterIds)
+    query = query.in('id', membershipFilterIds.length ? membershipFilterIds : ['00000000-0000-0000-0000-000000000000']);
   // 'none': everything NOT placed anywhere. An empty exclusion list is a no-op
   // (nothing is placed yet), so guard it — `not.in.()` is invalid syntax.
   if (membershipExcludeIds?.length) query = query.not('id', 'in', `(${membershipExcludeIds.join(',')})`);
@@ -197,7 +205,10 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   const ids = rows.map((r) => r.id);
   const subjectsByFragment: Record<string, string[]> = {};
   if (ids.length) {
-    const { data: fs } = await supabase.from('fragment_subjects').select('fragment_id, subjects(name)').in('fragment_id', ids);
+    const { data: fs } = await supabase
+      .from('fragment_subjects')
+      .select('fragment_id, subjects(name)')
+      .in('fragment_id', ids);
     for (const link of fs ?? []) {
       const name = (link.subjects as { name: string } | null)?.name;
       if (name) (subjectsByFragment[link.fragment_id] ??= []).push(name);

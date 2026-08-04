@@ -25,7 +25,10 @@ const WORDS = 'id, kind, label, title, excerpt, body, created_at, updated_at';
 
 /** First words of the body, for a version list that shows what changed. */
 function preview(body: string | null, n = 120): string {
-  const flat = (body ?? '').replace(/[#*_>`[\]]/g, '').replace(/\s+/g, ' ').trim();
+  const flat = (body ?? '')
+    .replace(/[#*_>`[\]]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return flat.length > n ? flat.slice(0, n).trimEnd() + '…' : flat;
 }
 
@@ -210,7 +213,8 @@ export const versions = {
       if (fErr) throw fail(fErr.message);
       if (!frag) throw fail('That piece no longer exists', 'NOT_FOUND');
       if (frag.status === 'published') {
-        if (!version.title?.trim()) throw fail('This version has no title — a published piece needs one', 'BAD_REQUEST');
+        if (!version.title?.trim())
+          throw fail('This version has no title — a published piece needs one', 'BAD_REQUEST');
         if (!version.body?.trim()) throw fail('This version is empty — there’d be nothing to read', 'BAD_REQUEST');
       }
 

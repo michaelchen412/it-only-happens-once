@@ -58,7 +58,8 @@ if (zone) {
       const on = $<HTMLElement>(`[data-tb="${field}"].tb--on`);
       return on ? Number(on.dataset.v) : null;
     };
-    const text = (field: string): string | null => $<HTMLTextAreaElement>(`[data-field="${field}"]`)?.value.trim() || null;
+    const text = (field: string): string | null =>
+      $<HTMLTextAreaElement>(`[data-field="${field}"]`)?.value.trim() || null;
     const time = (field: string): string | null => $<HTMLInputElement>(`[data-field="${field}"]`)?.value || null;
 
     const collect = () => ({

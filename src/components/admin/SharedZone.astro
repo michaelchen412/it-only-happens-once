@@ -46,9 +46,11 @@ const MARK: Record<SharedFragment['type'], string> = {
     </button>
   </div>
 
-  {/* Unlinking happens with the sheet CLOSED, so its failure cannot be
+  {
+    /* Unlinking happens with the sheet CLOSED, so its failure cannot be
       reported inside the sheet — a message written into a closed <dialog> is
-      a silent failure wearing the costume of a handled one. */}
+      a silent failure wearing the costume of a handled one. */
+  }
   <p data-shared-error hidden role="alert" class="admin-alert mx-3 mt-3"></p>
 
   {
@@ -65,9 +67,7 @@ const MARK: Record<SharedFragment['type'], string> = {
               <span class="shelf__t">
                 {w.title}
                 {(w.authorName || w.year) && (
-                  <span class="shelf__by">
-                    {[w.authorName, w.year].filter(Boolean).join(' · ')}
-                  </span>
+                  <span class="shelf__by">{[w.authorName, w.year].filter(Boolean).join(' · ')}</span>
                 )}
                 {w.note && <span class="shelf__note">{w.note}</span>}
               </span>
@@ -82,9 +82,7 @@ const MARK: Record<SharedFragment['type'], string> = {
               /* Honest rather than hidden: the link is real and correct, and
                  nothing in the corpus carries this work yet. It will fill in
                  on its own, which is exactly why the link was worth making. */
-              <p class="shelf__q admin-hint">
-                No quotes from this yet — they’ll appear here as you add them.
-              </p>
+              <p class="shelf__q admin-hint">No quotes from this yet — they’ll appear here as you add them.</p>
             ) : (
               w.fragments.map((f) => (
                 <div class="shelf__q">

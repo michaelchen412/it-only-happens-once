@@ -73,8 +73,7 @@ export function parseSpotifyEmbed(url: string): SpotifyEmbed | null {
  * becoming fragments — see `PairedMedia` in `blog.ts`.
  */
 export type SongRef =
-  | { provider: 'spotify'; kind: 'track' | 'album'; id: string }
-  | { provider: 'youtube'; kind: 'video'; id: string };
+  { provider: 'spotify'; kind: 'track' | 'album'; id: string } | { provider: 'youtube'; kind: 'video'; id: string };
 
 /** YouTube ids are exactly 11 chars of [A-Za-z0-9_-]. */
 const YT_ID = '([A-Za-z0-9_-]{11})';

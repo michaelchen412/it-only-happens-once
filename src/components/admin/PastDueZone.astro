@@ -94,14 +94,18 @@ const more = rows.length - shown.length;
             {/* Answered, the two chips become the way back — one control,
                 because there is now one question. */}
             <span class="flex shrink-0" data-answered hidden={!t.answeredAs}>
-              <button type="button" class="chip chip--act" data-undo>Undo</button>
+              <button type="button" class="chip chip--act" data-undo>
+                Undo
+              </button>
             </span>
           </div>
         ))}
 
         {more > 0 && (
           <p class="admin-hint mt-2 text-xs">
-            <a href="/admin/agenda/tasks" class="hover:underline">{more} more in Tasks →</a>
+            <a href="/admin/agenda/tasks" class="hover:underline">
+              {more} more in Tasks →
+            </a>
           </p>
         )}
       </div>

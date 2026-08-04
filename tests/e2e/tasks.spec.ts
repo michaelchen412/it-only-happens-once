@@ -36,7 +36,11 @@ test.describe('the editor — where the two invisible rules become checkable', (
     const line = page.locator('[data-lead-line]');
 
     // quick 1 · sitting 3 · block 7 · project 21 (§3a).
-    for (const [effort, days] of [['quick', 1], ['sitting', 3], ['block', 7]] as const) {
+    for (const [effort, days] of [
+      ['quick', 1],
+      ['sitting', 3],
+      ['block', 7],
+    ] as const) {
       await page.locator(`[data-effort="${effort}"]`).click();
       await expect(line).toContainText(`${days} day${days === 1 ? '' : 's'} ahead`);
     }
@@ -252,7 +256,12 @@ test.describe('the room', () => {
 
     // The meter is filled TO THE STEP: effort is ordinal, and four identical
     // chips threw the ordering away.
-    for (const [key, step] of [['quick', 1], ['sitting', 2], ['block', 3], ['project', 4]] as const) {
+    for (const [key, step] of [
+      ['quick', 1],
+      ['sitting', 2],
+      ['block', 3],
+      ['project', 4],
+    ] as const) {
       const pill = page.locator(`.eff--${key}`).first();
       if ((await pill.count()) === 0) continue;
       await expect(pill.locator('.eff__m i.on')).toHaveCount(step);

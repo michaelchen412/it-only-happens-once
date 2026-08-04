@@ -73,9 +73,9 @@ if (sheet && personId) {
 
   function setMode(next: Mode) {
     mode = next;
-    sheet!.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
-      b.setAttribute('aria-pressed', String(b.dataset.mode === next)),
-    );
+    sheet!
+      .querySelectorAll<HTMLButtonElement>('[data-mode]')
+      .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === next)));
     for (const [key, el] of Object.entries(lists)) if (el) el.hidden = key !== next;
     // "Add a quote from them" belongs to the fragment mode only — a work is
     // created by the quote's own Work field, so offering it here would point
@@ -89,9 +89,9 @@ if (sheet && personId) {
     applyFilter();
   }
 
-  sheet.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((btn) =>
-    btn.addEventListener('click', () => setMode(btn.dataset.mode as Mode)),
-  );
+  sheet
+    .querySelectorAll<HTMLButtonElement>('[data-mode]')
+    .forEach((btn) => btn.addEventListener('click', () => setMode(btn.dataset.mode as Mode)));
 
   search.addEventListener('input', applyFilter);
 
@@ -118,9 +118,9 @@ if (sheet && personId) {
     }),
   );
 
-  sheet.querySelectorAll<HTMLElement>('[data-close]').forEach((btn) =>
-    btn.addEventListener('click', () => sheet.close()),
-  );
+  sheet
+    .querySelectorAll<HTMLElement>('[data-close]')
+    .forEach((btn) => btn.addEventListener('click', () => sheet.close()));
 
   saveBtn.addEventListener('click', async () => {
     if (!picked) return;

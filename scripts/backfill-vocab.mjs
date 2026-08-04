@@ -72,7 +72,9 @@ for (const f of frags) {
 }
 
 console.log(`${frags.length} quote/song fragments`);
-console.log(`→ ${authorSet.size} authors, ${workSet.size} works (incl. The Bible), ${scriptureCount} scripture verses grouped under The Bible`);
+console.log(
+  `→ ${authorSet.size} authors, ${workSet.size} works (incl. The Bible), ${scriptureCount} scripture verses grouped under The Bible`,
+);
 console.log(`→ ${taxonomy.length} subject definitions to set`);
 
 if (!COMMIT) {
@@ -106,7 +108,7 @@ const workRows = [...workSet.entries()].map(([slug, w]) => ({
   title: w.title,
   slug,
   kind: w.kind ?? null,
-  author_id: w.authorSlug ? authorIdBySlug[w.authorSlug] ?? null : null,
+  author_id: w.authorSlug ? (authorIdBySlug[w.authorSlug] ?? null) : null,
 }));
 if (workRows.length) {
   const { error } = await sb.from('works').upsert(workRows, { onConflict: 'slug', ignoreDuplicates: true });

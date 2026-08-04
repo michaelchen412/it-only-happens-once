@@ -51,7 +51,9 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
           <Icon name="ph:calendar-blank" />
         </span>
         <h2 class="zone__title">Today</h2>
-        <span class="zone__count ml-auto" data-progress hidden={!progress}>{progress}</span>
+        <span class="zone__count ml-auto" data-progress hidden={!progress}>
+          {progress}
+        </span>
         <a class="zone__act" href="/admin/agenda" aria-label="Open the calendar">
           <Icon name="ph:arrow-right" />
         </a>
@@ -62,11 +64,7 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
           const state = it.kind === 'task' ? answered.get(it.id) : undefined;
           return (
             <div
-              class:list={[
-                'row',
-                state === 'done' && 'task--done',
-                state === 'skipped' && 'task--skipped',
-              ]}
+              class:list={['row', state === 'done' && 'task--done', state === 'skipped' && 'task--skipped']}
               data-id={it.id}
               data-kind={it.kind}
               data-task={it.kind === 'task' ? '' : undefined}

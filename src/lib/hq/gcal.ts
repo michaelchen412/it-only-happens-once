@@ -64,7 +64,11 @@ export async function accessToken(creds: Credentials): Promise<string> {
       grant_type: 'refresh_token',
     }),
   });
-  const body = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number; error_description?: string } | null;
+  const body = (await res.json().catch(() => null)) as {
+    access_token?: string;
+    expires_in?: number;
+    error_description?: string;
+  } | null;
   if (!res.ok || !body?.access_token) {
     throw new Error(body?.error_description ?? `Google refused the refresh token (${res.status}).`);
   }

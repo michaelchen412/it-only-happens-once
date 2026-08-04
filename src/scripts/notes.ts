@@ -310,12 +310,14 @@ if (undoBar) {
    * and delete.
    */
   document.addEventListener('hq:note-filed', async (e) => {
-    const { noteId, what, href, undo } = (e as CustomEvent<{
-      noteId: string;
-      what: string;
-      href: string | null;
-      undo: { kind: 'task' | 'interaction' | 'event'; id?: string };
-    }>).detail;
+    const { noteId, what, href, undo } = (
+      e as CustomEvent<{
+        noteId: string;
+        what: string;
+        href: string | null;
+        undo: { kind: 'task' | 'interaction' | 'event'; id?: string };
+      }>
+    ).detail;
     const card = pile?.querySelector<HTMLElement>(`[data-note="${noteId}"]`);
     if (!card) return;
 

@@ -17,9 +17,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function profiles(page: Page): Promise<string[]> {
   await page.goto('/admin/people');
-  const hrefs = await page.locator('[data-person]').evaluateAll((els) =>
-    els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!),
-  );
+  const hrefs = await page
+    .locator('[data-person]')
+    .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!));
   test.skip(hrefs.length === 0, 'no people in the roster to open');
   return hrefs;
 }

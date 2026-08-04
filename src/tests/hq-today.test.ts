@@ -16,7 +16,14 @@
 //    is that it stays quiet rather than becoming loud as it recedes.
 import { describe, expect, it } from 'vitest';
 import type { CalendarItem } from '../lib/hq/calendar';
-import { PAST_DUE_CAP, PRACTICE_COLD_DAYS, announces, byDayThenTime, progressLabel, publishedSignal } from '../lib/hq/today';
+import {
+  PAST_DUE_CAP,
+  PRACTICE_COLD_DAYS,
+  announces,
+  byDayThenTime,
+  progressLabel,
+  publishedSignal,
+} from '../lib/hq/today';
 import type { Ymd } from '../lib/hq/time';
 
 const TODAY = '2026-08-03' as Ymd;
@@ -70,8 +77,12 @@ describe('announces — the lead decides, and nothing else does', () => {
 });
 
 describe('byDayThenTime', () => {
-  const item = (on: string, title: string, kind: CalendarItem['kind'] = 'task', at: string | null = null): CalendarItem =>
-    ({ kind, id: title, on: on as Ymd, title, at });
+  const item = (
+    on: string,
+    title: string,
+    kind: CalendarItem['kind'] = 'task',
+    at: string | null = null,
+  ): CalendarItem => ({ kind, id: title, on: on as Ymd, title, at });
 
   it('sorts by day first, then defers to the day’s own order', () => {
     // The day's order is `byTime` — the calendar's, reused. A birthday is a fact
@@ -83,12 +94,7 @@ describe('byDayThenTime', () => {
       item('2026-08-04', 'Devi', 'birthday'),
       item('2026-08-04', 'Call the bank'),
     ];
-    expect([...rows].sort(byDayThenTime).map((i) => i.title)).toEqual([
-      'Devi',
-      'Dentist',
-      'Call the bank',
-      'Rent',
-    ]);
+    expect([...rows].sort(byDayThenTime).map((i) => i.title)).toEqual(['Devi', 'Dentist', 'Call the bank', 'Rent']);
   });
 });
 

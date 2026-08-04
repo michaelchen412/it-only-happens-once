@@ -160,7 +160,9 @@ const songSuggest = wireSubjectSuggest({
   gather: () => {
     const why = song.editor.getText().trim();
     if (!why) {
-      return { missing: 'Say why this one first — a song’s subjects come from what you wrote about it, not from its genre.' };
+      return {
+        missing: 'Say why this one first — a song’s subjects come from what you wrote about it, not from its genre.',
+      };
     }
     const field = (n: string) => (songForm.elements.namedItem(n) as HTMLInputElement | null)?.value.trim() ?? '';
     const heading = [field('title'), field('attribution')].filter(Boolean).join(' — ');
@@ -220,7 +222,9 @@ song.editor.on('update', () => markDirty());
 
 // --- constellation membership: its own tab, one picker for both types ---
 // (It applies immediately, so it never belonged inside either <form>.)
-const picker = wireConstellationPicker(document.getElementById('sheet-panel-cn')!.querySelector('.cn-picker') as HTMLElement);
+const picker = wireConstellationPicker(
+  document.getElementById('sheet-panel-cn')!.querySelector('.cn-picker') as HTMLElement,
+);
 const tabs = wireSheetTabs(sheet);
 const cnCount = document.getElementById('sheet-cn-count')!;
 const fieldsTabLabel = document.getElementById('sheet-tab-fields-label')!;
@@ -420,7 +424,8 @@ async function runLookup() {
   lookupNote.textContent = 'Looking up…';
   const { data, error } = await actions.songs.lookup({ url });
   if (error || !data) {
-    lookupNote.textContent = 'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
+    lookupNote.textContent =
+      'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
     return;
   }
   fillIfEmpty('title', data.title);

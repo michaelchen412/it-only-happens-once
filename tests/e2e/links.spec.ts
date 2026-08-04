@@ -33,9 +33,9 @@ import { stubActions } from './fixtures';
 /** Every profile URL on the roster. These specs adapt rather than seed. */
 async function profiles(page: Page): Promise<string[]> {
   await page.goto('/admin/people');
-  const hrefs = await page.locator('[data-person]').evaluateAll((els) =>
-    els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!),
-  );
+  const hrefs = await page
+    .locator('[data-person]')
+    .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!));
   test.skip(hrefs.length === 0, 'no people in the roster to open');
   return hrefs;
 }
@@ -71,7 +71,9 @@ const openSheet = async (page: Page) => {
 test.describe('the Shared zone', () => {
   test.beforeEach(async ({ page }) => await openProfile(page));
 
-  test('sits in the rail with one control, and says the shelf is empty rather than showing a skeleton', async ({ page }) => {
+  test('sits in the rail with one control, and says the shelf is empty rather than showing a skeleton', async ({
+    page,
+  }) => {
     await expect(page.locator('[data-shared] .zone__title')).toHaveText('Shared');
     await expect(page.locator('[data-open-link-sheet]')).toBeVisible();
 

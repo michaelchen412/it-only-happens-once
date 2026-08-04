@@ -40,7 +40,9 @@ async function resolveWork(sb: DB, title?: string, authorId?: string | null): Pr
   const t = title?.trim();
   if (!t) return null;
   const slug = slugify(t);
-  const { error } = await sb.from('works').upsert({ title: t, slug, author_id: authorId ?? null }, { onConflict: 'slug', ignoreDuplicates: true });
+  const { error } = await sb
+    .from('works')
+    .upsert({ title: t, slug, author_id: authorId ?? null }, { onConflict: 'slug', ignoreDuplicates: true });
   if (error) throw fail(error.message);
   const { data } = await sb.from('works').select('id').eq('slug', slug).single();
   return data?.id ?? null;
@@ -64,7 +66,10 @@ async function syncSubjects(sb: DB, fragmentId: string, raw?: string): Promise<v
   const { data: subs, error: selErr } = await sb
     .from('subjects')
     .select('id, slug')
-    .in('slug', rows.map((r) => r.slug));
+    .in(
+      'slug',
+      rows.map((r) => r.slug),
+    );
   if (selErr) throw fail(selErr.message);
 
   const links = (subs ?? []).map((s) => ({ fragment_id: fragmentId, subject_id: s.id }));
@@ -112,7 +117,7 @@ async function persist(
     existing = data;
   }
 
-  const published_at = publishing ? existing?.published_at ?? now : existing?.published_at ?? null;
+  const published_at = publishing ? (existing?.published_at ?? now) : (existing?.published_at ?? null);
 
   const payload: FragmentInsert = { ...row, published_at };
   if (row.occurred_at === undefined) {
@@ -304,7 +309,10 @@ export const fragments = {
       if (input.release_year) details.release_year = input.release_year;
       if (input.spotify_album_id) details.spotify_album_id = input.spotify_album_id;
       if (input.spotify_artist_ids) {
-        details.spotify_artist_ids = input.spotify_artist_ids.split(',').map((s) => s.trim()).filter(Boolean);
+        details.spotify_artist_ids = input.spotify_artist_ids
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
       // provenance facets follow the shown fields: artist → author, album → work
       const author_id = await resolveAuthor(sb, input.attribution);
@@ -348,8 +356,16 @@ export const fragments = {
       if (error || !data) throw fail('That fragment no longer exists', 'NOT_FOUND');
       // The Music tab shows what's paired without a second round trip. A
       // soft-deleted song reads as no pairing — same rule as pairedMediaOf.
-      const song = data.paired_song as { id: string; title: string | null; attribution: string | null; deleted_at: string | null } | null;
-      const paired = song && !song.deleted_at ? { id: song.id, title: song.title ?? '(untitled)', artist: song.attribution ?? '' } : null;
+      const song = data.paired_song as {
+        id: string;
+        title: string | null;
+        attribution: string | null;
+        deleted_at: string | null;
+      } | null;
+      const paired =
+        song && !song.deleted_at
+          ? { id: song.id, title: song.title ?? '(untitled)', artist: song.attribution ?? '' }
+          : null;
       return {
         paired,
         constellationIds: (data.fragment_constellations ?? []).map((l) => l.constellation_id),
@@ -385,7 +401,10 @@ export const fragments = {
       requireAdmin(ctx);
       const apiKey = getSecret('ANTHROPIC_API_KEY');
       if (!apiKey) throw fail('AI suggestions aren’t configured — add ANTHROPIC_API_KEY.', 'BAD_REQUEST');
-      const { data: taxonomy, error } = await ctx.locals.supabase.from('subjects').select('name, definition').order('name');
+      const { data: taxonomy, error } = await ctx.locals.supabase
+        .from('subjects')
+        .select('name, definition')
+        .order('name');
       if (error) throw fail(error.message);
       try {
         const { suggestSubjects } = await import('../lib/suggest-subjects');
@@ -547,7 +566,10 @@ export const fragments = {
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
-      const ids = input.ids.split(',').map((s) => s.trim()).filter(Boolean);
+      const ids = input.ids
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (!ids.length) return { ok: true, count: 0 };
       const now = new Date().toISOString();
 
@@ -614,7 +636,10 @@ export const songs = {
         .order('occurred_at', { ascending: false })
         .limit(20);
       // PostgREST `.or()` values can't contain its own delimiters.
-      const term = (q ?? '').replace(/[%,()\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      const term = (q ?? '')
+        .replace(/[%,()\\]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (term) query = query.or(`title.ilike.%${term}%,attribution.ilike.%${term}%`);
       const { data, error } = await query;
       if (error) throw fail(error.message);

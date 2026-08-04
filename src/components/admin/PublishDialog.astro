@@ -24,7 +24,7 @@ const { formId, subjectNames } = Astro.props;
   <div class="flex flex-col gap-5 p-6 font-sans">
     <div>
       <h2 id="dialog-title" class="font-display text-2xl">Publish this piece</h2>
-      <p id="dialog-sub" class="mt-1 text-sm text-base-content/60">A few last details, then it goes live.</p>
+      <p id="dialog-sub" class="text-base-content/60 mt-1 text-sm">A few last details, then it goes live.</p>
     </div>
 
     {/* Posted date — automatic unless you deliberately backdate */}
@@ -42,38 +42,61 @@ const { formId, subjectNames } = Astro.props;
         disabled
         class="input input-sm input-bordered w-full disabled:opacity-40"
       />
-      <p id="date-auto-note" class="text-xs text-base-content/55">
+      <p id="date-auto-note" class="text-base-content/55 text-xs">
         Otherwise the posted date is set automatically when you publish.
       </p>
     </div>
 
     <label class="flex flex-col gap-1 text-sm">
       <span class="text-base-content/80">Slug <span class="text-base-content/40">— the URL</span></span>
-      <input name="slug" id="slug-field" form={formId} class="input input-sm input-bordered" placeholder="auto-from-title" />
+      <input
+        name="slug"
+        id="slug-field"
+        form={formId}
+        class="input input-sm input-bordered"
+        placeholder="auto-from-title"
+      />
     </label>
 
     <label class="flex flex-col gap-1 text-sm">
-      <span class="text-base-content/80">Excerpt <span class="text-base-content/40">— the card blurb (optional)</span></span>
-      <textarea name="excerpt" id="excerpt-field" form={formId} rows="2" class="textarea textarea-bordered font-serif text-base"></textarea>
+      <span class="text-base-content/80"
+        >Excerpt <span class="text-base-content/40">— the card blurb (optional)</span></span
+      >
+      <textarea
+        name="excerpt"
+        id="excerpt-field"
+        form={formId}
+        rows="2"
+        class="textarea textarea-bordered font-serif text-base"></textarea>
     </label>
 
-    {/* Subjects are edited HERE, not in the sheet, so this is where the AI
+    {
+      /* Subjects are edited HERE, not in the sheet, so this is where the AI
         button belongs — and it lands next to the preflight below, which is the
         thing that says "no subjects — it won't appear under any of them". The
-        complaint and its fix now sit in the same dialog. */}
+        complaint and its fix now sit in the same dialog. */
+    }
     <SubjectsField id="ws-subjects" labelClass="text-base-content/80">
-      <TagInput name="subjects" label="Subjects" suggestions={subjectNames} form={formId} placeholder="Add a subject…" />
+      <TagInput
+        name="subjects"
+        label="Subjects"
+        suggestions={subjectNames}
+        form={formId}
+        placeholder="Add a subject…"
+      />
     </SubjectsField>
 
-    {/* Preflight (docs/plans/06) — instruments, never gates. It borrows the
+    {
+      /* Preflight (docs/plans/06) — instruments, never gates. It borrows the
         constellation composer's grammar exactly, so the two rooms feel like one
         building: the number is always a neutral chip, the judgement is one
         off-band hint line, and NOTHING here can stop Publish. If a signal ever
         turns red or disables the button, this has become the wrong feature.
 
         Writing only, for now: a quote has almost no way to be incomplete, and
-        four permanently-green chips would just teach you to stop reading them. */}
-    <div class="flex flex-col gap-2 border-t border-base-300 pt-4">
+        four permanently-green chips would just teach you to stop reading them. */
+    }
+    <div class="border-base-300 flex flex-col gap-2 border-t pt-4">
       <div class="flex flex-wrap items-center gap-1.5">
         <span class="admin-stat">
           <b class="admin-stat__n" id="pf-words">0</b><span class="admin-stat__label">words</span>
@@ -84,9 +107,16 @@ const { formId, subjectNames } = Astro.props;
         <span class="admin-stat">
           <b class="admin-stat__n" id="pf-subjects">0</b><span class="admin-stat__label">subjects</span>
         </span>
-        {/* The only actionable one: the picker is already a tab in the sheet,
-            so this jumps there rather than duplicating it in here. */}
-        <button type="button" id="pf-constellations" class="admin-stat admin-stat--action" title="Open the Constellations tab">
+        {
+          /* The only actionable one: the picker is already a tab in the sheet,
+            so this jumps there rather than duplicating it in here. */
+        }
+        <button
+          type="button"
+          id="pf-constellations"
+          class="admin-stat admin-stat--action"
+          title="Open the Constellations tab"
+        >
           <b class="admin-stat__n" id="pf-cn">0</b><span class="admin-stat__label">constellations</span>
         </button>
       </div>

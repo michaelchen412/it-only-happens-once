@@ -45,7 +45,11 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
 
     <p id="cl-error" hidden role="alert" class="admin-alert mb-4"></p>
 
-    <form id="new-constellation" hidden class="mb-6 flex flex-wrap items-end gap-3 rounded-box border border-base-300 bg-base-200/50 p-4">
+    <form
+      id="new-constellation"
+      hidden
+      class="rounded-box border-base-300 bg-base-200/50 mb-6 flex flex-wrap items-end gap-3 border p-4"
+    >
       <div class="grow">
         <label class="admin-label" for="cl-new-name">Name it</label>
         <input
@@ -53,7 +57,7 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
           name="name"
           required
           placeholder="A new way of seeing…"
-          class="input input-sm input-bordered w-full max-w-sm font-display text-base"
+          class="input input-sm input-bordered font-display w-full max-w-sm text-base"
         />
       </div>
       <div class="flex items-center gap-2">
@@ -65,36 +69,64 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
 
     {
       rows.length === 0 ? (
-        <div class="rounded-box border border-dashed border-base-300 px-6 py-16 text-center">
-          <p class="font-display text-xl text-base-content/60">No constellations yet.</p>
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-16 text-center">
+          <p class="font-display text-base-content/60 text-xl">No constellations yet.</p>
           <p class="admin-hint mt-1">Name the first way of seeing, and the sky begins.</p>
         </div>
       ) : (
-        <ul id="cl-list" class="divide-y divide-base-300 rounded-box border border-base-300 bg-base-200/50">
+        <ul id="cl-list" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 divide-y border">
           {rows.map((c) => (
             <li class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]} data-id={c.id}>
-              <span class="shrink-0" style="color: var(--cn)"><StarMark /></span>
+              <span class="shrink-0" style="color: var(--cn)">
+                <StarMark />
+              </span>
               <div class="min-w-0 grow">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">{c.name}</a>
+                  <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">
+                    {c.name}
+                  </a>
                   <StatusChip status={c.status} />
                 </div>
-                <p class="mt-0.5 font-sans text-xs text-base-content/45">
+                <p class="text-base-content/45 mt-0.5 font-sans text-xs">
                   {c.total === 0 ? 'nothing composed yet' : `${c.total} placed`}
                   {c.total > 0 && c.total !== c.published && ` · ${c.published} public`}
                 </p>
               </div>
               <span class="row-edit flex shrink-0 items-center gap-0.5">
-                <button type="button" class="btn btn-ghost btn-xs" data-move="up" title="Move up" aria-label={`Move ${c.name} up`}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs"
+                  data-move="up"
+                  title="Move up"
+                  aria-label={`Move ${c.name} up`}
+                >
                   <Icon name="ph:arrow-up" />
                 </button>
-                <button type="button" class="btn btn-ghost btn-xs" data-move="down" title="Move down" aria-label={`Move ${c.name} down`}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs"
+                  data-move="down"
+                  title="Move down"
+                  aria-label={`Move ${c.name} down`}
+                >
                   <Icon name="ph:arrow-down" />
                 </button>
-                <button type="button" class="btn btn-ghost btn-xs font-sans normal-case" data-toggle-status={c.status} data-name={c.name}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs font-sans normal-case"
+                  data-toggle-status={c.status}
+                  data-name={c.name}
+                >
                   {c.status === 'published' ? 'Unpublish' : 'Publish'}
                 </button>
-                <button type="button" class="btn btn-ghost btn-xs text-error" data-delete data-name={c.name} title="Delete" aria-label={`Delete ${c.name}`}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs text-error"
+                  data-delete
+                  data-name={c.name}
+                  title="Delete"
+                  aria-label={`Delete ${c.name}`}
+                >
                   <Icon name="ph:trash" />
                 </button>
               </span>
@@ -144,7 +176,9 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
       if (!sib) return;
       btn.dataset.move === 'up' ? sib.before(row) : sib.after(row);
       btn.focus(); // keep the keyboard with the row it moved
-      const ids = [...row.parentElement!.querySelectorAll<HTMLElement>('li[data-id]')].map((l) => l.dataset.id).join(',');
+      const ids = [...row.parentElement!.querySelectorAll<HTMLElement>('li[data-id]')]
+        .map((l) => l.dataset.id)
+        .join(',');
       const fd = new FormData();
       fd.set('ids', ids);
       const { error } = await actions.constellations.reorder(fd);

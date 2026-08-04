@@ -138,7 +138,7 @@ export const checkin = {
         arousal: v.arousal ?? null,
         dream_recall: v.dreamRecall ?? null,
         dream_intensity: noDream ? null : (v.dreamIntensity ?? null),
-        dream_body: noDream ? null : (v.dreamBody || null),
+        dream_body: noDream ? null : v.dreamBody || null,
         note: v.note || null,
         skipped: v.skipped ?? false,
       });

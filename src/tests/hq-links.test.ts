@@ -58,11 +58,29 @@ describe('sharedFor — the two-hop path', () => {
   it('resolves a linked work’s fragments at read time, from work_id', async () => {
     const shared = await sharedFor(
       fakeDb({
-        person_works: [{ note: 'recommended', created_at: '1', person_id: PERSON, works: { id: 'w1', slug: 'w-1', title: 'Piranesi', kind: 'book', year: 2020, authors: { name: 'Susanna Clarke' } } }],
+        person_works: [
+          {
+            note: 'recommended',
+            created_at: '1',
+            person_id: PERSON,
+            works: {
+              id: 'w1',
+              slug: 'w-1',
+              title: 'Piranesi',
+              kind: 'book',
+              year: 2020,
+              authors: { name: 'Susanna Clarke' },
+            },
+          },
+        ],
         person_fragments: [],
         // NOTHING links these two quotes to the person. They belong to the
         // work, and that is the entire mechanism.
-        fragments: [quote('f1', 'The first line.', 'w1'), quote('f2', 'The second.', 'w1'), quote('f3', 'Not from that book.', 'w2')],
+        fragments: [
+          quote('f1', 'The first line.', 'w1'),
+          quote('f2', 'The second.', 'w1'),
+          quote('f3', 'Not from that book.', 'w2'),
+        ],
       }),
       PERSON,
     );
@@ -79,7 +97,14 @@ describe('sharedFor — the two-hop path', () => {
   it('reports a linked work with nothing in the corpus yet, rather than hiding it', async () => {
     const shared = await sharedFor(
       fakeDb({
-        person_works: [{ note: null, created_at: '1', person_id: PERSON, works: { id: 'w1', slug: 'w-1', title: 'Piranesi', kind: null, year: null, authors: null } }],
+        person_works: [
+          {
+            note: null,
+            created_at: '1',
+            person_id: PERSON,
+            works: { id: 'w1', slug: 'w-1', title: 'Piranesi', kind: null, year: null, authors: null },
+          },
+        ],
         person_fragments: [],
         fragments: [],
       }),
@@ -95,7 +120,14 @@ describe('sharedFor — the two-hop path', () => {
     const shared = await sharedFor(
       fakeDb({
         person_works: [],
-        person_fragments: [{ note: 'sent me this', created_at: '1', person_id: PERSON, fragments: quote('s1', 'A song, no book behind it.') }],
+        person_fragments: [
+          {
+            note: 'sent me this',
+            created_at: '1',
+            person_id: PERSON,
+            fragments: quote('s1', 'A song, no book behind it.'),
+          },
+        ],
         fragments: [],
       }),
       PERSON,
@@ -109,8 +141,22 @@ describe('sharedFor — the two-hop path', () => {
 describe('sharedFor — a fragment reachable both ways', () => {
   const both = () =>
     fakeDb({
-      person_works: [{ note: null, created_at: '1', person_id: PERSON, works: { id: 'w1', slug: 'w-1', title: 'Piranesi', kind: null, year: null, authors: null } }],
-      person_fragments: [{ note: 'she said this one out loud', created_at: '2', person_id: PERSON, fragments: quote('f1', 'The first line.', 'w1') }],
+      person_works: [
+        {
+          note: null,
+          created_at: '1',
+          person_id: PERSON,
+          works: { id: 'w1', slug: 'w-1', title: 'Piranesi', kind: null, year: null, authors: null },
+        },
+      ],
+      person_fragments: [
+        {
+          note: 'she said this one out loud',
+          created_at: '2',
+          person_id: PERSON,
+          fragments: quote('f1', 'The first line.', 'w1'),
+        },
+      ],
       fragments: [quote('f1', 'The first line.', 'w1')],
     });
 
@@ -156,7 +202,12 @@ describe('sharedFor — labels', () => {
         person_works: [],
         person_fragments: [
           { note: null, created_at: '2', person_id: PERSON, fragments: { ...quote('f1', 'The words themselves.') } },
-          { note: null, created_at: '1', person_id: PERSON, fragments: { ...quote('f2', 'annotation'), type: 'song', title: 'Hush' } },
+          {
+            note: null,
+            created_at: '1',
+            person_id: PERSON,
+            fragments: { ...quote('f2', 'annotation'), type: 'song', title: 'Hush' },
+          },
         ],
         fragments: [],
       }),
@@ -169,7 +220,14 @@ describe('sharedFor — labels', () => {
     const shared = await sharedFor(
       fakeDb({
         person_works: [],
-        person_fragments: [{ note: null, created_at: '1', person_id: PERSON, fragments: quote('f1', '> *A quoted, emphasised*\n> line') }],
+        person_fragments: [
+          {
+            note: null,
+            created_at: '1',
+            person_id: PERSON,
+            fragments: quote('f1', '> *A quoted, emphasised*\n> line'),
+          },
+        ],
         fragments: [],
       }),
       PERSON,

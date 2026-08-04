@@ -67,7 +67,12 @@ const [
     .select('*, event_people(person_id, people(id, display_name))')
     .gte('starts_on', from)
     .lte('starts_on', to),
-  supabase.from('tasks').select('id, title, due_on, due_time').is('archived_at', null).gte('due_on', from).lte('due_on', to),
+  supabase
+    .from('tasks')
+    .select('id, title, due_on, due_time')
+    .is('archived_at', null)
+    .gte('due_on', from)
+    .lte('due_on', to),
   supabase.from('people').select('id, display_name, birth_month, birth_day, birthday_lead_days, archived_at'),
   supabase.from('task_events').select('task_id').eq('occurred_on', todayYmd),
   // 13 · Piece 3. The fourth source finally has a producer — until now `mirror`
@@ -147,7 +152,9 @@ const href = (params: Record<string, string | null>) => {
 };
 
 /** No roster, no tag control — the same rule the "who was there" field follows. */
-const roster = (peopleRows ?? []).filter((p) => !p.archived_at).map((p) => ({ id: p.id, display_name: p.display_name }));
+const roster = (peopleRows ?? [])
+  .filter((p) => !p.archived_at)
+  .map((p) => ({ id: p.id, display_name: p.display_name }));
 const taggable = roster.length > 0;
 
 const stepWeek = (n: number) => {
@@ -167,10 +174,18 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         {week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}
       </h1>
       <span class="flex items-center">
-        <a class="navb" href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })} aria-label={week ? 'Previous week' : 'Previous month'}>
+        <a
+          class="navb"
+          href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
+          aria-label={week ? 'Previous week' : 'Previous month'}
+        >
           <Icon name="ph:caret-left" />
         </a>
-        <a class="navb" href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })} aria-label={week ? 'Next week' : 'Next month'}>
+        <a
+          class="navb"
+          href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
+          aria-label={week ? 'Next week' : 'Next month'}
+        >
           <Icon name="ph:caret-right" />
         </a>
       </span>
@@ -178,7 +193,9 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         /* Being on another month must never be ambiguous — the same rule the
            date bar follows on Today. */
         (week ? todayYmd < weekCells[0] || todayYmd > weekCells[6] : anchor.slice(0, 7) !== todayYmd.slice(0, 7)) && (
-          <a class="chip u-none" href={href({ date: null })}>↩ Today</a>
+          <a class="chip u-none" href={href({ date: null })}>
+            ↩ Today
+          </a>
         )
       }
       <span class="ml-auto flex items-center gap-2">
@@ -186,15 +203,27 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           <a class="pseg__b" href={href({ view: null })} aria-pressed={!week}>Month</a>
           <a class="pseg__b" href={href({ view: 'week' })} aria-pressed={week}>Week</a>
         </span>
-        <button type="button" data-open-event-sheet={openDay ?? anchor} class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
+        <button
+          type="button"
+          data-open-event-sheet={openDay ?? anchor}
+          class="btn btn-sm zone__cta cn-amber gap-1 font-sans"
+        >
           <Icon name="ph:plus" /> New event
         </button>
       </span>
     </header>
 
-    {error && <p class="admin-alert mb-4" role="alert">Couldn’t load the calendar: {error.message}</p>}
-    {/* One alert for both writes on this page: the sheet's, and the day
-        panel's tick, which is the tasks room's script reused verbatim. */}
+    {
+      error && (
+        <p class="admin-alert mb-4" role="alert">
+          Couldn’t load the calendar: {error.message}
+        </p>
+      )
+    }
+    {
+      /* One alert for both writes on this page: the sheet's, and the day
+        panel's tick, which is the tasks room's script reused verbatim. */
+    }
     <p hidden role="alert" class="admin-alert mb-4" data-event-error data-task-error></p>
 
     {
@@ -259,7 +288,11 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         </div>
       ) : (
         <div class="month">
-          <div class="month__dow">{DOW.map((d) => <span>{d}</span>)}</div>
+          <div class="month__dow">
+            {DOW.map((d) => (
+              <span>{d}</span>
+            ))}
+          </div>
           <div class="month__grid">
             {cells.map((cell) => {
               const list = days.get(cell.ymd) ?? [];
@@ -272,7 +305,9 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                     cell.ymd === openDay && 'cell--open',
                   ]}
                 >
-                  <a class="cell__n" href={href({ day: cell.ymd })}>{cell.day}</a>
+                  <a class="cell__n" href={href({ day: cell.ymd })}>
+                    {cell.day}
+                  </a>
                   {list.slice(0, CELL_ROWS).map((it) => (
                     <a
                       href={href({ day: cell.ymd })}
@@ -286,7 +321,9 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                     </a>
                   ))}
                   {list.length > CELL_ROWS && (
-                    <a class="cell__more" href={href({ day: cell.ymd })}>+{list.length - CELL_ROWS} more</a>
+                    <a class="cell__more" href={href({ day: cell.ymd })}>
+                      +{list.length - CELL_ROWS} more
+                    </a>
                   )}
                 </div>
               );
@@ -355,9 +392,7 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                       </span>
                     )}
                     {it.location && <span class="drow__l">{it.location}</span>}
-                    {!!it.people?.length && (
-                      <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>
-                    )}
+                    {!!it.people?.length && <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>}
                   </span>
                   {it.kind === 'event' && (
                     <button type="button" class="chip chip--act shrink-0" data-edit-event>

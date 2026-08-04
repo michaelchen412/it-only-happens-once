@@ -37,10 +37,7 @@ export const CIRCLES: { key: Circle; label: string }[] = [
 ];
 
 /** The month names the birthday picker offers, indexed 1–12 by value. */
-export const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
  * Above this many people the roster grows a search box.
@@ -92,10 +89,7 @@ export const PHOTO_BUCKET = 'hq';
  * loss, and a page that 500s because one object was deleted out from under it
  * is not.
  */
-export async function signPhotos(
-  sb: SupabaseClient<Database>,
-  paths: (string | null)[],
-): Promise<Map<string, string>> {
+export async function signPhotos(sb: SupabaseClient<Database>, paths: (string | null)[]): Promise<Map<string, string>> {
   const wanted = [...new Set(paths.filter((p): p is string => !!p))];
   const urls = new Map<string, string>();
   if (wanted.length === 0) return urls;

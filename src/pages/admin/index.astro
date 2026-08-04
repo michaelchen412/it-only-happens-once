@@ -112,8 +112,14 @@ if (selected === todayYmd && !times.bed && !times.woke) {
   if (rows.length >= 3) {
     // Bed times straddle midnight, so their median is taken on a clock rotated
     // by twelve hours — see `medianClock`. Waking times do not, so they are not.
-    const bed = medianClock(rows.map((r) => utcToZonedTime(r.bed_at!, tz)), 12);
-    const woke = medianClock(rows.map((r) => utcToZonedTime(r.woke_at!, tz)), 0);
+    const bed = medianClock(
+      rows.map((r) => utcToZonedTime(r.bed_at!, tz)),
+      12,
+    );
+    const woke = medianClock(
+      rows.map((r) => utcToZonedTime(r.woke_at!, tz)),
+      0,
+    );
     if (bed && woke) prefill = { bed, woke };
   }
   prefill ??= DEFAULT_TIMES;
@@ -152,10 +158,7 @@ if (!offToday) {
     mirroredToday,
     { data: syncState },
   ] = await Promise.all([
-    supabase
-      .from('events')
-      .select('*, event_people(person_id, people(id, display_name))')
-      .eq('starts_on', todayYmd),
+    supabase.from('events').select('*, event_people(person_id, people(id, display_name))').eq('starts_on', todayYmd),
     supabase.from('tasks').select('*').is('archived_at', null),
     // The embedded task row rather than a second lookup: a one-off answered this
     // morning is already archived, so it is NOT in the query above — and it must
@@ -279,9 +282,7 @@ if (!offToday) {
   ];
 
   comingItems = [
-    ...taskRows
-      .filter((t) => !t.answeredAs && announces({ ...t, due_on: t.shownDueOn }, todayYmd))
-      .map(taskItem),
+    ...taskRows.filter((t) => !t.answeredAs && announces({ ...t, due_on: t.shownDueOn }, todayYmd)).map(taskItem),
     ...birthdays.filter((b) => b.birthday.days > 0).map((b) => birthdayItem(b.person, b.birthday.ymd)),
   ];
 
@@ -291,7 +292,11 @@ if (!offToday) {
   // One round trip for every face the zone can show, and no more: signing the
   // whole roster would mint URLs for people who are not on this page.
   const shown = [...briefs.map((b) => b.person), ...drifting.map((d) => d.person)];
-  if (shown.length) peoplePhotos = await signPhotos(supabase, shown.map((p) => p.photo_path));
+  if (shown.length)
+    peoplePhotos = await signPhotos(
+      supabase,
+      shown.map((p) => p.photo_path),
+    );
 
   /* ── practice ───────────────────────────────────────────────────────────── */
   published = publishedSignal((lastWriting?.[0]?.published_at ?? null)?.slice(0, 10) as Ymd | null, todayYmd);
@@ -321,13 +326,15 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 ---
 
 <AdminLayout title="Today" active="today">
-  {/* Deep links from before the move, and from muscle memory. A hash never
+  {
+    /* Deep links from before the move, and from muscle memory. A hash never
       reaches the server, so this cannot be a redirect — every *producer* was
       updated instead (the retired writing page's 302, the blog's edit link,
       the manager's history base), and this catches what is already in a
       browser's history or an old note. `is:inline` so it runs while the
       document parses rather than after paint; `replace` so Back does not
-      bounce you here again. */}
+      bounce you here again. */
+  }
   <script is:inline>
     (function () {
       const h = location.hash;
@@ -360,8 +367,10 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
             </a>
           </div>
           <div class="cal__dow">{DOW.map((d) => <span>{d}</span>)}</div>
-          {/* 42 cells always, never 35 or 28 — a grid that changes height
-              between months makes the page jump under the cursor. */}
+          {
+            /* 42 cells always, never 35 or 28 — a grid that changes height
+              between months makes the page jump under the cursor. */
+          }
           <div class="cal__grid">
             {
               cells.map((c) => (
@@ -392,14 +401,18 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       }
     </header>
 
-    {/* The configured zone always wins; a device somewhere else gets a quiet
+    {
+      /* The configured zone always wins; a device somewhere else gets a quiet
         note and nothing more. A silent switch mid-trip corrupts the sleep
         series exactly at the boundary — doubling or skipping a day — and does
-        it invisibly (docs/plans/11-checkin.md §2). */}
+        it invisibly (docs/plans/11-checkin.md §2). */
+    }
     <p id="tz-note" hidden class="admin-hint mb-4 text-xs" data-tz={tz}></p>
 
-    {/* One alert for every write on this page: the tick, and both of drift's
-        dismissals. The zones themselves are read-only. */}
+    {
+      /* One alert for every write on this page: the tick, and both of drift's
+        dismissals. The zones themselves are read-only. */
+    }
     <p hidden role="alert" class="admin-alert mb-4" data-task-error></p>
 
     {
@@ -413,18 +426,30 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       )
     }
 
-    {/* ⚠ THE ORDER IS §10c's, AND THE `o-*` CLASSES ARE WHY IT SURVIVES A PHONE.
+    {
+      /* ⚠ THE ORDER IS §10c's, AND THE `o-*` CLASSES ARE WHY IT SURVIVES A PHONE.
         The wrappers go `display: contents` when narrow, so these five zones
         collapse into one stack and `order` resequences them — People outranks
         Coming up on a small screen, because who you are seeing today matters
         more than what is approaching. Wide, the orders reset and the columns
         take over. (Trap 1: a `grid-column: 2` here would conjure an implicit
-        column and put every zone on its own row.) */}
+        column and put every zone on its own row.) */
+    }
     <div class="hq-grid">
       <div class="col-main">
-        {/* ══ MORNING ══ pinned first, always, answered or not. Every field is
-            a real column on `daily_checkins`. ══ */}
-        <CheckinZone logDate={selected} today={todayYmd} row={checkin ?? null} times={times} prefill={prefill} writable={writable} tz={tz} />
+        {
+          /* ══ MORNING ══ pinned first, always, answered or not. Every field is
+            a real column on `daily_checkins`. ══ */
+        }
+        <CheckinZone
+          logDate={selected}
+          today={todayYmd}
+          row={checkin ?? null}
+          times={times}
+          prefill={prefill}
+          writable={writable}
+          tz={tz}
+        />
 
         {/* ══ TODAY ══ the day itself: events and tasks in one time order. ══ */}
         <AgendaZone items={dayItems} answered={answeredToday} />
@@ -434,9 +459,11 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       </div>
 
       <div class="col-rail">
-        {/* ══ PEOPLE ══ the brief, then drift capped at three. The rail rather
+        {
+          /* ══ PEOPLE ══ the brief, then drift capped at three. The rail rather
             than the main column: the check-in is the thing you came to do, and
-            this is the thing you came to notice. ══ */}
+            this is the thing you came to notice. ══ */
+        }
         <PeopleZone briefs={briefs} drifting={drifting} today={todayYmd} photos={peoplePhotos} />
 
         {/* ══ PRACTICE ══ signals. Nothing here is tickable or countable. ══ */}

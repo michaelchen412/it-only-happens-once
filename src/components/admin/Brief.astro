@@ -51,10 +51,12 @@ const birthday = birthdayLine(person);
       </span>
       <span class="pc__name truncate">{person.display_name}</span>
     </a>
-    {/* The event that put them here. §2a's sketch wrote "Tonight, 7:00 PM" —
+    {
+      /* The event that put them here. §2a's sketch wrote "Tonight, 7:00 PM" —
         the word went, because the clock already says which end of the day it is
         and a derived time-of-day word is one more thing that can be wrong at
-        4:30. */}
+        4:30. */
+    }
     <span class="brf__when">
       {event.title}
       {event.at ? <span class="brf__at">{clockTime(event.at)}</span> : <span class="brf__at">all day</span>}
@@ -67,7 +69,9 @@ const birthday = birthdayLine(person);
         <>
           <dt>Last contact</dt>
           <dd>
-            <span class="stamp" title={fullDate(brief.lastOn)}>{since(brief.lastOn, today)}</span>
+            <span class="stamp" title={fullDate(brief.lastOn)}>
+              {since(brief.lastOn, today)}
+            </span>
           </dd>
         </>
       )
@@ -98,9 +102,11 @@ const birthday = birthdayLine(person);
     }
   </dl>
 
-  {/* §2b retired the morning-after prompt and admitted it removed one of the
+  {
+    /* §2b retired the morning-after prompt and admitted it removed one of the
       two defences against the log going empty. This is the other one: logging
-      is one click from where you already are. */}
+      is one click from where you already are. */
+  }
   <a class="brf__log" href={`/admin/people/${person.slug}#log`}>
     <Icon name="ph:note-pencil" /> Log an entry
   </a>

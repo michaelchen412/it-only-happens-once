@@ -473,12 +473,9 @@ test.describe('note → the Agenda', () => {
     await expect(undo).toContainText('Filed as a task');
     await expect(undo.locator('a[href="/admin/agenda/tasks"]')).toBeVisible();
     await undo.locator('[data-undo-do]').click();
-    await expect.poll(() => calls.map((c) => c.name)).toEqual([
-      'tasks.save',
-      'fragments.bulk',
-      'tasks.remove',
-      'fragments.bulk',
-    ]);
+    await expect
+      .poll(() => calls.map((c) => c.name))
+      .toEqual(['tasks.save', 'fragments.bulk', 'tasks.remove', 'fragments.bulk']);
     expect(field(calls[3].body, 'op')).toBe('restore');
   });
 
@@ -585,12 +582,9 @@ test.describe('note → log entry', () => {
     // who you picked — so the strip says nothing rather than guessing.
     await expect(undo.locator('a')).toHaveCount(0);
     await undo.locator('[data-undo-do]').click();
-    await expect.poll(() => calls.map((c) => c.name)).toEqual([
-      'interactions.save',
-      'fragments.bulk',
-      'interactions.remove',
-      'fragments.bulk',
-    ]);
+    await expect
+      .poll(() => calls.map((c) => c.name))
+      .toEqual(['interactions.save', 'fragments.bulk', 'interactions.remove', 'fragments.bulk']);
   });
 });
 

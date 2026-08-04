@@ -194,7 +194,9 @@ describe('staleness', () => {
       stale: true,
       text: 'Google last reached a day ago',
     });
-    expect(staleness({ synced_at: hoursAgo(24 * 3), last_error: null }, now)?.text).toBe('Google last reached 3 days ago');
+    expect(staleness({ synced_at: hoursAgo(24 * 3), last_error: null }, now)?.text).toBe(
+      'Google last reached 3 days ago',
+    );
   });
 
   it('⚠ speaks IMMEDIATELY on an error, without waiting out the window', () => {

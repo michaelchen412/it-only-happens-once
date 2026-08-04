@@ -173,7 +173,8 @@ export function medianClock(times: string[], rotateHours: number): string | null
     .sort((a, b) => a - b);
   if (!mins.length) return null;
 
-  const mid = mins.length % 2 ? mins[(mins.length - 1) / 2] : Math.round((mins[mins.length / 2 - 1] + mins[mins.length / 2]) / 2);
+  const mid =
+    mins.length % 2 ? mins[(mins.length - 1) / 2] : Math.round((mins[mins.length / 2 - 1] + mins[mins.length / 2]) / 2);
   const back = (mid + rot) % 1440;
   return `${String(Math.floor(back / 60)).padStart(2, '0')}:${String(back % 60).padStart(2, '0')}`;
 }

@@ -40,11 +40,7 @@ const since = shiftYmd(todayYmd, -OBSERVATION_DAYS);
 const [{ data: goalData, error }, { data: lastDone }, { data: recent }] = await Promise.all([
   supabase.from('goals').select('*').order('created_at'),
   supabase.from('goal_last_done').select('*'),
-  supabase
-    .from('task_events')
-    .select('tasks!inner(goal_id)')
-    .eq('outcome', 'done')
-    .gte('occurred_on', since),
+  supabase.from('task_events').select('tasks!inner(goal_id)').eq('outcome', 'done').gte('occurred_on', since),
 ]);
 
 const all: Goal[] = goalData ?? [];
@@ -75,20 +71,26 @@ const inactive = all.filter((g) => g.status !== 'active');
       <div class="flex items-center gap-3">
         {/* The cap as a FACT you can see, not an error you hit. */}
         <span class="admin-hint text-xs">{active.length} of {ACTIVE_CAP} active</span>
-        <button type="button" data-open-goal-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-amber">
+        <button type="button" data-open-goal-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
           <Icon name="ph:plus" /> New
         </button>
       </div>
     </header>
 
-    {error && <p class="admin-alert mb-5" role="alert">Couldn’t load your goals: {error.message}</p>}
+    {
+      error && (
+        <p class="admin-alert mb-5" role="alert">
+          Couldn’t load your goals: {error.message}
+        </p>
+      )
+    }
     <p hidden role="alert" class="admin-alert mb-5" data-goal-error></p>
 
     {
       all.length === 0 ? (
-        <div class="rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
           <p class="font-serif text-lg">Nothing you’re working toward yet.</p>
-          <button type="button" data-open-goal-sheet class="btn btn-sm mt-4 gap-1 font-sans zone__cta cn-amber">
+          <button type="button" data-open-goal-sheet class="btn btn-sm zone__cta cn-amber mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Name the first
           </button>
         </div>
@@ -99,7 +101,9 @@ const inactive = all.filter((g) => g.status !== 'active');
               const obs = observe(g);
               return (
                 <a href={`/admin/agenda/goals/${g.slug}`} class="gcard">
-                  <span class="gcard__k"><Icon name="ph:target" /> {horizonLabel(g.horizon)}</span>
+                  <span class="gcard__k">
+                    <Icon name="ph:target" /> {horizonLabel(g.horizon)}
+                  </span>
                   <span class="gcard__n">{g.name}</span>
                   {/* Nothing here at all when there is nothing to observe. */}
                   {obs && <span class:list={['gcard__o', obs.cold && 'gcard__o--cold']}>{obs.text}</span>}
@@ -113,11 +117,15 @@ const inactive = all.filter((g) => g.status !== 'active');
               <h2 class="admin-label mb-2">
                 Not active <span class="opacity-50">{inactive.length}</span>
               </h2>
-              <ul class="zone__list rounded-box border border-base-300">
+              <ul class="zone__list rounded-box border-base-300 border">
                 {inactive.map((g) => (
                   <li class="row">
-                    <span class="row__mark"><Icon name="ph:target" /></span>
-                    <a href={`/admin/agenda/goals/${g.slug}`} class="min-w-0 flex-1 text-sm hover:underline">{g.name}</a>
+                    <span class="row__mark">
+                      <Icon name="ph:target" />
+                    </span>
+                    <a href={`/admin/agenda/goals/${g.slug}`} class="min-w-0 flex-1 text-sm hover:underline">
+                      {g.name}
+                    </a>
                     {/* THE TALLY IS THE POINT, and it replaces a sentence.
                         §4a asked for a line stating that nothing was deleted
                         and the tasks done toward it stay done — but a visible

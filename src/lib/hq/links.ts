@@ -85,8 +85,7 @@ export interface FragmentOption {
  */
 const PICKER_CHARS = 120;
 
-const clamp = (s: string, n = PICKER_CHARS): string =>
-  s.length <= n ? s : `${s.slice(0, n).trimEnd()}…`;
+const clamp = (s: string, n = PICKER_CHARS): string => (s.length <= n ? s : `${s.slice(0, n).trimEnd()}…`);
 
 /** Strip the Markdown that would otherwise render as literal punctuation in a one-line label. */
 function plainish(s: string): string {
@@ -148,7 +147,11 @@ export async function sharedFor(sb: DB, personId: string): Promise<Shared> {
   const works = (workLinks ?? [])
     .map((row) => {
       const w = row.works as unknown as {
-        id: string; slug: string; title: string; kind: string | null; year: number | null;
+        id: string;
+        slug: string;
+        title: string;
+        kind: string | null;
+        year: number | null;
         authors: { name: string } | null;
       } | null;
       return w ? { link: row, work: w } : null;
@@ -177,8 +180,13 @@ export async function sharedFor(sb: DB, personId: string): Promise<Shared> {
 
   // Direct edges, minus the trash.
   const direct = (fragmentLinks ?? [])
-    .map((row) => ({ note: row.note, f: row.fragments as unknown as (FragmentBits & { deleted_at: string | null }) | null }))
-    .filter((x): x is { note: string | null; f: FragmentBits & { deleted_at: string | null } } => !!x.f && !x.f.deleted_at);
+    .map((row) => ({
+      note: row.note,
+      f: row.fragments as unknown as (FragmentBits & { deleted_at: string | null }) | null,
+    }))
+    .filter(
+      (x): x is { note: string | null; f: FragmentBits & { deleted_at: string | null } } => !!x.f && !x.f.deleted_at,
+    );
 
   // A fragment reached through its work is ALREADY on the shelf. Showing it
   // again under a loose heading reads as a rendering bug, so the direct link's

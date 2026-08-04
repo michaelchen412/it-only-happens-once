@@ -176,7 +176,8 @@ export function wireVersionsPanel(opts: Options): VersionsPanelHandle {
       try {
         const { data, error } = await actions.versions.get({ id });
         if (error) showError(formatActionError(error));
-        else await opts.onResume({ title: data.title, excerpt: data.excerpt, body: data.body }, data.kind === 'working');
+        else
+          await opts.onResume({ title: data.title, excerpt: data.excerpt, body: data.body }, data.kind === 'working');
       } catch (err) {
         showError(formatActionError(err));
       }

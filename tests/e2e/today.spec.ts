@@ -61,9 +61,9 @@ test.describe('the move: /admin is Today, the manager is /admin/fragments', () =
 
     // …and the bundle itself never arrives. Asserting on the DOM alone would
     // pass even if the editor were being downloaded and left unmounted.
-    const scripts = await page.locator('script[src]').evaluateAll((els) =>
-      els.map((e) => (e as HTMLScriptElement).src),
-    );
+    const scripts = await page
+      .locator('script[src]')
+      .evaluateAll((els) => els.map((e) => (e as HTMLScriptElement).src));
     const editor = scripts.filter((s) => /tiptap|prosemirror/i.test(s));
     expect(editor, `Today pulled an editor bundle: ${editor.join(', ')}`).toHaveLength(0);
   });
@@ -116,9 +116,7 @@ test.describe('the deep links survived the move', () => {
     // Get a real id the way the blog does — from the preview banner's edit link.
     await page.goto(`/blog/${draftSlug}`);
     const href = await page.getByRole('link', { name: 'Edit' }).getAttribute('href');
-    expect(href, 'the blog preview must point at the manager, not the old root').toMatch(
-      /^\/admin\/fragments#edit=/,
-    );
+    expect(href, 'the blog preview must point at the manager, not the old root').toMatch(/^\/admin\/fragments#edit=/);
     const id = href!.split('#edit=')[1];
 
     // …and the same link still works if it arrives at the OLD address.
@@ -283,7 +281,13 @@ test.describe('what Today does not claim', () => {
     await page.goto('/admin');
     await expect(page.getByText(/isn’t built yet/)).toHaveCount(0);
 
-    for (const attr of ['[data-agenda-zone]', '[data-coming-up]', '[data-practice]', '[data-past-due]', '[data-people-zone]']) {
+    for (const attr of [
+      '[data-agenda-zone]',
+      '[data-coming-up]',
+      '[data-practice]',
+      '[data-past-due]',
+      '[data-people-zone]',
+    ]) {
       const zone = page.locator(attr);
       if ((await zone.count()) === 0) continue;
       expect(await zone.locator('.row, .sig, .brf, .bw__row').count(), `${attr} is an empty box`).toBeGreaterThan(0);

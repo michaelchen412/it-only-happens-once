@@ -86,11 +86,7 @@ export interface Observation {
  * `doneIn30` is counted with a boundary from `localToday()`, never from
  * Postgres's `current_date` — see the view's comment in the migration.
  */
-export function observationFor(
-  doneIn30: number,
-  lastDoneOn: Ymd | null,
-  today: Ymd,
-): Observation | null {
+export function observationFor(doneIn30: number, lastDoneOn: Ymd | null, today: Ymd): Observation | null {
   if (doneIn30 > 0) {
     return { text: `${doneIn30} task${doneIn30 === 1 ? '' : 's'} done in the last 30 days`, cold: false };
   }

@@ -32,15 +32,18 @@ const FILTER_THRESHOLD = 8;
 
 <dialog id="event-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="event-sheet-title">
   <form id="event-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
-    <header class="flex shrink-0 items-center justify-between border-b border-base-300 px-6 py-4">
+    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
       <h2 id="event-sheet-title" class="font-display text-xl">New event</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <p id="event-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
 
-    {/* Only ever visible when a reading filled this form in (14 · Piece 3) —
-        an event typed by hand is not a judgement anybody made. */}
+    {
+      /* Only ever visible when a reading filled this form in (14 · Piece 3) —
+        an event typed by hand is not a judgement anybody made. */
+    }
     <div class="px-6 pt-4"><KindBar self="event" /></div>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
@@ -81,7 +84,9 @@ const FILTER_THRESHOLD = 8;
             <summary>
               <Icon name="ph:users-three" class="opacity-55" />
               <span>Who’s there</span>
-              <span class="sby__who" data-who>nobody</span>
+              <span class="sby__who" data-who>
+                nobody
+              </span>
             </summary>
 
             {people.length > FILTER_THRESHOLD && (
@@ -99,7 +104,12 @@ const FILTER_THRESHOLD = 8;
                   {/* The name rides on the INPUT, not the row: a row's
                       textContent also carries the monogram, which is how the
                       fragment editor's summary once read "MMarisol Quint". */}
-                  <input type="checkbox" class="ep-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
+                  <input
+                    type="checkbox"
+                    class="ep-check checkbox checkbox-xs"
+                    value={p.id}
+                    data-name={p.display_name}
+                  />
                   <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
                     {monogram(p.display_name)}
                   </span>
@@ -117,12 +127,12 @@ const FILTER_THRESHOLD = 8;
       </label>
     </div>
 
-    <div class="flex shrink-0 items-center gap-2 border-t border-base-300 bg-base-200 px-6 py-3">
-      <button type="button" class="btn btn-ghost btn-sm gap-1 font-sans text-error" data-delete-event hidden>
+    <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+      <button type="button" class="btn btn-ghost btn-sm text-error gap-1 font-sans" data-delete-event hidden>
         <Icon name="ph:trash" /> Delete
       </button>
       <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
-      <button type="submit" class="btn btn-sm gap-1 font-sans zone__cta cn-amber" data-submit>Add event</button>
+      <button type="submit" class="btn btn-sm zone__cta cn-amber gap-1 font-sans" data-submit>Add event</button>
     </div>
   </form>
 </dialog>

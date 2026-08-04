@@ -27,7 +27,10 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
   let dirty = false;
   let inFlight: Promise<unknown> = Promise.resolve();
 
-  const selected = () => boxes().filter((b) => b.checked).map((b) => b.value);
+  const selected = () =>
+    boxes()
+      .filter((b) => b.checked)
+      .map((b) => b.value);
 
   function say(msg: string, isError = false) {
     if (!status) return;

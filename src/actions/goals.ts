@@ -63,10 +63,7 @@ async function assertRoomToActivate(sb: DB, exclude?: string): Promise<void> {
   const { count, error } = await q;
   if (error) throw fail(error.message);
   if ((count ?? 0) >= ACTIVE_CAP) {
-    throw fail(
-      `Five active goals is the cap. Pause one, let one go, or mark one achieved first.`,
-      'BAD_REQUEST',
-    );
+    throw fail(`Five active goals is the cap. Pause one, let one go, or mark one achieved first.`, 'BAD_REQUEST');
   }
 }
 
@@ -92,7 +89,11 @@ export const goals = {
       // The slug is minted once, from the name, and never re-minted: renaming a
       // goal is ordinary and must not move its page.
       const slug = await uniqueGoalSlug(sb, goalSlug(v.name));
-      const { data, error } = await sb.from('goals').insert({ ...values, slug }).select('id, slug').single();
+      const { data, error } = await sb
+        .from('goals')
+        .insert({ ...values, slug })
+        .select('id, slug')
+        .single();
       if (error) throw fail(error.message);
       return data;
     },

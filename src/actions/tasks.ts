@@ -28,9 +28,21 @@ import { advance } from '../lib/hq/tasks';
 
 const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
 
-const ymd = z.preprocess(blankToUndef, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD').optional());
+const ymd = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+    .optional(),
+);
 /** `<input type="time">` gives HH:MM, and some browsers add :SS. */
-const hhmm = z.preprocess(blankToUndef, z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM').optional());
+const hhmm = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM')
+    .optional(),
+);
 const optCount = z.preprocess(blankToUndef, z.coerce.number().int().optional());
 
 const input = z.object({
@@ -81,7 +93,12 @@ function recurrenceOf(v: Input, dueOn: string | null): RecurrenceColumns {
   if (v.repeat === 'after') {
     const every = v.every ?? 2;
     if (every < 1 || every > 366) throw fail('Repeat every 1 to 366.', 'BAD_REQUEST');
-    return { recur_mode: 'after_completion' as const, recur_rrule: null, recur_every: every, recur_unit: v.unit ?? 'weeks' };
+    return {
+      recur_mode: 'after_completion' as const,
+      recur_rrule: null,
+      recur_every: every,
+      recur_unit: v.unit ?? 'weeks',
+    };
   }
 
   const preset = v.preset ?? 'weekly';

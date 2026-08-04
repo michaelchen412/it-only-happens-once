@@ -20,7 +20,7 @@ const { type, class: className = '' } = Astro.props;
 const meta = TYPE_META[type as FragmentType] ?? TYPE_META.writing;
 ---
 
-<span class:list={['shrink-0 font-serif text-base-content/45 select-none', className]}>
+<span class:list={['text-base-content/45 shrink-0 font-serif select-none', className]}>
   <span aria-hidden="true">{meta.glyph}</span>
   <span class="sr-only">{meta.label}</span>
 </span>

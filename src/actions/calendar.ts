@@ -156,12 +156,10 @@ export const calendar = {
           // `external_id`, and even though `event_people.external_id` is not a
           // foreign key — so nothing would cascade — a reload leaves a window
           // in which the mirror is empty and Today is wrong.
-          const { error } = await sb
-            .from('external_events')
-            .upsert(
-              result.rows.map((r) => ({ ...r, synced_at: stamp })),
-              { onConflict: 'external_id' },
-            );
+          const { error } = await sb.from('external_events').upsert(
+            result.rows.map((r) => ({ ...r, synced_at: stamp })),
+            { onConflict: 'external_id' },
+          );
           if (error) throw new Error(error.message);
           changed += result.rows.length;
         }

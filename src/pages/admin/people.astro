@@ -72,7 +72,10 @@ const archived = everyone.filter((p) => p.archived_at).sort(rosterOrder);
 
 // One round trip for every face on the page. These URLs expire, which is why
 // they are minted here per render and never stored (lib/hq/people.ts).
-const photos = await signPhotos(supabase, everyone.map((p) => p.photo_path));
+const photos = await signPhotos(
+  supabase,
+  everyone.map((p) => p.photo_path),
+);
 
 // The rail carries what is actually actionable in the next weeks, and each
 // person's own lead decides whether they are on it — 30 days by default,
@@ -106,22 +109,28 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
             </label>
           )
         }
-        <button type="button" data-open-person-sheet class="btn btn-sm gap-1 font-sans zone__cta cn-azure">
+        <button type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure gap-1 font-sans">
           <Icon name="ph:plus" /> Add
         </button>
       </div>
     </header>
 
-    {error && <p class="admin-alert mb-5" role="alert">Couldn’t load the roster: {error.message}</p>}
+    {
+      error && (
+        <p class="admin-alert mb-5" role="alert">
+          Couldn’t load the roster: {error.message}
+        </p>
+      )
+    }
 
     {
       everyone.length === 0 ? (
         /* The room on day one. One line, one button — no grid of skeletons, no
            "0 people", no setup checklist. A roster is designed on the day it is
            full and lived in on the day it is empty. */
-        <div class="rounded-box border border-dashed border-base-300 px-6 py-12 text-center">
+        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
           <p class="font-serif text-lg">Nobody here yet.</p>
-          <button type="button" data-open-person-sheet class="btn btn-sm mt-4 gap-1 font-sans zone__cta cn-azure">
+          <button type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Add the first
           </button>
         </div>
@@ -153,7 +162,10 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
           {sections.map((section) => (
             <section class="mb-6" data-section data-roster-part>
               <h2 class="admin-label mb-2">
-                {section.label} <span class="opacity-50" data-count>{section.members.length}</span>
+                {section.label}{' '}
+                <span class="opacity-50" data-count>
+                  {section.members.length}
+                </span>
               </h2>
               <div class="pgrid">
                 {section.members.map((person) => {
@@ -211,10 +223,12 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
             </section>
           ))}
 
-          <p id="people-no-match" hidden class="admin-hint py-6 text-center text-sm">Nobody by that name.</p>
+          <p id="people-no-match" hidden class="admin-hint py-6 text-center text-sm">
+            Nobody by that name.
+          </p>
 
           {archived.length > 0 && (
-            <details class="mt-8 border-t border-base-300 pt-4">
+            <details class="border-base-300 mt-8 border-t pt-4">
               <summary class="admin-label cursor-pointer">
                 Archived <span class="opacity-50">{archived.length}</span>
               </summary>

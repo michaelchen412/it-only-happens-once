@@ -12,7 +12,11 @@ import { test, expect, type Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
 import { stubActions } from './fixtures';
 
-type Returns<T> = T extends (...a: never[]) => Promise<infer R> ? (R extends { data: infer D } ? NonNullable<D> : never) : never;
+type Returns<T> = T extends (...a: never[]) => Promise<infer R>
+  ? R extends { data: infer D }
+    ? NonNullable<D>
+    : never
+  : never;
 type Suggestion = Returns<typeof actions.fragments.suggestSubjects>;
 
 const EXISTING = ['solitude', 'attention'];

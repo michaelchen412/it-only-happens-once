@@ -13,7 +13,16 @@
 // below are what keep that true, because the failure only appears on a server
 // in a different zone from the developer's laptop.
 import { describe, expect, it } from 'vitest';
-import { dmd, elapsedSince, headerDate, monthGrid, monthTitle, nextOccurrence, ordinal, shiftMonth } from '../lib/hq/dates';
+import {
+  dmd,
+  elapsedSince,
+  headerDate,
+  monthGrid,
+  monthTitle,
+  nextOccurrence,
+  ordinal,
+  shiftMonth,
+} from '../lib/hq/dates';
 import { deviceZoneNote, isValidTimezone, localToday, parseYmd, shiftYmd, ymdOf } from '../lib/hq/time';
 
 describe('ordinal', () => {

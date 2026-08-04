@@ -28,7 +28,8 @@ async function overflowingChildren(container: Locator): Promise<string[]> {
     for (const el of Array.from(root.querySelectorAll('*'))) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
-      if (r.right > right + 1) bad.push(`${el.tagName.toLowerCase()}.${el.className} → ${Math.round(r.right - right)}px`);
+      if (r.right > right + 1)
+        bad.push(`${el.tagName.toLowerCase()}.${el.className} → ${Math.round(r.right - right)}px`);
     }
     return bad;
   });

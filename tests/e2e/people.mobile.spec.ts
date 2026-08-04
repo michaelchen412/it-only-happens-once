@@ -36,7 +36,8 @@ async function overflowingChildren(container: Locator): Promise<string[]> {
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
       // A pixel of slack for sub-pixel rounding.
-      if (r.right > right + 1) bad.push(`${el.tagName.toLowerCase()}.${el.className} → ${Math.round(r.right - right)}px`);
+      if (r.right > right + 1)
+        bad.push(`${el.tagName.toLowerCase()}.${el.className} → ${Math.round(r.right - right)}px`);
     }
     return bad;
   });

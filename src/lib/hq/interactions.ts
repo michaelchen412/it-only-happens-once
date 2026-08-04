@@ -88,12 +88,16 @@ export interface LastContact {
  * That was the provenance audit's finding, and it is why drift (Piece 4) must
  * require at least one logged interaction rather than treating null as ancient.
  */
-export async function lastContactMap(
-  sb: { from: (t: 'person_last_contact') => any },
-): Promise<Map<string, LastContact>> {
+export async function lastContactMap(sb: {
+  from: (t: 'person_last_contact') => any;
+}): Promise<Map<string, LastContact>> {
   const { data } = await sb.from('person_last_contact').select('person_id, last_contact_on, interaction_count');
   const map = new Map<string, LastContact>();
-  for (const row of (data ?? []) as { person_id: string | null; last_contact_on: string | null; interaction_count: number | null }[]) {
+  for (const row of (data ?? []) as {
+    person_id: string | null;
+    last_contact_on: string | null;
+    interaction_count: number | null;
+  }[]) {
     if (row.person_id && row.last_contact_on) {
       map.set(row.person_id, { on: row.last_contact_on, count: row.interaction_count ?? 0 });
     }

@@ -28,7 +28,6 @@ import {
 // Shared, so a new column breaks one builder rather than four fixtures.
 import { person } from './stubs/person';
 
-
 describe('upcomingBirthday', () => {
   it('shows a birthday inside the lead window', () => {
     const p = person({ birth_month: 8, birth_day: 20 });

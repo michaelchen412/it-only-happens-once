@@ -22,26 +22,55 @@ const ctrl = 'rounded-field px-1.5 hover:bg-base-200 hover:text-base-content';
 const expanded = true;
 ---
 
-<div class="interest-row rounded-box border border-base-300 bg-base-100">
+<div class="interest-row rounded-box border-base-300 bg-base-100 border">
   <div class="flex items-start gap-2 p-3">
     <input class:list={['interest-term flex-1', field]} placeholder="Jazz" value={term} />
-    <div class="flex shrink-0 items-center gap-1 pt-1 font-sans text-base-content/45">
-      <button type="button" class:list={['interest-toggle', ctrl]} aria-label="Why it matters" aria-expanded={expanded ? 'true' : 'false'}>
+    <div class="text-base-content/45 flex shrink-0 items-center gap-1 pt-1 font-sans">
+      <button
+        type="button"
+        class:list={['interest-toggle', ctrl]}
+        aria-label="Why it matters"
+        aria-expanded={expanded ? 'true' : 'false'}
+      >
         <span class:list={['interest-caret inline-block transition-transform', expanded && 'rotate-180']}>▾</span>
       </button>
       <button type="button" class:list={['interest-up', ctrl]} aria-label="Move up">↑</button>
       <button type="button" class:list={['interest-down', ctrl]} aria-label="Move down">↓</button>
-      <button type="button" class:list={['interest-remove', 'rounded-field px-1.5 hover:bg-base-200 hover:text-error']} aria-label="Remove">✕</button>
+      <button
+        type="button"
+        class:list={['interest-remove', 'rounded-field hover:bg-base-200 hover:text-error px-1.5']}
+        aria-label="Remove">✕</button
+      >
     </div>
   </div>
 
   {/* “Why it’s part of who I am” — a slim, link-free rich editor. */}
-  <div class="interest-note-wrap border-t border-base-300" hidden={!expanded}>
-    <div class="interest-toolbar flex flex-wrap items-center gap-1 border-b border-base-300 px-3 py-1.5" role="toolbar" aria-label="Formatting">
-      <button type="button" data-cmd="bold" title="Bold" aria-label="Bold" aria-pressed="false" class="tt-btn font-bold">B</button>
-      <button type="button" data-cmd="italic" title="Italic" aria-label="Italic" aria-pressed="false" class="tt-btn italic">I</button>
-      <span class="mx-1 h-5 w-px bg-base-300"></span>
-      <button type="button" data-cmd="bulletList" title="Bulleted list" aria-label="Bulleted list" aria-pressed="false" class="tt-btn">•</button>
+  <div class="interest-note-wrap border-base-300 border-t" hidden={!expanded}>
+    <div
+      class="interest-toolbar border-base-300 flex flex-wrap items-center gap-1 border-b px-3 py-1.5"
+      role="toolbar"
+      aria-label="Formatting"
+    >
+      <button type="button" data-cmd="bold" title="Bold" aria-label="Bold" aria-pressed="false" class="tt-btn font-bold"
+        >B</button
+      >
+      <button
+        type="button"
+        data-cmd="italic"
+        title="Italic"
+        aria-label="Italic"
+        aria-pressed="false"
+        class="tt-btn italic">I</button
+      >
+      <span class="bg-base-300 mx-1 h-5 w-px"></span>
+      <button
+        type="button"
+        data-cmd="bulletList"
+        title="Bulleted list"
+        aria-label="Bulleted list"
+        aria-pressed="false"
+        class="tt-btn">•</button
+      >
     </div>
     <div class="interest-note-editor reading px-4 py-3"></div>
     <textarea class="interest-note-src" hidden>{note}</textarea>

@@ -43,22 +43,27 @@ const { roster, today } = Astro.props;
 
 <dialog id="log-sheet" class="modal-dialog w-full max-w-lg" aria-labelledby="log-sheet-title">
   <div class="flex flex-col font-sans" data-log-sheet data-today={today}>
-    <header class="flex shrink-0 items-center justify-between gap-4 border-b border-base-300 px-5 py-3.5">
+    <header class="border-base-300 flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3.5">
       <h2 id="log-sheet-title" class="font-display text-lg">Log an entry</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button>
+      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
+      >
     </header>
 
     <div class="p-5">
       <div class="logbox cn-azure">
-        {/* Prefilled with the dump, and editable — what you jotted at 11pm is
-            usually the entry, but not always the words you want kept. */}
+        {
+          /* Prefilled with the dump, and editable — what you jotted at 11pm is
+            usually the entry, but not always the words you want kept. */
+        }
         <textarea rows="3" data-log-body aria-label="What happened?" placeholder="What happened?"></textarea>
 
         <div class="logbox__foot">
           <div class="logbox__meta">
-            {/* ⚠ WHO COMES FIRST, and it is the only required field here. The
+            {
+              /* ⚠ WHO COMES FIRST, and it is the only required field here. The
                 kind and the date both have honest defaults; there is no
-                defensible default for whose life this was. */}
+                defensible default for whose life this was. */
+            }
             <button type="button" class="lchip" popovertarget="ls-who" data-who-open>
               <Icon name="ph:users-three" />
               <span data-who-label>Who?</span>
@@ -79,9 +84,11 @@ const { roster, today } = Astro.props;
 
           <div class="logbox__acts">
             <button type="button" class="btn btn-ghost btn-xs font-sans" data-close>Cancel</button>
-            {/* Disabled until somebody is named — the affordance says the field
-                is required, so no sentence has to (10-hq §10i). */}
-            <button type="button" class="btn btn-xs font-sans zone__cta cn-azure" data-log-save disabled>Save</button>
+            {
+              /* Disabled until somebody is named — the affordance says the field
+                is required, so no sentence has to (10-hq §10i). */
+            }
+            <button type="button" class="btn btn-xs zone__cta cn-azure font-sans" data-log-save disabled>Save</button>
           </div>
         </div>
       </div>
@@ -115,9 +122,11 @@ const { roster, today } = Astro.props;
       }
     </div>
 
-    {/* Three taps for the common cases, then a real date input for anything
+    {
+      /* Three taps for the common cases, then a real date input for anything
         older. NO TIME FIELD: `occurred_on` is a local date, and the log box
-        settled that argument once already. */}
+        settled that argument once already. */
+    }
     <div class="pop" popover id="ls-date" data-pop="date">
       {
         QUICK_DAYS.map((d, i) => (

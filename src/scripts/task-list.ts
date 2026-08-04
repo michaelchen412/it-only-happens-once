@@ -34,8 +34,7 @@ for (const list of lists) {
   };
 
   /** Every control on the row, so an in-flight answer cannot be double-sent. */
-  const controls = (row: HTMLElement) =>
-    Array.from(row.querySelectorAll<HTMLButtonElement>('.tick, .chip--act'));
+  const controls = (row: HTMLElement) => Array.from(row.querySelectorAll<HTMLButtonElement>('.tick, .chip--act'));
 
   /**
    * `1 of 2 done`, kept true after a tick.
@@ -49,8 +48,9 @@ for (const list of lists) {
    * moves the row out of the unanswered state without moving this number.
    */
   const repaint = () => {
-    const el = list.querySelector<HTMLElement>('[data-progress]')
-      ?? list.closest('.zone')?.querySelector<HTMLElement>('[data-progress]');
+    const el =
+      list.querySelector<HTMLElement>('[data-progress]') ??
+      list.closest('.zone')?.querySelector<HTMLElement>('[data-progress]');
     const total = Number(list.dataset.progressTotal ?? 0);
     if (!el || !total) return;
     const done = list.querySelectorAll('.task--done').length;
@@ -73,9 +73,7 @@ for (const list of lists) {
     buttons.forEach((b) => (b.disabled = true));
 
     try {
-      const { error } = undoing
-        ? await actions.tasks.undo({ id })
-        : await actions.tasks.dispose({ id, outcome });
+      const { error } = undoing ? await actions.tasks.undo({ id }) : await actions.tasks.dispose({ id, outcome });
       if (error) throw new Error(error.message);
 
       // The row's own record of what it is now. `data-undo` is what the next

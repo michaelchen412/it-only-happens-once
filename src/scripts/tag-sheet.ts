@@ -61,7 +61,9 @@ if (sheet && form) {
     try {
       const { error } = await actions.events.tag({
         externalId: subject,
-        personIds: checks().filter((c) => c.checked).map((c) => c.value),
+        personIds: checks()
+          .filter((c) => c.checked)
+          .map((c) => c.value),
       });
       if (error) throw new Error(error.message);
       // Reload rather than patching: tagging somebody changes the day panel,

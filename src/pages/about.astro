@@ -19,7 +19,13 @@ const { data: page } = await supabase.from('pages').select('content, updated_at'
 
 type Interest = { term: string; note?: string };
 const c = (page?.content ?? {}) as {
-  me?: { headline?: string; portrait?: string | null; portrait_caption?: string; body?: string; interests?: Interest[] };
+  me?: {
+    headline?: string;
+    portrait?: string | null;
+    portrait_caption?: string;
+    body?: string;
+    interests?: Interest[];
+  };
   site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
   contact?: { intro?: string };
 };
@@ -56,7 +62,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
     {
       !hasMe && !hasSite ? (
         <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-          <p class="font-serif text-lg text-base-content/55">This page is being composed.</p>
+          <p class="text-base-content/55 font-serif text-lg">This page is being composed.</p>
         </div>
       ) : (
         <>
@@ -73,16 +79,18 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                     <img
                       src={portraitUrl}
                       alt={me.headline ? `Portrait of ${me.headline}` : 'Portrait of the author'}
-                      class="w-full rounded-box border border-base-300 object-cover"
+                      class="rounded-box border-base-300 w-full border object-cover"
                       style="aspect-ratio: 4 / 5"
                     />
                     {me.portrait_caption && (
-                      <figcaption class="mt-2 font-serif text-sm text-base-content/40 italic">{me.portrait_caption}</figcaption>
+                      <figcaption class="text-base-content/40 mt-2 font-serif text-sm italic">
+                        {me.portrait_caption}
+                      </figcaption>
                     )}
                   </figure>
                 )}
                 {me.headline && (
-                  <p class="mb-2 font-display text-4xl leading-[1.08] font-light sm:text-5xl">{me.headline}</p>
+                  <p class="font-display mb-2 text-4xl leading-[1.08] font-light sm:text-5xl">{me.headline}</p>
                 )}
                 {meBodyHtml && <div class="reading" set:html={meBodyHtml} />}
               </div>
@@ -96,7 +104,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                         <h4 class="font-serif text-2xl">{it.term}</h4>
                         {it.noteHtml && (
                           <div
-                            class="mt-1.5 max-w-xl space-y-2 font-sans text-sm leading-relaxed text-base-content/55 [&_ul]:list-disc [&_ul]:pl-5"
+                            class="text-base-content/55 mt-1.5 max-w-xl space-y-2 font-sans text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"
                             set:html={it.noteHtml}
                           />
                         )}
@@ -108,7 +116,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
             </section>
           )}
 
-          {hasMe && hasSite && <hr class="my-20 border-base-300" />}
+          {hasMe && hasSite && <hr class="border-base-300 my-20" />}
 
           {/* ─────────  ABOUT THE BLOG  ───────── */}
           {hasSite && (
@@ -118,7 +126,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
               </h2>
 
               {site.thesis && (
-                <blockquote class="mt-8 border-l-2 border-base-300 pl-6 font-serif text-xl leading-relaxed text-base-content/80 italic">
+                <blockquote class="border-base-300 text-base-content/80 mt-8 border-l-2 pl-6 font-serif text-xl leading-relaxed italic">
                   {site.thesis}
                 </blockquote>
               )}
@@ -127,7 +135,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
               {(blurbHtml || embedSrc) && (
                 <div class="mt-12">
                   <Label as="h3">About the Name</Label>
-                  <div class="mt-4 rounded-box border border-base-300 bg-base-200 p-6">
+                  <div class="rounded-box border-base-300 bg-base-200 mt-4 border p-6">
                     {blurbHtml && <div class="reading" set:html={blurbHtml} />}
                     {embedSrc && (
                       <iframe
@@ -149,14 +157,14 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
           )}
 
           {/* ─────────  SAY HELLO  ───────── */}
-          <section aria-labelledby="mv-hello" class="mt-20 border-t border-base-300 pt-10">
+          <section aria-labelledby="mv-hello" class="border-base-300 mt-20 border-t pt-10">
             <h2 id="mv-hello">
               <Label as="span">Say hello</Label>
             </h2>
             {contactIntroHtml ? (
               <div class="reading mt-6 max-w-lg" set:html={contactIntroHtml} />
             ) : (
-              <p class="mt-6 max-w-lg font-serif text-lg leading-relaxed text-base-content/70">
+              <p class="text-base-content/70 mt-6 max-w-lg font-serif text-lg leading-relaxed">
                 Have a thought, a question, or a hello? I read everything.
               </p>
             )}
@@ -164,11 +172,10 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
           </section>
 
           {/* Authorship attestation — hardcoded so it is always present. */}
-          <div class="mt-16 border-t border-base-300 pt-6">
-            <p class="font-serif text-sm leading-relaxed text-base-content/55 italic">
-              There is no AI-generated content on this blog; all content is authored, edited, and
-              compiled by me. Claude Code was only used to streamline the development process of the
-              site itself.
+          <div class="border-base-300 mt-16 border-t pt-6">
+            <p class="text-base-content/55 font-serif text-sm leading-relaxed italic">
+              There is no AI-generated content on this blog; all content is authored, edited, and compiled by me. Claude
+              Code was only used to streamline the development process of the site itself.
             </p>
           </div>
         </>

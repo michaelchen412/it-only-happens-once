@@ -86,9 +86,12 @@ test.describe('the month grid', () => {
     expect(text).not.toContain('Mirrored');
     // And a one-source month gets no key at all: a legend over one thing is
     // the repeated label §5 cut, wearing a different hat.
-    const kinds = await page.locator('.month__grid .ev').evaluateAll((els) =>
-      [...new Set(els.map((e) => [...e.classList].find((c) => c.startsWith('ev--') && c !== 'ev--ro')))].length,
-    );
+    const kinds = await page
+      .locator('.month__grid .ev')
+      .evaluateAll(
+        (els) =>
+          [...new Set(els.map((e) => [...e.classList].find((c) => c.startsWith('ev--') && c !== 'ev--ro')))].length,
+      );
     if (kinds <= 1) await expect(page.locator('.legend')).toHaveCount(0);
   });
 });

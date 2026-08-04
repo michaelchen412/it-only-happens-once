@@ -124,10 +124,7 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
     // date only, and the "Then" line is the body — asking the view for the date
     // and then the table for the words would be two queries answering one
     // question, with a window between them where they can disagree.
-    sb
-      .from('interaction_people')
-      .select('person_id, interactions(occurred_on, body)')
-      .in('person_id', ids),
+    sb.from('interaction_people').select('person_id, interactions(occurred_on, body)').in('person_id', ids),
     sb
       .from('person_works')
       .select('person_id, created_at, works(title, authors(name))')
@@ -160,11 +157,22 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
   for (const row of fragmentLinks ?? []) {
     if (shelf.has(row.person_id)) continue;
     const f = row.fragments as unknown as {
-      type: FragmentType; title: string | null; body: string | null; attribution: string | null; deleted_at: string | null;
+      type: FragmentType;
+      title: string | null;
+      body: string | null;
+      attribution: string | null;
+      deleted_at: string | null;
     } | null;
     // A fragment in the trash is not on the shelf — the same rule `sharedFor`
     // keeps, so the brief and the profile can never disagree about what is there.
-    if (f && !f.deleted_at) shelf.set(row.person_id, rowTitle(f).replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim());
+    if (f && !f.deleted_at)
+      shelf.set(
+        row.person_id,
+        rowTitle(f)
+          .replace(/[*_`>#]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      );
   }
 
   return briefs.map((b) => ({

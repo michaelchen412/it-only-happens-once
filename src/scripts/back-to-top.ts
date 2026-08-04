@@ -19,7 +19,7 @@ function scrollTopOf(s: Scroller): number {
 
 function wire(btn: HTMLElement) {
   const sel = btn.dataset.scroller;
-  const scroller: Scroller = sel ? (document.querySelector(sel) as HTMLElement | null) ?? window : window;
+  const scroller: Scroller = sel ? ((document.querySelector(sel) as HTMLElement | null) ?? window) : window;
   if (btn.dataset.btWired) return;
   btn.dataset.btWired = '1';
 
