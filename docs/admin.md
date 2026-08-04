@@ -108,7 +108,7 @@ The deep end. A near-fullscreen `<dialog>` drawer ([`WritingSheet`](../src/compo
 writes to [`fragment_versions`](../supabase/migrations/20260730224623_fragment_versions.sql),
 and the live essay changes only when a human promotes one. Michael's framing:
 *"any number of drafts, and we choose to promote one into the published
-version — like a recipe version manager."* See [plan 07](plans/07-revision-history.md).
+version — like a recipe version manager."* See [plan 07](plans/archive/07-revision-history.md).
 
 A version holds **words only** — title, excerpt, body. Slug, dates, status,
 subjects and constellation membership belong to the fragment, so promoting
@@ -162,8 +162,8 @@ A **note** is a private fragment: a thought that isn't a piece yet. It's a
 `status`, not a type, so `note → draft → published` is one linear promotion
 rather than a migration between kinds — private thought graduating into public
 piece, which is the whole shape of this site. See
-[plan 09](plans/09-offline-and-notes.md) Piece 2 for the tier and
-[plan 14](plans/14-capture.md) for the room that reads it.
+[plan 09](plans/archive/09-offline-and-notes.md) Piece 2 for the tier and
+[plan 14](plans/archive/14-capture.md) for the room that reads it.
 
 **⚠ The interface around this tier was rebuilt on 2026-08-03, and the reason is
 worth keeping.** Notes shipped in July as a *view of the fragment manager*: a
@@ -250,7 +250,7 @@ an uncomfortable third thing between a piece of writing and a scratch line.
 
 **Until 2026-07-31 a blog post physically could not contain a picture** — the
 render path had allowlisted `img` all along, but there was no way to get one in.
-See [plan 03](plans/03-images-in-essays.md).
+See [plan 03](plans/archive/03-images-in-essays.md).
 
 Three ways in, all landing in the same place: the toolbar's **▣** button, a
 **paste** (which is what a screenshot actually is), and **drag-and-drop**. The
@@ -358,7 +358,7 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 
 **✦ Suggest with AI.** Each editor's subject field has a button that sends the fragment's text + the taxonomy (names **and** definitions, read live from the DB) to **Claude Haiku 4.5** and pre-fills the tag input with the existing subjects that apply (capped at 3). The human stays in control — suggestions are ordinary editable chips, and they **merge** with what you already typed rather than replacing it. If the model proposes a *new* subject it appears as a distinct "New subject: X — Add it" affordance that must be **explicitly accepted** (accepting just drops the name into the field; `syncSubjects` mints it on save). Runs server-side ([`suggestSubjects` action](../src/actions/fragments.ts) → [`src/lib/suggest-subjects.ts`](../src/lib/suggest-subjects.ts)) with `ANTHROPIC_API_KEY`; structured output (`zodOutputFormat`) pins picks to the real taxonomy. Absent key → the button degrades to an inline "not configured" message; manual tagging is unaffected. Cost ≈ $0.0015/call.
 
-**All three types, since 2026-07-31** (docs/plans/02) — the server always accepted `kind: 'quote' | 'song' | 'writing'` and branches on it nowhere but the system prompt, so this was only ever a UI gap. One implementation now: [`SubjectsField.astro`](../src/components/admin/SubjectsField.astro) renders the control and [`subject-suggest.ts`](../src/scripts/subject-suggest.ts) wires it, so the three call sites can't drift. What differs between them is only **what text there is to read**:
+**All three types, since 2026-07-31** (docs/plans/archive/02) — the server always accepted `kind: 'quote' | 'song' | 'writing'` and branches on it nowhere but the system prompt, so this was only ever a UI gap. One implementation now: [`SubjectsField.astro`](../src/components/admin/SubjectsField.astro) renders the control and [`subject-suggest.ts`](../src/scripts/subject-suggest.ts) wires it, so the three call sites can't drift. What differs between them is only **what text there is to read**:
 
 - **Quote** — the quote itself. Refuses when empty.
 - **Writing** — title + the **whole body**, in the publish dialog, which is where writing subjects are actually edited and where the preflight is already saying "no subjects". Not an opening slice: measured against the corpus on 2026-07-31, 51 pieces run to a median of 6,107 characters and a maximum of 14,131, against the action's 20,000 cap — so a "first N words" budget would truncate the top decile to save nothing.
@@ -718,7 +718,7 @@ A row's title is plain text here, where in the tasks room it opens the sheet. An
 
 ## 5c. Reading a task out of a sentence
 
-*The parser, [plan 14](plans/14-capture.md) §6. Claude Haiku 4.5, structured
+*The parser, [plan 14](plans/archive/14-capture.md) §6. Claude Haiku 4.5, structured
 output, Zod-validated — the same pattern as ✦ Suggest with AI
 ([ADR 0007](adr/0007-ai-subject-tagging.md)), and the same rule: the model
 proposes, the person disposes.*
@@ -762,7 +762,7 @@ language model is good at and a regex is not.
 
 ### Which row it picks, and why that is not the router §4.21 banned
 
-**[10-hq §4.21](plans/10-hq.md) forbids a model deciding what a captured thought
+**[10-hq §4.21](plans/archive/10-hq.md) forbids a model deciding what a captured thought
 IS**, and the recorded reason is that a router's failure is *silent* — a thought
 filed as the wrong kind disappears into the wrong room. **That ban stands** for
 task vs log entry vs piece.

@@ -32,7 +32,7 @@ Design notes, so this isn't re-derived later:
 The same workflow then archives the **`site` bucket** — the About portrait and
 every image in an essay — under `storage/site/**`, with a `storage/manifest.json`
 recording each object's path, size and md5. Built 2026-07-31, the same day
-[plan 03](plans/03-images-in-essays.md) made essays able to hold pictures.
+[plan 03](plans/archive/03-images-in-essays.md) made essays able to hold pictures.
 
 It exists because of something this page previously got wrong: **`supabase db
 dump` covers `auth.*` and `public.*` and nothing else.** There is no `storage.`
@@ -103,7 +103,7 @@ about it:
 A **Export corpus** link on [`/admin/library`](../src/pages/admin/library.astro)
 downloads the whole corpus as one JSON file: all nine tables, every row,
 `select('*')` so a column added later appears without anyone remembering. Built
-2026-07-31 ([plan 05 Piece 2](plans/05-export-backup.md)). 478 KB and 538 rows
+2026-07-31 ([plan 05 Piece 2](plans/archive/05-export-backup.md)). 478 KB and 538 rows
 at the time of writing.
 
 **Be clear about what it is for, because it is not disaster recovery.** That job
