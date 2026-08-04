@@ -18,7 +18,17 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "verify": "npm run format:check && npm run lint && npm run check && npm run test"
+    "verify": "npm run format:check && npm run lint && npm run check && npm run test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,astro,mjs,js}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,css}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.4",
@@ -49,6 +59,8 @@
     "eslint": "^10.8.0",
     "eslint-plugin-astro": "^3.1.0",
     "globals": "^17.9.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "prettier": "3.9.6",
     "prettier-plugin-astro": "0.14.1",
     "prettier-plugin-tailwindcss": "0.8.1",
