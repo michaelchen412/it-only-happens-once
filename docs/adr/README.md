@@ -36,6 +36,7 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0013](0013-absence-never-accumulates.md) | Absence never accumulates: a recurrence is a rule plus one date, and a row is written only on disposition | Accepted |
 | [0014](0014-calendar-is-one-way.md) | The calendar is one-way: Google reads in, HQ owns the personal, and tags are additive | Accepted |
 | [0015](0015-admin-root-becomes-today.md) | `/admin` becomes Today; the Fragment Manager moves to `/admin/fragments`; the building is the Observatory | Accepted |
+| [0016](0016-hq-layering.md) | HQ's three layers — rules are pure, loaders gather, pages render; routing belongs to the page | Accepted |
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —

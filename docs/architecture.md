@@ -2,16 +2,23 @@
 
 *How the site is assembled and rendered. Companion to [`data-model.md`](data-model.md) and [`auth.md`](auth.md). Decisions are recorded in [`adr/`](adr/).*
 
+⚠ **This file describes the app as it stands today.** When something changes,
+this changes with it — the historical record of *why* a thing is the way it is
+lives in [`adr/`](adr/), and a superseded narrative left here is worse than no
+narrative, because it reads as current. *(Rule set 2026-08-04, after this file
+spent a week describing a pre-HQ app that used an editor we had replaced.)*
+
 ---
 
 ## 1. What the system is
 
-One Astro application with two audiences:
+One Astro application with **three** surfaces:
 
-- **The public site** — read-only, fast, cacheable. Currently: the **blog** (an index of writing, quotes, and music). Later: the **Sky** (constellation navigation) and **About**.
-- **The admin** (`/admin`) — a private, auth-gated dashboard where Michael creates and edits content. Built **incrementally**.
+- **The public site** — read-only, fast, cacheable. The **blog** (writing, quotes and music, with search and subject filters), the **Sky** (constellation navigation), and **About**.
+- **The Workshop** (`/admin/fragments` and its neighbours) — where the corpus is written and groomed: the fragment manager, the composer, constellations, the Library, the About builder.
+- **HQ** (`/admin`, `/admin/people`, `/admin/agenda`, `/admin/notes`) — a private daily dashboard: the morning check-in, the people you are seeing, the agenda, brain dumps. It is a **second domain**, not a feature of the first ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)): its tables carry no `anon` policy and nothing in it ever becomes public content.
 
-Both are the same Astro app, sharing the design system and components. They differ in rendering mode and access.
+All three are the same Astro app, sharing the design system and components. The building the two private halves live in is the **Observatory**, and its front door is Today ([ADR 0015](adr/0015-admin-root-becomes-today.md)).
 
 ## 2. Stack
 
@@ -62,27 +69,52 @@ Admin write:
 | DB access | anon key, RLS = published only | user session, RLS = admin write |
 | Build cadence | independent of content changes (SSR reads live data) | — |
 
-## 6. Incremental admin roadmap
+⚠ **The HQ tables are a third case and are stricter than "admin".** They carry
+**no `anon` policy at all** — private by omission rather than by a rule that
+could be edited wrongly ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)).
+The one seam between the halves runs in a single direction: a person's profile
+renders public fragments they shared with you. Nothing private ever becomes
+public content.
 
-The admin is built in shippable slices, not all at once. Full design in [`admin.md`](admin.md).
+## 6. The private half, as built
 
-1. **Fragment list + quote/song quick-editors** — the unified list (filter/search/sort/bulk) plus the two light types. Songs auto-fill from a Spotify or YouTube link (Spotify Web API, with keyless oEmbed as the fallback — see [admin.md](admin.md) §6).
-2. **Writing composer** — create / edit / publish a `writing` fragment: WYSIWYG-that-stores-Markdown, backdatable posted date, excerpt. This slice replaces Squarespace for posting *and* is the on-ramp for migrating the existing essays (§8).
-3. **Subjects** — created inline (typeahead) in every editor from slice 1 onward; a management screen comes only if the tag set needs grooming.
-4. **Constellations & placement** — create constellations, place fragments, order the suite (`position`). Deferred to ship *with the Sky*, where that UI belongs; the on-ramp toward the "synthesis instrument" in `vision.md`.
-5. **Gathering aids** — further import helpers (Spotify Web API for artist/album, quote capture) to reduce context-switching.
+Both halves are shipped. Full design in [`admin.md`](admin.md).
 
-Editing architecture (Astro Actions + Milkdown) is [ADR 0005](adr/0005-admin-editing-architecture.md).
+**The Workshop** — the fragment manager (filter / search / sort / bulk), the writing composer (TipTap, storing Markdown — [ADR 0006](adr/0006-composer-editor-tiptap.md)), quote and song quick-editors with Spotify/YouTube auto-fill, draft versions and promotion ([ADR 0010](adr/0010-online-first-writing.md)), constellations and placement, the Library (subjects / authors / works), and the About builder.
 
-## 7. Public build order (matches `vision.md`)
+**HQ** — Today (the check-in, the day, coming up, people, practice, past due), People (roster, profiles, interactions, drift), the Agenda (calendar, tasks, goals), and Notes. Its three load-bearing decisions: absence never accumulates ([ADR 0013](adr/0013-absence-never-accumulates.md)), the Google calendar mirror is one-way ([ADR 0014](adr/0014-calendar-is-one-way.md)), and HQ is private by construction ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)).
 
-1. Schema + RLS live in Supabase; **migrate the existing Squarespace essays** in.
-2. Public blog: writing-by-date list (the stream) + individual post pages (the `/reading` layout renders one `writing` fragment).
-3. Quote and music indexes (their own view shapes — not infinite scroll).
-4. Search + filters (the retrieval chrome).
-5. Admin slices, per §6.
+Editing architecture (Astro Actions, and a WYSIWYG that stores Markdown) is [ADR 0005](adr/0005-admin-editing-architecture.md); the editor itself is TipTap, which supersedes 0005's original choice.
 
-The **Sky** is a later, separate effort.
+### How the private code is layered
+
+[ADR 0016](adr/0016-hq-layering.md), in one table:
+
+| Layer | Where | May import | Must not |
+|---|---|---|---|
+| **Rules** — pure, tested, run on both sides | `src/lib/hq/{today,tasks,dates,time,goals,recurrence,checkin,drift}.ts` | other rule modules | a Supabase client, at runtime |
+| **Loaders** — queries and shaping | `src/lib/hq/{today-data,brief,links}.ts` | rules; Supabase as a **type** | rendering concerns |
+| **Actions** — the one write path | `src/actions/*.ts` | rules, `_shared.ts` | the service-role key |
+| **Pages & zones** — render | `src/pages/admin/`, `src/components/admin/` | all of the above | build a view-model of their own |
+
+Three conventions fall out of it and are worth stating separately:
+
+- **A local date is a `YYYY-MM-DD` string, never a `Date`.** `new Date('2026-08-01')` is midnight UTC, so `.getDate()` gives 31 July west of Greenwich. `src/lib/hq/time.ts` is the only place that decides what day it is, and the zone is a row in `settings` rather than the server's clock.
+- **Nothing renders UTC on screen.** Server-rendered stamps use the configured home zone; `src/scripts/local-time.ts` then rewrites them into the reader's device zone. The browser may say what o'clock it was, never what day.
+- **A module that reaches the browser imports Supabase as a type only**, and takes its client as an argument.
+
+### The write path
+
+Every mutation is an [Astro Action](https://docs.astro.build/en/guides/actions/) in `src/actions/`, composed by `index.ts` — *add a namespace by adding a file, never by growing the index*. Handlers run on `ctx.locals.supabase`, the caller's cookie-session client, so **RLS is the trust boundary and an action is a validation layer, not a security one**. `requireAdmin` is used where an action does not touch an RLS-protected table (the AI parser, the Spotify lookup), and as a readable refusal elsewhere.
+
+Client scripts (`src/scripts/`) are plain TypeScript modules imported by a page's `<script>` — no UI framework, no hydration. The DOM is the state: a selected segment lives in `aria-pressed`, a date lives in the date input, and there is no JavaScript copy of a form beside the form.
+
+## 7. The public surfaces, as built
+
+- **The Sky** (`/`) — the constellation overview; `/{slug}` is one constellation as a typeset suite. Canonical and shareable: the zoom is navigation, and home *is* the overview (`design.md` §13).
+- **The blog** (`/blog`) — writing by date, with quote and music indexes in their own view shapes, plus search and subject filters ([`search.md`](search.md)).
+- **A single piece** (`/blog/[slug]`) — the `/reading` layout, rendering one `writing` fragment. An unpublished one is visible to the admin behind a preview bar and 404s for everyone else.
+- **About** (`/about`) — built from the About builder, with a contact form (Resend + Cloudflare Turnstile).
 
 ## 8. Migration
 
@@ -94,27 +126,60 @@ This **revised** the earlier "migrate through the composer" plan: once we knew t
 
 **Deferred:** the `/journal/` (424 short dailies) and `/for-someone/` (49 personal letters) sections — each wants its own treatment/surface and privacy decision, not the essay feed.
 
-## 9. Directory structure (target)
+## 9. Directory structure
+
+As it stands. *(This section describes the tree today; history lives in the ADRs.)*
 
 ```
 src/
-  styles/app.css           ← single source of truth (theme, type, base)
-  layouts/                 ← Base.astro, PostLayout, AdminLayout
-  components/              ← FragmentCard, Timestamp, … (design-system primitives)
+  styles/app.css           ← single source of truth (theme, type, base, every component class)
+  layouts/                 ← Base · SiteLayout (public) · AdminLayout (the Observatory)
+  components/              ← public primitives: PostCard, Reader, Timestamp, StarMark, …
+    admin/                 ← private ones: Zone, PageHeader, the *Sheet dialogs, the *Zone cards
   lib/
     supabase.ts            ← client factories (browser / server session via @supabase/ssr)
-    fragments.ts           ← typed queries
+    database.types.ts      ← GENERATED from the live schema; never hand-edit
+    blog.ts, media.ts, markdown.ts, fragment-query.ts, …   ← the corpus half
+    hq/                    ← the private half: rules, then loaders (ADR 0016)
+  actions/                 ← the one write path; index.ts only composes (ADR 0005)
+  scripts/                 ← client-side modules, imported by a page's <script>
   pages/
-    index.astro            ← home
-    blog/                  ← the public blog (list + [slug])
-    admin/                 ← auth-gated dashboard (prerender = false)
-    auth/callback.astro    ← OAuth code exchange → session cookies
+    index.astro            ← the Sky (constellation overview)
+    [slug].astro           ← one constellation
+    blog/, about, reading, constellations, styleguide
+    admin/                 ← Today (index), people/, agenda/, notes, fragments, library, …
+    auth/callback.ts       ← OAuth code exchange → session cookies
+  tests/                   ← vitest: pure functions only (*.test.ts)
   middleware.ts            ← Supabase session refresh + /admin route protection
-docs/                      ← this folder
-supabase/
-  migrations/              ← SQL migrations (schema + RLS)
-astro.config.mjs           ← integrations: icon(); adapter: vercel; output: server; fonts
+tests/e2e/                 ← Playwright, against the live project — read-only by construction
+docs/                      ← this folder; adr/ holds the decisions
+supabase/migrations/       ← SQL migrations (schema + RLS)
+scripts/                   ← one-off Node tooling (imports, backfills, build checks)
 ```
+
+## 9a. Working on it
+
+```
+npm run dev        astro dev
+npm run verify     format:check + lint + astro check + test   ← before pushing
+npm run test       vitest (pure functions)
+npm run test:e2e   Playwright — needs a dev server and a real admin session
+npm run format     prettier across the tree
+```
+
+**`npm run verify` is the gate.** A pre-commit hook (husky + lint-staged) formats
+and lints *staged files only* — deliberately not the test suite, because a slow
+hook is a bypassed hook. Formatting is Prettier's alone; ESLint carries no style
+rule.
+
+⚠ **Green checks are necessary and nowhere near sufficient.** Twice, work has
+shipped with a clean typecheck, a clean build and green unit tests and been
+broken within ten minutes of a human using it. Anything whose behaviour depends
+on state a compiler cannot see — network conditions, dialogs, sessions, the
+authenticated admin — wants the e2e harness or a real look.
+
+⚠ **`.git-blame-ignore-revs`** lists the whole-tree reformat of 2026-08-04.
+Turn it on once per clone: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## 10. Environment & secrets
 
