@@ -14,7 +14,6 @@
 //    units renders half a character.
 import { describe, expect, it } from 'vitest';
 import {
-  daysBetween,
   daysToMonths,
   hueFor,
   knownFor,
@@ -157,21 +156,6 @@ describe('knownFor', () => {
 
   it('is absent when unknown', () => {
     expect(knownFor(null, '2026-08-02')).toBeNull();
-  });
-});
-
-describe('daysBetween', () => {
-  it('counts whole days forward and back', () => {
-    expect(daysBetween('2026-08-02', '2026-08-20')).toBe(18);
-    expect(daysBetween('2026-08-20', '2026-08-02')).toBe(-18);
-  });
-
-  // The recurring bug in this codebase: a local date is a string, and doing the
-  // arithmetic on a `Date` built in the server's zone loses or gains a day
-  // across a DST boundary. `ymdToUtc` is why this holds.
-  it('is not thrown off by a DST boundary', () => {
-    expect(daysBetween('2026-03-07', '2026-03-09')).toBe(2);
-    expect(daysBetween('2026-10-31', '2026-11-02')).toBe(2);
   });
 });
 

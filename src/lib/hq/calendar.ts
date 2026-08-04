@@ -24,6 +24,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types';
 import { spans } from './mirror';
+import { one } from './relations';
 import type { Ymd } from './time';
 
 export type ItemKind = 'event' | 'task' | 'mirror' | 'birthday';
@@ -206,7 +207,7 @@ export async function mirroredBetween(sb: SupabaseClient<Database>, from: Ymd, t
 
   const bySeries = new Map<string, { id: string; name: string }[]>();
   for (const t of tags ?? []) {
-    const p = t.people as unknown as { id: string; display_name: string } | null;
+    const p = one<{ id: string; display_name: string }>(t.people);
     if (!t.external_id || !p) continue;
     const list = bySeries.get(t.external_id) ?? [];
     list.push({ id: p.id, name: p.display_name });

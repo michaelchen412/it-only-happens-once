@@ -133,6 +133,24 @@ export function shiftYmd(ymd: Ymd, n: number): Ymd {
 }
 
 /**
+ * Whole days from `a` to `b`, both local dates. Negative if `b` is earlier.
+ *
+ * ⚠ THROUGH `ymdToUtc`, WHICH IS WHY IT SURVIVES DST. Both operands become
+ * UTC-midnight calendar positions before subtracting, so a span crossing a
+ * clock change is still a whole number of days — where subtracting two local
+ * instants would give 23.0 or 25.0 hours and round to the wrong answer twice a
+ * year. `Math.round` then absorbs nothing but floating-point dust.
+ *
+ * Lived in `people.ts` until 2026-08-04 and was imported from there by `today`,
+ * `drift`, `goals` and `interactions`, while `tasks.ts` quietly kept a second
+ * copy by a different route. It is generic calendar arithmetic, so it belongs
+ * beside `shiftYmd` rather than inside a domain module.
+ */
+export function daysBetween(a: Ymd, b: Ymd): number {
+  return Math.round((ymdToUtc(b).getTime() - ymdToUtc(a).getTime()) / 86_400_000);
+}
+
+/**
  * How far ahead of UTC `tz` is at a given instant, in milliseconds.
  *
  * There is no direct API for this, so it is read back out of a formatter: ask

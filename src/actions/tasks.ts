@@ -21,49 +21,30 @@
 import { defineAction } from 'astro:actions';
 import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
-import { fail, requireAdmin, type DB } from './_shared';
+import { blankToUndef, fail, optHhmm, optInt, optUuid, optYmd, requireAdmin, type DB } from './_shared';
 import { homeTimezone, localToday, parseYmd } from '../lib/hq/time';
 import { PRESETS, rruleFor } from '../lib/hq/recurrence';
 import { advance } from '../lib/hq/tasks';
 
-const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
-
-const ymd = z.preprocess(
-  blankToUndef,
-  z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-    .optional(),
-);
-/** `<input type="time">` gives HH:MM, and some browsers add :SS. */
-const hhmm = z.preprocess(
-  blankToUndef,
-  z
-    .string()
-    .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM')
-    .optional(),
-);
-const optCount = z.preprocess(blankToUndef, z.coerce.number().int().optional());
-
 const input = z.object({
   /** Absent on create. */
-  id: z.preprocess(blankToUndef, z.string().uuid().optional()),
+  id: optUuid,
   title: z.string().trim().min(1, 'A task needs a name.').max(300),
   notes: z.preprocess(blankToUndef, z.string().max(20_000).optional()),
-  dueOn: ymd,
-  dueTime: hhmm,
+  dueOn: optYmd,
+  dueTime: optHhmm,
   priority: z.enum(['low', 'normal', 'high']).default('normal'),
   effort: z.enum(['quick', 'sitting', 'block', 'project']).default('sitting'),
   /** Blank = derive from effort. Set = the override that always wins (§3a). */
-  leadDays: optCount,
+  leadDays: optInt,
   repeat: z.enum(['none', 'after', 'fixed']).default('none'),
   /** `after` only. */
-  every: optCount,
+  every: optInt,
   unit: z.enum(['days', 'weeks', 'months']).optional(),
   /** `fixed` only — a preset key, never a rule string. */
   preset: z.enum(PRESETS as unknown as [string, ...string[]]).optional(),
   /** Optional, and blank is a real answer — "belongs to no goal" (§4a). */
-  goalId: z.preprocess(blankToUndef, z.string().uuid().optional()),
+  goalId: optUuid,
 });
 
 type Input = z.infer<typeof input>;

@@ -23,7 +23,7 @@ import {
   ordinal,
   shiftMonth,
 } from '../lib/hq/dates';
-import { deviceZoneNote, isValidTimezone, localToday, parseYmd, shiftYmd, ymdOf } from '../lib/hq/time';
+import { daysBetween, deviceZoneNote, isValidTimezone, localToday, parseYmd, shiftYmd, ymdOf } from '../lib/hq/time';
 
 describe('ordinal', () => {
   it('handles the ordinary cases', () => {
@@ -255,5 +255,22 @@ describe('elapsedSince', () => {
   it('says nothing at all for a value that is not a timestamp', () => {
     expect(elapsedSince('', NOW)).toBe('');
     expect(elapsedSince('not a date', NOW)).toBe('');
+  });
+});
+
+// Moved here from hq-people.test.ts with the function itself (plan 00 ·
+// Piece 7): it is generic calendar arithmetic, not a fact about people.
+describe('daysBetween', () => {
+  it('counts whole days forward and back', () => {
+    expect(daysBetween('2026-08-02', '2026-08-20')).toBe(18);
+    expect(daysBetween('2026-08-20', '2026-08-02')).toBe(-18);
+  });
+
+  // The recurring bug in this codebase: a local date is a string, and doing the
+  // arithmetic on a `Date` built in the server's zone loses or gains a day
+  // across a DST boundary. `ymdToUtc` is why this holds.
+  it('is not thrown off by a DST boundary', () => {
+    expect(daysBetween('2026-03-07', '2026-03-09')).toBe(2);
+    expect(daysBetween('2026-10-31', '2026-11-02')).toBe(2);
   });
 });

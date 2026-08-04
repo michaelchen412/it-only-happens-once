@@ -18,6 +18,7 @@
 // join for a policy to have to get right.
 import type { Database } from '../database.types';
 import { rowTitle, type FragmentType } from '../fragments-display';
+import { one } from './relations';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type DB = SupabaseClient<Database>;
@@ -146,14 +147,14 @@ export async function sharedFor(sb: DB, personId: string): Promise<Shared> {
 
   const works = (workLinks ?? [])
     .map((row) => {
-      const w = row.works as unknown as {
+      const w = one<{
         id: string;
         slug: string;
         title: string;
         kind: string | null;
         year: number | null;
         authors: { name: string } | null;
-      } | null;
+      }>(row.works);
       return w ? { link: row, work: w } : null;
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
@@ -182,7 +183,7 @@ export async function sharedFor(sb: DB, personId: string): Promise<Shared> {
   const direct = (fragmentLinks ?? [])
     .map((row) => ({
       note: row.note,
-      f: row.fragments as unknown as (FragmentBits & { deleted_at: string | null }) | null,
+      f: one<FragmentBits & { deleted_at: string | null }>(row.fragments),
     }))
     .filter(
       (x): x is { note: string | null; f: FragmentBits & { deleted_at: string | null } } => !!x.f && !x.f.deleted_at,
@@ -236,7 +237,7 @@ export async function pickerOptions(sb: DB): Promise<{ works: WorkOption[]; frag
     works: (works ?? []).map((w) => ({
       id: w.id,
       title: w.title,
-      authorName: (w.authors as unknown as { name: string } | null)?.name ?? null,
+      authorName: one<{ name: string }>(w.authors)?.name ?? null,
       year: w.year,
     })),
     fragments: (fragments ?? []).map((f) => ({

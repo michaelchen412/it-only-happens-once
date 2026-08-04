@@ -26,9 +26,9 @@
 //     below, and `seenToday` optional so no existing caller had to change.
 //     The morning you are finally seeing somebody again, they no longer sit
 //     under "Been a while" accusing you of it while you are on your way out.
-import { daysBetween, type Person } from './people';
+import { type Person } from './people';
 import type { LastContact } from './interactions';
-import type { Ymd } from './time';
+import { daysBetween, type Ymd } from './time';
 
 /** Today, capped at three, most-drifted first — the roster holds the full list. */
 export const TODAY_DRIFT_CAP = 3;

@@ -26,6 +26,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types';
 import { rowTitle, type FragmentType } from '../fragments-display';
+import { one } from './relations';
 import type { Person } from './people';
 import type { Ymd } from './time';
 
@@ -87,8 +88,8 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
   const people = new Map<string, Person>();
   const events = new Map<string, Brief['event'][]>();
   for (const row of tagged ?? []) {
-    const person = row.people as unknown as Person | null;
-    const event = row.events as unknown as { id: string; title: string; starts_at: string | null } | null;
+    const person = one<Person>(row.people);
+    const event = one<{ id: string; title: string; starts_at: string | null }>(row.events);
     if (!person || !event) continue;
     // Archived: they were deliberately removed from the roster, and a brief is
     // the roster speaking. The event itself still renders in the agenda zone.
@@ -139,7 +140,7 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
 
   const last = new Map<string, { on: Ymd; body: string }>();
   for (const row of entries ?? []) {
-    const e = row.interactions as unknown as { occurred_on: string; body: string } | null;
+    const e = one<{ occurred_on: string; body: string }>(row.interactions);
     if (!e) continue;
     const held = last.get(row.person_id);
     if (!held || e.occurred_on > held.on) last.set(row.person_id, { on: e.occurred_on as Ymd, body: e.body });
@@ -151,18 +152,18 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
   const shelf = new Map<string, string>();
   for (const row of workLinks ?? []) {
     if (shelf.has(row.person_id)) continue;
-    const w = row.works as unknown as { title: string; authors: { name: string } | null } | null;
+    const w = one<{ title: string; authors: { name: string } | null }>(row.works);
     if (w) shelf.set(row.person_id, w.authors?.name ? `${w.title} — ${w.authors.name}` : w.title);
   }
   for (const row of fragmentLinks ?? []) {
     if (shelf.has(row.person_id)) continue;
-    const f = row.fragments as unknown as {
+    const f = one<{
       type: FragmentType;
       title: string | null;
       body: string | null;
       attribution: string | null;
       deleted_at: string | null;
-    } | null;
+    }>(row.fragments);
     // A fragment in the trash is not on the shelf — the same rule `sharedFor`
     // keeps, so the brief and the profile can never disagree about what is there.
     if (f && !f.deleted_at)

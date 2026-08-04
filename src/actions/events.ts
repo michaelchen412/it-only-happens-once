@@ -13,26 +13,18 @@
 // ============================================================================
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { fail, requireAdmin, type DB } from './_shared';
+import { blankToUndef, fail, optHhmm, optUuid, requireAdmin, type DB } from './_shared';
 import { homeTimezone, localToday, parseYmd } from '../lib/hq/time';
-
-const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
-const hhmm = z.preprocess(
-  blankToUndef,
-  z
-    .string()
-    .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM')
-    .optional(),
-);
 
 const input = z.object({
   /** Absent on create. */
-  id: z.preprocess(blankToUndef, z.string().uuid().optional()),
+  id: optUuid,
   title: z.string().trim().min(1, 'An event needs a name.').max(300),
+  // Required rather than `optYmd`: an event with no date is not an event.
   startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
   /** Blank = all day. */
-  startsAt: hhmm,
-  endsAt: hhmm,
+  startsAt: optHhmm,
+  endsAt: optHhmm,
   location: z.preprocess(blankToUndef, z.string().max(300).optional()),
   notes: z.preprocess(blankToUndef, z.string().max(10_000).optional()),
   /** Who is there — replaces the whole list, like `interactions`. */

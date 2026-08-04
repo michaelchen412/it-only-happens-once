@@ -10,7 +10,7 @@
 //
 // NO SUPABASE IMPORT. This module reaches the browser bundle.
 import { afterCompletion, nextAfter, type Unit } from './recurrence';
-import { shiftYmd, type Ymd } from './time';
+import { daysBetween, shiftYmd, type Ymd } from './time';
 
 export type Effort = 'quick' | 'sitting' | 'block' | 'project';
 export type Priority = 'low' | 'normal' | 'high';
@@ -101,9 +101,6 @@ export const GROUPS: readonly { key: GroupKey; title: string }[] = [
   { key: 'later', title: 'Later' },
   { key: 'none', title: 'Unscheduled' },
 ] as const;
-
-const daysBetween = (a: Ymd, b: Ymd) =>
-  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 
 export function groupOf(dueOn: Ymd | null, today: Ymd): GroupKey {
   if (!dueOn) return 'none';

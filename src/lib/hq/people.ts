@@ -14,7 +14,7 @@
 import type { Database } from '../database.types';
 import { slugify } from '../slug';
 import { nextOccurrence } from './dates';
-import { ymdToUtc, type Ymd } from './time';
+import { daysBetween, ymdToUtc, type Ymd } from './time';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Person = Database['public']['Tables']['people']['Row'];
@@ -157,11 +157,6 @@ export function monogram(displayName: string): string {
  */
 export function personSlug(displayName: string): string {
   return slugify(displayName) || 'person';
-}
-
-/** Whole days from `a` to `b`, both local dates. Negative if `b` is earlier. */
-export function daysBetween(a: Ymd, b: Ymd): number {
-  return Math.round((ymdToUtc(b).getTime() - ymdToUtc(a).getTime()) / 86_400_000);
 }
 
 export interface UpcomingBirthday {

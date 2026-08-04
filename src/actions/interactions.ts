@@ -14,14 +14,14 @@
 // ============================================================================
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { fail, requireAdmin, type DB } from './_shared';
+import { fail, optUuid, requireAdmin, type DB } from './_shared';
 import { homeTimezone, localToday, parseYmd, type Ymd } from '../lib/hq/time';
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
 const input = z.object({
   /** Absent on create. */
-  id: z.preprocess((v) => (v === '' || v == null ? undefined : v), z.string().uuid().optional()),
+  id: optUuid,
   /** Whose profile this was logged from. Always a participant. */
   personId: z.string().uuid(),
   /** Everyone else who was there. */

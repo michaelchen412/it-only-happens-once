@@ -19,7 +19,7 @@
 // NO SUPABASE IMPORT. This module reaches the browser bundle.
 import { byTime, type CalendarItem } from './calendar';
 import { since } from './interactions';
-import { daysBetween } from './people';
+import { daysBetween } from './time';
 import { leadFor, leadStart, type Effort, type Priority } from './tasks';
 import type { Ymd } from './time';
 

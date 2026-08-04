@@ -18,14 +18,12 @@
 // ============================================================================
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { fail, requireAdmin, type DB } from './_shared';
+import { blankToUndef, fail, optUuid, requireAdmin, type DB } from './_shared';
 import { ACTIVE_CAP, goalSlug } from '../lib/hq/goals';
-
-const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
 
 const input = z.object({
   /** Absent on create. */
-  id: z.preprocess(blankToUndef, z.string().uuid().optional()),
+  id: optUuid,
   name: z.string().trim().min(1, 'A goal needs a name.').max(200),
   /** Markdown: what this is actually for. */
   why: z.preprocess(blankToUndef, z.string().max(10_000).optional()),

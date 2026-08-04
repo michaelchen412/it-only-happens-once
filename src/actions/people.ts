@@ -18,7 +18,7 @@
 // the real work. This layer validates and converts; it is not the boundary.
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { fail, requireAdmin, type DB } from './_shared';
+import { fail, optUuid, requireAdmin, type DB } from './_shared';
 import { monthsToDays, personSlug, PHOTO_BUCKET } from '../lib/hq/people';
 
 /**
@@ -44,7 +44,7 @@ const nullableInt = (min: number, max: number) =>
 
 const facts = z.object({
   /** Absent on create. The client does not mint ids here — the database does. */
-  id: z.preprocess((v) => (v === '' || v == null ? undefined : v), z.string().uuid().optional()),
+  id: optUuid,
 
   displayName: z.string().trim().min(1, 'A name is the one thing this needs.').max(120),
   circle: z.enum(['family', 'friends', 'professional']),

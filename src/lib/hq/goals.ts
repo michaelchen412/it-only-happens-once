@@ -13,7 +13,7 @@
 //
 // NO SUPABASE IMPORT — this module reaches the browser bundle.
 import { slugify } from '../slug';
-import { daysBetween } from './people';
+import { daysBetween } from './time';
 import type { Ymd } from './time';
 
 export type GoalStatus = 'active' | 'paused' | 'achieved' | 'let_go';

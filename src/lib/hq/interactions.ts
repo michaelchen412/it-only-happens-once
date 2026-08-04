@@ -5,7 +5,7 @@
 // append to. What they share is `since()`, which lives here because this is the
 // module that owns the thing being measured.
 import type { Database } from '../database.types';
-import { daysBetween } from './people';
+import { daysBetween } from './time';
 import type { Ymd } from './time';
 
 export type Interaction = Database['public']['Tables']['interactions']['Row'];

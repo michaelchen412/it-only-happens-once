@@ -14,11 +14,40 @@ import type { Database } from '../lib/database.types';
 export type DB = SupabaseClient<Database>;
 
 // --- Zod helpers: empty form fields arrive as '' — treat them as absent ------
-const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
+//
+// ⚠ USE THESE. Three action modules had re-declared `blankToUndef` verbatim and
+// two had written `hhmm` byte-identically, because it was private here and easy
+// to retype. It is exported now for exactly that reason: a validation helper
+// that is cheaper to copy than to import will be copied.
+export const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
 export const optText = z.preprocess(blankToUndef, z.string().optional());
 export const optUrl = z.preprocess(blankToUndef, z.string().url('That doesn’t look like a URL').optional());
 export const optInt = z.preprocess(blankToUndef, z.coerce.number().int().optional());
 export const optUuid = z.preprocess(blankToUndef, z.string().uuid().optional());
+
+/**
+ * The two scalars HQ passes around as strings rather than as `Date`s.
+ *
+ * A local date is `YYYY-MM-DD` and a wall-clock time is `HH:MM`, both for the
+ * reasons `src/lib/hq/time.ts` opens with: a `Date` has a zone to get wrong and
+ * these do not. The regexes are the wire format's own shape — the semantic
+ * check ("is 31 February a day?") is `parseYmd`'s job, not Zod's.
+ */
+export const optYmd = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+    .optional(),
+);
+/** `<input type="time">` gives HH:MM, and some browsers add :SS. */
+export const optHhmm = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Expected HH:MM')
+    .optional(),
+);
 /**
  * A comma-joined id list where EMPTY is a meaningful value, not absence
  * ("belongs to no constellation"). Astro's form→object step turns a blank
