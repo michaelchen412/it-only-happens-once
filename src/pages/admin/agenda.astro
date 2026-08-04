@@ -23,6 +23,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../components/admin/AgendaTabs.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
 import TagSheet from '../../components/admin/TagSheet.astro';
 import { today as hqToday, parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
 import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
@@ -163,49 +164,66 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
   <div class="mx-auto w-full max-w-6xl px-4 py-6 pb-24 sm:px-6">
     <AgendaTabs active="calendar" />
 
-    <header class="mb-4 flex flex-wrap items-center gap-3">
-      <h1 class="font-display text-2xl font-light">
-        {week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}
-      </h1>
-      <span class="flex items-center">
-        <a
-          class="navb"
-          href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
-          aria-label={week ? 'Previous week' : 'Previous month'}
-        >
-          <Icon name="ph:caret-left" />
-        </a>
-        <a
-          class="navb"
-          href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
-          aria-label={week ? 'Next week' : 'Next month'}
-        >
-          <Icon name="ph:caret-right" />
-        </a>
-      </span>
-      {
-        /* Being on another month must never be ambiguous — the same rule the
-           date bar follows on Today. */
-        (week ? todayYmd < weekCells[0] || todayYmd > weekCells[6] : anchor.slice(0, 7) !== todayYmd.slice(0, 7)) && (
-          <a class="chip u-none" href={href({ date: null })}>
-            ↩ Today
+    {
+      /* The `title` slot rather than the `title` prop: this room's heading is
+         a period, not a name, and it travels with the two step arrows and the
+         way back. Those belong beside it — moving them to `actions` would put
+         "previous month" at the far end of the bar, away from the month it
+         steps. The slot exists for exactly this. */
+    }
+    <PageHeader class="mb-4">
+      <div slot="title" class="flex flex-wrap items-center gap-3">
+        <h1 class="font-display text-2xl font-light">
+          {week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}
+        </h1>
+        <span class="flex items-center">
+          <a
+            class="navb"
+            href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
+            aria-label={week ? 'Previous week' : 'Previous month'}
+          >
+            <Icon name="ph:caret-left" />
           </a>
-        )
-      }
-      <span class="ml-auto flex items-center gap-2">
-        <span class="pseg pseg--fit" role="group" aria-label="View">
-          <a class="pseg__b" href={href({ view: null })} aria-pressed={!week}>Month</a>
-          <a class="pseg__b" href={href({ view: 'week' })} aria-pressed={week}>Week</a>
+          <a
+            class="navb"
+            href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
+            aria-label={week ? 'Next week' : 'Next month'}
+          >
+            <Icon name="ph:caret-right" />
+          </a>
         </span>
-        <button
-          type="button"
-          data-open-event-sheet={openDay ?? anchor}
-          class="btn btn-sm zone__cta cn-amber gap-1 font-sans"
-        >
-          <Icon name="ph:plus" /> New event
-        </button>
+        {
+          /* Being on another month must never be ambiguous — the same rule the
+             date bar follows on Today. */
+          (week ? todayYmd < weekCells[0] || todayYmd > weekCells[6] : anchor.slice(0, 7) !== todayYmd.slice(0, 7)) && (
+            <a class="chip u-none" href={href({ date: null })}>
+              ↩ Today
+            </a>
+          )
+        }
+      </div>
+
+      {
+        /* ⚠ `aria-current`, NEVER `aria-pressed`. These are real links to
+           `?view=week` — navigation, not a toggle — and `aria-pressed` is only
+           valid on `role="button"`, so on an `<a>` it is ignored or announced
+           wrongly. `AgendaTabs.astro` three lines up already gets this right,
+           which is what made the inconsistency worth fixing rather than
+           tolerating (plans/00-groundwork.md · Piece 9). */
+      }
+      <span slot="actions" class="pseg pseg--fit" role="group" aria-label="View">
+        <a class="pseg__b" href={href({ view: null })} aria-current={!week ? 'true' : undefined}>Month</a>
+        <a class="pseg__b" href={href({ view: 'week' })} aria-current={week ? 'true' : undefined}>Week</a>
       </span>
-    </header>
+      <button
+        slot="actions"
+        type="button"
+        data-open-event-sheet={openDay ?? anchor}
+        class="btn btn-sm zone__cta cn-amber gap-1 font-sans"
+      >
+        <Icon name="ph:plus" /> New event
+      </button>
+    </PageHeader>
 
     {
       error && (

@@ -21,6 +21,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
 import PersonSheet from '../../components/admin/PersonSheet.astro';
 import { today as hqToday } from '../../lib/hq/time';
 import { dmd } from '../../lib/hq/dates';
@@ -98,22 +99,19 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
 
 <AdminLayout title="People" active="people">
   <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
-    <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
-      <h1 class="font-display text-2xl font-light">People</h1>
-      <div class="flex items-center gap-2">
-        {
-          roster.length > SEARCH_APPEARS_ABOVE && (
-            <label class="search">
-              <Icon name="ph:magnifying-glass" class="opacity-45" />
-              <input type="search" id="people-search" placeholder="Find someone…" aria-label="Find someone" />
-            </label>
-          )
-        }
-        <button type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure gap-1 font-sans">
-          <Icon name="ph:plus" /> Add
-        </button>
-      </div>
-    </header>
+    <PageHeader title="People" class="pt-1">
+      {
+        roster.length > SEARCH_APPEARS_ABOVE && (
+          <label slot="actions" class="search">
+            <Icon name="ph:magnifying-glass" class="opacity-45" />
+            <input type="search" id="people-search" placeholder="Find someone…" aria-label="Find someone" />
+          </label>
+        )
+      }
+      <button slot="actions" type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure gap-1 font-sans">
+        <Icon name="ph:plus" /> Add
+      </button>
+    </PageHeader>
 
     {
       error && (

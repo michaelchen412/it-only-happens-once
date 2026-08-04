@@ -2771,13 +2771,27 @@ a.row__t:hover {
   background: var(--color-base-200);
 }
 /* TRAP 6 again. These come AFTER `:hover` and carry their own, or the segment
-   you just tapped goes pale under the cursor and reads as disabled. */
+   you just tapped goes pale under the cursor and reads as disabled.
+
+   ⚠ TWO ATTRIBUTES, BECAUSE THERE ARE TWO KINDS OF SEGMENT — and the difference
+   is not cosmetic. `aria-pressed` is a TOGGLE and is only valid on
+   `role="button"`: that is the sheets' version (GoalSheet, TaskSheet,
+   PersonSheet, LinkSheet), where pressing one changes a value in a form.
+   `aria-current` is NAVIGATION: that is the calendar's Month/Week pair, which
+   are real `<a href="?view=…">` links that reload the page. Putting
+   `aria-pressed` on a link — as that one did until 2026-08-04 — is invalid ARIA
+   and gets ignored or announced wrongly.
+   They look identical on purpose; they are the same control in two situations,
+   which is exactly why one selector list styles both. */
 .pseg__b[aria-pressed='true'],
-.pseg__b[aria-pressed='true']:hover {
+.pseg__b[aria-current='true'],
+.pseg__b[aria-pressed='true']:hover,
+.pseg__b[aria-current='true']:hover {
   background: var(--color-primary);
   color: var(--color-primary-content);
 }
-.pseg__b[aria-pressed='true']:hover {
+.pseg__b[aria-pressed='true']:hover,
+.pseg__b[aria-current='true']:hover {
   filter: brightness(1.08);
 }
 

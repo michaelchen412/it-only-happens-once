@@ -22,6 +22,7 @@
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
+import PageHeader from '../../../components/admin/PageHeader.astro';
 import GoalSheet from '../../../components/admin/GoalSheet.astro';
 import { today as hqToday } from '../../../lib/hq/time';
 import { shiftYmd } from '../../../lib/hq/time';
@@ -66,16 +67,13 @@ const inactive = all.filter((g) => g.status !== 'active');
   <div class="hq-cq mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
     <AgendaTabs active="goals" />
 
-    <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="font-display text-2xl font-light">Goals</h1>
-      <div class="flex items-center gap-3">
-        {/* The cap as a FACT you can see, not an error you hit. */}
-        <span class="admin-hint text-xs">{active.length} of {ACTIVE_CAP} active</span>
-        <button type="button" data-open-goal-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
-          <Icon name="ph:plus" /> New
-        </button>
-      </div>
-    </header>
+    <PageHeader title="Goals">
+      {/* The cap as a FACT you can see, not an error you hit. */}
+      <span slot="actions" class="admin-hint text-xs">{active.length} of {ACTIVE_CAP} active</span>
+      <button slot="actions" type="button" data-open-goal-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
+        <Icon name="ph:plus" /> New
+      </button>
+    </PageHeader>
 
     {
       error && (

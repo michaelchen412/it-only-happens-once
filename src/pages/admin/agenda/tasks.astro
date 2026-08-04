@@ -25,6 +25,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import DispositionChips from '../../../components/admin/DispositionChips.astro';
+import PageHeader from '../../../components/admin/PageHeader.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
 import Tick from '../../../components/admin/Tick.astro';
 import { today as hqToday } from '../../../lib/hq/time';
@@ -102,12 +103,11 @@ const payload = (t: Task) =>
   <div class="mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6">
     <AgendaTabs active="tasks" />
 
-    <header class="mb-5 flex flex-wrap items-center justify-between gap-3 pt-1">
-      <h1 class="font-display text-2xl font-light">Tasks</h1>
-      <button type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
+    <PageHeader title="Tasks" class="pt-1">
+      <button slot="actions" type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber gap-1 font-sans">
         <Icon name="ph:plus" /> New
       </button>
-    </header>
+    </PageHeader>
 
     {
       error && (
