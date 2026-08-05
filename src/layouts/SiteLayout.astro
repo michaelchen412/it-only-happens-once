@@ -10,7 +10,6 @@
   transitions). Pages set an `active` nav item.
 */
 import { Icon } from 'astro-icon/components';
-import { fade } from 'astro:transitions';
 import Base from './Base.astro';
 import Colophon from '../components/Colophon.astro';
 import BackToTop from '../components/BackToTop.astro';
@@ -109,7 +108,15 @@ const nav = [
       </nav>
     </header>
 
-    <main class="min-w-0 flex-1" transition:name="content" transition:animate={fade({ duration: '0.22s' })}>
+    {
+      /* No transition:name here on purpose. <main> carried one ("content")
+        with the page fade on it until 2026-08-05, and on the Sky that made the
+        outgoing page SLIDE ~1000px across the incoming one rather than
+        dissolve — <main>'s box is the whole document, so the group had two very
+        different boxes to interpolate between. The fade moved up to the root in
+        Base.astro, whose box is the viewport; the full account is there. */
+    }
+    <main class="min-w-0 flex-1">
       <slot />
     </main>
   </div>

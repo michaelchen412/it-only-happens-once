@@ -1,6 +1,47 @@
 ---
+/*
+  Base — the document itself: <head>, fonts, the no-flash theme pick, and the
+  view-transition opt-in. Wrapped by SiteLayout (public) and AdminLayout (the
+  Observatory, which does not opt into transitions).
+
+  THE PAGE FADE LIVES HERE, ON THE ROOT — not on <main>, and the difference is
+  not cosmetic.
+
+  A view-transition group interpolates its own BOX between the outgoing and
+  incoming element. `root`'s box is the viewport, so both sides are the same
+  size and in the same place: the old page dissolves out exactly where it stood
+  and the new one dissolves in exactly where it stands. Nothing travels.
+
+  ⚠ It used to be `transition:name="content"` on SiteLayout's <main>, with the
+  root set to "none" — and on the Sky that was actively broken. <main> on a
+  16-fragment suite and <main> on the overview are different heights and, once
+  you have scrolled, in very different places: measured at 1280×720, the group
+  translated 982px and shrank 670px across the 0.22s fade. So the outgoing page
+  did not dissolve — it SLID a thousand pixels across the incoming one while
+  both were half-opaque. Frozen and scrubbed frame by frame (2026-08-05) that is
+  two full pages of serif text superimposed and moving over each other,
+  illegible for most of the transition. It was the other half of "no jarring
+  transitions", and plan 18's scroll restore could not touch it: that fixes
+  where the page LANDS, this is what it does on the way.
+
+  Two alternatives were built and measured before this one:
+  - `::view-transition-group(content) { animation: none }` — pins the box to its
+    destination, which removes the slide but replaces it with a JUMP CUT on the
+    first frame: the reader's content vanishes and is replaced by a different
+    part of the same page before the dissolve even starts.
+  - dropping the page animation entirely, so only the name and stars morph —
+    genuinely clean, and the closest thing to a rival. Rejected because the
+    named elements keep their own fade while everything else swaps instantly, so
+    the eleven constellation names ghost in over descriptions that are already
+    solid. One page, two speeds.
+
+  The named pairs (`c-<slug>`, `star-<slug>`) are unaffected either way: an
+  element with its own transition:name is lifted out of its ancestor's snapshot,
+  so the title still morphs ACROSS this fade rather than through it. Its travel
+  is the point — see `scripts/sky-slot.ts` for what aims it.
+*/
 import { Font } from 'astro:assets';
-import { ClientRouter } from 'astro:transitions';
+import { ClientRouter, fade } from 'astro:transitions';
 import '../styles/app.css';
 
 interface Props {
@@ -15,7 +56,7 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
 ---
 
 <!doctype html>
-<html lang="en" data-theme="dusk" transition:name="root" transition:animate="none">
+<html lang="en" data-theme="dusk" transition:name="root" transition:animate={fade({ duration: '0.22s' })}>
   <head>
     <meta charset="utf-8" />
     {
