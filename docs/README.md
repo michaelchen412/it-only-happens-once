@@ -28,7 +28,8 @@ Durable records of what this site is and how it's built — so that neither a hu
 | Themes | **dusk** (dark) / **paper** (light), OKLCH, semantic tokens only | `design.md` |
 | Composer editor | **TipTap** (ProseMirror), fixed toolbar, stores Markdown | [0006](adr/0006-composer-editor-tiptap.md) |
 | AI subject tagging | **Claude Haiku 4.5**, structured output, human-in-loop | [0007](adr/0007-ai-subject-tagging.md) |
-| Provenance | **authors/works** as query facets, decoupled from display | [0008](adr/0008-provenance-and-facets.md) |
+| Provenance | **authors/works** as query facets (the browse axis) | [0008](adr/0008-provenance-and-facets.md) |
+| Quote provenance | A quote is **three facts — Who / From / Where**; the shown line is *derived* from them, and the citation opens behind the attribution itself | [0017](adr/0017-quote-provenance-three-facts.md) |
 | Music | Three roles — **score / paired / annotated fragment**; a song's `body` is its *why*, the embed is the citation | [0009](adr/0009-music-three-roles.md) |
 | Offline | **Online-first.** No outbox, no service worker, no queue — one was built and removed within two days | [0010](adr/0010-online-first-writing.md) |
 | Paired media | A song paired to an essay is **a fragment**, not a column | [0011](adr/0011-paired-media-is-a-fragment.md) |

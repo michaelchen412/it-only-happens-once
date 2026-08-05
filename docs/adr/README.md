@@ -28,7 +28,7 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0005](0005-admin-editing-architecture.md) | Admin edits via Astro Actions; WYSIWYG editor that stores Markdown | Accepted (editor choice superseded by 0006) |
 | [0006](0006-composer-editor-tiptap.md) | Composer editor is TipTap (ProseMirror) with a fixed toolbar; stores Markdown | Accepted |
 | [0007](0007-ai-subject-tagging.md) | AI subject suggestions via Claude Haiku 4.5 (structured output, human-in-loop, privacy) | Accepted |
-| [0008](0008-provenance-and-facets.md) | Authors/works as optional query facets, decoupled from display (the "Bible rule") | Accepted |
+| [0008](0008-provenance-and-facets.md) | Authors/works as optional query facets, decoupled from display (the "Bible rule") | Accepted — display half superseded by 0017 |
 | [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted |
 | [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |
 | [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Accepted |
@@ -37,6 +37,7 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0014](0014-calendar-is-one-way.md) | The calendar is one-way: Google reads in, HQ owns the personal, and tags are additive | Accepted |
 | [0015](0015-admin-root-becomes-today.md) | `/admin` becomes Today; the Fragment Manager moves to `/admin/fragments`; the building is the Observatory | Accepted |
 | [0016](0016-hq-layering.md) | HQ's three layers — rules are pure, loaders gather, pages render; routing belongs to the page | Accepted |
+| [0017](0017-quote-provenance-three-facts.md) | A quote is three facts (Who / From / Where); the line under it is derived, and the citation opens behind the attribution itself | Accepted |
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —

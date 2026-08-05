@@ -1,7 +1,21 @@
 # 0008 — Provenance (authors & works) as query facets, decoupled from display
 
-Status: Accepted
+Status: **Accepted — the display half superseded by
+[ADR 0017](0017-quote-provenance-three-facts.md)** *(2026-08-05)*
 Date: 2026-07-20
+
+> ⚠ **Read 0017 before trusting the "Decision" section below.** The tables, the
+> query axis, `/admin/library` and the insight that *what you group by and what
+> you show must be allowed to differ* all still stand. What changed is the
+> sentence this ADR is most emphatic about — that the facets are **"decoupled
+> from display"** and that *"nothing about rendering changed"*. **The shown line
+> is now derived FROM the facets**, by one rule, at save time.
+>
+> The alternative rejected below as *"full normalization… can't express 'group
+> under The Bible but show the verse'"* turned out to be expressible after all —
+> because with no author to lead with, the locator IS the line. That rejection
+> was right about the shape of the problem and wrong about its impossibility,
+> and 0017 exists to say so rather than to leave this page quietly untrue.
 
 ## Context
 
