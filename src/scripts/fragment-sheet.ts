@@ -95,6 +95,7 @@ const authorNameById = new Map(allAuthors.map((a) => [a.id, a.name]));
 function scopedWorks() {
   const aid = authorCombo.getId();
   const authorless = allWorks.filter((w) => !w.authorId);
+  if (aid === SELF_ID) return allWorks; // Me owns no `works` rows, so Me constrains nothing
   if (aid) return allWorks.filter((w) => w.authorId === aid).concat(authorless);
   if (authorCombo.getName().trim()) return authorless; // a not-yet-created author owns no attributed works
   return allWorks;
@@ -142,9 +143,18 @@ quoteWhere.addEventListener('input', refreshPreview);
 // What replaces all three is one function, called from every input, whose
 // output you can read.
 
+/**
+ * The sentinel that "Me" commits into the Author combo — see FragmentSheet's
+ * `SELF_ID`. It is never sent: submit() strips it and sends `is_self` instead,
+ * so `resolveAuthor` can never turn Michael into an `authors` row.
+ */
+const SELF_ID = 'self';
+const isSelf = () => authorCombo.getId() === SELF_ID;
+
 /** The three facts as the public renderers will read them. */
 const quoteFacts = () => ({
-  who: authorCombo.getName(),
+  isSelf: isSelf(),
+  who: isSelf() ? '' : authorCombo.getName(),
   from: workCombo.getName(),
   where: quoteWhere.value,
 });
@@ -163,7 +173,14 @@ function refreshPreview() {
   const { line, reveal } = deriveProvenance(quoteFacts());
   const override = quoteAttr.value.trim();
   const shown = overrideWrap.hidden ? line : override || line;
-  say(previewLine, shown ? `— ${shown}` : '', 'nothing — the line stays silent');
+  // Two silences, two sentences. They render identically on the page and mean
+  // opposite things, so the one place they must NOT look alike is the place you
+  // choose between them.
+  say(
+    previewLine,
+    shown ? `— ${shown}` : '',
+    isSelf() ? 'nothing — on your own site your words need no byline' : 'nothing — the line stays silent',
+  );
   say(previewReveal, reveal, 'nothing to reveal');
 }
 
@@ -458,7 +475,13 @@ document.addEventListener('fragment:edit', (e) => {
       // OPEN migrates itself, and the batch migration is only catching up with
       // the ones you don't.
       setField(form, 'citation', mergePage(d.details.citation, d.details.page));
-      authorCombo.setValue(d.authorId ?? '', d.authorName ?? '');
+      // A self-authored quote has NO author row to restore from — the flag is
+      // the whole record of it. Without this the sheet would reopen it as
+      // "nobody knows", and saving would quietly clear the flag: the two
+      // silences collapsing into one, which is the exact loss `is_self` exists
+      // to prevent.
+      if (d.isSelf) authorCombo.setValue(SELF_ID, 'Me');
+      else authorCombo.setValue(d.authorId ?? '', d.authorName ?? '');
       recomputeWorkScope(); // scope the Work list to this author before selecting
       workCombo.setValue(d.workId ?? '', d.workName ?? '');
       // Is the stored line an OVERRIDE, or just the derivation written down by
@@ -575,6 +598,17 @@ for (const [form, action] of [
       const override = overrideWrap.hidden ? '' : quoteAttr.value.trim();
       if (override && override !== deriveProvenance(quoteFacts()).line) fd.set('attribution', override);
       else fd.delete('attribution');
+      // ⚠ THE SENTINEL NEVER LEAVES THE BROWSER. `author_id` is a uuid on the
+      // server and `author_name` is what `resolveAuthor` upserts — sending "Me"
+      // in either would fail validation or, worse, mint an `authors` row called
+      // Me and give the derivation a name to lead with on every one of these.
+      if (isSelf()) {
+        fd.delete('author_id');
+        fd.delete('author_name');
+        fd.set('is_self', '1');
+      } else {
+        fd.delete('is_self');
+      }
     }
     const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
     submitBtn.disabled = true;

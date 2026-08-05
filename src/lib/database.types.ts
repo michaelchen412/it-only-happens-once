@@ -112,12 +112,14 @@ export type Database = {
       daily_checkins: {
         Row: {
           arousal: number | null
+          asleep_at: string | null
           awakenings: Database["public"]["Enums"]["awakenings"] | null
           bed_at: string | null
           created_at: string
           dream_body: string | null
           dream_intensity: number | null
           dream_recall: Database["public"]["Enums"]["dream_recall"] | null
+          got_up_at: string | null
           id: string
           log_date: string
           note: string | null
@@ -131,12 +133,14 @@ export type Database = {
         }
         Insert: {
           arousal?: number | null
+          asleep_at?: string | null
           awakenings?: Database["public"]["Enums"]["awakenings"] | null
           bed_at?: string | null
           created_at?: string
           dream_body?: string | null
           dream_intensity?: number | null
           dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          got_up_at?: string | null
           id?: string
           log_date: string
           note?: string | null
@@ -150,12 +154,14 @@ export type Database = {
         }
         Update: {
           arousal?: number | null
+          asleep_at?: string | null
           awakenings?: Database["public"]["Enums"]["awakenings"] | null
           bed_at?: string | null
           created_at?: string
           dream_body?: string | null
           dream_intensity?: number | null
           dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          got_up_at?: string | null
           id?: string
           log_date?: string
           note?: string | null
@@ -410,6 +416,7 @@ export type Database = {
           details: Json
           excerpt: string | null
           id: string
+          is_self: boolean
           occurred_at: string
           paired_song_id: string | null
           published_at: string | null
@@ -431,6 +438,7 @@ export type Database = {
           details?: Json
           excerpt?: string | null
           id?: string
+          is_self?: boolean
           occurred_at?: string
           paired_song_id?: string | null
           published_at?: string | null
@@ -452,6 +460,7 @@ export type Database = {
           details?: Json
           excerpt?: string | null
           id?: string
+          is_self?: boolean
           occurred_at?: string
           paired_song_id?: string | null
           published_at?: string | null

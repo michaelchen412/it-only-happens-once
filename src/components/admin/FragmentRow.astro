@@ -84,6 +84,10 @@ const editorData =
         occurredIso: r.occurred_at,
         datePrecision: r.date_precision,
         authorId,
+        // The ONLY record that a quote is Michael's own — there is no author row
+        // to infer it from. Without it the sheet reopens a self-authored quote
+        // as "nobody knows" and the next save clears the flag.
+        isSelf: r.is_self ?? false,
         authorName: authorName ?? '',
         workId,
         workName: workName ?? '',
@@ -135,7 +139,7 @@ const editorData =
       )
     }
     {
-      r.attribution && (
+      r.attribution ? (
         <div class="text-base-content/60 truncate font-sans text-xs">
           {r.type === 'quote' && '— '}
           <Highlighted text={r.attribution} term={term} />
@@ -145,6 +149,19 @@ const editorData =
             </>
           )}
         </div>
+      ) : (
+        /* THE TWO SILENCES, told apart (docs/plans/17a). A quote with no line
+           renders nothing on the page whether Michael wrote it or nobody knows
+           — but here they must not look alike, and neither may look like a row
+           you forgot to finish. A matched pair in muted italic, in the slot the
+           citation would occupy, reads as a statement ABOUT the row rather than
+           as data in it. (Rejected: "Myself", which reads as a value someone
+           typed; and a glyph alone, which has to be learned.) */
+        r.type === 'quote' && (
+          <div class="text-base-content/40 truncate font-sans text-xs italic">
+            {r.is_self ? 'your words' : 'source unknown'}
+          </div>
+        )
       )
     }
     {

@@ -55,7 +55,19 @@ const {
   linkPersonId = null,
   autoNew = null,
 } = Astro.props;
-const authorOptions = authors.map((a) => ({ id: a.id, name: a.name }));
+/**
+ * "Me" leads the Who list (docs/plans/17a) — not a checkbox off to the side.
+ * Every quote answers "who said it"; sometimes the answer is you. A checkbox
+ * would make a fourth thing to remember out of a case the model already covers.
+ *
+ * ⚠ IT IS NOT AN `authors` ROW, and the sentinel id is what keeps it from
+ * becoming one. An author row would give the derivation a name to lead with, so
+ * every self-authored quote would render "— Michael Chen" on a site that is
+ * already his — and `resolveAuthor` would happily upsert it on the first save.
+ * The sheet strips this id before submitting and sends `is_self` instead.
+ */
+const SELF_ID = 'self';
+const authorOptions = [{ id: SELF_ID, name: 'Me' }, ...authors.map((a) => ({ id: a.id, name: a.name }))];
 const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
 const thisYear = new Date().getUTCFullYear();
 ---
@@ -169,7 +181,17 @@ const thisYear = new Date().getUTCFullYear();
               placeholder="Marcus Aurelius"
               options={authorOptions}
             />
-            <span class="text-base-content/45 text-xs">Leave blank if nobody knows — the line just stays quiet.</span>
+            {
+              /* The two silences, named where you choose between them. "Me" and
+              blank both render no line at all — and they mean opposite things,
+              which is the whole reason the flag is stored rather than inferred.
+              Michael's "how does the UI know to list it or not?" is answered
+              here: you told it. Blank is not Me. */
+            }
+            <span class="text-base-content/45 text-xs"
+              >Pick <b class="font-medium">Me</b> for your own words. Leave it blank if nobody knows — both stay quiet on
+              the page, and the workshop tells them apart.</span
+            >
           </label>
           <label class="flex flex-col gap-1 text-sm">
             <span class="text-base-content/70">From what</span>

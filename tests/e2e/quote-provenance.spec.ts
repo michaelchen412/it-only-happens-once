@@ -19,7 +19,7 @@
 // "The Bible", so they assert the RULE — every authorless work stays offerable,
 // a work with no author leads with its locator — rather than the datum.
 import { test, expect, type Page } from '@playwright/test';
-import { blockWrites } from './fixtures';
+import { blockWrites, stubActions } from './fixtures';
 
 const AUTHOR = '#quote-author';
 const WORK = '#quote-work';
@@ -37,11 +37,17 @@ async function openQuoteSheet(page: Page) {
   await expect(page.locator(AUTHOR)).toBeVisible();
 }
 
-/** The real vocabulary this page shipped into the two combos. */
+/**
+ * The real vocabulary this page shipped into the two combos.
+ *
+ * ⚠ "Me" is dropped: it is a sentinel the sheet prepends, not a row in
+ * `authors`, and leaving it in made `authors[0]` mean something different from
+ * one spec to the next — which is how it first went red.
+ */
 async function vocab(page: Page) {
   return page.evaluate(() => {
     const parse = (sel: string) => JSON.parse((document.querySelector(sel) as HTMLElement).dataset.options || '[]');
-    const authors = parse('#quote-author') as { id: string; name: string }[];
+    const authors = (parse('#quote-author') as { id: string; name: string }[]).filter((a) => a.id !== 'self');
     const works = parse('#quote-work') as { id: string; name: string; authorId: string | null }[];
     const attributed = works.find((w) => w.authorId) ?? null;
     return {
@@ -149,6 +155,59 @@ test.describe('the line is derived, not typed', () => {
     await page.locator(WHERE).fill('Ecclesiastes 9:11');
     expect(await committed(page, AUTHOR)).toEqual({ id: '', name: '' });
     await expect(page.locator(LINE)).toHaveText('— Ecclesiastes 9:11');
+  });
+});
+
+// Michael, 2026-08-03: "what if I wanted to add quotes of my own? … I don't
+// wanna do '--Myself' at the end of every quote." The answer is that Me is
+// simply the first option under Who, and it stores a flag rather than a name.
+test.describe('Me — your own words', () => {
+  test('leads the Who list, because every quote answers "who said it"', async ({ page }) => {
+    await openQuoteSheet(page);
+    await page.locator(`${AUTHOR} input[role="combobox"]`).click();
+    await expect(page.locator(`${AUTHOR} .entity-combo__opt`).first()).toHaveText('Me');
+  });
+
+  test('silences the line and answers the reader behind it', async ({ page }) => {
+    await openQuoteSheet(page);
+    await pick(page, AUTHOR, 'Me');
+    // Silent, because on your own site your own words are the default voice —
+    // the essays don't sign themselves either.
+    await expect(page.locator(LINE)).toHaveText('nothing — on your own site your words need no byline');
+    // But the reader's real question — "if I take this, who do I attribute?" —
+    // still has an answer, on demand. That is what makes the reveal the right
+    // control rather than two controls wearing one coat.
+    await expect(page.locator(REVEAL)).toHaveText('Michael Chen');
+  });
+
+  // ⚠ THE ONE THAT MATTERS. "Me" is a sentinel id in the combo, and if it ever
+  // reached the server `resolveAuthor` would upsert a real `authors` row called
+  // Me — which would give the derivation a name to lead with and put
+  // "— Michael Chen" under every self-authored quote on his own site. This
+  // watches the wire.
+  test('the sentinel never leaves the browser — it becomes `is_self`', async ({ page }) => {
+    let body = '';
+    await stubActions(page, {
+      'fragments.saveQuote': (req) => {
+        body = req.postData() ?? '';
+        return { id: 'deadbeef-1111-2222-3333-444444444444', slug: 'q' };
+      },
+    });
+    await page.goto('/admin/fragments');
+    await page.locator('#add-btn').click();
+    await page.locator('#add-menu [data-new="quote"]').click();
+    await expect(page.locator(AUTHOR)).toBeVisible();
+
+    await page.locator('#quote-editor [contenteditable]').fill('A short snippet of truth.');
+    await pick(page, AUTHOR, 'Me');
+    await page.locator('#quote-save').click();
+    await expect.poll(() => body).not.toBe('');
+
+    expect(body, 'Me must be sent as the flag').toContain('is_self');
+    expect(body, 'and never as an author the server would create').not.toMatch(/name="author_name"\r?\n\r?\nMe/);
+    expect(body).not.toMatch(/name="author_id"\r?\n\r?\nself/);
+    // Nothing to override, either — the silence is derived, not typed.
+    expect(body).not.toContain('name="attribution"');
   });
 });
 

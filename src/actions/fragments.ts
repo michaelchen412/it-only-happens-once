@@ -221,6 +221,12 @@ export const fragments = {
       work_id: optUuid, //   FROM
       author_name: optText,
       work_name: optText,
+      /**
+       * WHO = ME. Sent as '1' or not at all — the sheet strips its "Me" sentinel
+       * out of `author_id`/`author_name` and sets this instead, so there is no
+       * path by which Michael becomes a row in `authors`.
+       */
+      is_self: optText,
       occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
       status: fragmentStatus,
       subjects: optText,
@@ -239,8 +245,12 @@ export const fragments = {
       // What is left is the WHERE, and it is about to get a public surface.
       const details: Record<string, Json> = {};
       if (input.citation) details.citation = input.citation;
+      // ⚠ Me is a FLAG, never an author. Belt and braces with the sheet's strip:
+      // this is the line that guarantees no `authors` row is ever upserted for
+      // Michael, whatever a client sends.
+      const is_self = input.is_self === '1';
       // Prefer the chosen entity's id; fall back to creating one by name.
-      let author_id = input.author_id ?? (await resolveAuthor(sb, input.author_name));
+      let author_id = is_self ? null : (input.author_id ?? (await resolveAuthor(sb, input.author_name)));
       const work_id = input.work_id ?? (await resolveWork(sb, input.work_name, author_id));
       // Integrity: a work belongs to one author, so the work's canonical author is
       // authoritative — this keeps fragment.author_id and work.author_id from ever
@@ -250,7 +260,10 @@ export const fragments = {
       let workTitle: string | null = null;
       if (work_id) {
         const { data: w } = await sb.from('works').select('author_id, title').eq('id', work_id).single();
-        if (w?.author_id) author_id = w.author_id;
+        // ⚠ but never onto a self-authored quote — the snap exists to keep the
+        // facet honest, and "Michael's own line, filed under a book he was
+        // reading" must not become "by that book's author".
+        if (!is_self && w?.author_id) author_id = w.author_id;
         workTitle = w?.title ?? null;
       }
       // ⚠ THE SHOWN LINE IS DERIVED HERE, FROM WHAT WAS ACTUALLY STORED — not
@@ -268,7 +281,7 @@ export const fragments = {
         const { data: a } = await sb.from('authors').select('name').eq('id', author_id).single();
         authorName = a?.name ?? null;
       }
-      const derived = provenanceLine({ who: authorName, from: workTitle, where: input.citation });
+      const derived = provenanceLine({ isSelf: is_self, who: authorName, from: workTitle, where: input.citation });
       // An explicit override wins; otherwise the derivation; otherwise silence,
       // which both renderers already handle by drawing no line at all.
       const attribution = input.attribution?.trim() || derived || null;
@@ -284,6 +297,7 @@ export const fragments = {
         details,
         author_id,
         work_id,
+        is_self,
         status: input.status,
       };
       if (input.occurred_at) {

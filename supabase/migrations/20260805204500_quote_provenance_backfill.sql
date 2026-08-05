@@ -120,7 +120,7 @@ declare
   sample text;
 begin
   select count(*),
-         string_agg(format('%L → %L', f.attribution, derived), E'\n  ')
+         string_agg(format('%L → %L', f.attribution, f.derived), E'\n  ')
     into bad, sample
     from (
       select f.attribution,
@@ -132,9 +132,14 @@ begin
     ) f
    where coalesce(f.attribution, '') is distinct from f.derived;
 
+  -- ⚠ Exactly as many `%` as arguments. RAISE takes no `%s`, and getting that
+  -- wrong is a COMPILE error in the DO block — which aborts the migration after
+  -- the four updates above have already run. It rolled back cleanly the first
+  -- time this was applied, which is the transaction doing its job; but it means
+  -- the assertion must itself be rehearsed, not just the statements it guards.
   if bad > 0 then
     raise exception
-      'quote provenance: % row(s) still disagree with the derived line. The matrix is missing a case — read these before shipping:%s%',
-      bad, E'\n  ', sample;
+      'quote provenance: % row(s) still disagree with the derived line. The matrix is missing a case — read these before shipping: %',
+      bad, sample;
   end if;
 end $$;
