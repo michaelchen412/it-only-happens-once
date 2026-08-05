@@ -12,6 +12,11 @@
   constellation render dimmed with a disabled checkbox — visible, never
   re-addable; everything else gets a per-row ＋ place button (data-act).
 
+  The CONSTELLATIONS CELL is a control, not a label: it opens this fragment's
+  editor already on its Constellations tab (`data-act="constellations"` →
+  src/scripts/open-editor.ts). See the cell itself for why it's one button
+  rather than one per chip.
+
   When a search term is active, the title/attribution highlight matches and a
   `writing` fragment shows an excerpt line per match window (search-highlight.ts).
 */
@@ -65,6 +70,16 @@ const { windows: bodyWindows, more: moreMatches } =
 // label on every quote the moment it was next saved. The prop beside it has been
 // the real answer all along; the copy was only ever a duplicate that could drift.
 const quoteWork = r.type === 'quote' ? (workName ?? '').trim() : '';
+
+// The membership cell's two names. STATE FIRST, THEN THE VERB — the same order
+// the chips read in, so the screen reader hears what the eye sees. `title` stays
+// the mouse-only full list it always was; it is not an accessible name, which is
+// why the label below exists rather than being left to it.
+const cnNames = constellations.map((c) => c.name);
+const cnTitle = cnNames.join(' · ') || undefined;
+const cnLabel = cnNames.length
+  ? `In ${cnNames.join(', ')} — change constellations`
+  : 'In no constellations — assign one';
 
 // The primary line. A quote's body is Markdown → strip it to plain text for the row.
 const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
@@ -184,20 +199,44 @@ const editorData =
     }
   </td>
   {
+    /* ── The membership cell: ONE button, ONE verb ──────────────────────────
+      Filing a fragment used to cost a detour — open the row, find the tab,
+      then find your place in the list again. The chips you were already
+      reading are the door now.
+
+      NOT A BUTTON PER CHIP, for three reasons that all point the same way. A
+      <button> may not contain interactive content, so a per-chip ✕ would mean
+      the cell can't be one control at all — it becomes a strip of small
+      targets with dead gaps between them, and "click the column" stops
+      existing. It would also hang an unassign on the kind of fast, unaimed
+      click a dense table invites; ConstellationPicker made this same call for
+      its ↗ ("specified not to forward activation" is a thin thread). And this
+      row already carries three click meanings — a fourth is fine, a fourth
+      that changes with which 60px you hit is not. Removal lives in the picker,
+      where it is labelled and instantly reversible.
+
+      The cell is `data-noedit` so its dead space does NOTHING rather than
+      falling through to "open this fragment" — one region, one answer. */
     !trash && (
-      <td class="hidden max-w-[13rem] px-3 pt-2 align-top lg:table-cell">
-        {constellations.length === 0 ? (
-          <span class="admin-chip admin-chip--none">none</span>
-        ) : (
-          <span class="flex flex-wrap gap-1" title={constellations.map((c) => c.name).join(' · ')}>
-            {constellations.map((c) => (
-              <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
-                <StarMark class="mr-1" />
-                {c.name}
-              </span>
-            ))}
+      <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
+        <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
+          <span class="cn-cell__chips">
+            {constellations.length === 0 ? (
+              <span class="admin-chip admin-chip--none">none</span>
+            ) : (
+              constellations.map((c) => (
+                <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
+                  <StarMark class="mr-1" />
+                  {c.name}
+                </span>
+              ))
+            )}
           </span>
-        )}
+          {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
+          <span class="cn-cell__mark" aria-hidden="true">
+            ＋
+          </span>
+        </button>
       </td>
     )
   }

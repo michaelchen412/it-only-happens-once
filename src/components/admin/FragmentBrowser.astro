@@ -134,6 +134,7 @@ const { constellation, constellationName, constellationDescription, constellatio
   import { formatActionError } from '../../scripts/action-error';
   import '../../scripts/subject-filter'; // the fetched partial's <subject-filter> needs the definition
   import { starMarkHtml } from '../../lib/star-mark';
+  import { openEditorFor } from '../../scripts/open-editor';
   import { onSkyChange } from '../../scripts/sky-changed';
   import { notifyFragmentsChanged, onFragmentsChanged } from '../../scripts/fragments-changed';
 
@@ -188,6 +189,22 @@ const { constellation, constellationName, constellationDescription, constellatio
     return true;
   }
 
+  /** Re-derive the membership cell's names from the chips now in it. The cell
+   *  is a button, so its accessible name is an `aria-label` — which means it
+   *  does NOT follow the chips we just changed unless something says so, and a
+   *  label that still says "in no constellations" over a filled chip is worse
+   *  than no label at all. */
+  function relabelCnCell(row: HTMLElement) {
+    const btn = row.querySelector<HTMLElement>('.cn-cell');
+    if (!btn) return;
+    const names = [...row.querySelectorAll('.cn-cell__chips .admin-chip--in')].map((c) => c.textContent!.trim());
+    btn.title = names.join(' · ');
+    btn.setAttribute(
+      'aria-label',
+      names.length ? `In ${names.join(', ')} — change constellations` : 'In no constellations — assign one',
+    );
+  }
+
   /** Flip a row to its placed state in place — no refetch, the sheet stays open. */
   function markPlaced(row: HTMLElement) {
     row.classList.add('opacity-45');
@@ -209,20 +226,20 @@ const { constellation, constellationName, constellationDescription, constellatio
 
     // Keep the membership column honest without a refetch: drop the "none"
     // chip if this was an orphan, and add this constellation's own chip.
-    const chips = row.querySelector('td.lg\\:table-cell');
-    if (chips) {
-      chips.querySelector('.admin-chip--none')?.remove();
-      let list = chips.querySelector('span.flex');
-      if (!list) {
-        list = document.createElement('span');
-        list.className = 'flex flex-wrap gap-1';
-        chips.appendChild(list);
-      }
+    //
+    // It used to find that cell by `td.lg\:table-cell` and build the chip list
+    // if it was missing — both of which stopped being true when the column
+    // became a control (FragmentRow.astro). The wrapper is now always there,
+    // and `.cn-cell__chips` names it rather than describing where it sits.
+    const list = row.querySelector('.cn-cell__chips');
+    if (list) {
+      list.querySelector('.admin-chip--none')?.remove();
       const chip = document.createElement('span');
       chip.className = `admin-chip admin-chip--in max-w-[11rem] truncate${ccolor ? ` cn-${ccolor}` : ''}`;
       chip.innerHTML = starMarkHtml('mr-1');
       chip.append(cname);
       list.appendChild(chip);
+      relabelCnCell(row);
     }
     const ids = new Set((row.dataset.constellations || '').split(',').filter(Boolean));
     ids.add(cid);
@@ -245,15 +262,17 @@ const { constellation, constellationName, constellationDescription, constellatio
       historyBase: null,
       onOpen(row) {
         clearError();
-        if (row.dataset.writing) {
-          document.dispatchEvent(new CustomEvent('writing:edit', { detail: row.dataset.writing }));
-        } else if (row.dataset.fragment) {
-          document.dispatchEvent(new CustomEvent('fragment:edit', { detail: row.dataset.fragment }));
-        }
+        openEditorFor(row);
       },
       async onAction(act, id, row) {
-        if (act !== 'place') return;
         clearError();
+        // The membership cell works in here too, and it can tick THIS
+        // constellation — the same placement the ＋ beside it makes. Nothing
+        // needs to reconcile the two: the sheet announces `fragments:changed`
+        // on its way out, this drawer refreshes its rows, and the row comes
+        // back from the server already marked placed.
+        if (act === 'constellations') return void openEditorFor(row, 'constellations');
+        if (act !== 'place') return;
         if (await place(id)) markPlaced(row); // which also takes it out of the cart
       },
       onSelectionChange(ids, shown) {

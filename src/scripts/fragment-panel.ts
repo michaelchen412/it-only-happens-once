@@ -303,6 +303,14 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
     opts.onSelectionChange?.([...cart], visible.length);
   }
 
+  // Everything in this table is INERT until this line: the rows are markup, and
+  // every click on one — the title, the ＋, the membership cell — is delivered
+  // by the delegated listeners above. Saying so out loud costs one attribute
+  // and buys a signal nothing else in the DOM provides. The e2e harness needs
+  // it (a spec that clicks before this is testing the dev server's compile
+  // time), and it names the real gap a slow connection can show a person.
+  root.dataset.wired = '';
+
   return {
     root,
     refresh: applyFilters,

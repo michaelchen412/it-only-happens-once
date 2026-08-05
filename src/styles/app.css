@@ -1192,6 +1192,73 @@ html.reader-open .sky-return {
   border: 1px dashed color-mix(in oklab, var(--color-base-content) 22%, transparent);
 }
 
+/* The membership cell AS A CONTROL — the chips are the door to this fragment's
+   Constellations tab (FragmentRow.astro says why it's one button, not one per
+   chip). Three rules hold this together:
+
+   1. HOVER IS NEVER THE ONLY SIGNAL. Touch has no hover and the keyboard has
+      none either, so the ＋ is visible at rest and hover/focus only raises it.
+      A control you can only discover with a mouse is a control half the ways
+      into this room can't find.
+   2. NOTHING MOVES. The ＋ has a reserved slot rather than being appended when
+      the pointer arrives — inserting a glyph beside wrapped chips reflows the
+      whole cell, and a dense table cannot afford to twitch under the cursor.
+   3. IT IS A DIFFERENT DOOR FROM THE ROW. The row already tints on hover and
+      already opens the editor; if this cell's hover looked like that one, it
+      would be saying it does the same thing. Hence its own outline. */
+.cn-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem 0.5rem;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-field);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+.cn-cell__chips {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.cn-cell__mark {
+  flex: none;
+  width: 0.85rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  text-align: center;
+  color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+/* Gated: on touch, `:hover` sticks after a tap and would leave one row lit
+   until you tapped elsewhere. The at-rest ＋ is what those devices get. */
+@media (hover: hover) {
+  .cn-cell:hover {
+    background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+    border-color: color-mix(in oklab, var(--color-primary) 32%, transparent);
+  }
+  .cn-cell:hover .cn-cell__mark {
+    opacity: 1;
+    color: var(--color-primary);
+  }
+}
+.cn-cell:focus-visible {
+  outline: none;
+  background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+  border-color: var(--color-primary);
+}
+.cn-cell:focus-visible .cn-cell__mark {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
 /* Count badge — "▤ 5 writing". The mark keeps its type color inside. */
 .admin-stat {
   display: inline-flex;
@@ -2432,13 +2499,18 @@ a.row__t:hover {
 /* Native <input type="time"> on purpose: it is the correct control on iOS, and
    anything hand-rolled is slower and worse at 7am. In an en-US locale it
    renders 12-hour, which is what HQ's date register requires anyway. */
+/* THREE COLUMNS SINCE 2026-08-05: in bed → woke → up. The `→` glyphs that used
+   to separate the first two are gone, not repeated — at 390px three native time
+   pickers already spend the whole row, and the labels were the thing carrying
+   the sequence anyway. A grid rather than flex so the three stay equal and the
+   longest label ("Went off around", on the row below) cannot widen a column. */
 .times {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.375rem;
 }
 .tm {
-  flex: 1 1 0;
   min-width: 0;
 }
 .tm__k {
@@ -2450,24 +2522,44 @@ a.row__t:hover {
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
   margin-bottom: 0.25rem;
 }
-.tm__arrow {
-  padding-bottom: 0.6rem;
-  color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
-}
-.times input {
+/* 0.875rem, down from 0.9375: `07:00 AM` in three columns at 390px is about
+   106px each, and the larger size clipped the meridiem on Safari. */
+.times input,
+.asleep-at input {
   width: 100%;
   min-height: 2.5rem;
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-field, 0.5rem);
   background: var(--color-base-100);
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0.375rem;
   font-family: var(--font-sans);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
-.times input:focus {
+.times input:focus,
+.asleep-at input:focus {
   outline: none;
   border-color: var(--cn);
+}
+
+/* The one question the top latency bucket cannot answer itself. It appears only
+   under `over_60`, so it costs nothing on an ordinary morning — and it is set
+   in from the options above so it reads as a follow-up rather than a fifth
+   choice. Half width: it holds one picker, and a full-width row would promote
+   it over the buckets it is qualifying. */
+.asleep-at {
+  margin-top: 0.5rem;
+  padding-left: 0.625rem;
+  border-left: 2px solid color-mix(in oklch, var(--cn) 30%, transparent);
+}
+.asleep-at .tm {
+  max-width: 11rem;
+}
+.asleep-at__k {
+  margin-top: 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
 }
 .prefill {
   margin-top: 0.375rem;

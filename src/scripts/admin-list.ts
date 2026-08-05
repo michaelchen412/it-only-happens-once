@@ -7,6 +7,7 @@ import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
 import { onFragmentsChanged } from './fragments-changed';
 import { wireFragmentPanel, wireAddMenu } from './fragment-panel';
+import { openEditorFor } from './open-editor';
 
 const root = document.querySelector('.fpanel') as HTMLElement;
 const bulkbar = document.getElementById('bulkbar') as HTMLElement;
@@ -22,14 +23,16 @@ const showBulkError = (msg: string) => {
 const panel = wireFragmentPanel(root, {
   historyBase: '/admin/fragments',
   onOpen(row) {
-    if (row.dataset.writing) {
-      document.dispatchEvent(new CustomEvent('writing:edit', { detail: row.dataset.writing }));
-    } else if (row.dataset.fragment) {
-      document.dispatchEvent(new CustomEvent('fragment:edit', { detail: row.dataset.fragment }));
-    }
+    openEditorFor(row);
   },
-  onAction(act, id) {
-    if (act === 'restore' || act === 'purge') void trashAction(act, id);
+  onAction(act, id, row) {
+    if (act === 'restore' || act === 'purge') return void trashAction(act, id);
+    // The membership cell — the same editor, opened on its Constellations tab.
+    // Deliberately the SAME door for all three types rather than a lighter one
+    // for quotes: you shouldn't have to know a row's type to predict what a
+    // click does, and a badge that behaved differently on writing rows would
+    // make the `none` chip beside it a dead label.
+    if (act === 'constellations') openEditorFor(row, 'constellations');
   },
   // The selection is a CART now (see fragment-panel.ts): it survives filter
   // and search changes rather than being thrown away by them. One behaviour

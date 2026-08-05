@@ -10,6 +10,7 @@ import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSharedBy } from './shared-by';
+import { readIntent } from './open-editor';
 import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireSubjectSuggest } from './subject-suggest';
@@ -340,12 +341,15 @@ const sharedByMap: Record<string, string[]> = JSON.parse(sheet.dataset.sharedBy 
 /** Set when you arrived from a profile's "Add a quote" (`?person=<slug>`). */
 const linkPersonId = sheet.dataset.linkPerson || '';
 
-function openSheet(type: 'quote' | 'song') {
+function openSheet(type: 'quote' | 'song', tab = 'fields') {
   clearError();
   quoteForm.hidden = type !== 'quote';
   songForm.hidden = type !== 'song';
   fieldsTabLabel.textContent = type === 'quote' ? 'Quote' : 'Song';
-  tabs.select('fields'); // always open on the content, never mid-composition
+  // Default: the content, never mid-composition. The exception is a caller that
+  // names a tab — the row's membership cell asks for 'constellations', so the
+  // gesture lands where you were already looking instead of one tab away.
+  tabs.select(tab);
   refreshCnCount();
   sheet.showModal(); // native: focus-trap + Escape + focus restore on close
   dirty = false; // the fields we just populated don't count as user edits
@@ -453,9 +457,13 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
 // --- Edit existing quote / song (opened by a row click in the manager) ---
 document.addEventListener('fragment:edit', (e) => {
   {
+    // Either shape: a bare JSON string, or `{ data, tab }` from a row that
+    // wants a particular tab open (src/scripts/open-editor.ts).
+    const intent = readIntent((e as CustomEvent).detail, 'data');
+    if (!intent) return showError('Could not read that fragment.');
     let d: any;
     try {
-      d = JSON.parse((e as CustomEvent).detail);
+      d = JSON.parse(intent.value);
     } catch {
       return showError('Could not read that fragment.');
     }
@@ -518,7 +526,7 @@ document.addEventListener('fragment:edit', (e) => {
     picker.setFragment(d.id, Array.isArray(d.constellationIds) ? d.constellationIds : []);
     sharedByHandles.get(type)?.setFragment(d.id, sharedByMap[d.id] ?? []);
     sheetTitle.textContent = type === 'quote' ? 'Edit quote' : 'Edit song';
-    openSheet(type);
+    openSheet(type, intent.tab);
   }
 });
 

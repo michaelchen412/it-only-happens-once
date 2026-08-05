@@ -32,6 +32,7 @@ import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
+import { readIntent } from './open-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
 import { wireMusicPanel, type PairedSong } from './music-panel';
@@ -692,7 +693,7 @@ function openNew(fromHash = false, asNote = false) {
   titleField.focus();
 }
 
-async function openEdit(id: string, fromHash = false) {
+async function openEdit(id: string, fromHash = false, tab?: string) {
   let loaded: Loaded | null = null;
   let loadError: unknown = null;
   try {
@@ -712,6 +713,11 @@ async function openEdit(id: string, fromHash = false) {
     return;
   }
   populate(loaded);
+  // AFTER populate, which resets to the document — a caller that named a tab
+  // (the list's membership cell asks for 'constellations') is overruling that
+  // default, so it has to land second. Only on the success path: the inert
+  // error shell above has nothing to show on any other tab.
+  if (tab) tabs.select(tab);
   openSheet(`#edit=${id}`, fromHash);
 }
 
@@ -1016,8 +1022,9 @@ deleteBtn.addEventListener('click', async () => {
 
 // ---- triggers: events, buttons, deep links ----
 document.addEventListener('writing:edit', (e) => {
-  const id = (e as CustomEvent).detail;
-  if (typeof id === 'string' && id) void openEdit(id);
+  // Either shape: a bare id, or `{ id, tab }` (src/scripts/open-editor.ts).
+  const intent = readIntent((e as CustomEvent).detail, 'id');
+  if (intent) void openEdit(intent.value, false, intent.tab);
 });
 document
   .querySelectorAll<HTMLElement>('[data-new-writing]')
