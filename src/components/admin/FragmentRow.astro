@@ -58,8 +58,13 @@ const { windows: bodyWindows, more: moreMatches } =
   term && r.type === 'writing' && r.body ? excerpts(toPlain(r.body), term) : { windows: [], more: 0 };
 
 // A quote's fuller identity for the citation line: "— Author, Work".
-const quoteWork =
-  r.type === 'quote' ? String((r.details as Record<string, unknown> | null)?.source_title ?? '').trim() : '';
+//
+// ⚠ From the RELATION, not from `details.source_title` (2026-08-05, plan 17a).
+// That key was a string copy of `works.title` — 41 of its 42 rows verbatim — and
+// `saveQuote` has stopped writing it, so reading it here would have blanked this
+// label on every quote the moment it was next saved. The prop beside it has been
+// the real answer all along; the copy was only ever a duplicate that could drift.
+const quoteWork = r.type === 'quote' ? (workName ?? '').trim() : '';
 
 // The primary line. A quote's body is Markdown → strip it to plain text for the row.
 const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);

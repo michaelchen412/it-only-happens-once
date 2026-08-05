@@ -1,26 +1,33 @@
-// Plan 17 · step 1 — the seeding trap, and the two dead fields.
+// Plan 17 · the quote sheet as Who / From / Where, and a line derived from them.
 //
-// The reported symptom, in Michael's words: "if I'm adding a Bible verse, what
-// is the process?" The answer was that from several states there wasn't one.
-// Typing a book name into Attribution seeded a PHANTOM author, and an
-// uncommitted author owns no works — so the Work list emptied and "The Bible"
-// could no longer be chosen. The only way forward was to type it again, creating
-// a second, duplicate, authorless work. The Ecclesiastes 9:11 row in the live
-// corpus is very likely that scar: filed under no work at all, with the Bible as
-// a loose string in `details`.
+// The report, in Michael's words: "if I'm adding a Bible verse, what is the
+// process? Do I put attribution first, or do I put the work? Do I have to put an
+// author, and then do I have to put the source title again?" Every one of those
+// had an answer the form could not give, and one had an answer the form actively
+// prevented. Seven fields became three, and the field readers actually see
+// stopped being one you type.
+//
+// ⚠ WHAT THIS FILE USED TO TEST IS GONE ON PURPOSE. Its first version pinned the
+// Attribution→Author seeding fix from ce11bc4 — that a book name typed into
+// Attribution no longer seeded a phantom author. That fix narrowed a guess about
+// whether text was a person's name; this rebuild DELETES THE SURFACE the guess
+// lived on, because there is no free-text attribution field to type a book name
+// into any more. `scopedWorks`'s authorless rule is the half that survives, and
+// it still has its spec below.
 //
 // ⚠ These specs read the vocabulary the PAGE rendered rather than hardcoding
-// "The Bible", so they assert the RULE — every authorless work stays offerable —
-// rather than the datum. A rename can't make them lie, and they still fail if
-// the rule breaks. (`entity-combo.spec.ts` drives `setOptions()` instead; that
-// can't work here, because the scoping logic reads `allWorks` from the combo's
-// `data-options` once at module load.)
+// "The Bible", so they assert the RULE — every authorless work stays offerable,
+// a work with no author leads with its locator — rather than the datum.
 import { test, expect, type Page } from '@playwright/test';
 import { blockWrites } from './fixtures';
 
-const ATTR = '#quote-form [name="attribution"]';
 const AUTHOR = '#quote-author';
 const WORK = '#quote-work';
+const WHERE = '#quote-where';
+const LINE = '#quote-preview-line';
+const REVEAL = '#quote-preview-reveal';
+const OVERRIDE = '#quote-attr-override';
+const ATTR = '#quote-form [name="attribution"]';
 
 async function openQuoteSheet(page: Page) {
   await blockWrites(page); // nothing here saves; refuse it at the door anyway
@@ -53,6 +60,14 @@ const committed = (page: Page, sel: string) =>
     return { id: el.getId(), name: el.getName() };
   }, sel);
 
+/** Commit a combo the way a person does, so `combo:change` actually fires. */
+async function pick(page: Page, sel: string, name: string) {
+  const field = page.locator(`${sel} input[role="combobox"]`);
+  await field.click();
+  await field.fill(name);
+  await field.press('Enter'); // also closes the menu, which otherwise overlays the field below
+}
+
 const workRows = (page: Page) => page.locator(`${WORK} .entity-combo__opt:not(.entity-combo__opt--create)`);
 
 async function openWorkMenu(page: Page) {
@@ -60,68 +75,138 @@ async function openWorkMenu(page: Page) {
   await expect(page.locator(`${WORK} .entity-combo__menu`)).toBeVisible();
 }
 
-/** Type into Attribution and blur, which is what fires its `change` handler. */
-async function typeAttribution(page: Page, text: string) {
-  await page.locator(ATTR).fill(text);
-  await page.locator(ATTR).press('Tab'); // the blur is what fires `change`, and `change` is what seeds
-  // ⚠ Tab lands in the Author combo, which opens its menu on focus — and that
-  // menu is absolutely positioned over the Work field directly below it, so the
-  // next click gets intercepted by an <li>. Park focus on something inert first.
-  await page.locator('#sheet-title').click();
-}
-
-test.describe('a typed attribution can no longer strand the Work list', () => {
-  test('a bare book name seeds no author, and the Bible stays choosable', async ({ page }) => {
+test.describe('the form asks three questions', () => {
+  test('Who, From and Where — and the fields they replaced are gone', async ({ page }) => {
     await openQuoteSheet(page);
-    const v = await vocab(page);
-    test.skip(!v.authorless.length, 'needs at least one authorless work in the corpus');
+    await expect(page.locator(AUTHOR)).toBeVisible();
+    await expect(page.locator(WORK)).toBeVisible();
+    await expect(page.locator(WHERE)).toBeVisible();
 
-    // The exact input that used to break: a book name with no chapter:verse, so
-    // the old `/\d+\s*:\s*\d+/` exemption did not catch it.
-    const bookName = 'Ecclesiastes';
-    expect(
-      v.authors.some((a) => a.name.toLowerCase() === bookName.toLowerCase()),
-      'the premise of this spec is that this is NOT an author',
-    ).toBe(false);
-
-    await typeAttribution(page, bookName);
-
-    // Nothing seeded — so nothing to empty the list, and nothing for
-    // `resolveAuthor` to turn into a real `authors` row on save.
-    expect(await committed(page, AUTHOR)).toEqual({ id: '', name: '' });
-
-    // And the work it actually belongs to is still on offer. This is the
-    // assertion that was RED before the fix.
-    await openWorkMenu(page);
-    for (const w of v.authorless) {
-      await expect(workRows(page).filter({ hasText: w.name })).toHaveCount(1);
+    // Every one of these was a duplicate of data that already existed elsewhere,
+    // or a key nothing rendered. `source_title` was 42 rows, 41 of them a
+    // verbatim copy of the Work above it.
+    for (const dead of ['source_author', 'work_year', 'source_title', 'page']) {
+      await expect(page.locator(`#quote-form [name="${dead}"]`)).toHaveCount(0);
     }
+
+    // Attribution still exists — as the override, closed until asked for. It is
+    // no longer something you fill in on the way past.
+    await expect(page.locator(OVERRIDE)).toBeHidden();
   });
 
-  test('a chapter:verse locator is never mistaken for a person', async ({ page }) => {
+  // The whole self-authored request ("I don't wanna do '--Myself' at the end of
+  // every quote") was blocked by nothing but this `required`. An unattributed
+  // quote could not be saved through the sheet at all — which is why the one in
+  // the corpus can only have arrived by import.
+  test('the words are the only required field', async ({ page }) => {
     await openQuoteSheet(page);
-    await typeAttribution(page, 'Matthew 5:43-48');
-    expect(await committed(page, AUTHOR)).toEqual({ id: '', name: '' });
-  });
-
-  // ⚠ Green against the OLD source too, and deliberately so: it guards the half
-  // of the behaviour that was worth keeping. Attribution still fills Author when
-  // it names someone real — that is the no-double-entry convenience, and the fix
-  // narrowed the rule without removing it.
-  test('an author who exists still seeds, and commits an id rather than a name', async ({ page }) => {
-    await openQuoteSheet(page);
-    const v = await vocab(page);
-    test.skip(!v.authors.length, 'needs at least one author in the corpus');
-
-    const a = v.authors[0];
-    await typeAttribution(page, a.name);
-
-    // An ID, not just text: a name-only commit is what "phantom author" means,
-    // and it is what `resolveAuthor` would have created a duplicate row from.
-    expect(await committed(page, AUTHOR)).toEqual({ id: a.id, name: a.name });
+    const save = page.locator('#quote-save');
+    await expect(save).toBeDisabled();
+    await page.locator('#quote-editor [contenteditable]').fill('A short snippet of truth.');
+    await expect(save).toBeEnabled(); // no attribution, no author, no work
   });
 });
 
+test.describe('the line is derived, not typed', () => {
+  test('silence reads as an answer, not as an empty field', async ({ page }) => {
+    await openQuoteSheet(page);
+    await expect(page.locator(LINE)).toHaveText('nothing — the line stays silent');
+    await expect(page.locator(REVEAL)).toHaveText('nothing to reveal');
+  });
+
+  test('a person leads, and the work waits behind the reveal', async ({ page }) => {
+    await openQuoteSheet(page);
+    const v = await vocab(page);
+    test.skip(!v.attributed || !v.attributedAuthor, 'needs an authored work in the corpus');
+
+    await pick(page, WORK, v.attributed!.name); // picking a work snaps its author
+    await expect(page.locator(LINE)).toHaveText(`— ${v.attributedAuthor!.name}`);
+    await expect(page.locator(REVEAL)).toHaveText(v.attributed!.name);
+  });
+
+  // Michael: "I don't want to say the Bible because that sounds awkward. I would
+  // much rather just say John 3:16." No rule of its own — with no Who to lead
+  // with, the locator is the only thing the line could be. And the work still
+  // files every verse together, which is what the three scripture rows never did.
+  test('with no Who, the locator leads and the work goes behind', async ({ page }) => {
+    await openQuoteSheet(page);
+    const v = await vocab(page);
+    test.skip(!v.authorless.length, 'needs an authorless work in the corpus');
+    const book = v.authorless[0];
+
+    await pick(page, WORK, book.name);
+    await page.locator(WHERE).fill('John 3:16');
+    await expect(page.locator(LINE)).toHaveText('— John 3:16');
+    await expect(page.locator(REVEAL)).toHaveText(book.name);
+
+    // And the Who was never touched — the thing the old `scriptureRe` existed to
+    // prevent now cannot happen, because a locator is never typed where a name goes.
+    expect(await committed(page, AUTHOR)).toEqual({ id: '', name: '' });
+  });
+
+  test('a locator typed into Where never becomes a person', async ({ page }) => {
+    await openQuoteSheet(page);
+    await page.locator(WHERE).fill('Ecclesiastes 9:11');
+    expect(await committed(page, AUTHOR)).toEqual({ id: '', name: '' });
+    await expect(page.locator(LINE)).toHaveText('— Ecclesiastes 9:11');
+  });
+});
+
+test.describe('the override is the exception, never the routine', () => {
+  test('opens pre-filled with the derived line, and reverts to it', async ({ page }) => {
+    await openQuoteSheet(page);
+    const v = await vocab(page);
+    test.skip(!v.authors.length, 'needs at least one author in the corpus');
+    const who = v.authors[0];
+
+    await pick(page, AUTHOR, who.name);
+    await expect(page.locator(LINE)).toHaveText(`— ${who.name}`);
+
+    // You edit the sentence you can see, rather than composing one from scratch
+    // against a blank field.
+    await page.locator('#quote-attr-edit').click();
+    await expect(page.locator(OVERRIDE)).toBeVisible();
+    await expect(page.locator(ATTR)).toHaveValue(who.name);
+
+    await page.locator(ATTR).fill('Someone else entirely');
+    await expect(page.locator(LINE)).toHaveText('— Someone else entirely');
+
+    await page.locator('#quote-attr-revert').click();
+    await expect(page.locator(OVERRIDE)).toBeHidden();
+    await expect(page.locator(ATTR)).toHaveValue('');
+    await expect(page.locator(LINE)).toHaveText(`— ${who.name}`);
+  });
+
+  // 74 of 76 live rows store exactly what the rule derives, so opening one must
+  // not read as "this quote is an exception". The two that DO open overridden are
+  // the scripture rows whose locator sits in the wrong column — that is the
+  // migration's to-do list surfacing where you can act on it, not a bug.
+  test('opening an existing quote whose line already derives leaves it closed', async ({ page }) => {
+    await blockWrites(page);
+    await page.goto('/admin/fragments');
+    const row = page.locator('tr[data-type="quote"][data-fragment]');
+    await expect(row.first()).toBeVisible();
+
+    // Find one the rule already explains: its stored line is its author's name.
+    const idx = await row.evaluateAll((rows) =>
+      rows.findIndex((r) => {
+        const d = JSON.parse((r as HTMLElement).dataset.fragment || '{}');
+        return d.attribution && d.authorName && d.attribution === d.authorName;
+      }),
+    );
+    test.skip(idx < 0, 'needs a quote whose attribution is just its author');
+
+    await row.nth(idx).locator('td').nth(2).click();
+    await expect(page.locator(AUTHOR)).toBeVisible();
+    await expect(page.locator(OVERRIDE)).toBeHidden();
+    await expect(page.locator(ATTR)).toHaveValue('');
+  });
+});
+
+// The half of ce11bc4 that survives the rebuild. "You can't pair an author with
+// someone else's book" simply does not apply to a book that belongs to nobody —
+// and `w.authorId === aid` can never match a null, so The Bible used to be
+// excluded from EVERY committed-author state, not just the reported one.
 test('authorless works are offered even when an author IS committed', async ({ page }) => {
   await openQuoteSheet(page);
   const v = await vocab(page);
@@ -130,30 +215,12 @@ test('authorless works are offered even when an author IS committed', async ({ p
     'needs an authored work and an authorless one',
   );
 
-  // Commit the author through the UI, so `combo:change` fires and the Work list
-  // actually re-scopes — the thing under test.
-  const field = page.locator(`${AUTHOR} input[role="combobox"]`);
-  await field.click();
-  await field.fill(v.attributedAuthor!.name);
-  await field.press('Enter');
+  await pick(page, AUTHOR, v.attributedAuthor!.name);
   expect((await committed(page, AUTHOR)).id).toBe(v.attributedAuthor!.id);
 
   await openWorkMenu(page);
-  // Their own work is there — the scoping still scopes.
-  await expect(workRows(page).filter({ hasText: v.attributed!.name })).toHaveCount(1);
-  // And so is the work that belongs to nobody. `w.authorId === aid` can never
-  // match a null, so this was excluded from EVERY committed-author state.
+  await expect(workRows(page).filter({ hasText: v.attributed!.name })).toHaveCount(1); // scoping still scopes
   for (const w of v.authorless) {
     await expect(workRows(page).filter({ hasText: w.name })).toHaveCount(1);
   }
-});
-
-test('the two dead fields are gone from the form', async ({ page }) => {
-  await openQuoteSheet(page);
-  // 0 rows in 76 quotes each. `source_author` never had an input at all — it was
-  // written to `details` and read back into a field that did not exist.
-  await expect(page.locator('#quote-form [name="source_author"]')).toHaveCount(0);
-  await expect(page.locator('#quote-form [name="work_year"]')).toHaveCount(0);
-  // Page survives: it is a locator, and it merges into "Where in it" later.
-  await expect(page.locator('#quote-form [name="page"]')).toHaveCount(1);
 });

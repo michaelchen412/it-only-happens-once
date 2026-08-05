@@ -10,6 +10,7 @@ import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
 import { lookupSong, parseSongRef, songRefUrl } from '../lib/media';
+import { provenanceLine } from '../lib/provenance';
 import type { Database, Json } from '../lib/database.types';
 import { type DB, fail, fragmentStatus, requireAdmin, uniqueSlug, optText, optUrl, optInt, optUuid } from './_shared';
 
@@ -204,17 +205,22 @@ export const fragments = {
     input: z.object({
       id: optText,
       body: z.string().min(1, 'The quote can’t be empty'),
+      /**
+       * The per-quote OVERRIDE, and nothing else (docs/plans/17a). Absent means
+       * "derive it", which is the case for every quote in the corpus. It is
+       * still the column both public renderers read, so it is written on every
+       * save — just never typed.
+       */
       attribution: optText,
-      source_title: optText,
-      page: optInt,
+      /** WHERE in the work: "Book 2:2", "John 3:16", "Letter 24:19–20, p. 19". */
       citation: optText,
       source_url: optUrl,
       // provenance facets. The combo submits an id when an existing entity was
       // chosen; the *_name is only used to create-by-name when the id is absent.
-      author_id: optUuid,
-      work_id: optUuid,
-      author_name: optText, // display stays in attribution
-      work_name: optText, //   display stays in details.source_title
+      author_id: optUuid, // WHO
+      work_id: optUuid, //   FROM
+      author_name: optText,
+      work_name: optText,
       occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
       status: fragmentStatus,
       subjects: optText,
@@ -222,18 +228,16 @@ export const fragments = {
     }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
-      const base = input.slug || `${input.attribution ?? ''} ${firstWords(input.body)}`;
-      const slug = await uniqueSlug(sb, slugify(base), input.id);
-      // ⚠ `details` is a drawer, not a schema: a key here is write-only until
-      // something renders it, and nothing warns you when nothing does. Two were
-      // removed 2026-08-05 (docs/plans/17a) — `source_author`, which had no form
-      // field at all and 0 rows, and `work_year`, which duplicated the existing
-      // `works.year` column and also had 0 rows. Both were written here and read
-      // back into the sheet; neither ever reached a reader. The remaining three
-      // are on the way out too, into Who / From / Where.
+      // ⚠ `details` IS DOWN TO ONE KEY, and that is the whole story of plan 17.
+      // It is a drawer, not a schema: a key here is write-only until something
+      // renders it, and nothing warns you when nothing does. Four have gone —
+      // `source_author` and `work_year` (0 rows each, dead in three files),
+      // `source_title` (42 rows, 41 of them a verbatim copy of `works.title`,
+      // labelled in the form as "shown after the attribution" and shown in
+      // exactly zero places a reader could reach), and `page` (7 rows, folded
+      // into the locator beside it — "p. 41" is a reference like any other).
+      // What is left is the WHERE, and it is about to get a public surface.
       const details: Record<string, Json> = {};
-      if (input.source_title) details.source_title = input.source_title;
-      if (input.page !== undefined) details.page = input.page;
       if (input.citation) details.citation = input.citation;
       // Prefer the chosen entity's id; fall back to creating one by name.
       let author_id = input.author_id ?? (await resolveAuthor(sb, input.author_name));
@@ -243,16 +247,39 @@ export const fragments = {
       // disagreeing (e.g. "Letters from a Stoic" can't be filed under Ocean Vuong),
       // even if the client sent a mismatched pair. Authorless works (The Bible)
       // leave the chosen author untouched.
+      let workTitle: string | null = null;
       if (work_id) {
-        const { data: w } = await sb.from('works').select('author_id').eq('id', work_id).single();
+        const { data: w } = await sb.from('works').select('author_id, title').eq('id', work_id).single();
         if (w?.author_id) author_id = w.author_id;
+        workTitle = w?.title ?? null;
       }
+      // ⚠ THE SHOWN LINE IS DERIVED HERE, FROM WHAT WAS ACTUALLY STORED — not
+      // in the browser, and not from the names the form happened to send.
+      //
+      // The sheet computes the same line for its preview, and that duplication
+      // is deliberate: the preview has to be instant. But only ONE of the two
+      // may be authoritative, and it has to be the one that also decides
+      // `author_id` — otherwise the work-wins snap just above could reassign the
+      // author while the client's line went on naming the old one. Re-reading
+      // the canonical name costs a round trip on an admin save and removes an
+      // entire class of "the label doesn't match the facet" bug.
+      let authorName: string | null = null;
+      if (author_id) {
+        const { data: a } = await sb.from('authors').select('name').eq('id', author_id).single();
+        authorName = a?.name ?? null;
+      }
+      const derived = provenanceLine({ who: authorName, from: workTitle, where: input.citation });
+      // An explicit override wins; otherwise the derivation; otherwise silence,
+      // which both renderers already handle by drawing no line at all.
+      const attribution = input.attribution?.trim() || derived || null;
+      const base = input.slug || `${attribution ?? ''} ${firstWords(input.body)}`;
+      const slug = await uniqueSlug(sb, slugify(base), input.id);
       const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
         type: 'quote',
         title: null,
         slug,
         body: input.body,
-        attribution: input.attribution ?? null,
+        attribution,
         source_url: input.source_url ?? null,
         details,
         author_id,

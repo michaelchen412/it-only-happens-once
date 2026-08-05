@@ -4,6 +4,7 @@
 // suggestions, the Spotify lookup, and the constellations tab. Kept out of the
 // .astro file so the markup stays legible.
 import { actions } from 'astro:actions';
+import { deriveProvenance, mergePage } from '../lib/provenance';
 import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
@@ -43,12 +44,14 @@ const song = mountMiniEditor({
   ariaLabel: 'Why this song',
 });
 
-// required-field gate: Quote + Attribution must be non-empty to save
+// The only required field is the words themselves (2026-08-05, docs/plans/17a).
+// Attribution used to gate this too, which is what made an unattributed quote
+// unenterable — and "no attribution" is now a meaningful answer twice over
+// (Michael's own words; nobody knows), not an unfinished form.
 function refreshQuoteValid() {
-  quoteSave.disabled = quoteEditor.isEmpty || !quoteAttr.value.trim();
+  quoteSave.disabled = quoteEditor.isEmpty;
 }
 quoteEditor.on('update', refreshQuoteValid);
-quoteAttr.addEventListener('input', refreshQuoteValid);
 
 // --- provenance facets: structured Author → Work combos (integrity by construction) ---
 type Combo = HTMLElement & {
@@ -61,7 +64,12 @@ type Combo = HTMLElement & {
 };
 const authorCombo = document.getElementById('quote-author') as Combo;
 const workCombo = document.getElementById('quote-work') as Combo;
-const quoteSourceTitle = quoteForm.elements.namedItem('source_title') as HTMLInputElement;
+const quoteWhere = document.getElementById('quote-where') as HTMLInputElement;
+const previewLine = document.getElementById('quote-preview-line')!;
+const previewReveal = document.getElementById('quote-preview-reveal')!;
+const overrideWrap = document.getElementById('quote-attr-override') as HTMLElement;
+const overrideOpenBtn = document.getElementById('quote-attr-edit') as HTMLButtonElement;
+const overrideRevertBtn = document.getElementById('quote-attr-revert') as HTMLButtonElement;
 
 // The full lists (rendered into the combos) — used to re-scope the Work list.
 const allAuthors: { id: string; name: string }[] = JSON.parse(authorCombo.dataset.options || '[]');
@@ -97,18 +105,9 @@ function recomputeWorkScope() {
   const wid = workCombo.getId();
   if (wid && !subset.some((w) => w.id === wid)) workCombo.clear(); // drop a now-orphaned work
 }
-// Author fills the shown attribution when it's still blank (no double-entry).
-function fillAttrFromAuthor() {
-  const n = authorCombo.getName().trim();
-  if (n && !quoteAttr.value.trim()) {
-    quoteAttr.value = n;
-    refreshQuoteValid();
-  }
-}
-
 authorCombo.addEventListener('combo:change', () => {
-  fillAttrFromAuthor();
   recomputeWorkScope();
+  refreshPreview();
 });
 workCombo.addEventListener('combo:change', () => {
   const opt = workCombo.getOption();
@@ -116,41 +115,80 @@ workCombo.addEventListener('combo:change', () => {
   if (opt && opt.authorId) {
     authorCombo.setValue(opt.authorId, authorNameById.get(opt.authorId) ?? '');
     recomputeWorkScope();
-    fillAttrFromAuthor();
   }
-  const wname = workCombo.getName().trim();
-  if (wname && !quoteSourceTitle.value.trim()) quoteSourceTitle.value = wname;
+  refreshPreview();
+});
+quoteWhere.addEventListener('input', refreshPreview);
+
+// ═══ THE DERIVED LINE (docs/plans/17a-quote-matrix.md, src/lib/provenance.ts) ══
+//
+// THREE HANDLERS DIED HERE, and their absence is the point of the rebuild:
+//
+//  · `fillAttrFromAuthor` — copied the author's name into Attribution. It was
+//    hiding the fact that `attribution` was a DERIVED value all along; Michael
+//    performed the derivation by hand seventy-six times and typed in the result.
+//    Now the derivation is a function and this copy is nonsense.
+//  · the Attribution→Author seeding, and its `/\d+\s*:\s*\d+/` exemption — a
+//    hardcoded rule for deciding whether "Matthew 5:43-48" was a person's name.
+//    It cannot exist here any more because THERE IS NO FREE-TEXT ATTRIBUTION
+//    FIELD TO TYPE A BOOK NAME INTO. A locator goes in "Where in it", a name
+//    goes in "Who said it", and nothing has to guess which is which. (The fix
+//    shipped in ce11bc4 narrowed that guess; this deletes the surface it lived
+//    on. `scopedWorks`'s authorless rule above is still load-bearing and stays.)
+//  · Work→Source title — a field that copied `works.title` into `details` and
+//    was labelled "shown after the attribution" while being shown nowhere a
+//    reader could reach. 42 rows, 41 of them verbatim duplicates.
+//
+// What replaces all three is one function, called from every input, whose
+// output you can read.
+
+/** The three facts as the public renderers will read them. */
+const quoteFacts = () => ({
+  who: authorCombo.getName(),
+  from: workCombo.getName(),
+  where: quoteWhere.value,
 });
 
-// Typing an attribution seeds the Author facet — but ONLY when the text names an
-// author who already exists (2026-08-05, docs/plans/17a).
-//
-// It used to seed ANY text as an uncommitted author name, guarded by
-// `/\d+\s*:\s*\d+/` — a hardcoded exemption so "Matthew 5:43-48" wouldn't be
-// mistaken for a person. That regex was the diagnosis, not the fix: a bare book
-// name ("Ecclesiastes", "Proverbs") doesn't match it, so it seeded a phantom
-// author, emptied the Work list via scopedWorks() above, and — on save —
-// `resolveAuthor` would have created a real `authors` row named after a book of
-// the Bible. Requiring an author who exists means a LOCATOR CAN NEVER BECOME A
-// NAME, and the special case disappears instead of growing a second branch.
-//
-// (The cost, paid deliberately: typing a BRAND-NEW author here no longer
-// pre-fills the Author field. Pick them in Author instead — which fills
-// Attribution, and is the direction the machinery already flows. Keeping the
-// convenience would mean keeping a guess about what is and isn't a person's
-// name, and that guess is the bug.)
-quoteAttr.addEventListener('change', () => {
-  const v = quoteAttr.value.trim();
-  if (!v || authorCombo.getName().trim()) return;
-  const known = allAuthors.find((a) => a.name.toLowerCase() === v.toLowerCase());
-  if (!known) return;
-  authorCombo.setValue(known.id, known.name);
-  recomputeWorkScope();
+/** Muted italic for "there is genuinely nothing here" — never an empty gap.
+ *  A blank slot in a preview reads as a bug, or as a field you forgot; a
+ *  sentence reads as an answer. Same reason the workshop says `source unknown`
+ *  rather than leaving the citation column empty. */
+function say(el: HTMLElement, text: string, whenEmpty: string) {
+  el.textContent = text || whenEmpty;
+  el.classList.toggle('italic', !text);
+  el.classList.toggle('opacity-55', !text);
+}
+
+function refreshPreview() {
+  const { line, reveal } = deriveProvenance(quoteFacts());
+  const override = quoteAttr.value.trim();
+  const shown = overrideWrap.hidden ? line : override || line;
+  say(previewLine, shown ? `— ${shown}` : '', 'nothing — the line stays silent');
+  say(previewReveal, reveal, 'nothing to reveal');
+}
+
+// The override opens pre-filled with the derived line, so you EDIT the sentence
+// you can see rather than compose one from scratch against a blank field. If you
+// then change it back, submit() drops it — an override that matches the
+// derivation isn't one, and pinning it would make this row stop tracking its own
+// facts for no reason anyone could later reconstruct.
+function setOverrideOpen(open: boolean) {
+  overrideWrap.hidden = !open;
+  overrideOpenBtn.hidden = open;
+}
+overrideOpenBtn.addEventListener('click', () => {
+  if (!quoteAttr.value.trim()) quoteAttr.value = deriveProvenance(quoteFacts()).line;
+  setOverrideOpen(true);
+  quoteAttr.focus();
+  quoteAttr.select();
+  refreshPreview();
 });
-quoteSourceTitle.addEventListener('change', () => {
-  const v = quoteSourceTitle.value.trim();
-  if (v && !workCombo.getName().trim()) workCombo.setValue('', v);
+overrideRevertBtn.addEventListener('click', () => {
+  quoteAttr.value = '';
+  setOverrideOpen(false);
+  refreshPreview();
 });
+quoteAttr.addEventListener('input', refreshPreview);
 
 // --- AI subject suggestions (Haiku) — pre-fill tags; new subject needs accept ---
 // Both types share one implementation (docs/plans/02); only the question "what
@@ -367,6 +405,8 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
       authorCombo.clear();
       workCombo.clear();
       recomputeWorkScope();
+      setOverrideOpen(false); // a fresh quote is never an exception to its own rule
+      refreshPreview();
       resetQuoteDate();
       refreshQuoteValid();
       quoteSuggest.reset();
@@ -412,12 +452,26 @@ document.addEventListener('fragment:edit', (e) => {
     if (type === 'quote') {
       quoteEditor.commands.setContent(d.body || '', { emitUpdate: false });
       setField(form, 'source_url', d.source_url);
-      setField(form, 'source_title', d.details.source_title ?? '');
-      setField(form, 'page', d.details.page != null ? String(d.details.page) : '');
-      setField(form, 'citation', d.details.citation ?? '');
+      // "Where in it" absorbs the legacy `page`, so the two locators Michael
+      // recorded separately arrive as the one sentence he'd say out loud
+      // ("Letter 2:3, p. 19"). Saving writes it back merged — so every quote you
+      // OPEN migrates itself, and the batch migration is only catching up with
+      // the ones you don't.
+      setField(form, 'citation', mergePage(d.details.citation, d.details.page));
       authorCombo.setValue(d.authorId ?? '', d.authorName ?? '');
       recomputeWorkScope(); // scope the Work list to this author before selecting
       workCombo.setValue(d.workId ?? '', d.workName ?? '');
+      // Is the stored line an OVERRIDE, or just the derivation written down by
+      // hand? Compare. 74 of 76 live rows are the latter, so this opens closed
+      // and empty almost always — and the ones where it opens are exactly the
+      // rows whose facts don't yet produce their own line. That is not a
+      // nuisance, it is the migration's to-do list surfacing where you can act
+      // on it: move "Matthew 5:43-48" into Where in it, and the override goes.
+      const stored = (d.attribution ?? '').trim();
+      const overridden = !!stored && stored !== deriveProvenance(quoteFacts()).line;
+      quoteAttr.value = overridden ? stored : '';
+      setOverrideOpen(overridden);
+      refreshPreview();
       resetQuoteDate(d.occurredIso, d.datePrecision);
       refreshQuoteValid();
       quoteSuggest.reset();
@@ -500,8 +554,8 @@ for (const [form, action] of [
     clearError();
     if (form === quoteForm) {
       quoteBody.value = quoteMarkdown();
-      if (quoteEditor.isEmpty || !quoteAttr.value.trim()) {
-        showError('A quote needs both its words and an attribution.');
+      if (quoteEditor.isEmpty) {
+        showError('A quote needs its words.');
         return;
       }
     } else if (form === songForm) {
@@ -511,6 +565,17 @@ for (const [form, action] of [
     }
     const fd = new FormData(form);
     if (form === quoteForm && !quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic
+    if (form === quoteForm) {
+      // ABSENT `attribution` MEANS "derive it" — the server owns that, so a
+      // stale sheet can never write a line that disagrees with its own facts.
+      // Sent only when it is a genuine exception: the box is open AND says
+      // something the derivation wouldn't. (The input is `hidden`, not
+      // `disabled`, so it submits regardless — hence reading the box's state
+      // rather than trusting the field to be empty.)
+      const override = overrideWrap.hidden ? '' : quoteAttr.value.trim();
+      if (override && override !== deriveProvenance(quoteFacts()).line) fd.set('attribution', override);
+      else fd.delete('attribution');
+    }
     const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
     submitBtn.disabled = true;
     const { data, error } = await action(fd);
