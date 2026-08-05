@@ -138,6 +138,16 @@ setup('mint an admin session and find fixtures', async () => {
   // /admin — so reaching it needs a real constellation to open.
   const { data: constellation } = await service.from('constellations').select('id').limit(1).maybeSingle();
 
+  // A constellation with a SUITE in it, for the specs about removing rows. The
+  // one above may well be empty, and an empty composer has no ✕ to press. Two
+  // placements is the floor: one to remove and one to prove the rest survive.
+  const { data: placements } = await service.from('fragment_constellations').select('constellation_id');
+  const byConstellation = new Map<string, number>();
+  for (const p of placements ?? []) {
+    byConstellation.set(p.constellation_id, (byConstellation.get(p.constellation_id) ?? 0) + 1);
+  }
+  const composed = [...byConstellation.entries()].find(([, n]) => n >= 2)?.[0] ?? null;
+
   fs.writeFileSync(
     FIXTURES_FILE,
     JSON.stringify(
@@ -146,6 +156,7 @@ setup('mint an admin session and find fixtures', async () => {
         draftStatus: draft?.status ?? null,
         publishedSlug: published?.slug ?? null,
         constellationId: constellation?.id ?? null,
+        composedConstellationId: composed,
       },
       null,
       2,

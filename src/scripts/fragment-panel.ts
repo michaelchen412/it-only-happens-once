@@ -5,6 +5,7 @@
 // onOpen, per-row action buttons (restore/purge/place) → onAction, and
 // checkbox selection (with shift-range) → onSelectionChange.
 import { MIN_SEARCH } from '../lib/search-highlight';
+import { onSkyChange } from './sky-changed';
 
 const PARTIAL = '/admin/fragments-panel';
 
@@ -17,7 +18,13 @@ export interface PanelOpts {
   onOpen?: (row: HTMLElement, e: MouseEvent) => void;
   /** A [data-act] button: 'restore' | 'purge' | 'place'. */
   onAction?: (act: string, id: string, row: HTMLElement) => void;
-  onSelectionChange?: (ids: string[]) => void;
+  /**
+   * The cart changed. `ids` is every fragment in it, in the order they were
+   * added; `shown` is how many of those are on screen under the current
+   * filter. They differ whenever the cart outlives the filter that filled it,
+   * which is the whole point of Piece 4 — and the host has to SAY so.
+   */
+  onSelectionChange?: (ids: string[], shown: number) => void;
   /** After each fetch+swap — the parsed partial doc, for host-side syncing. */
   onSwap?: (doc: Document) => void;
 }
@@ -27,6 +34,11 @@ export interface PanelHandle {
   refresh: () => Promise<void>;
   getSelected: () => string[];
   clearSelection: () => void;
+  /** Take one fragment out of the cart without touching the rest. The browser
+   *  calls this after a per-row ＋: `markPlaced` disables the checkbox, but a
+   *  disabled box is invisible to the cart, so its id would otherwise ride
+   *  along into the next bulk place. */
+  deselect: (id: string) => void;
 }
 
 export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): PanelHandle {
@@ -38,6 +50,28 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
 
   const checkList = () => Array.from(listWrap.querySelectorAll<HTMLInputElement>('.row-check:not(:disabled)'));
 
+  /**
+   * ── THE CART ──────────────────────────────────────────────────────────
+   * The selection is a Set that OUTLIVES the filter, not a reading of which
+   * checkboxes happen to be ticked right now.
+   *
+   * Before this there was no selection model at all — `getSelected()` read
+   * `.row-check:checked` off the DOM, and every filter change replaced
+   * `listWrap.innerHTML`, which destroyed those checkboxes and rebuilt them
+   * unticked from the partial. So selecting three things and then narrowing
+   * the search silently threw all three away. Nothing was broken in the
+   * selection logic; there was simply nothing for it to be logic about.
+   *
+   * A Set (not an array, not a NodeList) because two properties matter:
+   * membership is the question asked on every re-tick after a swap, and
+   * INSERTION ORDER is what the browser's bulk place turns into suite order —
+   * each placement takes `position = max + 1`, so the order you added things
+   * to the cart becomes the order they read in. That is a quiet improvement
+   * over what happened before, which was whatever order the current filter
+   * happened to render.
+   */
+  const cart = new Set<string>();
+
   function buildParams(): URLSearchParams {
     const params = new URLSearchParams();
     for (const [k, v] of new FormData(filters) as unknown as Iterable<[string, string]>) if (v) params.set(k, v);
@@ -46,9 +80,18 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
     return params;
   }
 
-  // Type-badge counts live in the toolbar (outside the swapped region) — copy
-  // the fresh numbers from the fetched partial.
-  function syncCounts(doc: Document) {
+  // The toolbar sits OUTSIDE `.fpanel-list`, so the swap below never touches
+  // it — but every partial we fetch contains a fresh copy of it. Copying the
+  // parts that go stale out of a response we're already receiving costs no
+  // request at all, and it makes the toolbar self-healing: any filter change,
+  // any refresh(), any fragments:changed re-syncs it.
+  //
+  // This is the PULL half of Piece 3. It is the only half that can see a
+  // constellation made in ANOTHER TAB, or one made on /admin/constellations
+  // before you navigated here — the `sky:changed` push is blind to both, since
+  // a CustomEvent cannot cross a document.
+  function syncToolbar(doc: Document) {
+    // type-badge counts
     doc.querySelectorAll<HTMLElement>('.type-badge').forEach((src) => {
       const dst = root.querySelector<HTMLElement>(
         `.type-badge[data-type-filter="${src.dataset.typeFilter ?? ''}"] .type-badge__n`,
@@ -56,7 +99,35 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
       const val = src.querySelector('.type-badge__n')?.textContent;
       if (dst && val != null) dst.textContent = val;
     });
+
+    // "Filter by constellation" — the sharp one. Before this, every filter
+    // change fetched a partial containing a fresh option list and threw it
+    // away, so the select was stale from the moment the page rendered and
+    // stayed stale no matter what you did short of a hard reload.
+    const freshIn = doc.querySelector<HTMLSelectElement>('select[name="in"]');
+    const liveIn = root.querySelector<HTMLSelectElement>('select[name="in"]');
+    if (freshIn && liveIn && freshIn.innerHTML !== liveIn.innerHTML) {
+      const keep = liveIn.value; // the selection is the user's, not the server's
+      liveIn.innerHTML = freshIn.innerHTML;
+      liveIn.value = keep;
+      // A filter pointing at a constellation that has since been deleted can't
+      // be honoured; fall back to "any" rather than showing a blank select.
+      if (liveIn.selectedIndex === -1) liveIn.value = '';
+    }
   }
+
+  /** Add one `<option>` to the constellation filter, if it isn't there yet.
+   *  Appended, because `save` gives a new constellation sort = max+1 and the
+   *  server renders this list in `sort` order. */
+  function addConstellationOption(c: { slug: string; name: string }) {
+    const sel = root.querySelector<HTMLSelectElement>('select[name="in"]');
+    if (!sel || sel.querySelector(`option[value="${CSS.escape(c.slug)}"]`)) return;
+    const opt = document.createElement('option');
+    opt.value = c.slug;
+    opt.textContent = c.name; // textContent, not innerHTML — it's a typed name
+    sel.appendChild(opt);
+  }
+  onSkyChange(addConstellationOption);
 
   // --- fetch + swap (keeps focus; no navigation) ----------------------------
   let fetchToken = 0;
@@ -76,9 +147,13 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
       if (!next) throw new Error('no list');
       if (token !== fetchToken) return;
       listWrap.innerHTML = next.innerHTML;
-      syncCounts(doc);
+      syncToolbar(doc);
       if (historyUrl) history.replaceState({}, '', historyUrl);
       lastIndex = -1;
+      // The rows arrived unticked. Re-tick from the cart BEFORE reporting, so
+      // a fragment carted three searches ago shows ticked the moment a later
+      // filter brings it back on screen.
+      restoreTicks();
       refreshSelection();
       if (focusField) listWrap.querySelector<HTMLElement>(`.sort-header[data-field="${focusField}"]`)?.focus();
       opts.onSwap?.(doc);
@@ -165,48 +240,80 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
     if (row && root.dataset.view !== 'trash') opts.onOpen?.(row, e as MouseEvent);
   });
 
-  // select-all (change fires once)
+  // select-all (change fires once). It keeps meaning "everything currently
+  // VISIBLE": it adds the rows on screen to the cart or takes them out of it,
+  // and never touches what's in the cart from another filter. Making it mean
+  // "the whole cart" would give the one control on the page that can empty a
+  // cart you can't see — which is what the explicit Clear button is for.
   listWrap.addEventListener('change', (e) => {
     const t = e.target as HTMLElement;
     if (t.classList.contains('select-all')) {
       const on = (t as HTMLInputElement).checked;
-      checkList().forEach((c) => (c.checked = on));
+      checkList().forEach((c) => {
+        c.checked = on;
+        setInCart(c.value, on);
+      });
       refreshSelection();
     }
   });
 
   // --- selection + shift-range ----------------------------------------------
   let lastIndex = -1;
+
+  function setInCart(id: string, on: boolean) {
+    // Delete-then-add on a re-tick would move the id to the END of the
+    // insertion order, quietly reshuffling a suite you were about to place.
+    // Ticking something already carted is a no-op; only untick removes.
+    if (on) cart.add(id);
+    else cart.delete(id);
+  }
+
+  /** Point the visible checkboxes at the cart. Runs after every swap. */
+  function restoreTicks() {
+    checkList().forEach((c) => (c.checked = cart.has(c.value)));
+  }
+
   function onCheckClick(e: MouseEvent, check: HTMLInputElement) {
     const boxes = checkList();
     const idx = boxes.indexOf(check);
     if (e.shiftKey && lastIndex !== -1) {
       const [a, b] = [lastIndex, idx].sort((x, y) => x - y);
-      for (let i = a; i <= b; i++) boxes[i].checked = check.checked;
+      for (let i = a; i <= b; i++) {
+        boxes[i].checked = check.checked;
+        setInCart(boxes[i].value, check.checked);
+      }
+    } else {
+      setInCart(check.value, check.checked);
     }
     lastIndex = idx;
     refreshSelection();
   }
+
   function refreshSelection() {
     const boxes = checkList();
-    const selected = boxes.filter((c) => c.checked);
+    const visible = boxes.filter((c) => cart.has(c.value));
     const all = listWrap.querySelector<HTMLInputElement>('.select-all');
     if (all) {
-      all.checked = selected.length > 0 && selected.length === boxes.length;
-      all.indeterminate = selected.length > 0 && selected.length < boxes.length;
+      // Scoped to what's VISIBLE, matching what select-all does. A tick-all
+      // box that reads the whole cart would sit indeterminate forever the
+      // moment the cart held something off-screen.
+      all.checked = visible.length > 0 && visible.length === boxes.length;
+      all.indeterminate = visible.length > 0 && visible.length < boxes.length;
     }
-    opts.onSelectionChange?.(selected.map((c) => c.value));
+    opts.onSelectionChange?.([...cart], visible.length);
   }
 
   return {
     root,
     refresh: applyFilters,
-    getSelected: () =>
-      checkList()
-        .filter((c) => c.checked)
-        .map((c) => c.value),
+    getSelected: () => [...cart],
     clearSelection: () => {
-      checkList().forEach((c) => (c.checked = false));
+      cart.clear();
+      restoreTicks();
+      refreshSelection();
+    },
+    deselect: (id: string) => {
+      cart.delete(id);
       refreshSelection();
     },
   };

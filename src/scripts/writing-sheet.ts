@@ -30,6 +30,7 @@ import { slugify } from '../lib/slug';
 import { countWords, minutesForWords } from '../lib/reading';
 import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
+import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
@@ -674,10 +675,14 @@ function closeNow() {
   releaseEditLock();
   // A pairing counts too: it applied immediately, so the feed underneath is
   // now stale in exactly the way a membership change makes it stale.
-  const reload = everSaved || picker.changed() || musicPanel.changed();
+  const stale = everSaved || picker.changed() || musicPanel.changed();
   setHash(prevHash); // restore the underlying context (e.g. #browse) first
   sheet.close();
-  if (reload) location.reload();
+  // This used to be `location.reload()` on the very next line, which meant the
+  // 0.28s slide-out got a frame or two before the page started tearing down —
+  // the "instantly disappears, and there's some bit of lag" of the report. The
+  // close is real now, and the host refreshes in place around it.
+  if (stale) notifyFragmentsChanged(sheet);
 }
 async function requestClose() {
   if (!loadFailed && dirty) {

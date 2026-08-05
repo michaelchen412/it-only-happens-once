@@ -5,7 +5,7 @@
   color, so the mix of a constellation is legible at a glance.
 */
 import TypeMark from './TypeMark.astro';
-import { type FragmentType } from '../../lib/fragments-display';
+import { typeCountLabel, type FragmentType } from '../../lib/fragments-display';
 
 interface Props {
   type: FragmentType;
@@ -14,17 +14,13 @@ interface Props {
   title?: string;
 }
 const { type, count, title } = Astro.props;
-
-// "writing" is a mass noun; the other two count normally.
-const LABEL: Record<FragmentType, (n: number) => string> = {
-  writing: () => 'writing',
-  quote: (n) => (n === 1 ? 'quote' : 'quotes'),
-  song: (n) => (n === 1 ? 'song' : 'songs'),
-};
+// The mass-noun rule lives in fragments-display.ts, not here: the composer
+// recomputes these badges client-side after an unplace, and both sides have to
+// singularise the same way or the number and the noun disagree.
 ---
 
-<span class:list={['admin-stat', count === 0 && 'opacity-50']} title={title}>
+<span class:list={['admin-stat', count === 0 && 'opacity-50']} title={title} data-type-count={type}>
   <TypeMark type={type} />
   <b class="admin-stat__n">{count}</b>
-  <span class="admin-stat__label">{LABEL[type](count)}</span>
+  <span class="admin-stat__label">{typeCountLabel(type, count)}</span>
 </span>

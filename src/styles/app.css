@@ -1058,6 +1058,17 @@ html.reader-open .sky-return {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  /* ⚠ `width: max-content` is LOAD-BEARING, not tidying. A `position: fixed`
+     box with only `left` set shrink-to-fits against `100% - left` — so pinning
+     the bar at `left: 50%` silently capped it at HALF the viewport, however
+     much empty space sat either side of it. Nothing showed until Piece 4 made
+     the count longer than "3 selected": at "7 selected · 0 shown here" the
+     label wrapped to two lines and the pill went ragged, on a 1280px screen
+     with 600px to spare. Found by looking at a screenshot — `toHaveText`
+     normalises whitespace, so the spec asserting that exact string was green
+     the whole time. */
+  width: max-content;
+  max-width: calc(100vw - 2rem);
   padding: 0.4rem 0.5rem 0.4rem 1.1rem;
   border: 1px solid var(--color-base-300);
   border-radius: 999px;
@@ -1098,6 +1109,33 @@ html.reader-open .sky-return {
   .row-edit {
     opacity: 1;
   }
+}
+
+/* The selection checkbox in a fragment row. It renders at 16×16 (daisyUI's
+   `checkbox-xs`), which is under WCAG 2.5.8 AA's 24px floor — tolerable while
+   ticking a box was a throwaway gesture undone by the next filter change, and
+   not tolerable now that the selection is a CART that persists across filters
+   and searches and drives bulk publish, bulk membership and bulk DELETE.
+
+   The box keeps its size; the TARGET grows around it with a transparent
+   pseudo-element, so the visual density of a dense table is unchanged and only
+   the thing your finger has to find gets bigger. `position: relative` on the
+   box itself is what the ::after anchors to.
+
+   (Found by the 2026-08-04 audit at ten widths — one of 366 instances of the
+   same measurement. This one is fixed HERE, with the piece that made the
+   control load-bearing, rather than waiting for the sweep.) */
+.row-check {
+  position: relative;
+}
+.row-check::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  content: '';
+  transform: translate(-50%, -50%);
 }
 
 /* ── Admin chrome primitives (docs/admin.md §2) ──────────────────────────────

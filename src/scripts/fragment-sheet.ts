@@ -6,6 +6,7 @@
 import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
+import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSharedBy } from './shared-by';
 import { mountMiniEditor } from './rich-editor';
@@ -277,9 +278,21 @@ async function requestClose() {
     if (!ok) return;
   }
   dirty = false;
-  // Membership applies immediately, so the list/suite behind us is stale.
-  if (membershipTouched()) return void window.location.reload();
+  // ⚠ CLOSE FIRST, ALWAYS — on every path, including this one.
+  //
+  // This line used to read `if (membershipTouched()) return void
+  // location.reload()`, and that `return` jumped straight over `sheet.close()`.
+  // So on the exact gesture "assign it to a constellation, then close the
+  // sheet", the sheet was never closed at all: it sat open on screen while a
+  // full page load ran, and vanished only when the new document painted. There
+  // was no close animation because there was no close. It read as jarring
+  // because it WAS jarring — an element disappearing is not an element closing.
+  const stale = membershipTouched();
   sheet.close();
+  // Membership applies immediately, so the list/suite behind us is stale. The
+  // host refreshes in place if it can; if nothing claims it, this falls back to
+  // the reload that used to be here unconditionally.
+  if (stale) notifyFragmentsChanged(sheet);
 }
 
 document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => requestClose()));
@@ -482,8 +495,11 @@ for (const [form, action] of [
         await picker.flush(data.id);
         await sharedByHandles.get(form === quoteForm ? 'quote' : 'song')?.flush(data.id);
       }
-      dirty = false; // saved — don't prompt on the reload
-      window.location.reload();
+      dirty = false; // saved — don't prompt the unsaved-work guard on the way out
+      // The reload used to be what closed this sheet after a save. It isn't any
+      // more, so the close is explicit and load-bearing rather than tidying.
+      sheet.close();
+      notifyFragmentsChanged(sheet);
       return;
     }
     showError(formatActionError(error));
@@ -511,7 +527,9 @@ document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
       btn.disabled = false;
       return showError(error.message);
     }
-    window.location.reload();
+    dirty = false; // trashed — nothing left here worth guarding
+    sheet.close();
+    notifyFragmentsChanged(sheet);
   });
 });
 

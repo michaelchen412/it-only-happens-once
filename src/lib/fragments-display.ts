@@ -12,6 +12,17 @@ export const TYPE_META = {
 
 export type FragmentType = keyof typeof TYPE_META;
 
+/** The noun beside a type count. "writing" is a MASS noun — five pieces of
+ *  writing is still "writing", and "5 writings" reads like a database. The
+ *  other two count normally.
+ *
+ *  Exported (rather than living inside TypeCount.astro) because the composer's
+ *  ✕ now recomputes its badges in the browser, and a singularisation rule the
+ *  server knows and the client doesn't would show "1 quotes" the moment you
+ *  removed the second one. */
+export const typeCountLabel = (type: FragmentType, n: number): string =>
+  type === 'writing' ? 'writing' : n === 1 ? TYPE_META[type].label : `${TYPE_META[type].label}s`;
+
 /** The bare public date for a fragment (UTC, so it never drifts by a day). */
 export function displayDate(iso: string, precision: 'day' | 'year'): string {
   const d = new Date(iso);

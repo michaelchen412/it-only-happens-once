@@ -5,6 +5,7 @@
 // sheets (quote/song → FragmentSheet, writing → WritingSheet).
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
+import { onFragmentsChanged } from './fragments-changed';
 import { wireFragmentPanel, wireAddMenu } from './fragment-panel';
 
 const root = document.querySelector('.fpanel') as HTMLElement;
@@ -30,9 +31,19 @@ const panel = wireFragmentPanel(root, {
   onAction(act, id) {
     if (act === 'restore' || act === 'purge') void trashAction(act, id);
   },
-  onSelectionChange(ids) {
+  // The selection is a CART now (see fragment-panel.ts): it survives filter
+  // and search changes rather than being thrown away by them. One behaviour
+  // for one component — the manager and the composer's browser sheet share
+  // this panel, and a flag to make them differ would be two behaviours to keep
+  // straight for no reason anybody could state.
+  onSelectionChange(ids, shown) {
     bulkbar.classList.toggle('is-open', ids.length > 0);
-    bulkcount.textContent = `${ids.length} selected`;
+    // ⚠ The load-bearing half. A cart that outlives its filter can hold rows
+    // you cannot see, and the actions on this bar include DELETE. Saying "3
+    // selected · 1 shown here" is what stops that being a trap; the confirm
+    // dialog names the count for the same reason.
+    bulkcount.textContent =
+      shown === ids.length ? `${ids.length} selected` : `${ids.length} selected · ${shown} shown here`;
     syncRemovableConstellations(ids);
   },
   onSwap(doc) {
@@ -65,27 +76,57 @@ bulkBtns.forEach((btn) =>
       showBulkError(error.message);
       return;
     }
+    // Every op on this bar can move rows OUT of the current view — a trashed
+    // fragment, a published one under a draft filter, a note under the list
+    // view. Leaving them in the cart would strand a count that says "3
+    // selected · 0 shown here" for the rest of the session, about three
+    // fragments the op has already dealt with. The constellation menu below
+    // deliberately does NOT clear: those rows stay, and adding one selection
+    // to two constellations in a row is a real thing to want.
+    panel.clearSelection();
     await panel.refresh();
     bulkBtns.forEach((b) => (b.disabled = false));
   }),
 );
 
+/**
+ * ⚠ Names the COUNT, and does so because the selection is a cart. Before Piece
+ * 4 the number on the bar was always the number of ticked boxes in front of
+ * you; now it can include rows scrolled out of view under a filter you have
+ * since changed. "Delete 7 fragments" is the last chance to notice that 7 is
+ * not the 2 you can see — which is also why the bar carries "· n shown here".
+ */
 function confirmBulk(op: 'trash' | 'purge', n: number) {
   const noun = `${n} fragment${n === 1 ? '' : 's'}`;
   return op === 'purge'
     ? confirmDialog({
         title: 'Delete forever',
         message: `Permanently delete ${noun}? This cannot be undone.`,
-        confirmLabel: 'Delete forever',
+        confirmLabel: `Delete ${noun} forever`,
         danger: true,
       })
     : confirmDialog({
         title: 'Move to trash',
         message: `Move ${noun} to trash?`,
-        confirmLabel: 'Delete',
+        confirmLabel: `Delete ${noun}`,
         danger: true,
       });
 }
+
+document.getElementById('bulk-clear')?.addEventListener('click', () => panel.clearSelection());
+
+// An editor sheet saved, trashed, or changed a membership. `panel.refresh` is
+// `applyFilters` — it refetches the fragments-panel partial and swaps the table
+// in place, which is exactly what the reload used to accomplish and nothing
+// more. There was genuinely nothing to build here; the capability was already
+// on the handle, and since Piece 3 the same call also re-syncs the toolbar.
+// The whole thing waits on the sheet's exit rather than fetching early like the
+// composer does: this partial is a table, not a page, and the ~0.28s head start
+// isn't worth the extra branch. The swap is what must not land mid-slide.
+onFragmentsChanged(({ settled }) => {
+  void settled.then(() => panel.refresh());
+  return true;
+});
 
 // --- per-row trash actions --------------------------------------------------
 async function trashAction(op: 'restore' | 'purge', id: string) {
@@ -136,6 +177,13 @@ if (cnBtn && cnMenu) wireAddMenu(cnBtn, cnMenu);
  * "Remove from" only lists constellations the selection actually belongs to —
  * offering to remove something from a suite it was never in is noise. Read off
  * each row's data-constellations, which the server rendered.
+ *
+ * ⚠ With a cart, a selected fragment may not have a row on screen, and its
+ * memberships are then simply unknown here. The list UNDER-offers in that
+ * case, which is the safe direction: you can't be shown a "remove from" you
+ * didn't mean, only miss one you did (change the filter back and it returns).
+ * Fetching memberships for off-screen ids would be a round trip to decide the
+ * contents of a menu, which is not worth it in a room with one user.
  */
 function syncRemovableConstellations(ids: string[]) {
   if (!cnMenu) return;

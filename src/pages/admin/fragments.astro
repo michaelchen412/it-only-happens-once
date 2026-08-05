@@ -162,7 +162,8 @@ const SUBTITLES = {
 
   {/* Floating bulk-action bar (buttons rendered per view) */}
   <div id="bulkbar" class="bulkbar font-sans text-sm" data-view={view}>
-    <span id="bulkcount" class="text-base-content/70">0 selected</span>
+    {/* nowrap: "7 selected · 0 shown here" is one fact, not two lines. */}
+    <span id="bulkcount" class="text-base-content/70 whitespace-nowrap">0 selected</span>
     <div class="flex gap-1">
       {
         view === 'trash' ? (
@@ -242,6 +243,14 @@ const SUBTITLES = {
           </>
         )
       }
+      {
+        /* Clear sits apart from the actions, after a gap: the selection now
+          survives a filter change, so "change the filter" has stopped being
+          the way to empty it and there has to be a real control. It is not an
+          action ON the selection, so it doesn't join the row of things that
+          are. */
+      }
+      <button id="bulk-clear" class="btn btn-xs btn-ghost ml-2 normal-case">Clear</button>
     </div>
   </div>
   <p

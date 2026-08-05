@@ -9,9 +9,13 @@
   quote/song → FragmentSheet, writing → WritingSheet — and the header's own
   Add ▾ creates new fragments that auto-place via body[data-place-in].
 
-  While open the hash is #browse, so the full-page reload an editor-sheet save
-  triggers lands back inside the browser with fresh rows. Closing after any
-  placement reloads the page so the suite reflects what was added.
+  Nothing here navigates. A sheet that saves on top of this drawer, and this
+  drawer closing after a placement, both announce `fragments:changed` — the
+  composer refreshes its suite in place and this drawer refreshes its own rows,
+  so composing survives a save with its scroll position, its view mode and its
+  unsaved form edits intact. The #browse hash is kept for a genuine hard
+  refresh; it is no longer what makes a save land back inside the browser,
+  because the browser no longer closes for one.
 */
 import { Icon } from 'astro-icon/components';
 import TypeMark from './TypeMark.astro';
@@ -41,15 +45,20 @@ const { constellation, constellationName, constellationDescription, constellatio
     <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">
         <h2 id="fb-title" class="font-display truncate text-xl">
-          Add to <span class="text-primary">{constellationName}</span>
+          Add to <span id="fb-cname" class="text-primary">{constellationName}</span>
         </h2>
         {
-          constellationDescription && (
-            <p class="admin-hint line-clamp-1" title={constellationDescription}>
-              {constellationDescription}
-            </p>
-          )
+          /* Rendered even when empty, so a description added in the form behind
+          this drawer has somewhere to land without a reload (sky:changed). */
         }
+        <p
+          id="fb-cdesc"
+          class="admin-hint line-clamp-1"
+          title={constellationDescription}
+          hidden={!constellationDescription}
+        >
+          {constellationDescription}
+        </p>
       </div>
       <p id="fb-error" hidden role="alert" class="admin-alert px-2 py-1 text-xs"></p>
       <div class="relative ml-auto">
@@ -99,14 +108,22 @@ const { constellation, constellationName, constellationDescription, constellatio
 
     <BackToTop scroller="#fb-panel" inDialog class="bottom-20" />
 
-    {/* bulk place bar — appears once something is checked */}
+    {
+      /* The cart bar — it appears once anything is in the cart, and STAYS while
+        you change the filter underneath it. Two controls exist only because of
+        that: the "· n shown here" half of the count, which explains a number
+        you can't finish counting on screen, and Clear — with a persisting cart,
+        "change the filter" is no longer the way to empty it, so there has to be
+        one. */
+    }
     <footer
       id="fb-bulkbar"
       hidden
       class="border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
     >
-      <span id="fb-bulkcount" class="text-base-content/70">0 selected</span>
+      <span id="fb-bulkcount" class="text-base-content/70 whitespace-nowrap">0 selected</span>
       <button id="fb-place-selected" class="btn btn-primary btn-xs normal-case">Place in constellation</button>
+      <button id="fb-clear-selected" class="btn btn-ghost btn-xs ml-auto normal-case">Clear</button>
     </footer>
   </div>
 </dialog>
@@ -117,11 +134,27 @@ const { constellation, constellationName, constellationDescription, constellatio
   import { formatActionError } from '../../scripts/action-error';
   import '../../scripts/subject-filter'; // the fetched partial's <subject-filter> needs the definition
   import { starMarkHtml } from '../../lib/star-mark';
+  import { onSkyChange } from '../../scripts/sky-changed';
+  import { notifyFragmentsChanged, onFragmentsChanged } from '../../scripts/fragments-changed';
 
   const browser = document.getElementById('fbrowser') as HTMLDialogElement;
   const cid = browser.dataset.constellation!;
-  const cname = browser.dataset.constellationName ?? '';
-  const ccolor = browser.dataset.constellationColor ?? '';
+  // `let`, not `const`: the constellation's name and colour are edited in the
+  // form BEHIND this drawer, and a chip added live has to match what was just
+  // saved rather than what the server rendered when the page loaded.
+  let cname = browser.dataset.constellationName ?? '';
+  let ccolor = browser.dataset.constellationColor ?? '';
+
+  onSkyChange((c) => {
+    if (c.id !== cid) return;
+    cname = c.name;
+    if (c.color) ccolor = c.color;
+    document.getElementById('fb-cname')!.textContent = c.name;
+    const desc = document.getElementById('fb-cdesc')!;
+    desc.textContent = c.description ?? '';
+    desc.title = c.description ?? '';
+    desc.hidden = !c.description;
+  });
   const panelHost = document.getElementById('fb-panel')!;
   const errBox = document.getElementById('fb-error') as HTMLParagraphElement;
   const bulkbar = document.getElementById('fb-bulkbar') as HTMLElement;
@@ -156,6 +189,11 @@ const { constellation, constellationName, constellationDescription, constellatio
     if (check) {
       check.checked = false;
       check.disabled = true;
+      // The cart is a Set of ids, not a reading of the checkboxes, so
+      // disabling one does NOT take it out — and a placed fragment left in the
+      // cart would be re-placed on the next bulk press (harmless, `place` is
+      // idempotent) and would keep inflating the count (not harmless).
+      panel?.deselect(check.value);
     }
     const cell = row.querySelector('[data-act="place"]')?.closest('td');
     if (cell)
@@ -208,18 +246,28 @@ const { constellation, constellationName, constellationDescription, constellatio
       async onAction(act, id, row) {
         if (act !== 'place') return;
         clearError();
-        if (await place(id)) markPlaced(row);
+        if (await place(id)) markPlaced(row); // which also takes it out of the cart
       },
-      onSelectionChange(ids) {
+      onSelectionChange(ids, shown) {
+        // Shows on the CART being non-empty, not on the visible selection —
+        // and there is deliberately no `onSwap` hide any more. Hiding the bar
+        // on a filter change was belt-and-braces on a loss that no longer
+        // happens; keeping it would now hide a cart that still has things in
+        // it, which is the confusing half of this feature rather than the
+        // useful half.
         bulkbar.hidden = ids.length === 0;
-        bulkcount.textContent = `${ids.length} selected`;
+        // "· n shown here" is the honesty mechanism, not decoration: once the
+        // cart outlives the filter, the count can exceed what you can see, and
+        // a number that doesn't match what's on screen has to be explained or
+        // it reads as a bug.
+        bulkcount.textContent =
+          shown === ids.length ? `${ids.length} selected` : `${ids.length} selected · ${shown} shown here`;
         placeSelectedBtn.textContent = `Place ${ids.length === 1 ? 'it' : `all ${ids.length}`} in constellation`;
-      },
-      onSwap() {
-        bulkbar.hidden = true;
       },
     });
   }
+
+  document.getElementById('fb-clear-selected')?.addEventListener('click', () => panel?.clearSelection());
 
   placeSelectedBtn.addEventListener('click', async () => {
     if (!panel) return;
@@ -227,15 +275,18 @@ const { constellation, constellationName, constellationDescription, constellatio
     if (!ids.length) return;
     clearError();
     placeSelectedBtn.disabled = true;
-    // sequential — each placement appends position = max+1, so order holds
+    // Sequential — each placement appends position = max+1, so the cart's
+    // insertion order becomes the suite's order. That is why getSelected()
+    // returns a Set's iteration order and not a DOM read.
     for (const id of ids) {
       const ok = await place(id);
-      if (!ok) break;
+      if (!ok) break; // the rest stay in the cart, so a failure is retryable
       const row = panel.root.querySelector<HTMLElement>(`tr.fragment-row[data-id="${id}"]`);
-      if (row) markPlaced(row);
+      if (row)
+        markPlaced(row); // which deselects it
+      else panel.deselect(id); // carted under a filter that no longer shows it
     }
     placeSelectedBtn.disabled = false;
-    panel.clearSelection();
   });
 
   // --- open / close -----------------------------------------------------------
@@ -250,8 +301,14 @@ const { constellation, constellationName, constellationDescription, constellatio
   function closeBrowser() {
     setHash('');
     browser.close();
-    // the suite underneath is stale the moment something was placed
-    if (placedAny) location.reload();
+    // The suite underneath is stale the moment something was placed. It used to
+    // be a `location.reload()` in this same tick, which cut the drawer's own
+    // slide-out short; now the composer refreshes the suite in place and the
+    // drawer gets to finish closing.
+    if (placedAny) {
+      placedAny = false;
+      notifyFragmentsChanged(browser);
+    }
   }
 
   document
@@ -270,6 +327,19 @@ const { constellation, constellationName, constellationDescription, constellatio
 
   wireAddMenu(document.getElementById('fb-add-btn')!, document.getElementById('fb-add-menu')!);
 
-  // A reload from an editor-sheet save lands back here (#browse) with fresh rows.
+  // A fragment created from this drawer's own Add ▾, or edited in a sheet on
+  // top of it, should appear in these rows. Only while the drawer is open —
+  // refetching a list nobody is looking at is work for nothing, and the load
+  // on next open is fresh anyway.
+  onFragmentsChanged(({ settled }) => {
+    if (!browser.open) return false; // not handled — let the host underneath answer
+    void settled.then(() => panel?.refresh());
+    return true;
+  });
+
+  // The #browse hash trick is no longer LOAD-BEARING: the drawer never closes
+  // for a save any more, so there is no navigation to land back inside. Left in
+  // place because it still covers a genuine hard refresh (and Back, though
+  // Piece 3's `no-store` means that is now a real request rather than bfcache).
   if (location.hash === '#browse') openBrowser();
 </script>

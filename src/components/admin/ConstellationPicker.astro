@@ -19,6 +19,25 @@
 
   Adding here APPENDS to the end of that constellation's suite; composed order
   is the constellation's business (recompose in /admin/constellations/[id]).
+  That is also why a constellation created from the footer form below needs no
+  position decision — it starts empty, and this fragment becomes its first.
+
+  ── The footer: making one from in here ──────────────────────────────────
+  You are deciding where a fragment belongs, and the honest answer is
+  sometimes "somewhere that doesn't exist yet". Before this, that thought cost
+  you the edit: leave the fragment, go to /admin/constellations, create, come
+  back, find the fragment again. Now it costs a name.
+
+  Rejected alternative: letting the FILTER field double as a create ("no
+  match? press Enter to make it"). It reads as clever and behaves as a trap —
+  a filter that mutates the sky on Enter is a keystroke away from making a
+  constellation called "gri" every time you pause mid-word. A separate,
+  explicitly-pressed row can't be triggered by accident.
+
+  The ↗ on each row opens that constellation's own page in a NEW TAB, never
+  this one: the whole point of creating from in here is that the fragment
+  you're editing is never disturbed. It's revealed on hover/focus so it doesn't
+  clutter a list whose job is fast ticking.
 
   `scope` namespaces the ids so the two editor sheets can each hold one.
 */
@@ -33,46 +52,94 @@ const FILTER_THRESHOLD = 8; // below this, a filter field is just another contro
 
 <div class:list={['cn-picker', className]} data-scope={scope}>
   {
-    constellations.length === 0 ? (
-      <p class="admin-hint">
-        No constellations yet — make one in{' '}
-        <a href="/admin/constellations" class="underline">
-          Constellations
-        </a>
-        .
-      </p>
-    ) : (
-      <>
-        {constellations.length > FILTER_THRESHOLD && (
-          <input
-            type="search"
-            class="cn-filter input input-xs input-bordered mb-1.5 w-full font-sans"
-            placeholder="Filter constellations…"
-            aria-label="Filter constellations"
-          />
-        )}
-        <ul class="cn-list space-y-0.5">
-          {constellations.map((c) => (
-            <li class="cn-row" data-search={`${c.name} ${c.description ?? ''}`.toLowerCase()}>
-              <label class="rounded-field hover:bg-base-200 flex cursor-pointer items-start gap-2.5 px-2 py-2">
-                <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
-                <span class="min-w-0 grow">
-                  <span class="block truncate text-sm leading-snug">{c.name}</span>
-                  {c.description && (
-                    <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
-                      {c.description}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        <p class="cn-empty admin-hint mt-1" hidden>
-          Nothing matches.
-        </p>
-      </>
-    )
+    /* The filter is rendered ALWAYS and hidden below the threshold, rather
+      than branched away. Creating constellations from the footer can push the
+      sky past 8 mid-session, and a filter that only arrives on the next page
+      load is a filter you learn not to expect. */
   }
+  <input
+    type="search"
+    class="cn-filter input input-xs input-bordered mb-1.5 w-full font-sans"
+    placeholder="Filter constellations…"
+    aria-label="Filter constellations"
+    hidden={constellations.length <= FILTER_THRESHOLD}
+    data-threshold={FILTER_THRESHOLD}
+  />
+  <ul class="cn-list space-y-0.5">
+    {
+      /* The ↗ is a SIBLING of the label, never inside it. Interactive content
+        inside a <label> is specified not to forward activation to the control,
+        but "specified not to" is a thin thread to hang a mis-tick on when the
+        whole surface is one you click fast without looking. Outside, it cannot
+        toggle anything by construction. */
+      constellations.map((c) => (
+        <li
+          class="cn-row group rounded-field hover:bg-base-200 flex items-start"
+          data-id={c.id}
+          data-name={c.name}
+          data-search={`${c.name} ${c.description ?? ''}`.toLowerCase()}
+        >
+          <label class="flex min-w-0 grow cursor-pointer items-start gap-2.5 py-2 pl-2">
+            <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
+            <span class="min-w-0 grow">
+              <span class="block truncate text-sm leading-snug">{c.name}</span>
+              {c.description && (
+                <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
+                  {c.description}
+                </span>
+              )}
+            </span>
+          </label>
+          <a
+            href={`/admin/constellations/${c.id}`}
+            target="_blank"
+            rel="noopener"
+            class="cn-open text-base-content/40 hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            title={`Open ${c.name} in a new tab`}
+          >
+            <span aria-hidden="true">↗</span>
+            <span class="sr-only">Open {c.name} in a new tab</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+  <p class="cn-empty admin-hint mt-1" hidden>Nothing matches.</p>
+  {
+    /* The empty state gets the create form too, and stops sending you away —
+      "make one in Constellations" was a dead end that cost you the edit. */
+  }
+  <p class="cn-none admin-hint mt-1" hidden={constellations.length > 0}>
+    No constellations yet — name the first way of seeing.
+  </p>
+
+  <div class="cn-footer border-base-300 mt-2 border-t pt-2">
+    <button type="button" class="cn-new-btn btn btn-ghost btn-xs font-sans normal-case">
+      <span aria-hidden="true">＋</span> New constellation
+    </button>
+    {
+      /* Same fold-away shape as /admin/constellations' own create form, so the
+        muscle memory transfers. Not a <form>: this component is mounted INSIDE
+        the editor sheets' forms, and a nested form is invalid HTML — the
+        browser drops the inner tags and Enter would submit the fragment. */
+    }
+    <div class="cn-new-form mt-1.5 flex flex-wrap items-end gap-2" hidden>
+      <div class="grow">
+        <label class="admin-label" for={`cn-new-${scope}`}>Name it</label>
+        <input
+          id={`cn-new-${scope}`}
+          class="cn-new-name input input-xs input-bordered font-display w-full max-w-xs"
+          placeholder="A new way of seeing…"
+          autocomplete="off"
+        />
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button type="button" class="cn-new-cancel btn btn-ghost btn-xs font-sans normal-case">Cancel</button>
+        <button type="button" class="cn-new-save btn btn-primary btn-xs font-sans normal-case">Create</button>
+      </div>
+      <p class="admin-hint w-full">It starts as a draft — invisible in the sky until you publish it.</p>
+    </div>
+  </div>
+
   <p class="cn-picker-status admin-hint mt-1" role="status" aria-live="polite"></p>
 </div>

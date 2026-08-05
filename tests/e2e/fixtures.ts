@@ -12,6 +12,9 @@ export interface Fixtures {
   publishedSlug: string | null;
   /** Any constellation — the only route to the fragment browser. */
   constellationId: string | null;
+  /** One with at least two fragments placed in it — the composer specs need a
+   *  suite with rows to remove, and the one above may well be empty. */
+  composedConstellationId: string | null;
 }
 
 export function fixtures(): Fixtures {
