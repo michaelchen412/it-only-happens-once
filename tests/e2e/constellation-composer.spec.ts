@@ -196,4 +196,34 @@ test.describe('reordering survives a refresh', () => {
     expect(idsAfter[0], 'Alt+↓ did nothing — the swap replaced the element and took its listeners').toBe(idsBefore[1]);
     expect(idsAfter[1]).toBe(idsBefore[0]);
   });
+
+  // ⚠ THE REGRESSION GUARD FOR PLAN 16 · PIECE 3. This page's drag/keyboard/
+  // nudge wiring was lifted into `scripts/list-reorder.ts` so the constellations
+  // index could have it too. Whether the ORIGINAL consumer still works is the
+  // whole risk of that extraction, and this is the assertion that catches it —
+  // dragging here, not on the page the extraction was done for.
+  test('dragging a suite row still commits, after the wiring was extracted', async ({ page }) => {
+    const seen = await stubComposer(page);
+    await openComposer(page);
+    test.skip((await rows(page).count()) < 2, 'needs two rows to reorder');
+
+    const before = await rows(page).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.fid));
+    await page.evaluate(() => {
+      const list = document.getElementById('suite-rows')!;
+      const [a, b] = [...list.querySelectorAll('li[data-fid]')] as HTMLElement[];
+      const dt = new DataTransfer();
+      a.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      const r = b.getBoundingClientRect();
+      b.dispatchEvent(
+        new DragEvent('dragover', { bubbles: true, dataTransfer: dt, clientY: r.bottom - 2, cancelable: true }),
+      );
+      b.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt, cancelable: true }));
+    });
+
+    const after = await rows(page).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.fid));
+    expect(after[0]).toBe(before[1]);
+    expect(after[1]).toBe(before[0]);
+    // The DOM moving without the call is the failure that looks like success.
+    await expect.poll(() => seen().filter((n) => n === 'constellations.reorderPlacements')).toHaveLength(1);
+  });
 });

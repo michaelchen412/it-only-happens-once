@@ -55,6 +55,42 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
     }
     type Row = { create?: boolean; opt?: Opt; name: string };
 
+    /**
+     * How many rows the menu will draw (docs/plans/16 · Piece 2).
+     *
+     * It was 50, silently, against 70 authors — so focusing the field showed
+     * you 50 and said nothing about the other 20. The list simply ended, which
+     * teaches you it is complete when it isn't. The number is not the fault;
+     * the SILENCE is, which is why raising it comes with `__more` below.
+     *
+     * 200 is chosen to sit comfortably above the corpus rather than to be a
+     * real limit: rendering menu rows is the CHEAP half of this control (the
+     * expensive half — shipping every author and work into a `data-options`
+     * attribute on every page that mounts a sheet — is still unbounded, and
+     * that inversion is what step 2 of the plan exists to fix). Revisit at a
+     * few hundred rows, or the first time a name is hard to find by typing.
+     */
+    const MAX_ROWS = 200;
+
+    /**
+     * Accent-insensitive search key. `includes()` on a lowercased string meant
+     * "Marquez" could not find "Márquez" — a real failure in a corpus of
+     * quotations, where you type the name you remember rather than the one with
+     * the diacritics you'd have to go and look up.
+     *
+     * FOLDING IS FOR FINDING, NOT FOR IDENTITY. `commitFromText` and the
+     * exact-match test below deliberately still compare unfolded: this
+     * component's contract is that you either pick something that exists or
+     * EXPLICITLY choose "＋ Add", and folding identity would quietly make
+     * "Marquez" un-creatable next to "Márquez". Ranking the real match first is
+     * enough — you can see it and pick it.
+     */
+    const fold = (s: string) =>
+      s
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase();
+
     class EntityCombo extends HTMLElement {
       options: Opt[] = [];
       selected: Opt | null = null;
@@ -125,16 +161,35 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
       }
 
       // --- menu rendering ---
-      private filterOptions(text: string): Opt[] {
-        const q = text.trim().toLowerCase();
-        const list = q ? this.options.filter((o) => o.name.toLowerCase().includes(q)) : this.options;
-        return list.slice(0, 50);
+      /**
+       * Matches, best first, plus how many were left out.
+       *
+       * Ranking: names that START with what you typed come before names that
+       * merely contain it. Typing "mar" used to put every substring hit ahead
+       * of nothing in particular — "Amartya Sen" above "Marcus Aurelius" — so
+       * the top row, which is what Enter takes, was arbitrary.
+       */
+      private filterOptions(text: string): { list: Opt[]; more: number } {
+        const q = fold(text.trim());
+        if (!q) {
+          return { list: this.options.slice(0, MAX_ROWS), more: Math.max(0, this.options.length - MAX_ROWS) };
+        }
+        const starts: Opt[] = [];
+        const contains: Opt[] = [];
+        for (const o of this.options) {
+          const at = fold(o.name).indexOf(q);
+          if (at === 0) starts.push(o);
+          else if (at > 0) contains.push(o);
+        }
+        const all = starts.concat(contains);
+        return { list: all.slice(0, MAX_ROWS), more: Math.max(0, all.length - MAX_ROWS) };
       }
       private renderMenu() {
         const text = this.field.value;
         const q = text.trim();
         const exact = !!q && this.options.some((o) => o.name.toLowerCase() === q.toLowerCase());
-        this.rows = this.filterOptions(text).map((o) => ({ opt: o, name: o.name }));
+        const { list, more } = this.filterOptions(text);
+        this.rows = list.map((o) => ({ opt: o, name: o.name }));
         if (q && !exact) this.rows.push({ create: true, name: q });
 
         this.menu.innerHTML = '';
@@ -146,6 +201,11 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
         }
         this.activeIndex = Math.max(0, Math.min(this.activeIndex, this.rows.length - 1));
         this.rows.forEach((row, i) => {
+          // The truncation notice goes BEFORE "＋ Add", never after: if the list
+          // is cut short, the thing you're looking for may be in the part you
+          // can't see, and offering to create a second copy of it first is the
+          // wrong order to ask the two questions in.
+          if (row.create && more > 0) this.menu.appendChild(this.moreRow(more));
           const li = document.createElement('li');
           li.id = `${this.baseId}-opt-${i}`;
           li.className = 'entity-combo__opt';
@@ -166,9 +226,33 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
           li.addEventListener('click', () => this.pick(i));
           this.menu.appendChild(li);
         });
+        // No create row to sit above (an exact match was typed, or the field is
+        // empty) — the notice still has to be said, so it lands at the foot.
+        if (more > 0 && !this.menu.querySelector('.entity-combo__more')) {
+          this.menu.appendChild(this.moreRow(more));
+        }
         this.menu.hidden = false;
         this.field.setAttribute('aria-expanded', 'true');
         this.field.setAttribute('aria-activedescendant', `${this.baseId}-opt-${this.activeIndex}`);
+      }
+      /**
+       * "42 more — keep typing to narrow this down."
+       *
+       * A cap is defensible; a cap that doesn't admit it is not. This row is
+       * the whole point of the piece: the menu used to just END, and a list
+       * that ends looks exactly like a list that is complete. Not a member of
+       * `this.rows`, so it is never the active descendant and Enter can never
+       * land on it — but it IS `role="option"`, so a screen reader arrowing to
+       * the bottom hears it too rather than only sighted users seeing it.
+       */
+      private moreRow(n: number): HTMLLIElement {
+        const li = document.createElement('li');
+        li.className = 'entity-combo__more';
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-disabled', 'true');
+        li.setAttribute('aria-selected', 'false');
+        li.textContent = `${n.toLocaleString()} more — keep typing to narrow this down`;
+        return li;
       }
       private openMenu() {
         this.open = true;
@@ -348,8 +432,30 @@ const { name, idName, noun, label, options = [], placeholder = '', id, class: cl
   .entity-combo__opt:hover {
     background: var(--color-base-200);
   }
+  /* Pinned to the foot of the menu (docs/plans/16 · Piece 2). "＋ Add" was
+     appended after up to 50 rows, so on a long list the ONLY way to create
+     something sat below the fold — the likeliest reason creating an author
+     felt harder than it is. Its position in the list is unchanged (still last,
+     still after you've looked); only its visibility is. The alternative —
+     moving it to the top — was rejected: it would put "make a new one" above
+     "here is the one that exists", which is the wrong order to offer. */
   .entity-combo__opt--create {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-base-100);
+    border-top: 1px solid var(--color-base-300);
     color: color-mix(in oklab, var(--color-primary) 85%, var(--color-base-content));
+  }
+  /* The honest cap. Muted and un-clickable on purpose: it is a statement about
+     the list, not another thing in it. */
+  .entity-combo__more {
+    padding: 0.35rem 0.55rem;
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-style: italic;
+    line-height: 1.3;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    cursor: default;
   }
   .entity-combo__opt--create b {
     font-weight: 600;

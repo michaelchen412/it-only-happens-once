@@ -10,6 +10,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import StatusChip from '../../../components/admin/StatusChip.astro';
 import StarMark from '../../../components/StarMark.astro';
+import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 
 const sb = Astro.locals.supabase;
 const [{ data: cs }, { data: links }] = await Promise.all([
@@ -76,10 +77,40 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
       ) : (
         <ul id="cl-list" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 divide-y border">
           {rows.map((c) => (
-            <li class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]} data-id={c.id}>
-              <span class="shrink-0" style="color: var(--cn)">
-                <StarMark />
+            /* `data-slug` and `data-status` ride along because every save from
+               this page goes through `constellations.save`, which rebuilds the
+               slug from whatever it is given and DEFAULTS `status` to draft.
+               A call that sends only the field it means to change would quietly
+               rewrite a hand-edited URL, or unpublish a live constellation. */
+            <li
+              class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]}
+              data-id={c.id}
+              data-name={c.name}
+              data-slug={c.slug}
+              data-status={c.status}
+              data-color={c.color}
+              draggable="true"
+            >
+              <span
+                class="text-base-content/25 group-hover:text-base-content/50 shrink-0 cursor-grab transition-colors select-none"
+                title="Drag to reorder (or Alt+↑/↓)"
+                aria-hidden="true"
+              >
+                ⋮⋮
               </span>
+              {/* The row's own star IS the colour control (see the popover below). */}
+              <button
+                type="button"
+                data-color-btn
+                class="cn-star-btn shrink-0"
+                style="color: var(--cn)"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-label={`Star colour for ${c.name} — currently ${c.color}`}
+                title={`Star colour — ${c.color}`}
+              >
+                <StarMark />
+              </button>
               <div class="min-w-0 grow">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <a href={`/admin/constellations/${c.id}`} class="font-display text-lg hover:underline">
@@ -92,10 +123,18 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
                   {c.total > 0 && c.total !== c.published && ` · ${c.published} public`}
                 </p>
               </div>
+              {/* `.row-nudge` deletes these on a hovering device: with a pointer
+                  you drag the ⋮⋮ and with a keyboard you Alt+↑/↓, so on a
+                  desktop they would only reserve row width for a duplicate of
+                  drag — and that width is what pays for the colour trigger this
+                  row just gained. On a touchscreen drag doesn't exist and they
+                  are the ONLY reorder path, which is why they aren't simply
+                  deleted. The sky's order gets fiddled with anywhere; the
+                  composer's suite is built at a desk. */}
               <span class="row-edit flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs"
+                  class="row-nudge btn btn-ghost btn-xs"
                   data-move="up"
                   title="Move up"
                   aria-label={`Move ${c.name} up`}
@@ -104,7 +143,7 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
                 </button>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs"
+                  class="row-nudge btn btn-ghost btn-xs"
                   data-move="down"
                   title="Move down"
                   aria-label={`Move ${c.name} down`}
@@ -135,16 +174,99 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
         </ul>
       )
     }
+
+    {
+      /* THE COLOUR PICKER — one popover, reused by every row.
+        (docs/plans/16 · Piece 3.)
+
+        A POPOVER RATHER THAN INLINE SWATCHES, because the rest of the list has
+        to stay visible behind it — that is the entire point of the control
+        being in this room. Eight inline swatches per row was the alternative
+        and it scales badly: fine at four constellations, 120 swatches at
+        fifteen, and it would push the name out of a row that already carries a
+        grip, a status chip and four buttons.
+
+        ONE element, not one per row: the popover is positioned against
+        whichever star opened it, so N copies would be N times the DOM for a
+        thing only ever open once.
+
+        `popover` (the native attribute) rather than a hand-rolled dropdown,
+        because it renders in the TOP LAYER — a menu absolutely positioned
+        inside a list is either covered by the sticky admin header or clipped by
+        an ancestor's overflow, and both failures are invisible to typecheck, to
+        build and to a screenshot of the closed state. It also brings
+        outside-click and Escape for free.
+
+        THE COUNTS ARE THE POINT. The judgement being made is "is this
+        distinguishable from its neighbours", so how many constellations already
+        wear each slot belongs on screen rather than in your memory of the list
+        you just scrolled past. This is exactly what `leastUsedSlot` knows when
+        it picks automatically — surfaced, at last, for the human doing it by
+        hand. */
+    }
+    {
+      /* ONE RANK OF EIGHT, not a 4×2 block. Measured rather than assumed: the
+        square version stood three rows of the list tall, so it covered the
+        neighbours it exists to let you compare against. Laid out flat it is the
+        whole ramp, hot → cool, in the order design.md §13 defines it — and the
+        thing you are judging (does this read apart from the others?) is exactly
+        what a single line of eight is for. */
+    }
+    <div id="cl-colors" popover class="cl-colors rounded-box border-base-300 bg-base-100 border px-2 py-1.5 shadow-lg">
+      <div class="flex items-end gap-0.5" role="group" aria-labelledby="cl-colors-label">
+        {
+          COLOR_SLOTS.map((slot) => (
+            <button type="button" class="cn-slot" data-slot={slot} aria-pressed="false">
+              <span class:list={['cn-swatch', `cn-${slot}`]}>
+                <StarMark />
+              </span>
+              <span class="cn-slot__n" data-count aria-hidden="true" />
+              <span class="sr-only">{slot}</span>
+            </button>
+          ))
+        }
+      </div>
+      {
+        /* The numerals need one word to be numerals OF something. Everything
+          else about why this control is in this room is in the code comments
+          and in the plan — a paragraph of reasoning on screen is a paragraph
+          you read once and scroll past forever. */
+      }
+      <p id="cl-colors-label" class="admin-hint mt-1 text-center text-[0.65rem]">how many wear each</p>
+    </div>
   </div>
 </AdminLayout>
 
 <script>
   import { actions } from 'astro:actions';
   import { confirmDialog } from '../../../scripts/confirm-dialog';
-  import { formatActionError } from '../../../scripts/action-error';
+  import { callAction, formatActionError } from '../../../scripts/action-error';
+  import { wireListReorder } from '../../../scripts/list-reorder';
+  import { announceSkyChange } from '../../../scripts/sky-changed';
 
   const errBox = document.getElementById('cl-error') as HTMLParagraphElement;
   const show = (m: string) => ((errBox.textContent = m), (errBox.hidden = false));
+
+  const list = document.getElementById('cl-list');
+  const listRows = () => [...(list?.querySelectorAll<HTMLElement>('li[data-id]') ?? [])];
+
+  /**
+   * Every write from this page goes through `constellations.save`, which is a
+   * whole-row update: it rebuilds the slug from what it is given and DEFAULTS
+   * `status` to draft. So a call that sends only the field it means to change
+   * doesn't leave the rest alone — it rewrites a hand-edited URL, or unpublishes
+   * something that was live. Each row carries its own identity in `data-*` for
+   * exactly this reason, and every caller sends the lot.
+   */
+  function rowForm(row: HTMLElement, change: Record<string, string>): FormData {
+    const fd = new FormData();
+    fd.set('id', row.dataset.id!);
+    fd.set('name', row.dataset.name ?? '');
+    fd.set('slug', row.dataset.slug ?? '');
+    fd.set('status', row.dataset.status ?? 'draft');
+    for (const [k, v] of Object.entries(change)) fd.set(k, v);
+    return fd;
+  }
 
   // create — the form stays folded away until asked for
   const newForm = document.getElementById('new-constellation') as HTMLFormElement;
@@ -160,39 +282,51 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
 
   newForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { data, error } = await actions.constellations.save(new FormData(newForm));
+    // `callAction`, not a bare await: `astro:actions` THROWS on a dead network
+    // rather than returning `{ error }`, so this used to be a button that
+    // silently did nothing offline. Same defect 15 found in the composer.
+    const { data, error } = await callAction(actions.constellations.save(new FormData(newForm)));
     if (error) return show(formatActionError(error));
-    location.href = `/admin/constellations/${data.id}`; // straight into the composer
+    if (data) location.href = `/admin/constellations/${data.id}`; // straight into the composer
   });
 
-  document.getElementById('cl-list')?.addEventListener('click', async (e) => {
+  // ── the sky's authored order ────────────────────────────────────────────
+  // Drag, Alt+↑/↓ and the touch nudges, all from the module the composer's
+  // suite uses. Until now this page — the one that orders the sky the home page
+  // reads top to bottom — could only be reordered with two arrow buttons: no
+  // grip, no drag, no keyboard path. `constellations.reorder` already rewrote
+  // `sort` 1..n from an id list, so nothing on the server changed.
+  if (list) {
+    wireListReorder(list, {
+      rowSelector: 'li[data-id]',
+      onCommit: async () => {
+        const fd = new FormData();
+        fd.set(
+          'ids',
+          listRows()
+            .map((l) => l.dataset.id)
+            .join(','),
+        );
+        const { error } = await callAction(actions.constellations.reorder(fd));
+        // Loud rather than silently reverting: the rows are where you put them,
+        // and a list that snaps back on its own is indistinguishable from a
+        // list that ignored you. The message says which it was.
+        if (error) show(formatActionError(error));
+      },
+    });
+  }
+
+  list?.addEventListener('click', async (e) => {
     const btn = (e.target as Element).closest('button');
     const row = (e.target as Element).closest('li[data-id]') as HTMLLIElement | null;
     if (!btn || !row) return;
     const id = row.dataset.id!;
 
-    if (btn.dataset.move) {
-      const sib = btn.dataset.move === 'up' ? row.previousElementSibling : row.nextElementSibling;
-      if (!sib) return;
-      btn.dataset.move === 'up' ? sib.before(row) : sib.after(row);
-      btn.focus(); // keep the keyboard with the row it moved
-      const ids = [...row.parentElement!.querySelectorAll<HTMLElement>('li[data-id]')]
-        .map((l) => l.dataset.id)
-        .join(',');
-      const fd = new FormData();
-      fd.set('ids', ids);
-      const { error } = await actions.constellations.reorder(fd);
-      if (error) show(formatActionError(error));
-      return;
-    }
+    if (btn.hasAttribute('data-color-btn')) return void openColors(btn as HTMLButtonElement, row);
 
     if (btn.hasAttribute('data-toggle-status')) {
       const next = btn.dataset.toggleStatus === 'published' ? 'draft' : 'published';
-      const fd = new FormData();
-      fd.set('id', id);
-      fd.set('name', btn.dataset.name ?? '');
-      fd.set('status', next);
-      const { error } = await actions.constellations.save(fd);
+      const { error } = await callAction(actions.constellations.save(rowForm(row, { status: next })));
       if (error) return show(formatActionError(error));
       location.reload();
       return;
@@ -201,16 +335,117 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
     if (btn.hasAttribute('data-delete')) {
       const ok = await confirmDialog({
         title: 'Delete constellation',
-        message: `Delete “${btn.dataset.name}”? Its composition is lost; the fragments themselves are untouched.`,
+        message: `Delete “${row.dataset.name}”? Its composition is lost; the fragments themselves are untouched.`,
         confirmLabel: 'Delete',
         danger: true,
       });
       if (!ok) return;
       const fd = new FormData();
       fd.set('id', id);
-      const { error } = await actions.constellations.remove(fd);
+      const { error } = await callAction(actions.constellations.remove(fd));
       if (error) return show(formatActionError(error));
       location.reload();
     }
   });
+
+  // ── colour: the row's own star is the control ───────────────────────────
+  const pop = document.getElementById('cl-colors') as HTMLElement;
+  const slots = [...pop.querySelectorAll<HTMLButtonElement>('.cn-slot')];
+  let openRow: HTMLElement | null = null;
+  let openTrigger: HTMLButtonElement | null = null;
+
+  /** Which slots are taken, read off the DOM rather than the server's render —
+   *  so the counts stay true after a recolour without needing a reload. */
+  function slotCounts(): Record<string, number> {
+    const n: Record<string, number> = {};
+    for (const r of listRows()) {
+      const c = r.dataset.color;
+      if (c) n[c] = (n[c] ?? 0) + 1;
+    }
+    return n;
+  }
+
+  function openColors(trigger: HTMLButtonElement, row: HTMLElement) {
+    openRow = row;
+    openTrigger = trigger;
+    const counts = slotCounts();
+    for (const b of slots) {
+      const slot = b.dataset.slot!;
+      const used = counts[slot] ?? 0;
+      const mine = row.dataset.color === slot;
+      b.setAttribute('aria-pressed', String(mine));
+      b.classList.toggle('is-active', mine);
+      b.querySelector<HTMLElement>('[data-count]')!.textContent = used ? String(used) : '';
+      b.title = mine ? `${slot} — this one` : used ? `${slot} — ${used} already wearing it` : `${slot} — free`;
+    }
+    pop.showPopover();
+    // Positioned against the star that opened it. The popover is in the top
+    // layer, so these are viewport coordinates and no ancestor can clip them —
+    // which is the whole reason it isn't an absolutely-positioned div inside
+    // the row. Flipped above the trigger when it would fall off the bottom.
+    const r = trigger.getBoundingClientRect();
+    const p = pop.getBoundingClientRect();
+    const below = r.bottom + 6;
+    pop.style.top = `${below + p.height > window.innerHeight - 8 ? Math.max(8, r.top - p.height - 6) : below}px`;
+    pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - p.width - 8))}px`;
+    trigger.setAttribute('aria-expanded', 'true');
+    (slots.find((b) => b.classList.contains('is-active')) ?? slots[0]).focus();
+  }
+
+  pop.addEventListener('toggle', (e) => {
+    if ((e as ToggleEvent).newState === 'open') return;
+    // Escape and light-dismiss both land here. Focus only comes back when it
+    // was inside the popover — otherwise you clicked somewhere on purpose and
+    // yanking the caret back to the star would be the rude reading.
+    const wasInside = pop.contains(document.activeElement);
+    openTrigger?.setAttribute('aria-expanded', 'false');
+    if (wasInside) openTrigger?.focus();
+    openTrigger = null;
+    openRow = null;
+  });
+
+  /** Repaint one row in a slot. The `cn-*` class is what carries `--cn`, so
+   *  this is the whole of "the star changes colour". */
+  function paintRow(row: HTMLElement, slot: string) {
+    if (row.dataset.color) row.classList.remove(`cn-${row.dataset.color}`);
+    row.classList.add(`cn-${slot}`);
+    row.dataset.color = slot;
+    const star = row.querySelector<HTMLElement>('[data-color-btn]');
+    star?.setAttribute('aria-label', `Star colour for ${row.dataset.name} — currently ${slot}`);
+    if (star) star.title = `Star colour — ${slot}`;
+  }
+
+  /**
+   * REPAINT ON CLICK, NOT ON ROUND TRIP. There is no form here and no Save
+   * button — the click IS the commit, matching the status toggle in the same
+   * row — so a preview that waits for the server would lag behind the gesture
+   * that caused it. The reconcile path is written in the same breath rather
+   * than afterwards: a colour left on screen that isn't in the database is a
+   * worse failure than the save failing, because nothing on the page says so.
+   */
+  async function chooseSlot(slot: string) {
+    const row = openRow;
+    if (!row) return;
+    const prev = row.dataset.color!;
+    pop.hidePopover();
+    if (slot === prev) return;
+    paintRow(row, slot);
+    const { error } = await callAction(actions.constellations.save(rowForm(row, { color: slot })));
+    if (error) {
+      paintRow(row, prev);
+      return show(formatActionError(error));
+    }
+    errBox.hidden = true;
+    // Nothing on THIS page listens yet — but the announcement is page-wide by
+    // contract, and a composer or browser drawer mounted beside this list would
+    // otherwise keep showing the colour the server rendered.
+    announceSkyChange({
+      id: row.dataset.id!,
+      name: row.dataset.name ?? '',
+      slug: row.dataset.slug ?? '',
+      color: slot,
+    });
+  }
+
+  for (const b of slots) b.addEventListener('click', () => void chooseSlot(b.dataset.slot!));
 </script>

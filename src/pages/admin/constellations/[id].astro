@@ -36,7 +36,6 @@ import type { SuiteItem } from '../../../lib/constellations';
 import { suiteHints } from '../../../lib/suite-shape';
 import type { SubjectRef } from '../../../lib/blog';
 import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
-import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 import { allFragmentPeople } from '../../../lib/hq/links';
 import StarMark from '../../../components/StarMark.astro';
 
@@ -262,21 +261,38 @@ const TYPES = ['writing', 'quote', 'song'] as const;
           <div>
             <label class="admin-label">Star colour</label>
             {
-              /* The colour is a SLOT, not a value — app.css owns what each means
-                in dusk and paper (design.md §13). It tints this constellation's
-                star out front, its lamplight inside, and its chips in here. */
+              /* ⚠ THE CONTROL IS DELIBERATELY NOT HERE (docs/plans/16 · Piece 3).
+                Eight swatches used to sit in this card. They were moved to
+                /admin/constellations, and this hint exists so their absence
+                reads as a decision rather than as something missing.
+
+                WHY: a colour slot is not a property of one constellation. It is
+                a property of one constellation RELATIVE to the other seven
+                slots and to whatever its neighbours are already wearing.
+                Choosing it in here asked you to make a comparative judgement
+                with nothing to compare against — one star, and a guess about a
+                sky. The codebase already believed this: `leastUsedSlot` picks a
+                new constellation's colour by looking at every OTHER
+                constellation's, so the automatic choice was better informed
+                than the manual one. That is backwards, and moving the control
+                is what fixes it — not more polish on the swatch where it stood.
+
+                ⚠ If a future session is tempted to put an editing control back
+                here, read the rest of that plan first: the composer carries the
+                saved colour as a `cn-*` class on three separate ancestors (this
+                title wrapper, #suite-read, and FragmentBrowser's cached
+                data-constellation-color), and none of them were repainted on
+                save. Rendering the server's value and never editing it is what
+                makes that class of "which copy is authoritative" bug impossible
+                here, rather than merely fixed. */
             }
-            <div class="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Star colour">
-              {
-                COLOR_SLOTS.map((slot) => (
-                  <label class:list={['cn-swatch', `cn-${slot}`, c.color === slot && 'is-active']} title={slot}>
-                    <input type="radio" name="color" value={slot} checked={c.color === slot} class="sr-only" />
-                    <StarMark />
-                    <span class="sr-only">{slot}</span>
-                  </label>
-                ))
-              }
-            </div>
+            <p class="admin-hint mt-1 flex items-center gap-1.5">
+              <span class="text-base" style="color: var(--cn)"><StarMark /></span>
+              <span>
+                Chosen in <a href="/admin/constellations" class="underline">the sky</a>, where you can see what the
+                others are wearing.
+              </span>
+            </p>
           </div>
           <div>
             <label class="admin-label" for="cc-status">Visibility</label>
@@ -560,11 +576,12 @@ const TYPES = ['writing', 'quote', 'song'] as const;
 <script>
   import { actions } from 'astro:actions';
   import { confirmDialog } from '../../../scripts/confirm-dialog';
-  import { formatActionError } from '../../../scripts/action-error';
+  import { callAction, formatActionError } from '../../../scripts/action-error';
   import { suiteHints } from '../../../lib/suite-shape';
   import { typeCountLabel, type FragmentType } from '../../../lib/fragments-display';
   import { announceSkyChange } from '../../../scripts/sky-changed';
   import { onFragmentsChanged } from '../../../scripts/fragments-changed';
+  import { wireListReorder } from '../../../scripts/list-reorder';
 
   const root = document.getElementById('ccomposer')!;
   const cid = root.dataset.id!;
@@ -588,13 +605,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
    *
    * Found by a spec, not by use — offline is never the state you are testing in.
    */
-  async function call<T>(p: Promise<{ data?: T; error?: unknown }>): Promise<{ data?: T; error?: unknown }> {
-    try {
-      return await p;
-    } catch (e) {
-      return { error: e };
-    }
-  }
+  const call = callAction; // it moved to action-error.ts — /admin/constellations needs it too
 
   // ── the constellation form: save is armed only by an actual edit ───
   const form = document.getElementById('cc-form') as HTMLFormElement;
@@ -638,7 +649,9 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       id: cid,
       name: (form.elements.namedItem('name') as HTMLInputElement).value.trim(),
       slug: data?.slug ?? root.dataset.slug!,
-      color: (form.querySelector<HTMLInputElement>('input[name="color"]:checked')?.value ?? '') || undefined,
+      // No `color` — this form stopped asking for one (docs/plans/16 · Piece 3),
+      // so it has nothing to announce about it. `SkyConstellation.color` is
+      // optional precisely for this: listeners repaint colour only when told.
       description: (form.elements.namedItem('description') as HTMLTextAreaElement).value.trim() || null,
     });
     savedFlash.hidden = false;
@@ -758,13 +771,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     if (!li) return;
     const btn = (e.target as Element).closest('button');
 
-    if (btn?.dataset.move) {
-      const sib = btn.dataset.move === 'up' ? li.previousElementSibling : li.nextElementSibling;
-      if (!sib) return;
-      btn.dataset.move === 'up' ? sib.before(li) : sib.after(li);
-      (btn as HTMLButtonElement).focus(); // keep the keyboard where the row went
-      return persistOrder();
-    }
+    // (the ↑/↓ nudges are handled by wireListReorder below, with drag and Alt+↑/↓)
     if (btn?.hasAttribute('data-unplace')) {
       // ── the ✕ removes a row, and NOTHING ELSE ────────────────────────
       // It unplaces; it never deletes. The fragment keeps existing, keeps its
@@ -885,18 +892,11 @@ const TYPES = ['writing', 'quote', 'song'] as const;
     return true;
   });
 
-  // Alt+↑/↓ nudges the focused row — the keyboard's reorder path, now that the
-  // arrow buttons only exist on touch (app.css `.row-nudge`).
-  rows.addEventListener('keydown', (e) => {
-    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-    const li = (e.target as Element).closest('li[data-fid]');
-    const sib = e.key === 'ArrowUp' ? li?.previousElementSibling : li?.nextElementSibling;
-    if (!li || !sib) return;
-    e.preventDefault();
-    e.key === 'ArrowUp' ? sib.before(li) : sib.after(li);
-    (e.target as HTMLElement).focus(); // keep the keyboard where the row went
-    persistOrder();
-  });
+  // Drag, Alt+↑/↓ and the touch nudges — all three now live in one module
+  // (docs/plans/16 · Piece 3), because /admin/constellations needed the same
+  // thing and had none of it. This page is where the behaviour was invented;
+  // it is now its first CONSUMER rather than its owner.
+  wireListReorder(rows, { rowSelector: 'li[data-fid]', onCommit: persistOrder });
 
   // ── Compose ⇄ Read ─────────────────────────────────────────────────
   // Two ways of looking at one suite: the dense rows to build it, the real
@@ -942,32 +942,5 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: art.dataset.writing }));
     if (art?.dataset.fragment)
       document.dispatchEvent(new CustomEvent('fragment:edit', { detail: art.dataset.fragment }));
-  });
-
-  // drag to reorder (the nudges remain the touch path, Alt+↑/↓ the keyboard's)
-  let dragged: HTMLElement | null = null;
-  rows.addEventListener('dragstart', (e) => {
-    dragged = (e.target as Element).closest('li[data-fid]');
-    if (dragged) {
-      dragged.classList.add('is-dragging');
-      e.dataTransfer?.setData('text/plain', dragged.dataset.fid!);
-    }
-  });
-  rows.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const over = (e.target as Element).closest('li[data-fid]') as HTMLElement | null;
-    if (!over || !dragged || over === dragged) return;
-    const r = over.getBoundingClientRect();
-    e.clientY < r.top + r.height / 2 ? over.before(dragged) : over.after(dragged);
-  });
-  rows.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dragged?.classList.remove('is-dragging');
-    if (dragged) persistOrder();
-    dragged = null;
-  });
-  rows.addEventListener('dragend', () => {
-    dragged?.classList.remove('is-dragging');
-    dragged = null;
   });
 </script>

@@ -36,6 +36,7 @@ import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
 import { wireMusicPanel, type PairedSong } from './music-panel';
 import { wireSubjectSuggest } from './subject-suggest';
+import { wireAddMenu } from './fragment-panel';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -47,6 +48,15 @@ const excerptField = document.getElementById('excerpt-field') as HTMLTextAreaEle
 const jsError = document.getElementById('ws-error') as HTMLParagraphElement;
 const spinner = document.getElementById('ws-spinner') as HTMLElement;
 const statusText = document.getElementById('ws-status-text') as HTMLElement;
+
+/**
+ * A class, not `hidden` (docs/plans/16 · Piece 1). app.css hides the spinner
+ * with `visibility`, so its box survives — `hidden` handed ~1rem of the command
+ * row back and took it again on every autosave, which on a draft is every 1.2
+ * seconds for as long as you keep writing. It was the worst of the five shifts
+ * precisely because it was the one on a timer.
+ */
+const setSpinner = (on: boolean) => spinner.classList.toggle('is-on', on);
 
 form.addEventListener('submit', (e) => e.preventDefault()); // no implicit submit
 
@@ -77,24 +87,24 @@ const { editor, getMarkdown } = mountRichEditor({
 
 // ---- status indicator ----
 function setSaving() {
-  spinner.hidden = false;
+  setSpinner(true);
   statusText.textContent = 'Saving…';
   statusText.classList.remove('text-error', 'text-warning');
 }
 function setSaved(msg = 'Saved ' + nowTime()) {
-  spinner.hidden = true;
+  setSpinner(false);
   statusText.textContent = msg;
   statusText.classList.remove('text-error', 'text-warning');
 }
 function setStatusError(msg: string) {
-  spinner.hidden = true;
+  setSpinner(false);
   statusText.textContent = msg;
   statusText.classList.remove('text-warning');
   statusText.classList.add('text-error');
 }
 /** Off-band notices: saved-locally, second-tab, will-sync. Never red. */
 function setStatusNote(msg: string) {
-  spinner.hidden = true;
+  setSpinner(false);
   statusText.textContent = msg;
   statusText.classList.remove('text-error');
   statusText.classList.add('text-warning');
@@ -136,7 +146,19 @@ const saveChangesBtn = document.getElementById('ws-save-changes') as HTMLButtonE
 const discardBtn = document.getElementById('ws-discard') as HTMLButtonElement;
 const viewLink = document.getElementById('ws-view-link') as HTMLAnchorElement;
 const deleteBtn = document.getElementById('ws-delete') as HTMLButtonElement;
+/** Delete's home since plan 16: the foot of the document, below a rule. */
+const deleteZone = document.getElementById('ws-delete-zone') as HTMLElement;
 const toDraftBtn = document.getElementById('ws-to-draft') as HTMLButtonElement;
+const detailsBtn = document.getElementById('ws-open-details') as HTMLButtonElement;
+const unpublishBtn = document.getElementById('ws-unpublish') as HTMLButtonElement;
+const moreBtn = document.getElementById('ws-more-btn') as HTMLButtonElement;
+/**
+ * The ⋯ overflow (docs/plans/16 · Piece 1). `wireAddMenu` is reused rather than
+ * a second dropdown invented: it already carries keyboard nav, outside-click
+ * and Escape, and it is what the other two menus in the admin are. A second
+ * implementation is how two menus start behaving differently.
+ */
+const { close: closeMoreMenu } = wireAddMenu(moreBtn, document.getElementById('ws-more-menu')!);
 const headingLabel = document.getElementById('ws-heading-label') as HTMLElement;
 const versionsTab = sheet.querySelector('[data-tab="versions"]') as HTMLButtonElement;
 let savedStatus = 'draft';
@@ -168,7 +190,7 @@ const isNote = () => savedStatus === 'note';
  * image…", and on failure nothing else would ever reclaim it.
  */
 function restStatus() {
-  spinner.hidden = true;
+  setSpinner(false);
   statusText.classList.remove('text-error', 'text-warning');
   statusText.textContent = isPublished()
     ? 'Up to date'
@@ -182,10 +204,26 @@ function reflectStatus() {
   draftActions.hidden = isPublished();
   publishedActions.hidden = !isPublished();
   toDraftBtn.hidden = !isNote();
-  headingLabel.textContent = isNote() ? 'Note' : 'Writing';
+  detailsBtn.hidden = !isPublished();
+  unpublishBtn.hidden = !isPublished();
+  // The word left the row; only the flip survives, as a chip (see the markup).
+  headingLabel.hidden = !isNote();
   // Only a published piece has versions: a draft simply edits itself.
   versionsTab.hidden = !(isPublished() && serverHasRow);
   updateDirtyUI();
+}
+
+/**
+ * The ⋯ button exists only when there is something behind it. A plain draft has
+ * nothing — Publish… is in the row and Delete is at the foot of the document —
+ * so the door would open onto an empty box. Hiding it is safe motion-wise: what
+ * this piece IS only changes at open time, or on an explicit publish/unpublish
+ * you just pressed, never mid-sentence.
+ */
+function syncMoreMenu() {
+  const items = [toDraftBtn, detailsBtn, discardBtn, unpublishBtn];
+  moreBtn.hidden = !items.some((el) => !el.hidden);
+  if (moreBtn.hidden) closeMoreMenu();
 }
 /**
  * The permalink button. Published pieces get "View"; drafts and notes get
@@ -219,13 +257,21 @@ function updateViewLink(slug: string) {
 function updateDirtyUI() {
   if (isPublished()) {
     saveChangesBtn.disabled = !dirty;
+    // Discard used to be a BUTTON APPEARING IN THE ROW on your first keystroke,
+    // shoving Save changes and everything beside it sideways mid-sentence — the
+    // single worst of the shifts this piece was opened for. Inside the ⋯ menu it
+    // can come and go for free, which is the whole argument for the menu.
     discardBtn.hidden = !dirty;
+    syncMoreMenu();
     if (dirty) {
-      spinner.hidden = true;
+      setSpinner(false);
       statusText.textContent = versionHeld ? `Kept as a draft version · not public yet` : 'Unsaved changes';
       statusText.classList.add('text-warning');
       return;
     }
+  } else {
+    discardBtn.hidden = true;
+    syncMoreMenu();
   }
   statusText.classList.remove('text-warning');
 }
@@ -369,7 +415,7 @@ async function doSave(status: string, opts: { silentEmpty?: boolean }): Promise<
     // composer's pre-tick) can only be written now that the row exists.
     await picker.flush(idField.value);
     setHash(`#edit=${idField.value}`);
-    deleteBtn.hidden = false;
+    deleteZone.hidden = false;
   }
   if (!slugTouched && data.slug) slugField.value = data.slug;
   savedStatus = status;
@@ -603,7 +649,7 @@ function populate(d: Loaded | null) {
   everSaved = false;
   versionHeld = false;
   jsError.hidden = true;
-  deleteBtn.hidden = !d;
+  deleteZone.hidden = !d;
   reflectStatus();
   // Versions are a published-piece concern; the panel fetches on its own and
   // reports back through the tab's count, including any working version left

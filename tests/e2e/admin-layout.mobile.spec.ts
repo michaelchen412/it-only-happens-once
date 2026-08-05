@@ -76,32 +76,27 @@ test.describe('the admin at 390px', () => {
     expect(overflows, `content escaping its zone at 390px: ${JSON.stringify(overflows)}`).toHaveLength(0);
   });
 
-  // KNOWN DEFECT, recorded rather than hidden — plan 08, finding 4.
+  // ✅ FIXED 2026-08-04 by plan 16 · Piece 1. This carried `test.fail()` from
+  // 2026-07-30 to 2026-08-04, and it did its job exactly as designed: it went
+  // "expected to fail, but passed" on the run that fixed the row, which is the
+  // signal its own comment said to watch for. Kept — as a real assertion now —
+  // because the row will be edited again.
   //
-  // Measured 2026-07-30: the row is 501px of content in a 389px drawer on an
-  // empty new piece (112px over), rising to 599px once you've typed and the
-  // word count appears (210px over). It is `flex items-center gap-3 px-6` with
-  // no wrap and no responsive rules, carrying close, type mark, "WRITING", two
-  // tabs, the status area, View/Preview, Publish… and Delete.
+  // What it was recording, worth keeping for scale: 501px of content in a 389px
+  // drawer on an empty new piece, rising to 599px once you had typed and the
+  // word count appeared, and worsening to 565px-at-rest on 2026-07-31 when a
+  // fourth tab (Music) arrived. The row was `flex items-center gap-3 px-6` with
+  // no wrap and no responsive rules, carrying up to thirteen children.
   //
-  // The overflow PREDATES the plan 06 word count — 112px of it is the row as it
-  // has always been; the count adds the other 98px. Left failing-on-purpose so
-  // the suite stays green while the finding stays executable: fix the row and
-  // Playwright will flag this as "expected to fail but passed", which is the
-  // signal to delete this comment and the `test.fail()` below.
-  //
-  // Worse since 2026-07-31, measured not guessed: plan 04 Piece 3 added a
-  // fourth tab (Music) and the row went 501px → 565px in the same 389px, i.e.
-  // over by 176px rather than 112px. Recorded here because a known defect
-  // getting quietly worse is how it stops being known. When this row is finally
-  // fixed, four tabs is the number to fix it for.
+  // ⚠ The plan that fixed it claimed "nothing measures this header". It was
+  // wrong: this did, for five days, with a number. A known defect left
+  // executable is worth more than a known defect written down.
   test('the writing sheet command row fits its drawer', async ({ page }) => {
-    test.fail();
     await blockWrites(page);
     await page.goto('/admin/fragments#new-writing');
     await expect(page.locator('#wsheet')).toBeVisible();
 
-    const row = await overflowOf(page, '#wsheet form > div > div.flex.items-center');
+    const row = await overflowOf(page, '#ws-command-row');
     expect(
       row.over,
       `command row overflows its drawer by ${row.over}px at 390px (content ${row.scroll}px in ${row.client}px)`,

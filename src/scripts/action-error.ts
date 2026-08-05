@@ -27,6 +27,23 @@ export function formatActionError(error: any): string {
   return error?.message ?? 'Something went wrong.';
 }
 
+/**
+ * Await an action and turn a THROW into an `{ error }` like any other failure.
+ *
+ * `astro:actions` does not hand back `{ error }` when the network is dead — the
+ * fetch underneath throws, so a bare `await actions.x.y(...)` rejects and skips
+ * whatever came after it. On an optimistic control that means the screen keeps
+ * showing a change the database never received. Pair it with
+ * `formatActionError`, which knows what a thrown `TypeError` means.
+ */
+export async function callAction<T>(p: Promise<{ data?: T; error?: unknown }>): Promise<{ data?: T; error?: unknown }> {
+  try {
+    return await p;
+  } catch (e) {
+    return { error: e };
+  }
+}
+
 /** True when a failure is connectivity rather than an answer from the server. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isNetworkError(error: any): boolean {

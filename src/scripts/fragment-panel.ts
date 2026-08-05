@@ -321,7 +321,12 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
 
 /** The Add ▾ dropdown (manager header + browser sheet header share the shape). */
 export function wireAddMenu(btn: HTMLElement, menu: HTMLElement) {
-  const items = () => Array.from(menu.querySelectorAll<HTMLElement>('.add-item'));
+  // `:not([hidden])` because the writing sheet's ⋯ menu (docs/plans/16 · Piece
+  // 1) shows a different set per publish state — Discard only exists while
+  // you're dirty. Arrow-keying onto a hidden item would silently do nothing and
+  // strand the index. The Add menus have no hidden items, so this is a no-op
+  // for them.
+  const items = () => Array.from(menu.querySelectorAll<HTMLElement>('.add-item:not([hidden])'));
   const openMenu = () => {
     menu.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
@@ -353,6 +358,14 @@ export function wireAddMenu(btn: HTMLElement, menu: HTMLElement) {
       closeMenu(true);
     }
   });
-  // creating something closes the menu (the sheet takes over)
-  items().forEach((el) => el.addEventListener('click', () => closeMenu()));
+  // Choosing something closes the menu (whatever it opened takes over).
+  // Delegated rather than bound per item at wire time: the set of items is no
+  // longer fixed, so a listener attached once would miss anything hidden then.
+  menu.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('.add-item')) closeMenu();
+  });
+
+  // Returned so a caller that hides the button can also shut the menu behind it
+  // — an open menu whose trigger has vanished is unclosable by outside-click.
+  return { close: closeMenu };
 }

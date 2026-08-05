@@ -1294,37 +1294,122 @@ html.reader-open .sky-return {
   border-bottom-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
 }
 
-/* Star-colour swatches in the composer — the ✦ itself in each slot, so you
-   pick the star you'll actually see rather than an abstract colour chip. */
+/* ── Star colour, on /admin/constellations ─────────────────────────────────
+   The ✦ itself in each slot, so you pick the star you'll actually see rather
+   than an abstract colour chip.
+
+   THESE MOVED OUT OF THE COMPOSER (docs/plans/16 · Piece 3). Colour is a
+   comparative judgement — a slot only means anything against the other seven
+   and against what the neighbouring constellations already wear — so the
+   control now lives where the whole sky is on screen. The reasoning is also
+   written at both call sites; this note is here because the MARKUP changed
+   shape with the move, and the two bugs below travelled with it.
+
+   The trigger is a real <button> now, not a <label> wrapping an `sr-only`
+   radio. That was the composer's shape because it sat inside a form and
+   FormData had to carry it; on the index the click is the commit, so the input
+   has nothing to do — and losing it makes one of the two bugs structurally
+   impossible rather than merely fixed (see .cn-slot:focus-visible). */
 .cn-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  cursor: pointer;
   color: var(--cn);
   font-family: var(--font-display);
   border: 1px solid transparent;
   border-radius: var(--radius-field);
-  opacity: 0.55;
+  /* Resting opacity was 0.55, reaching 1 only on `:hover` — WHICH TOUCH DOES
+     NOT HAVE. On a phone that made the picker one lit star and seven dim ones
+     with no way to preview any of them. Raised so every slot is legible at
+     rest, and the selection is carried by .is-active's ring, glow and tinted
+     background instead of by everything else being faded out. */
+  opacity: 0.82;
   transition:
     opacity 0.12s,
     border-color 0.12s,
     background 0.12s;
 }
-.cn-swatch:hover {
+.cn-slot:hover .cn-swatch {
   opacity: 1;
 }
-.cn-swatch.is-active {
+.cn-swatch.is-active,
+.cn-slot.is-active .cn-swatch {
   opacity: 1;
   background: color-mix(in oklab, var(--cn) 14%, transparent);
   border-color: color-mix(in oklab, var(--cn) 45%, transparent);
   filter: drop-shadow(0 0 5px color-mix(in oklab, var(--cn) 65%, transparent));
 }
-.cn-swatch:focus-within {
+
+/* One slot in the picker: the star, with how many constellations wear it. */
+.cn-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.25rem 0.15rem 0.2rem;
+  cursor: pointer;
+  border-radius: var(--radius-field);
+}
+.cn-slot:hover {
+  background: color-mix(in oklab, var(--color-base-300) 40%, transparent);
+}
+/* ⚠ `:focus-visible`, NOT `:focus-within` — this is one of the two bugs the
+   move had to kill rather than rebuild. The composer painted a 2px PRIMARY
+   outline on `.cn-swatch:focus-within`, and `:focus-within` matches a MOUSE
+   click too, because the `sr-only` radio inside took focus. So the instant you
+   picked a colour you got a blue ring on the new swatch, competing with the
+   glow still sitting on the old one: two selection signals on screen, and
+   neither of them the actual selection. The keyboard ring is for the keyboard;
+   `.is-active` is the one thing that means "chosen". */
+.cn-slot:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
   outline-offset: 2px;
+}
+.cn-slot__n {
+  min-height: 0.85rem; /* reserved, so a count arriving doesn't resize the grid */
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+
+/* The row's star, once it became a control. It has to read as pressable
+   without becoming a button-shaped thing in a list of quiet rows. */
+.cn-star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-field);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    filter 0.12s;
+}
+.cn-star-btn:hover {
+  background: color-mix(in oklab, var(--cn) 16%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--cn) 60%, transparent));
+}
+.cn-star-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* The picker itself. `position: fixed` with the offsets written by script —
+   the native top layer means viewport coordinates, and `inset: auto` undoes
+   the UA's centring default. */
+.cl-colors {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: 15rem;
+}
+.cl-colors::backdrop {
+  background: transparent;
 }
 
 /* Sheet tabs — an underline strip inside the editor drawers, so a fragment's
@@ -1361,10 +1446,111 @@ html.reader-open .sky-return {
   border-radius: var(--radius-field);
 }
 .admin-tab__n {
+  display: inline-block;
+  /* Reserved, not fitted. A count arriving on save (Versions ³) would otherwise
+     widen its tab and shove the whole strip along — a shift you see out of the
+     corner of your eye mid-sentence. Two characters covers 1–99, which this
+     corpus will not outlive. The margin is spent whether or not there's a
+     number, so reserving the glyph box too costs almost nothing. */
+  min-width: 2ch;
   margin-left: 0.3rem;
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
   color: color-mix(in oklab, var(--color-primary) 85%, transparent);
+}
+
+/* ── The writing sheet's command row: stillness while you type ──────────────
+   (docs/plans/16 · Piece 1.) The complaint was layout shift, and every one of
+   these rules buys the same thing: a region whose width does not depend on
+   what it currently says.
+
+   The distinction that decides what gets reserved: an OPEN-TIME difference (a
+   published piece showing different controls than a draft) is a state, settled
+   before the drawer is in front of you. A MID-TYPING change is the fault. Only
+   the second kind is worth spending permanent width on — and it is spent, on
+   every piece, forever, which is why nothing here reserves more than it must. */
+
+/* The worst offender, because it's the one on a timer: a draft autosaves every
+   1.2s, so `hidden` on the spinner took ~1rem of row and gave it back, twice a
+   cycle, for as long as you kept writing. `visibility` keeps the box. */
+#ws-spinner {
+  visibility: hidden;
+  flex: none;
+}
+#ws-spinner.is-on {
+  visibility: visible;
+}
+
+/* ⚠ THE TWO WIDTHS BELOW WERE MEASURED IN THE BROWSER, NOT ESTIMATED. A first
+   pass sized them in `ch` by counting characters, and the row still moved 6px
+   on the first keystroke — `1ch` is the width of a DIGIT and these strings are
+   mostly lowercase, so a character count is not a width. The pixel figures in
+   the comments are what the real strings render at, at 12px, in this font.
+   It matters more than it looks, because the row has no slack to absorb a
+   mistake: its content fills the drawer, so there is nothing for `ml-auto` to
+   give back and anything that grows pushes Save changes along.
+
+   The status sentence changes under you: "Autosaves as you write" → "Saving…" →
+   "Saved 14:32" on every autosave of a draft, and "Up to date" → "Unsaved
+   changes" → "Kept as a draft version · not public yet" on a published piece.
+   Sized for the longest REPEATING message, not the longest possible one:
+   reserving all 200px of that last sentence would buy a single settle — it
+   arrives once, 1.2s after your first keystroke, and never changes again — at
+   the cost of 100px of row on every piece forever. */
+#ws-status-text {
+  display: inline-block;
+  min-width: 6.25rem; /* 100px ≥ "Unsaved changes" (97px) */
+}
+/* Right-aligned inside its reserved box so the trailing "·" stays put and the
+   number grows leftward into the slack — the separator is what the eye uses to
+   find where the sentence beside it begins.
+
+   Same rule: sized for what recurs. 120px covers every count up to "9,999 words
+   · 45 min ·"; a piece crossing ten thousand words shifts the row once, on the
+   ten-thousandth word, and never again. */
+#ws-count {
+  display: inline-block;
+  min-width: 7.5rem; /* 120px ≥ "9,999 words · 45 min ·" */
+  text-align: right;
+}
+
+/* THE TAB STRIP IS THE NAMED SHOCK ABSORBER, and naming it is the point of
+   these two rules. Something has to give when the status line reaches its
+   longest sentence, and left to itself flex shrinks every flexible item in
+   proportion — which spent part of the deficit on `#ws-status` and passed the
+   rest along to Save changes. A button that drifts 4px is exactly the failure
+   this piece exists to remove, so the deficit is aimed: `#ws-status` never
+   shrinks and the strip takes all of it. The strip is the right place for it —
+   four tabs and their counts outrun a 390px phone on their own, so it had to
+   scroll there regardless, and a strip that scrolls still reaches every tab
+   (`wireSheetTabs` scrolls the selected one into view). The alternative —
+   letting the ROW scroll — puts Save changes off-screen with nothing saying
+   it's there, which in a near-fullscreen drawer is the worst answer available. */
+#ws-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#ws-tabs::-webkit-scrollbar {
+  display: none;
+}
+#ws-status {
+  flex: none;
+}
+
+/* Below `sm` the row becomes two lines rather than scrolling sideways, for the
+   same reason: a top bar you have to swipe hides its own Save button. The
+   reservations above are what make wrapping safe — without them the row would
+   re-flow mid-sentence, which is the original complaint wearing a different
+   hat. */
+#ws-command-row {
+  flex-wrap: wrap;
+}
+@media (min-width: 40rem) {
+  #ws-command-row {
+    flex-wrap: nowrap;
+  }
 }
 
 /* Composer suite rows — hover lift, and a held row while dragging. */

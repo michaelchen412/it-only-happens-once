@@ -19,6 +19,7 @@
   In a composer context (body[data-place-in]) the FIRST save also places the
   new piece into that constellation — same hook FragmentSheet uses.
 */
+import { Icon } from 'astro-icon/components';
 import EditorToolbar from './EditorToolbar.astro';
 import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
@@ -35,23 +36,45 @@ interface Props {
 const { subjects, constellations = [] } = Astro.props;
 ---
 
-<dialog id="wsheet" class="drawer-dialog w-full max-w-4xl" aria-labelledby="ws-heading">
+{
+  /* max-w-5xl, not 4xl (docs/plans/16 · Piece 1). MEASURED, not preferred: at
+    896px the command row's content came to ~1020px even after four buttons
+    moved behind ⋯ and even at rest, so the tab strip was silently clipping
+    Versions — and clipping Music too the moment the status line reached its
+    longest sentence. Two tabs quietly missing on a desktop is a worse outcome
+    than the shifts this piece set out to remove.
+    It costs the writing surface nothing: the document column below is
+    independently `max-w-2xl` and centred, so the measure you type against is
+    unchanged — only the chrome gets the room it was already using. The
+    FragmentBrowser drawer next door is already 5xl. */
+}
+<dialog id="wsheet" class="drawer-dialog w-full max-w-5xl" aria-labelledby="ws-heading">
   <form id="ws-form" class="flex h-full flex-col">
     <input type="hidden" name="id" />
     <input type="hidden" name="body" id="ws-body-field" />
 
     {/* command row + formatting toolbar (always visible; the document scrolls) */}
     <div class="border-base-300 bg-base-100/95 shrink-0 border-b">
-      <div class="flex items-center gap-3 px-6 py-2">
+      <div id="ws-command-row" class="flex items-center gap-3 px-6 py-2">
         <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
           >✕</button
         >
+        {
+          /* The word "WRITING" used to sit here permanently (docs/plans/16 ·
+            Piece 1). A title field and a rich text editor are directly below
+            it, so as a label it was a third assertion of the obvious — but it
+            did do one real job: it flipped to "Note", which is the one thing
+            about this drawer you cannot see by looking at it. So the word goes
+            and the FLIP stays, as a chip that appears only for a note.
+            TypeMark already carries an sr-only "Writing", so the dialog keeps
+            its accessible name without the visible word. */
+        }
         <span
           id="ws-heading"
-          class="text-base-content/40 flex items-center gap-1.5 font-sans text-xs tracking-widest uppercase"
+          class="text-base-content/40 flex shrink-0 items-center gap-1.5 font-sans text-xs tracking-widest uppercase"
         >
           <TypeMark type="writing" />
-          <span id="ws-heading-label">Writing</span>
+          <span id="ws-heading-label" hidden>Note</span>
         </span>
 
         {
@@ -59,7 +82,7 @@ const { subjects, constellations = [] } = Astro.props;
             the publish dialog: a DRAFT essay never opens that dialog, and
             placing drafts in piles is what the composing room is for. */
         }
-        <div class="admin-tabs ml-2 border-b-0" role="tablist" aria-label="Editor sections">
+        <div id="ws-tabs" class="admin-tabs ml-2 border-b-0" role="tablist" aria-label="Editor sections">
           <button
             type="button"
             role="tab"
@@ -125,7 +148,13 @@ const { subjects, constellations = [] } = Astro.props;
           aria-live="polite"
         >
           <span id="ws-count" hidden class="text-base-content/40 whitespace-nowrap tabular-nums"></span>
-          <span id="ws-spinner" hidden class="loading loading-spinner loading-xs"></span>
+          {
+            /* No `hidden` on the spinner: app.css hides it with `visibility` so
+              it never gives its width back. A draft autosaves every 1.2s, so
+              this was a ~1rem hole opening and closing beside the words you
+              were writing, twice a second-and-a-bit, indefinitely. */
+          }
+          <span id="ws-spinner" class="loading loading-spinner loading-xs"></span>
           <span id="ws-status-text">Autosaves as you write</span>
         </div>
 
@@ -136,28 +165,82 @@ const { subjects, constellations = [] } = Astro.props;
         }
         <a id="ws-view-link" href="#" target="_blank" hidden class="btn btn-ghost btn-sm normal-case">View ↗</a>
 
-        <div id="ws-actions-draft" class="flex items-center gap-2">
-          {
-            /* Notes promote one step at a time — note → draft → published — but
-              nothing stops a finished note going straight out via Publish… */
-          }
-          <button type="button" id="ws-to-draft" hidden class="btn btn-outline btn-sm normal-case"
-            >Make it a draft</button
-          >
+        {
+          /* THE ROW HOLDS TWO ACTIONS AND A DOOR (docs/plans/16 · Piece 1).
+            It used to hold six, and the row was carrying three different jobs
+            at once: what am I looking at (heading, tabs), what is happening
+            (count, spinner, status), and what can I do. Only the first two
+            earn permanent residence, so what stays is the PRIMARY (the one
+            thing this state is for) and View ↗ (frequent, and it's how you
+            check your work). Everything else went behind ⋯.
+
+            The alternative was a second row allowed to wrap. Rejected: a wrap
+            is a layout shift by another name — it re-flows at width
+            boundaries — and it spends vertical space in a drawer whose whole
+            job is the document. A menu's contents can appear and disappear
+            (Discard only exists while you're dirty) at zero cost to the row,
+            which is exactly the property this piece was fixing. */
+        }
+        <div id="ws-actions-draft" class="flex shrink-0 items-center gap-2">
           <button type="button" id="ws-open-publish" class="btn btn-primary btn-sm normal-case">Publish…</button>
         </div>
-        <div id="ws-actions-published" hidden class="flex items-center gap-2">
-          <button type="button" id="ws-discard" hidden class="btn btn-ghost btn-sm normal-case">Discard</button>
+        <div id="ws-actions-published" hidden class="flex shrink-0 items-center gap-2">
           <button type="button" id="ws-save-changes" class="btn btn-primary btn-sm normal-case" disabled
             >Save changes</button
           >
-          <button type="button" id="ws-open-details" class="btn btn-ghost btn-sm normal-case">Details…</button>
-          <button type="button" id="ws-unpublish" class="btn btn-outline btn-sm normal-case">Unpublish</button>
         </div>
 
-        <button type="button" id="ws-delete" hidden class="text-base-content/55 hover:text-error font-sans text-sm"
-          >Delete</button
-        >
+        <div class="relative shrink-0">
+          <button
+            type="button"
+            id="ws-more-btn"
+            hidden
+            class="btn btn-ghost btn-sm px-2"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-label="More actions"><span aria-hidden="true">⋯</span></button
+          >
+          <div
+            id="ws-more-menu"
+            hidden
+            role="menu"
+            class="rounded-box border-base-300 bg-base-100 absolute right-0 z-50 mt-1 w-52 border py-1 shadow-lg"
+          >
+            {
+              /* Notes promote one step at a time — note → draft → published —
+                but nothing stops a finished note going straight out via
+                Publish…, which is why that one stayed in the row. */
+            }
+            <button
+              type="button"
+              id="ws-to-draft"
+              hidden
+              role="menuitem"
+              class="add-item w-full px-3 py-2 text-left text-sm">Make it a draft</button
+            >
+            <button
+              type="button"
+              id="ws-open-details"
+              hidden
+              role="menuitem"
+              class="add-item w-full px-3 py-2 text-left text-sm">Details…</button
+            >
+            <button
+              type="button"
+              id="ws-discard"
+              hidden
+              role="menuitem"
+              class="add-item w-full px-3 py-2 text-left text-sm">Discard changes</button
+            >
+            <button
+              type="button"
+              id="ws-unpublish"
+              hidden
+              role="menuitem"
+              class="add-item w-full px-3 py-2 text-left text-sm">Unpublish</button
+            >
+          </div>
+        </div>
       </div>
       {/* wrapped (not given an id) so EditorToolbar stays shared-as-is */}
       <div id="ws-toolbar">
@@ -176,6 +259,33 @@ const { subjects, constellations = [] } = Astro.props;
         />
         <p id="ws-error" hidden role="alert" class="admin-alert mt-4"></p>
         <div id="ws-editor" class="reading mt-6"></div>
+
+        {
+          /* DELETE LEFT THE TOP BAR (docs/plans/16 · Piece 1). It was sitting
+            in a row of benign controls, one keystroke from Unpublish — a
+            destructive action wearing the same clothes as "Details…". The
+            constellation composer already solved this: Delete sits apart,
+            below a rule, at the END of the thing it destroys, with a line
+            saying what it does and doesn't touch. Same treatment here.
+
+            Deliberately NOT inside the ⋯ menu, which was the other candidate:
+            a menu is where you put things you reach for occasionally, and
+            putting delete one arrow-key from Unpublish would have reproduced
+            the original fault in a smaller box. */
+        }
+        <div
+          id="ws-delete-zone"
+          hidden
+          class="border-base-300 mt-20 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
+        >
+          <p class="admin-hint">
+            Deleting moves this piece to the trash. Its constellations keep their shape, and nothing else you've written
+            is touched.
+          </p>
+          <button type="button" id="ws-delete" class="btn btn-ghost btn-sm text-error gap-1.5 font-sans normal-case">
+            <Icon name="ph:trash" /> Delete
+          </button>
+        </div>
       </div>
 
       <div

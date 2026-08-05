@@ -19,6 +19,14 @@ export function wireSheetTabs(root: ParentNode, onSelect?: (key: string) => void
       t.tabIndex = on ? 0 : -1; // roving tabindex: one stop for the whole strip
     });
     panels.forEach((p) => (p.hidden = p.dataset.tabpanel !== key));
+    // Keep the chosen tab in view. The writing sheet's strip scrolls inside its
+    // own box on a narrow window (docs/plans/16 · Piece 1) so that the command
+    // ROW never has to — which means a tab you just selected, or arrowed to,
+    // can be off the end of the strip. `nearest` so it never scrolls when it
+    // doesn't have to, and never drags the dialog itself around.
+    tabs
+      .find((t) => t.dataset.tab === key)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
     onSelect?.(key);
   }
 

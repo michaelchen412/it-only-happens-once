@@ -152,8 +152,26 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   }
 
   // provenance facets: authors & works (for the datalists, filters, and editor prefill)
-  const { data: allAuthors } = await supabase.from('authors').select('id, name, slug').order('name');
-  const { data: allWorks } = await supabase.from('works').select('id, title, slug, author_id').order('title');
+  //
+  // ⚠ THE CEILING HERE IS CHOSEN, NOT DEFAULTED (docs/plans/16 · Piece 2).
+  // These look unbounded and are not: PostgREST stops at 1000 rows unless you
+  // say otherwise, so the read that "gets every author" would have started
+  // lying at 1001 with nothing on screen to say so — the same silent-truncation
+  // fault the combo's 50-row cap had, one layer down. Stating it makes the
+  // number somebody's decision. Harmless at 70 authors / 49 works; the thing
+  // that actually retires the question is the plan's step 2, where the combo
+  // asks the server per keystroke instead of being handed the whole vocabulary.
+  const VOCAB_CEILING = 1000;
+  const { data: allAuthors } = await supabase
+    .from('authors')
+    .select('id, name, slug')
+    .order('name')
+    .limit(VOCAB_CEILING);
+  const { data: allWorks } = await supabase
+    .from('works')
+    .select('id, title, slug, author_id')
+    .order('title')
+    .limit(VOCAB_CEILING);
   const authorNameById = Object.fromEntries((allAuthors ?? []).map((a) => [a.id, a.name]));
   const workTitleById = Object.fromEntries((allWorks ?? []).map((w) => [w.id, w.title]));
   const authorFilterId = p.authorSlug ? ((allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—') : null;

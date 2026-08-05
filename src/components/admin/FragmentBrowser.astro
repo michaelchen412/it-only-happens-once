@@ -139,9 +139,17 @@ const { constellation, constellationName, constellationDescription, constellatio
 
   const browser = document.getElementById('fbrowser') as HTMLDialogElement;
   const cid = browser.dataset.constellation!;
-  // `let`, not `const`: the constellation's name and colour are edited in the
-  // form BEHIND this drawer, and a chip added live has to match what was just
-  // saved rather than what the server rendered when the page loaded.
+  // `let`, not `const`: the constellation's name is edited in the form BEHIND
+  // this drawer, and a chip added live has to match what was just saved rather
+  // than what the server rendered when the page loaded.
+  //
+  // ⚠ COLOUR NO LONGER ARRIVES THIS WAY, and the absence is deliberate
+  // (docs/plans/16 · Piece 3): the composer stopped asking for a colour, so on
+  // this page the rendered value can't go stale — it is correct by
+  // construction. `ccolor` stays a `let` and the guard below stays, because the
+  // event still carries an optional colour and a future surface may send one.
+  // If an editing control ever returns to the composer, this is one of three
+  // places that cached its answer, which is the argument for it not returning.
   let cname = browser.dataset.constellationName ?? '';
   let ccolor = browser.dataset.constellationColor ?? '';
 
