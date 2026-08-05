@@ -45,7 +45,10 @@ export const WORDS = {
   dream_intensity: ['faint', 'mild', 'vivid', 'strong', 'consuming'],
 } as const;
 
-export function wordFor(field: keyof typeof WORDS, value: number | null): string {
+/** The fields that have a word beside their marks. */
+export type MarkField = keyof typeof WORDS;
+
+export function wordFor(field: MarkField, value: number | null): string {
   return value && value >= 1 && value <= 5 ? WORDS[field][value - 1] : '';
 }
 
@@ -65,13 +68,28 @@ export const DREAMS: { key: DreamRecall; label: string; tone: string; icon: stri
   { key: 'distressing', label: 'Distressing', tone: 'u-now', icon: 'ph:warning' },
 ];
 
-/** Buckets, not numbers: a minute count is a guess at 7am. */
+/**
+ * Buckets, not numbers: a minute count is a guess at 7am.
+ *
+ * ⚠ THE ARGUMENT INVERTS AT THE TOP OF THE SCALE, and that was a real bug for
+ * three days. Nobody knows whether it was twelve minutes or twenty — but
+ * everybody knows when it was three hours. `over_60` is open-ended, so its
+ * midpoint is a CEILING rather than a middle: a night awake until 3am was
+ * estimated at an hour and a quarter, and the efficiency came out about
+ * twenty-five points high, on the one number CBT-I actually moves.
+ *
+ * The bucket is still the answer. `asleep_at` (below, and only on this bucket)
+ * is the refinement offered when it cannot be one — see `derive`.
+ */
 export const LATENCIES: { key: SleepLatency; label: string; midpoint: number }[] = [
   { key: 'under_15', label: '< 15m', midpoint: 8 },
   { key: '15_30', label: '15–30', midpoint: 22 },
   { key: '30_60', label: '30–60', midpoint: 45 },
   { key: 'over_60', label: '60m +', midpoint: 75 },
 ];
+
+/** The one bucket that asks a second question, because it cannot answer it. */
+export const OPEN_ENDED_LATENCY: SleepLatency = 'over_60';
 
 /** Same reason. Nobody knows the count. */
 export const WAKINGS: { key: Awakenings; label: string; midpoint: number }[] = [
@@ -95,9 +113,35 @@ export function t12(hhmm: string): string {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+/** `HH:MM` as minutes since midnight, or null if it is not a clock time. */
+function clockMinutes(hhmm: string): number | null {
+  const [h, m] = hhmm.split(':').map(Number);
+  return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
+}
+
+/**
+ * Minutes from one wall clock to another, WRAPPING PAST MIDNIGHT — which is the
+ * normal case here rather than the edge one: 23:35 → 06:25 is 6h50m, not minus
+ * seventeen hours. This is the same fact `bed_at` being a full timestamp
+ * encodes in the database.
+ *
+ * Equal times are zero, not a full day. Somebody mid-edit with the same time in
+ * two pickers should see `0m`, not `24h 00m` — an absurd number reads as a bug
+ * in the instrument, and it briefly was one.
+ */
+export function span(from: string, to: string): number | null {
+  const a = clockMinutes(from);
+  const b = clockMinutes(to);
+  if (a === null || b === null) return null;
+  const d = b - a;
+  return d < 0 ? d + 1440 : d;
+}
+
 export interface Derived {
-  /** Minutes between getting into bed and waking. */
+  /** Minutes between getting into bed and getting OUT of it. */
   inBed: number;
+  /** Of those, the minutes spent awake after the final waking. Zero if unsaid. */
+  awakeInBed: number;
   /** Estimated minutes actually asleep — null until both buckets are answered. */
   asleep: number | null;
   /** Sleep efficiency as a percentage, null on the same condition. */
@@ -105,11 +149,24 @@ export interface Derived {
 }
 
 /**
- * The live payback, from two wall-clock times and the two buckets.
+ * The live payback, from the wall-clock times and the two buckets.
  *
- * `inBed` WRAPS PAST MIDNIGHT, which is the normal case rather than the edge
- * one: 23:35 → 06:25 is 6h50m, not minus seventeen hours. This is the same fact
- * `bed_at` being a full timestamp encodes in the database.
+ * **TIME IN BED ENDS WHEN YOU GET OUT OF BED**, not when you wake. Efficiency
+ * is asleep-over-in-bed, so the hour spent lying there at 5am belongs in the
+ * denominator and nowhere else. `woke_at` used to do both jobs, which meant
+ * that stretch was either erased or counted as sleep depending on which time
+ * got typed — and an early-morning awakening is the exact signature this
+ * instrument exists to catch. `gotUp` is optional and null means "I got up when
+ * I woke", which is what every row written before 2026-08-05 assumed.
+ *
+ * A `gotUp` EARLIER than `woke` is not wrapped, it is ignored. Getting up
+ * before you woke is impossible, so it is a mis-entry, and wrapping it would
+ * turn one typo into a thirty-one-hour night.
+ *
+ * `asleepAt` OVERRIDES THE TOP BUCKET'S MIDPOINT, because that midpoint is a
+ * ceiling rather than a middle — see `LATENCIES`. It is used only when it lands
+ * between getting into bed and waking up; outside that it is a mis-entry and
+ * the bucket wins, quietly, rather than producing a negative night.
  *
  * `asleep` and `efficiency` stay null until BOTH buckets are in. Showing an
  * efficiency that silently assumed "fell asleep instantly, never woke" would be
@@ -120,21 +177,27 @@ export function derive(
   woke: string | null,
   latency: SleepLatency | null,
   awakenings: Awakenings | null,
+  gotUp: string | null = null,
+  asleepAt: string | null = null,
 ): Derived | null {
   if (!bed || !woke) return null;
-  const [bh, bm] = bed.split(':').map(Number);
-  const [wh, wm] = woke.split(':').map(Number);
-  if ([bh, bm, wh, wm].some((n) => Number.isNaN(n))) return null;
+  const night = span(bed, woke);
+  if (night === null) return null;
 
-  let inBed = wh * 60 + wm - (bh * 60 + bm);
-  if (inBed <= 0) inBed += 1440;
+  const wokeMin = clockMinutes(woke);
+  const upMin = gotUp ? clockMinutes(gotUp) : null;
+  const awakeInBed = upMin !== null && wokeMin !== null && upMin > wokeMin ? upMin - wokeMin : 0;
+  const inBed = night + awakeInBed;
 
-  const lat = LATENCIES.find((l) => l.key === latency)?.midpoint;
+  const bucket = LATENCIES.find((l) => l.key === latency)?.midpoint;
   const wake = WAKINGS.find((w) => w.key === awakenings)?.midpoint;
-  if (lat === undefined || wake === undefined) return { inBed, asleep: null, efficiency: null };
+  if (bucket === undefined || wake === undefined) return { inBed, awakeInBed, asleep: null, efficiency: null };
 
-  const asleep = Math.max(0, inBed - lat - wake);
-  return { inBed, asleep, efficiency: Math.round((asleep / inBed) * 100) };
+  const measured = asleepAt ? span(bed, asleepAt) : null;
+  const lat = measured !== null && measured > 0 && measured < night ? measured : bucket;
+
+  const asleep = Math.max(0, night - lat - wake);
+  return { inBed, awakeInBed, asleep, efficiency: inBed ? Math.round((asleep / inBed) * 100) : null };
 }
 
 /**
@@ -192,6 +255,8 @@ export function hasAnswers(c: Checkin | null): boolean {
   return [
     c.bed_at,
     c.woke_at,
+    c.got_up_at,
+    c.asleep_at,
     c.sleep_latency,
     c.awakenings,
     c.sleep_quality,

@@ -84,6 +84,69 @@ describe('derive', () => {
     expect(derive(null, '06:25', null, null)).toBeNull();
     expect(derive('23:35', null, null, null)).toBeNull();
   });
+
+  it('gives 0m for two identical times, not a 24-hour lie-in', () => {
+    // Mid-edit with the same time in two pickers. `24h 00m` reads as a bug in
+    // the instrument, which for three days is what it was.
+    expect(derive('07:00', '07:00', null, null)!.inBed).toBe(0);
+  });
+});
+
+describe('derive · time in bed ends when you get OUT of bed', () => {
+  // THE BUG THIS BLOCK EXISTS FOR: efficiency is asleep over time IN BED, so an
+  // hour spent lying awake at 5am belongs in the denominator. With `woke` doing
+  // both jobs it was erased or scored as sleep depending on which time got
+  // typed — and an early waking is the signature the instrument watches for.
+  it('puts the awake stretch in the denominator and nowhere else', () => {
+    const d = derive('23:00', '06:00', 'under_15', 'none', '07:00')!;
+    expect(d.inBed).toBe(480); // 23:00 → 07:00, not → 06:00
+    expect(d.awakeInBed).toBe(60);
+    expect(d.asleep).toBe(420 - 8); // the sleep window is still bed → woke
+    expect(d.efficiency).toBe(86); // 412/480, not 412/420
+  });
+
+  it('is exactly the old behaviour when nobody says when they got up', () => {
+    const before = derive('23:00', '06:00', 'under_15', 'none')!;
+    expect(before.inBed).toBe(420);
+    expect(before.awakeInBed).toBe(0);
+    expect(before.efficiency).toBe(98);
+  });
+
+  it('ignores getting up BEFORE waking rather than wrapping it', () => {
+    // Impossible, so it is a typo — and wrapping a typo would turn one night
+    // into thirty-one hours in bed, which is a worse answer than no answer.
+    const d = derive('23:00', '07:00', null, null, '06:30')!;
+    expect(d.inBed).toBe(480);
+    expect(d.awakeInBed).toBe(0);
+  });
+});
+
+describe('derive · the open-ended bucket has a ceiling, and asleepAt lifts it', () => {
+  // Michael's night, 2026-08-05: in bed at midnight, awake until three.
+  it('no longer scores three hours awake as an hour and a quarter', () => {
+    const bucketOnly = derive('00:00', '07:00', 'over_60', 'none')!;
+    expect(bucketOnly.asleep).toBe(420 - 75); // the midpoint, and it is a ceiling
+    expect(bucketOnly.efficiency).toBe(82); // ~25 points too kind
+
+    const measured = derive('00:00', '07:00', 'over_60', 'none', null, '03:00')!;
+    expect(measured.asleep).toBe(240);
+    expect(measured.efficiency).toBe(57);
+  });
+
+  it('measures across midnight, which is the case it exists for', () => {
+    const d = derive('23:30', '07:00', 'over_60', 'none', null, '02:30')!;
+    expect(d.asleep).toBe(450 - 180);
+  });
+
+  it('falls back to the bucket rather than producing a negative night', () => {
+    // Outside bed → woke it is a mis-entry, and the bucket is still an answer.
+    expect(derive('00:00', '07:00', 'over_60', 'none', null, '09:00')!.asleep).toBe(420 - 75);
+    expect(derive('00:00', '07:00', 'over_60', 'none', null, '00:00')!.asleep).toBe(420 - 75);
+  });
+
+  it('still needs both buckets before it claims anything', () => {
+    expect(derive('00:00', '07:00', 'over_60', null, null, '03:00')).toMatchObject({ asleep: null });
+  });
 });
 
 describe('deriveLine', () => {
@@ -160,6 +223,8 @@ describe('hasAnswers', () => {
   const empty = {
     bed_at: null,
     woke_at: null,
+    got_up_at: null,
+    asleep_at: null,
     sleep_latency: null,
     awakenings: null,
     sleep_quality: null,

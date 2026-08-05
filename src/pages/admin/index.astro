@@ -75,6 +75,8 @@ const { data: checkin } = await supabase
 const times = {
   bed: checkin?.bed_at ? utcToZonedTime(checkin.bed_at, tz) : null,
   woke: checkin?.woke_at ? utcToZonedTime(checkin.woke_at, tz) : null,
+  gotUp: checkin?.got_up_at ? utcToZonedTime(checkin.got_up_at, tz) : null,
+  asleepAt: checkin?.asleep_at ? utcToZonedTime(checkin.asleep_at, tz) : null,
 };
 
 /**
@@ -85,11 +87,11 @@ const times = {
  * (a plausible suggested time on a day you are reconstructing gets confirmed
  * without being recalled), and a row that already has times has no use for one.
  */
-let prefill: { bed: string; woke: string } | null = null;
+let prefill: { bed: string; woke: string; up?: string } | null = null;
 if (selected === todayYmd && !times.bed && !times.woke) {
   const { data: recent } = await supabase
     .from('daily_checkins')
-    .select('bed_at, woke_at')
+    .select('bed_at, woke_at, got_up_at')
     .not('bed_at', 'is', null)
     .not('woke_at', 'is', null)
     .order('log_date', { ascending: false })
@@ -109,7 +111,19 @@ if (selected === todayYmd && !times.bed && !times.woke) {
       rows.map((r) => utcToZonedTime(r.woke_at!, tz)),
       0,
     );
-    if (bed && woke) prefill = { bed, woke };
+    // "Up" gets a median or it gets nothing — and unlike the other two it has
+    // no `DEFAULT_TIMES` to fall back on. A suggested rising time invented for
+    // the occasion is exactly the invented row this feature keeps refusing to
+    // write, and the column is new enough that most rows have no answer yet.
+    const ups = rows.map((r) => r.got_up_at).filter((v): v is string => v !== null);
+    const up =
+      ups.length >= 3
+        ? medianClock(
+            ups.map((v) => utcToZonedTime(v, tz)),
+            0,
+          )
+        : null;
+    if (bed && woke) prefill = up ? { bed, woke, up } : { bed, woke };
   }
   prefill ??= DEFAULT_TIMES;
 }

@@ -17,7 +17,7 @@
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
 import { fail, requireAdmin, type DB } from './_shared';
-import { BACKFILL_DAYS } from '../lib/hq/checkin';
+import { BACKFILL_DAYS, OPEN_ENDED_LATENCY } from '../lib/hq/checkin';
 import { homeTimezone, localToday, parseYmd, shiftYmd, zonedTimeToUtc, type Ymd } from '../lib/hq/time';
 
 /** A 1–5 mark, or explicitly cleared. */
@@ -34,6 +34,8 @@ const input = z.object({
   logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   bed: clock,
   woke: clock,
+  gotUp: clock,
+  asleepAt: clock,
   sleepLatency: z.enum(['under_15', '15_30', '30_60', 'over_60']).nullable().optional(),
   awakenings: z.enum(['none', 'few', 'many']).nullable().optional(),
   sleepQuality: mark,
@@ -86,10 +88,36 @@ function bedDate(logDate: Ymd, bed: string, woke: string | null | undefined): Ym
   return bed > '12:00' ? shiftYmd(logDate, -1) : logDate;
 }
 
-function instants(logDate: Ymd, bed: string | null | undefined, woke: string | null | undefined, tz: string) {
+function instants(
+  logDate: Ymd,
+  bed: string | null | undefined,
+  woke: string | null | undefined,
+  gotUp: string | null | undefined,
+  asleepAt: string | null | undefined,
+  tz: string,
+) {
+  const bedDay = bed ? bedDate(logDate, bed, woke) : null;
   return {
-    bed_at: bed ? zonedTimeToUtc(bedDate(logDate, bed, woke), bed, tz).toISOString() : null,
+    bed_at: bed && bedDay ? zonedTimeToUtc(bedDay, bed, tz).toISOString() : null,
     woke_at: woke ? zonedTimeToUtc(logDate, woke, tz).toISOString() : null,
+
+    // You get out of bed on the morning you woke up on. There is no comparison
+    // to make here and no wrinkle to handle: a wake-and-rise pair straddling
+    // midnight is not representable in this model at all, because `woke_at` is
+    // already pinned to `log_date` by the same reasoning.
+    got_up_at: gotUp ? zonedTimeToUtc(logDate, gotUp, tz).toISOString() : null,
+
+    // Falling asleep is AFTER getting into bed, so it belongs to bedtime's
+    // night — unless the clock has come round past midnight in between, which
+    // is exactly the nights this field exists for. That is the same single
+    // comparison `bedDate` makes, applied one step later: 23:30 → asleep at
+    // 02:30 is the following date, 00:15 → asleep at 03:00 is the same one.
+    // Needs a bedtime, because a latency with nothing to measure from is not a
+    // fact about anything.
+    asleep_at:
+      asleepAt && bed && bedDay
+        ? zonedTimeToUtc(asleepAt >= bed ? bedDay : shiftYmd(bedDay, 1), asleepAt, tz).toISOString()
+        : null,
   };
 }
 
@@ -127,9 +155,16 @@ export const checkin = {
       // change of mind clears them instead of failing the write.
       const noDream = v.dreamRecall === 'none' || v.dreamRecall === null;
 
+      // `asleep_at` refines the open-ended bucket and means nothing beside the
+      // others — the table's CHECK says so too. Cleared here rather than left
+      // to fail the write, so moving the answer down the scale is a change of
+      // mind and not an error at 7am. Same shape as the dream fields above.
+      const openEnded = v.sleepLatency === OPEN_ENDED_LATENCY;
+      const times = instants(logDate, v.bed, v.woke, v.gotUp, openEnded ? v.asleepAt : null, tz);
+
       return upsert(sb, {
         log_date: logDate,
-        ...instants(logDate, v.bed, v.woke, tz),
+        ...times,
         sleep_latency: v.sleepLatency ?? null,
         awakenings: v.awakenings ?? null,
         sleep_quality: v.sleepQuality ?? null,

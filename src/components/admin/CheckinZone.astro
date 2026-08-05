@@ -26,6 +26,7 @@ import Zone from './Zone.astro';
 import {
   DREAMS,
   LATENCIES,
+  OPEN_ENDED_LATENCY,
   WAKINGS,
   derive,
   deriveLine,
@@ -47,9 +48,9 @@ interface Props {
   /** The row for `logDate`, if there is one. */
   row: Checkin | null;
   /** Local `HH:MM` times off the row, already converted out of UTC. */
-  times: { bed: string | null; woke: string | null };
+  times: { bed: string | null; woke: string | null; gotUp: string | null; asleepAt: string | null };
   /** Median times from recent rows — suggested only, and only for today. */
-  prefill: { bed: string; woke: string } | null;
+  prefill: { bed: string; woke: string; up?: string } | null;
   /** Is this date inside the backfill window? */
   writable: boolean;
   /** The configured home zone — the no-JavaScript fallback for save stamps.
@@ -71,7 +72,14 @@ const bedValue = times.bed ?? suggest?.bed ?? '';
 const wokeValue = times.woke ?? suggest?.woke ?? '';
 
 const panel = skipped ? 'skipped' : answered ? 'done' : 'ask';
-const summary = derive(times.bed, times.woke, row?.sleep_latency ?? null, row?.awakenings ?? null);
+const summary = derive(
+  times.bed,
+  times.woke,
+  row?.sleep_latency ?? null,
+  row?.awakenings ?? null,
+  times.gotUp,
+  times.asleepAt,
+);
 const dream = DREAMS.find((d) => d.key === row?.dream_recall);
 
 const STARS = [
@@ -150,14 +158,21 @@ const TRACKS = [
           summary && (
             /* Read straight off the derived values, never off the formatted
                line: splitting `deriveLine` apart put two `≈` on the estimate. */
-            <div data-src="derived: woke_at − bed_at; never stored">
+            <div data-src="derived: got_up_at (or woke_at) − bed_at; never stored">
               <p class="font-display text-3xl leading-none font-light">{hm(summary.inBed)}</p>
               <p class="admin-hint mt-1.5 text-xs">
                 {times.bed && times.woke ? `${t12(times.bed)} → ${t12(times.woke)}` : ''}
+                {/* The third time only appears when it says something the first
+                    two do not. It is the span the big number now includes and
+                    the estimate deliberately does not — so on a morning that
+                    ended with an hour of lying there, the gap between them is
+                    the visible answer rather than a silent adjustment. */}
+                {summary.awakeInBed > 0 && times.gotUp && ` · up ${t12(times.gotUp)}`}
               </p>
               {summary.asleep !== null && (
                 <p class="admin-hint mt-0.5 text-xs">
                   ≈{hm(summary.asleep)} asleep · {summary.efficiency}%
+                  {summary.awakeInBed > 0 && ` · ${hm(summary.awakeInBed)} awake in bed`}
                 </p>
               )}
             </div>
@@ -325,17 +340,32 @@ const TRACKS = [
         <fieldset class="fs" data-fs="sleep">
           <legend class="fs__k">Sleep</legend>
 
-          <div class="times" data-src="daily_checkins.bed_at / woke_at (full timestamptz — crosses midnight)">
+          {/* THREE TIMES, NOT TWO. Efficiency is asleep over time IN BED, and
+              time in bed ends when you get OUT of it — so the hour spent lying
+              there at 5am belongs in the denominator. With "Woke" doing both
+              jobs it was either erased or scored as sleep depending on which
+              time got typed, and an early waking is the signature this whole
+              instrument is watching for. "Up" is optional: blank means you got
+              up when you woke, which is what every row before 2026-08-05 said.
+
+              The arrow between the first two is gone rather than repeated: at
+              390px three pickers and two glyphs do not fit, and the labels were
+              always the thing carrying the sequence. */}
+          <div
+            class="times"
+            data-src="daily_checkins.bed_at / woke_at / got_up_at (full timestamptz — crosses midnight)"
+          >
             <label class="tm">
               <span class="tm__k">In bed</span>
               <input type="time" data-field="bed" value={bedValue} />
             </label>
-            <span class="tm__arrow" aria-hidden="true">
-              →
-            </span>
             <label class="tm">
               <span class="tm__k">Woke</span>
               <input type="time" data-field="woke" value={wokeValue} />
+            </label>
+            <label class="tm">
+              <span class="tm__k">Up</span>
+              <input type="time" data-field="gotUp" value={times.gotUp ?? suggest?.up ?? ''} />
             </label>
           </div>
           {suggest && (
@@ -361,6 +391,26 @@ const TRACKS = [
                   {l.label}
                 </button>
               ))}
+            </div>
+
+            {/* ONLY UNDER THE OPEN-ENDED BUCKET, which is the one that cannot
+                answer its own question. "60m +" carries a midpoint of 75, so a
+                night awake until 3am scored an hour and a quarter and the
+                efficiency came out ~25 points high — on the number CBT-I
+                actually moves. The buckets are still right below this: nobody
+                knows whether it was twelve minutes or twenty. Everybody knows
+                when it was three hours.
+
+                A TIME, not a duration, and that is the whole reason it is one
+                tap. You remember "I finally went off around three", never "it
+                took me 187 minutes" — and it is the same native picker already
+                on this card twice, rather than a stepper invented for 7am. */}
+            <div class="asleep-at" data-asleep-at hidden={row?.sleep_latency !== OPEN_ENDED_LATENCY}>
+              <label class="tm">
+                <span class="tm__k">Went off around</span>
+                <input type="time" data-field="asleepAt" value={times.asleepAt ?? ''} />
+              </label>
+              <p class="asleep-at__k">Optional — without it, this bucket counts as 1h 15m.</p>
             </div>
           </div>
 

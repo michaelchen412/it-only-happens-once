@@ -18,7 +18,22 @@
 // this codebase is an offline outbox that reported success it did not have; a
 // check-in that silently drops the worst morning of the month would be the same
 // mistake in a place that matters more.
+// ⚠ THE ARITHMETIC AND THE WORDS ARE IMPORTED, NOT RE-DECLARED. This file used
+// to keep its own `LAT`, `WAKE`, `WORDS` and `hm` beside the module's, which
+// made the header of `lib/hq/checkin.ts` ("one implementation, three readers")
+// aspirational rather than true — two copies of "how long were you in bed",
+// and the one that would drift is the one on screen at 7am. The module is
+// type-only in its imports, so it costs the bundle nothing but the functions.
 import { actions } from 'astro:actions';
+import {
+  OPEN_ENDED_LATENCY,
+  derive,
+  deriveLine,
+  wordFor,
+  type Awakenings,
+  type MarkField,
+  type SleepLatency,
+} from '../lib/hq/checkin';
 
 const zone = document.querySelector<HTMLElement>('[data-checkin]');
 
@@ -66,6 +81,8 @@ if (zone) {
       logDate,
       bed: time('bed'),
       woke: time('woke'),
+      gotUp: time('gotUp'),
+      asleepAt: time('asleepAt'),
       sleepLatency: pressed('lat') as never,
       awakenings: pressed('wake') as never,
       sleepQuality: stars('sleep_quality'),
@@ -144,47 +161,26 @@ if (zone) {
     };
 
     // ── the live payback ──────────────────────────────────────────────────
-    // Recomputed from the same helper the server renders the summary with, so
-    // the line cannot disagree with the card it turns into.
-    const LAT = { under_15: 8, '15_30': 22, '30_60': 45, over_60: 75 } as Record<string, number>;
-    const WAKE = { none: 0, few: 12, many: 30 } as Record<string, number>;
-    function hm(mins: number) {
-      const h = Math.floor(mins / 60);
-      return h ? `${h}h ${String(mins % 60).padStart(2, '0')}m` : `${mins}m`;
-    }
+    // LITERALLY the same functions the server renders the summary with, so the
+    // line cannot disagree with the card it turns into.
     function recompute() {
       if (!derivedEl) return;
-      const bed = time('bed');
-      const woke = time('woke');
-      if (!bed || !woke) {
-        derivedEl.textContent = '';
-        return;
-      }
-      const [bh, bm] = bed.split(':').map(Number);
-      const [wh, wm] = woke.split(':').map(Number);
-      let inBed = wh * 60 + wm - (bh * 60 + bm);
-      if (inBed <= 0) inBed += 1440; // crossed midnight — the normal case
-      const parts = [`${hm(inBed)} in bed`];
-      const lat = LAT[pressed('lat') ?? ''];
-      const wake = WAKE[pressed('wake') ?? ''];
-      if (lat !== undefined && wake !== undefined) {
-        const asleep = Math.max(0, inBed - lat - wake);
-        parts.push(`≈${hm(asleep)} asleep`, `${Math.round((asleep / inBed) * 100)}%`);
-      }
-      derivedEl.textContent = parts.join(' · ');
+      derivedEl.textContent = deriveLine(
+        derive(
+          time('bed'),
+          time('woke'),
+          pressed('lat') as SleepLatency | null,
+          pressed('wake') as Awakenings | null,
+          time('gotUp'),
+          time('asleepAt'),
+        ),
+      );
     }
 
     // ── the words beside the marks ────────────────────────────────────────
-    const WORDS: Record<string, string[]> = {
-      sleep_quality: ['terrible', 'poor', 'ok', 'good', 'great'],
-      restedness: ['wrung out', 'tired', 'ok', 'rested', 'sharp'],
-      valence: ['bleak', 'low', 'even', 'good', 'bright'],
-      arousal: ['sleepy', 'calm', 'steady', 'restless', 'wired'],
-      dream_intensity: ['faint', 'mild', 'vivid', 'strong', 'consuming'],
-    };
     function setWord(field: string, value: number) {
       const el = $<HTMLElement>(`[data-w-for="${field}"]`);
-      if (el) el.textContent = WORDS[field]?.[value - 1] ?? '';
+      if (el) el.textContent = wordFor(field as MarkField, value);
     }
 
     // ── wiring ────────────────────────────────────────────────────────────
@@ -215,7 +211,19 @@ if (zone) {
         if (ta) ta.value = '';
       }
     });
-    group('lat');
+    group('lat', (value) => {
+      // The refinement belongs to the open-ended bucket and to nothing else —
+      // the same rule the table's CHECK enforces and the action re-applies.
+      // Clearing it on the way back down the scale means a change of mind
+      // cannot strand a measured latency under a bucket that contradicts it.
+      const more = $<HTMLElement>('[data-asleep-at]');
+      const open = value === OPEN_ENDED_LATENCY;
+      if (more) more.hidden = !open;
+      if (!open) {
+        const input = $<HTMLInputElement>('[data-field="asleepAt"]');
+        if (input) input.value = '';
+      }
+    });
     group('wake');
 
     $$<HTMLButtonElement>('[data-star]').forEach((btn) =>
