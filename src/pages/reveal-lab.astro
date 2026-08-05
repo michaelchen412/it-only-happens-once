@@ -1,0 +1,595 @@
+---
+/*
+  /reveal-lab — a LOCAL-ONLY bench for the citation reveal (docs/plans/17a,
+  §"Still open — the reveal itself"). Never rendered in production (dev-gated
+  below); never linked from anywhere. Delete it once the call is made.
+
+  THE QUESTION. Michael, 2026-08-05: "There should be a very subtle citation
+  reveal button." The Where is stored, derived and correct on all 76 quotes —
+  and reaches no reader, because the control that would show it doesn't exist.
+  This page is four candidates for that control, on real quotes, in both places
+  a quote is set.
+
+  WHAT IS NOT IN QUESTION, so don't re-litigate it here:
+    · WHETHER the citation shows by default. It doesn't, and there is no toggle
+      — the derivation already produces the right line for every case (17a
+      §"Why there is no toggle"). Scripture leads with its locator because it
+      has no author to lead with; Seneca leads with Seneca.
+    · WHAT the reveal says. `deriveProvenance()` decides, and this page calls
+      the real function on real rows rather than mocking strings.
+
+  WHAT TO JUDGE, in this order:
+    1. Is it quiet enough to read past? The attribution is serif all-small-caps
+       in muted ink; the marker must not shout over it. Scroll §2 as if reading.
+    2. Is it findable at all? "Subtle" and "hidden" have the same appearance
+       and opposite value. This is the real tension.
+    3. Does it belong in the SUITE (§3)? A constellation is typeset to be read
+       straight through. A column of markers down the side of it is a different
+       object from the one design.md §13 describes.
+    4. On a phone, mid-read. Resize to ~390px — the lab bar keeps working.
+
+  ⚠ Hover is deliberately never the only way in: every marker here is a real
+  <button>, tab-reachable, with aria-expanded. Plan 19 found four separate a11y
+  failures that all began as hover-only affordances.
+
+  ⚠ No app.css. Track D owns it; everything here is scoped to this page and
+  dies with it.
+*/
+import Base from '../layouts/Base.astro';
+import Label from '../components/Label.astro';
+import { deriveProvenance } from '../lib/provenance';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+// ── real rows, run through the REAL derivation ────────────────────────────
+const { data: rows } = await Astro.locals.supabase
+  .from('fragments')
+  .select('body, attribution, is_self, details, authors(name), works(title)')
+  .eq('type', 'quote')
+  .eq('status', 'published')
+  .is('deleted_at', null);
+
+type Row = {
+  body: string | null;
+  attribution: string | null;
+  is_self: boolean;
+  details: Record<string, unknown> | null;
+  authors: { name: string } | null;
+  works: { title: string } | null;
+};
+
+const shaped = ((rows ?? []) as unknown as Row[]).map((r) => {
+  const d = deriveProvenance({
+    isSelf: r.is_self,
+    who: r.authors?.name,
+    from: r.works?.title,
+    where: (r.details?.citation as string) ?? '',
+  });
+  return { body: r.body ?? '', line: d.line, reveal: d.reveal, stored: r.attribution ?? '' };
+});
+
+/** Pick a real quote by the line it derives, so a rename can't silently empty the page. */
+const byLine = (line: string) => shaped.find((q) => q.line === line);
+
+// One of each shape the matrix produces, so every candidate is judged against
+// the hard cases and not just the easy one.
+const RICH = byLine('Marcus Aurelius') ?? shaped[0]; //  reveal: work + locator
+const PAGED = byLine('Ocean Vuong'); //                  reveal: work + "p. 62"
+const WORKONLY = byLine('Seth Godin'); //                reveal: the work alone
+const SCRIPTURE = shaped.find((q) => q.reveal === 'The Bible'); // the locator IS the line
+const BARE = shaped.find((q) => q.line && !q.reveal); //  a person, no work — NO control at all
+const SILENT = shaped.find((q) => !q.line && !q.reveal); // nothing known — no line, no control
+
+// ⚠ SYNTHETIC, and the only one on this page. There are zero self-authored
+// quotes in the corpus (17a decision 10), and this is the case the reveal was
+// most argued about: silent line, and the reveal answers the reader's real
+// question — "if I take this, who do I attribute?"
+const SELF = {
+  body: 'The work you avoid is usually the work that would have changed you.',
+  ...deriveProvenance({ isSelf: true }),
+  stored: '',
+  synthetic: true,
+};
+
+const feed = [RICH, SCRIPTURE, PAGED, BARE, SELF, WORKONLY, SILENT].filter(Boolean) as {
+  body: string;
+  line: string;
+  reveal: string;
+  synthetic?: boolean;
+}[];
+
+const CANDIDATES = [
+  {
+    key: 'plus',
+    name: 'A · hairline mark',
+    blurb: 'A raised ＋ after the line, at 0.6em in the same muted ink. Reads as a printed diacritic, not a button.',
+  },
+  {
+    key: 'self',
+    name: 'B · the line itself',
+    blurb: 'No added glyph at all. The attribution IS the control — a dotted underline appears on hover and focus.',
+  },
+  {
+    key: 'caret',
+    name: 'C · caret, unfolding',
+    blurb:
+      'A thin ⌄ that rotates. The citation unfolds beneath instead of layering over — no top layer, but it reflows.',
+  },
+  {
+    key: 'note',
+    name: 'D · footnote',
+    blurb: 'A superscript numeral; the citations collect at the foot. Most book-like, and furthest from the quote.',
+  },
+];
+---
+
+<Base title="Reveal lab — It Only Happens Once">
+  <div class="border-base-300 bg-base-100/85 sticky top-0 z-50 border-b backdrop-blur">
+    <div class="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+      <Label variant="chrome" as="span">Reveal lab · local only</Label>
+      <div class="flex flex-wrap items-center gap-2 font-sans text-sm">
+        <span class="text-base-content/40 text-xs">treatment</span>
+        {
+          CANDIDATES.map((c) => (
+            <button type="button" class="lab-pick btn btn-ghost btn-xs normal-case" data-pick={c.key}>
+              {c.key === 'plus' ? 'A' : c.key === 'self' ? 'B' : c.key === 'caret' ? 'C' : 'D'}
+            </button>
+          ))
+        }
+        {/* Labelled by the script on load — Base resolves the theme before paint. */}
+        <button type="button" id="t-theme" class="btn btn-ghost btn-xs normal-case">theme</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="mx-auto max-w-4xl px-6 py-16" data-treatment="plus">
+    <header class="mb-16">
+      <Label variant="voice">prototype · the citation reveal</Label>
+      <h1 class="font-display mt-4 text-4xl leading-[1.1] font-light sm:text-5xl">Where did this come from?</h1>
+      <p class="prose-measure text-base-content/70 mt-6 text-lg">
+        Twenty-three quotes have carried a citation that nothing has ever displayed. Now every quote derives one. Four
+        ways to let a reader ask for it — judge them by reading past them, not by looking at them.
+      </p>
+      <p class="prose-measure text-base-content/50 mt-4 text-sm">
+        ⚠ The theme button matters more than it looks: “subtle” is a contrast judgement, and a mark that sits right on
+        <em>dusk</em>’s warm near-black can vanish on <em>paper</em>. Check both before deciding — and note that Base
+        picks one from your system preference before paint, so you may not have started where you think.
+      </p>
+    </header>
+
+    {/* ═══ 1 · the four markers, side by side ═════════════════════════════ */}
+    <section class="mb-24">
+      <Label as="h2" variant="voice" class="mb-2">1 · The four, on one quote</Label>
+      <p class="prose-measure text-base-content/60 mb-8 text-sm">
+        The same real row four ways, so the marks can be compared directly. Everything below this section shows one
+        treatment at a time — switch it in the bar.
+      </p>
+
+      <div class="border-base-300 divide-base-300 divide-y rounded-lg border">
+        {
+          CANDIDATES.map((c) => (
+            <div class="p-6" data-treatment={c.key} data-fixed>
+              <div class="text-base-content/45 mb-3 font-sans text-xs">{c.name}</div>
+              <blockquote class="text-base-content font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
+                {RICH.body}
+              </blockquote>
+              <div class="mt-3">
+                <span class="rl-attr" data-line={RICH.line} data-reveal={RICH.reveal} />
+              </div>
+              <p class="text-base-content/45 mt-4 font-sans text-xs">{c.blurb}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    {/* ═══ 2 · the blog feed ══════════════════════════════════════════════ */}
+    <section class="mb-24">
+      <Label as="h2" variant="voice" class="mb-2">2 · The feed, read straight through</Label>
+      <p class="prose-measure text-base-content/60 mb-8 text-sm">
+        Real quotes, in the register <code>QuoteCard</code> uses. This is the one that answers “is it quiet enough” — read
+        it, don’t inspect it. Note that two of these have <strong>no control at all</strong>, because there is genuinely
+        nothing behind them: a control that opens onto nothing is worse than no control.
+      </p>
+
+      <div class="divide-base-300/60 divide-y">
+        {
+          feed.map((q) => (
+            <figure class="py-9 first:pt-0">
+              <blockquote class="text-base-content font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
+                {q.body}
+              </blockquote>
+              <figcaption class="text-base-content/45 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm">
+                <span class="rl-attr" data-line={q.line} data-reveal={q.reveal} />
+                {q.synthetic && (
+                  <span class="text-warning/70 font-sans text-[0.7rem] tracking-wide uppercase">
+                    synthetic — the only one
+                  </span>
+                )}
+                <span class="text-base-content/25 ml-auto text-xs">Added Aug 5, 2026</span>
+              </figcaption>
+            </figure>
+          ))
+        }
+      </div>
+      <ol id="rl-notes" class="border-base-300 text-base-content/45 mt-10 hidden border-t pt-5 font-sans text-xs"></ol>
+    </section>
+
+    {/* ═══ 3 · the suite ══════════════════════════════════════════════════ */}
+    <section class="mb-24">
+      <Label as="h2" variant="voice" class="mb-2">3 · The suite — does it belong here at all?</Label>
+      <p class="prose-measure text-base-content/60 mb-8 text-sm">
+        The same control at the suite’s larger typeset size. This is the question I’d least like to guess on: a
+        constellation is composed to be read straight through, and a column of markers down its side is a different
+        object from the one design.md §13 describes. <strong>“Feed only” is a legitimate answer</strong> — the reveal would
+        then be something you meet in the blog, and the Sky stays clean.
+      </p>
+
+      <div class="rounded-box border-base-300 bg-base-100 border px-5 py-12 sm:px-12 sm:py-16">
+        <Label variant="voice">conditions, not character</Label>
+        <div class="mt-10 space-y-14">
+          {
+            [RICH, SCRIPTURE, SELF].filter(Boolean).map((q, i) => (
+              <figure style={`margin-left:${['0%', '9%', '3%'][i]}`}>
+                <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
+                  {q!.body}
+                </blockquote>
+                <figcaption class="mt-3">
+                  <span class="rl-attr rl-attr--suite" data-line={q!.line} data-reveal={q!.reveal} />
+                </figcaption>
+              </figure>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    {/* ═══ 4 · what each candidate costs ══════════════════════════════════ */}
+    <section class="mb-24">
+      <Label as="h2" variant="voice" class="mb-4">4 · What each one costs</Label>
+      <div class="overflow-x-auto">
+        <table class="w-full font-sans text-sm">
+          <thead class="text-base-content/45 text-left text-xs">
+            <tr class="border-base-300 border-b">
+              <th class="py-2 pr-4 font-normal">candidate</th>
+              <th class="py-2 pr-4 font-normal">for</th>
+              <th class="py-2 font-normal">against</th>
+            </tr>
+          </thead>
+          <tbody class="divide-base-300/60 text-base-content/70 divide-y align-top">
+            <tr>
+              <td class="py-3 pr-4 whitespace-nowrap">A · hairline mark</td>
+              <td class="py-3 pr-4"
+                >Reads as typography rather than UI. Findable without being loud. Works identically in both contexts.</td
+              >
+              <td class="py-3">One more glyph on a line whose whole job is restraint.</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 whitespace-nowrap">B · the line itself</td>
+              <td class="py-3 pr-4"
+                >Quietest possible — adds nothing at all. The attribution is already the thing you'd reach for.</td
+              >
+              <td class="py-3"
+                ><strong>Undiscoverable.</strong> Nothing says it is interactive until you are already on it, and on touch
+                there is no hover at all.</td
+              >
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 whitespace-nowrap">C · caret, unfolding</td>
+              <td class="py-3 pr-4"
+                >No top layer, so no clipping-container trap. Stays open while you read it. Obvious affordance.</td
+              >
+              <td class="py-3"
+                >Reflows the page under your eye — costly in a suite, where the drawn arcs between stanzas are
+                positioned.</td
+              >
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 whitespace-nowrap">D · footnote</td>
+              <td class="py-3 pr-4">The most literate answer, and the one a reader already knows how to use.</td>
+              <td class="py-3"
+                >Puts the citation far from the quote, and a feed has no natural “foot”. Numbers imply an order the
+                corpus doesn't have.</td
+              >
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose-measure text-base-content/50 mt-6 text-sm">
+        ⚠ Popovers here use the native top layer (<code>popover="auto"</code>), which is the repo's settled answer for
+        anything anchored inside a clipping container — a popover in a <code>.zone</code> was found inert twice before that
+        was learned. Positioning is done in JS rather than with CSS anchor positioning, which is still too thin on the ground
+        to ship.
+      </p>
+    </section>
+  </main>
+</Base>
+
+<style is:global>
+  /* Scoped to the lab by construction: these class names exist nowhere else and
+     die with the page. app.css belongs to Track D. */
+  .rl-attr__line {
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    letter-spacing: 0.06em;
+    font-variant: all-small-caps;
+  }
+  .rl-attr--suite .rl-attr__line {
+    font-size: 1.15rem;
+  }
+  .rl-attr__silent {
+    color: color-mix(in oklab, var(--color-base-content) 28%, transparent);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-style: italic;
+  }
+
+  /* the marker, in four registers ------------------------------------------ */
+  .rl-mark {
+    display: inline;
+    border: 0;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+    transition:
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+  .rl-mark:hover,
+  .rl-mark:focus-visible {
+    color: var(--color-primary);
+  }
+  .rl-mark:focus-visible {
+    outline: 1px dotted currentColor;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  [data-treatment='plus'] .rl-mark {
+    font-family: var(--font-serif);
+    font-size: 0.62em;
+    vertical-align: super;
+    margin-left: 0.35em;
+  }
+  /* B hides the mark entirely and makes the line the control. */
+  [data-treatment='self'] .rl-mark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  [data-treatment='self'] .rl-attr--live .rl-attr__line {
+    cursor: pointer;
+    text-decoration: underline dotted transparent;
+    text-underline-offset: 4px;
+    transition: text-decoration-color 150ms ease;
+  }
+  [data-treatment='self'] .rl-attr--live:hover .rl-attr__line,
+  [data-treatment='self'] .rl-attr--live:focus-within .rl-attr__line {
+    text-decoration-color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  }
+  [data-treatment='caret'] .rl-mark {
+    font-size: 0.7em;
+    margin-left: 0.4em;
+    display: inline-block;
+    transition: transform 180ms ease;
+  }
+  [data-treatment='caret'] .rl-mark[aria-expanded='true'] {
+    transform: rotate(180deg);
+  }
+  [data-treatment='note'] .rl-mark {
+    font-family: var(--font-sans);
+    font-size: 0.6em;
+    vertical-align: super;
+    margin-left: 0.2em;
+    text-decoration: none;
+  }
+
+  /* the disclosure --------------------------------------------------------- */
+  .rl-pop {
+    position: fixed;
+    margin: 0;
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background: var(--color-base-100);
+    box-shadow: 0 12px 32px -12px color-mix(in oklab, var(--color-base-content) 35%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+  }
+  .rl-pop::backdrop {
+    background: transparent;
+  }
+  .rl-fold {
+    display: block;
+    overflow: hidden;
+    max-height: 0;
+    transition:
+      max-height 200ms ease,
+      opacity 200ms ease;
+    opacity: 0;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+  }
+  .rl-fold[data-open] {
+    max-height: 6rem;
+    opacity: 1;
+    margin-top: 0.4rem;
+  }
+  #rl-notes li {
+    padding: 0.15rem 0;
+  }
+  /* Which treatment am I looking at? `aria-pressed` alone told a screen reader
+     and nobody else, and every section below §1 looks identical between two of
+     the four until you press one. */
+  .lab-pick[aria-pressed='true'] {
+    background: var(--color-base-200);
+    color: var(--color-primary);
+  }
+</style>
+
+<script>
+  // Build every attribution from its two derived strings, so the four
+  // treatments are genuinely the same data wearing different clothes — and so
+  // adding a fifth candidate is a branch here, not a new block of markup.
+  const main = document.querySelector('main') as HTMLElement;
+  const notes = document.getElementById('rl-notes') as HTMLOListElement;
+  let uid = 0;
+
+  function treatmentFor(el: Element): string {
+    return (el.closest('[data-treatment]') as HTMLElement | null)?.dataset.treatment ?? 'plus';
+  }
+
+  for (const host of document.querySelectorAll<HTMLElement>('.rl-attr')) {
+    const line = host.dataset.line ?? '';
+    const reveal = host.dataset.reveal ?? '';
+    const mode = treatmentFor(host);
+    const id = `rl-${++uid}`;
+
+    // No line at all — the two silences. In the workshop they are told apart;
+    // on the page they are identical, and that is the design (17a).
+    if (!line) {
+      const s = document.createElement('span');
+      s.className = 'rl-attr__silent';
+      s.textContent = reveal ? '(silent — the reveal still answers)' : '(silent — nothing known)';
+      host.append(s);
+      if (!reveal) continue;
+    }
+
+    if (line) {
+      const l = document.createElement('span');
+      l.className = 'rl-attr__line';
+      l.textContent = `— ${line}`;
+      host.append(l);
+    }
+
+    // ⚠ NO CONTROL WHEN THERE IS NOTHING BEHIND IT. A marker that opens onto an
+    // empty box teaches you to stop pressing it.
+    if (!reveal) continue;
+    host.classList.add('rl-attr--live');
+
+    const mark = document.createElement('button');
+    mark.type = 'button';
+    mark.className = 'rl-mark';
+    mark.setAttribute('aria-expanded', 'false');
+    mark.setAttribute('aria-label', `Where this came from: ${reveal}`);
+    mark.textContent = mode === 'plus' ? '＋' : mode === 'caret' ? '⌄' : mode === 'note' ? String(uid) : '＋';
+    host.append(mark);
+
+    // D collects its citations at the foot of the feed, like a printed page.
+    if (mode === 'note') {
+      notes.classList.remove('hidden');
+      const li = document.createElement('li');
+      li.id = `${id}-note`;
+      li.textContent = `${uid}. ${reveal}`;
+      notes.append(li);
+    }
+
+    // C unfolds in place; A, B and D layer.
+    const fold = document.createElement('span');
+    fold.className = 'rl-fold';
+    fold.textContent = reveal;
+    host.after(fold);
+
+    const pop = document.createElement('div');
+    pop.className = 'rl-pop';
+    pop.setAttribute('popover', 'auto');
+    pop.id = id;
+    pop.textContent = reveal;
+    document.body.append(pop);
+
+    // The line is the control in treatment B — clicking it presses the mark, so
+    // there is exactly one code path and the keyboard one keeps working.
+    host.addEventListener('click', (e) => {
+      if (treatmentFor(host) === 'self' && e.target !== mark) mark.click();
+    });
+
+    mark.addEventListener('click', () => {
+      const m = treatmentFor(host);
+      if (m === 'caret') {
+        const open = fold.hasAttribute('data-open');
+        fold.toggleAttribute('data-open', !open);
+        mark.setAttribute('aria-expanded', String(!open));
+        return;
+      }
+      if (m === 'note') {
+        document.getElementById(`${id}-note`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      // Positioned in JS rather than with CSS anchor positioning: the top layer
+      // escapes every ancestor, and anchor-positioning support is still too
+      // thin to ship on a reading surface.
+      //
+      // ⚠ BELOW FIRST, and this is not a default — it is a correction. The
+      // first version preferred *above* whenever there was room, which is the
+      // usual tooltip habit, and the lab showed why it is wrong here: the
+      // attribution sits directly under the quote, so "above" means covering
+      // the words the reader is in the middle of. Below covers whitespace or
+      // the next quote's opening. Above is the fallback, for when the mark is
+      // near the bottom of the viewport.
+      const r = mark.getBoundingClientRect();
+      pop.showPopover();
+      const p = pop.getBoundingClientRect();
+      const left = Math.min(Math.max(8, r.left - 8), window.innerWidth - p.width - 8);
+      const roomBelow = window.innerHeight - r.bottom > p.height + 16;
+      pop.style.left = `${left}px`;
+      pop.style.top = roomBelow ? `${r.bottom + 8}px` : `${r.top - p.height - 8}px`;
+    });
+
+    pop.addEventListener('toggle', (e) => {
+      mark.setAttribute('aria-expanded', String((e as ToggleEvent).newState === 'open'));
+    });
+  }
+
+  // Switching treatment closes anything open and re-labels the marks, so you
+  // never compare A's popover against C's caret by accident.
+  function setTreatment(key: string) {
+    for (const p of document.querySelectorAll<HTMLElement>('.rl-pop')) p.hidePopover?.();
+    for (const f of document.querySelectorAll<HTMLElement>('.rl-fold')) f.removeAttribute('data-open');
+    let n = 0;
+    for (const mk of document.querySelectorAll<HTMLButtonElement>('.rl-mark')) {
+      // §1's four cards are the fixed side-by-side comparison — they each keep
+      // their own treatment forever, or there is nothing to compare against.
+      if (mk.closest('[data-fixed]')) continue;
+      n++;
+      mk.textContent = key === 'plus' ? '＋' : key === 'caret' ? '⌄' : key === 'note' ? String(n) : '＋';
+      mk.setAttribute('aria-expanded', 'false');
+    }
+    main.dataset.treatment = key;
+    notes.classList.toggle('hidden', key !== 'note');
+    for (const b of document.querySelectorAll<HTMLElement>('.lab-pick')) {
+      b.setAttribute('aria-pressed', String(b.dataset.pick === key));
+    }
+  }
+  for (const b of document.querySelectorAll<HTMLElement>('.lab-pick')) {
+    b.addEventListener('click', () => setTreatment(b.dataset.pick!));
+  }
+  setTreatment('plus');
+
+  // "Subtle" is a contrast judgement, so both themes have to be checkable — and
+  // Base picks one before paint from localStorage or the system preference, so
+  // whichever you land on is not necessarily the one you need to check.
+  //
+  // ⚠ The names are `dusk` (dark, the default) and `paper` (light). An earlier
+  // version of this button wrote `day`, which is not a theme — daisyUI silently
+  // fell back to its default and the toggle appeared to work while comparing
+  // dusk against dusk. The label always names the theme you'd switch TO.
+  const themeBtn = document.getElementById('t-theme')!;
+  const syncThemeLabel = () => {
+    themeBtn.textContent = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
+  };
+  themeBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === 'paper' ? 'dusk' : 'paper';
+    syncThemeLabel();
+  });
+  syncThemeLabel();
+</script>
