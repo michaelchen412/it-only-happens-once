@@ -31,6 +31,7 @@ erDiagram
     text body
     text excerpt
     text attribution
+    boolean is_self
     text source_url
     jsonb details
     fragment_status status
@@ -100,7 +101,13 @@ create table fragments (
   body           text,            -- Markdown: full essay / full quote text /
                                   -- a song's annotation, the "why" (ADR-0009)
   excerpt        text,            -- authored snippet (writing); may be derived if null
-  attribution    text,            -- quote author / song artist
+  attribution    text,            -- the shown line. song: the artist, typed.
+                                  -- quote: DERIVED (see §"the three facts"),
+                                  -- written by saveQuote on every save.
+  is_self        boolean         not null default false,
+                                  -- quote: Michael's own words. Silences the
+                                  -- line while staying distinguishable from
+                                  -- "source unknown", which is also silent.
   source_url     text,            -- book link / Spotify or YouTube URL (canonical, no ?si=)
   paired_song_id uuid references fragments(id) on delete set null,
                                   -- an essay's paired song (ADR-0009). SET NULL,
@@ -173,7 +180,15 @@ create table works (
 --   alter table fragments add column work_id   uuid references works(id)   on delete set null;
 ```
 
-**Display vs. query — the Bible rule.** `author_id` / `work_id` are *facets for grouping and search*, kept separate from what's **shown** (`attribution` / `details.source_title`). So a scripture verse **displays** "Matthew 5:43-48" (from `attribution`) while **grouping** under the work "The Bible" (`work_id`) — the collection name never leaks into the presented text. "All Bible verses" = `where work_id = <the-bible>`; "everything by Ocean Vuong" = `where author_id = <vuong>`. Managed at [`/admin/library`](admin.md).
+**The three facts, and the line derived from them.** A quote stores **Who** (`author_id`, or `is_self`, or neither), **From** (`work_id`) and **Where** (`details.citation` — free text: *Book 2:2*, *John 3:16*, *Letter 24:19–20, p. 19*). Nothing else is a fact. The shown line is a **rendering** of those three, computed by [`src/lib/provenance.ts`](../src/lib/provenance.ts) and written into `attribution` on every save:
+
+> Lead with the Who. With no Who, the Where stands alone. With neither, the From. `is_self` renders nothing at all.
+
+That single rule is the **Bible rule**, and it is no longer a special case: a verse **displays** "Matthew 5:43-48" *because it has no author to lead with*, while **grouping** under the work "The Bible" — the collection name never leaks into the presented text. "All Bible verses" = `where work_id = <the-bible>`; "everything by Ocean Vuong" = `where author_id = <vuong>`. Managed at [`/admin/library`](admin.md).
+
+⚠ **`attribution` is derived-and-STORED, not derived-at-render** — for now. `QuoteCard` and `SuiteStanza` read the column and nothing else (no public query joins `authors` or `works`), so emptying it would blank the line on every published card. The column is written by `saveQuote` and only *typed* when it is a deliberate per-quote override, which no row currently is. See `docs/plans/17a`.
+
+⚠ **Two silences that mean opposite things.** `is_self` and "nothing known" both render no line. That is why the flag is a column rather than an inference from a blank field — a blank cannot mean both in a corpus that only grows, and the workshop has to be able to say `your words` where it otherwise says `source unknown`. **Michael is never a row in `authors`**: an author row would give the derivation a name to lead with and sign every one of his own aphorisms.
 
 `updated_at` is maintained by a standard `moddatetime` trigger on `fragments`.
 
@@ -184,7 +199,7 @@ Type-specific fields that don't deserve their own columns:
 | type | `details` shape |
 |---|---|
 | `song` | `{ "spotify_id": "…", "album": "…", "thumbnail_url": "…", "release_year": 2022, "spotify_album_id": "…", "spotify_artist_ids": ["…"] }` — `spotify_id` is a **track or album** id parsed from `source_url` (the one source of truth for both id and kind); a YouTube citation carries `youtube_id` instead. The three Web-API fields arrived with plan 04 Piece 4 and are absent on anything saved before it. `release_year` is the **album's** year and is deliberately not `occurred_at`, which on a song means the year *you added it*. |
-| `quote` | `{ "source_title": "Meditations", "source_author": "Marcus Aurelius", "work_year": 170, "page": 12 }` |
+| `quote` | `{ "citation": "Book 2:2" }` — the **Where**, and the only key left. Free text on purpose: the corpus already holds six citation traditions (books and verses, letters and verses, chapter-and-verse, acts and scenes, a bare circumstance, an attribution-within-an-attribution), and a structured locator would have to know which one it is in. Four keys were deleted 2026-08-05 — `source_author` and `work_year` (0 rows, dead in three files), `source_title` (42 rows, 41 of them verbatim copies of `works.title`) and `page` (7 rows, folded into `citation` as *"p. 41"* — a locator like any other). |
 | `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render). Also `{ "media": { "provider": "spotify", "url": "…" } }` on **2 imported rows** — the legacy paired-media shape from Squarespace, superseded by `paired_song_id`. Nothing in the app writes it; see §6 `paired_song_id`. |
 
 Kept in JSONB because the type set is small and stable, and these fields are rarely queried on. Anything that becomes a filter/sort target should graduate to a real column.
@@ -360,7 +375,7 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 | Composed suite / adjacency | `fragment_constellations.position` |
 | Placement / elevation | existence of a `fragment_constellations` row |
 | Subject (tag) | `subjects` + `fragment_subjects` |
-| Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` (facets; display stays in `attribution` / `details`) |
+| Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` — the **Who** and the **From**; the shown line is derived from them into `attribution` (§4) |
 | Emergent links between constellations | shared membership (no table) |
 | The morning check-in | `daily_checkins`, keyed by local `log_date` (§6b) |
 | A person | `people` row (§6b) |
