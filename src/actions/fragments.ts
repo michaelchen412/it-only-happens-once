@@ -206,8 +206,6 @@ export const fragments = {
       body: z.string().min(1, 'The quote can’t be empty'),
       attribution: optText,
       source_title: optText,
-      source_author: optText,
-      work_year: optInt,
       page: optInt,
       citation: optText,
       source_url: optUrl,
@@ -226,10 +224,15 @@ export const fragments = {
       const sb = ctx.locals.supabase;
       const base = input.slug || `${input.attribution ?? ''} ${firstWords(input.body)}`;
       const slug = await uniqueSlug(sb, slugify(base), input.id);
+      // ⚠ `details` is a drawer, not a schema: a key here is write-only until
+      // something renders it, and nothing warns you when nothing does. Two were
+      // removed 2026-08-05 (docs/plans/17a) — `source_author`, which had no form
+      // field at all and 0 rows, and `work_year`, which duplicated the existing
+      // `works.year` column and also had 0 rows. Both were written here and read
+      // back into the sheet; neither ever reached a reader. The remaining three
+      // are on the way out too, into Who / From / Where.
       const details: Record<string, Json> = {};
       if (input.source_title) details.source_title = input.source_title;
-      if (input.source_author) details.source_author = input.source_author;
-      if (input.work_year !== undefined) details.work_year = input.work_year;
       if (input.page !== undefined) details.page = input.page;
       if (input.citation) details.citation = input.citation;
       // Prefer the chosen entity's id; fall back to creating one by name.

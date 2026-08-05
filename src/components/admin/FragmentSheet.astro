@@ -184,10 +184,12 @@ const thisYear = new Date().getUTCFullYear();
               >
               <input name="source_title" class="input input-sm input-bordered" placeholder="Meditations" />
             </label>
-            <label class="flex flex-col gap-1 text-sm">
-              <span class="text-base-content/70">Work year</span>
-              <input name="work_year" type="number" class="input input-sm input-bordered" placeholder="170" />
-            </label>
+            {
+              /* "Work year" lived here until 2026-08-05 and is gone (docs/plans/17a):
+              it duplicated the `works.year` column and had written 0 rows in 76
+              quotes. Page survives for now — it is a locator, and it merges into
+              "Where in it" when this section is rebuilt as Who / From / Where. */
+            }
             <label class="flex flex-col gap-1 text-sm">
               <span class="text-base-content/70">Page</span>
               <input name="page" type="number" class="input input-sm input-bordered" />

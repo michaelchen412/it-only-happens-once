@@ -62,7 +62,6 @@ type Combo = HTMLElement & {
 const authorCombo = document.getElementById('quote-author') as Combo;
 const workCombo = document.getElementById('quote-work') as Combo;
 const quoteSourceTitle = quoteForm.elements.namedItem('source_title') as HTMLInputElement;
-const scriptureRe = /\d+\s*:\s*\d+/; // "Matthew 5:43-48" — a citation, not an author name
 
 // The full lists (rendered into the combos) — used to re-scope the Work list.
 const allAuthors: { id: string; name: string }[] = JSON.parse(authorCombo.dataset.options || '[]');
@@ -71,11 +70,25 @@ const authorNameById = new Map(allAuthors.map((a) => [a.id, a.name]));
 
 // The Work list only ever offers the chosen author's works (or all of them,
 // when no author is set yet) — you can't pair an author with someone else's book.
+//
+// ⚠ AUTHORLESS WORKS ARE ALWAYS OFFERED, from every state (2026-08-05,
+// docs/plans/17a). The rule above simply does not apply to a work that belongs
+// to nobody: The Bible is nobody's book, so it can't be "someone else's". It
+// used to be excluded twice over — `w.authorId === aid` can never match a null,
+// and an uncommitted author name returned `[]` outright — so from several states
+// there was NO WAY to file a verse under the work it belongs to. The only path
+// forward was to type "The Bible" again, creating a second, duplicate,
+// authorless work. That is very likely how the Ecclesiastes 9:11 row ended up
+// filed under no work at all, with the Bible as a loose string in `details`.
+//
+// (Rejected: offering them only while the author is uncommitted. That fixes the
+// trap as reported and leaves the identical hole open one state over — which is
+// the shape of bug that gets rediscovered rather than fixed.)
 function scopedWorks() {
   const aid = authorCombo.getId();
-  const aname = authorCombo.getName().trim();
-  if (aid) return allWorks.filter((w) => w.authorId === aid);
-  if (aname) return []; // a not-yet-created author owns no existing works
+  const authorless = allWorks.filter((w) => !w.authorId);
+  if (aid) return allWorks.filter((w) => w.authorId === aid).concat(authorless);
+  if (authorCombo.getName().trim()) return authorless; // a not-yet-created author owns no attributed works
   return allWorks;
 }
 function recomputeWorkScope() {
@@ -109,13 +122,30 @@ workCombo.addEventListener('combo:change', () => {
   if (wname && !quoteSourceTitle.value.trim()) quoteSourceTitle.value = wname;
 });
 
-// Typing a plain attribution seeds the Author facet (unless it's scripture).
+// Typing an attribution seeds the Author facet — but ONLY when the text names an
+// author who already exists (2026-08-05, docs/plans/17a).
+//
+// It used to seed ANY text as an uncommitted author name, guarded by
+// `/\d+\s*:\s*\d+/` — a hardcoded exemption so "Matthew 5:43-48" wouldn't be
+// mistaken for a person. That regex was the diagnosis, not the fix: a bare book
+// name ("Ecclesiastes", "Proverbs") doesn't match it, so it seeded a phantom
+// author, emptied the Work list via scopedWorks() above, and — on save —
+// `resolveAuthor` would have created a real `authors` row named after a book of
+// the Bible. Requiring an author who exists means a LOCATOR CAN NEVER BECOME A
+// NAME, and the special case disappears instead of growing a second branch.
+//
+// (The cost, paid deliberately: typing a BRAND-NEW author here no longer
+// pre-fills the Author field. Pick them in Author instead — which fills
+// Attribution, and is the direction the machinery already flows. Keeping the
+// convenience would mean keeping a guess about what is and isn't a person's
+// name, and that guess is the bug.)
 quoteAttr.addEventListener('change', () => {
   const v = quoteAttr.value.trim();
-  if (v && !authorCombo.getName().trim() && !scriptureRe.test(v)) {
-    authorCombo.setValue('', v);
-    recomputeWorkScope();
-  }
+  if (!v || authorCombo.getName().trim()) return;
+  const known = allAuthors.find((a) => a.name.toLowerCase() === v.toLowerCase());
+  if (!known) return;
+  authorCombo.setValue(known.id, known.name);
+  recomputeWorkScope();
 });
 quoteSourceTitle.addEventListener('change', () => {
   const v = quoteSourceTitle.value.trim();
@@ -383,8 +413,6 @@ document.addEventListener('fragment:edit', (e) => {
       quoteEditor.commands.setContent(d.body || '', { emitUpdate: false });
       setField(form, 'source_url', d.source_url);
       setField(form, 'source_title', d.details.source_title ?? '');
-      setField(form, 'source_author', d.details.source_author ?? '');
-      setField(form, 'work_year', d.details.work_year != null ? String(d.details.work_year) : '');
       setField(form, 'page', d.details.page != null ? String(d.details.page) : '');
       setField(form, 'citation', d.details.citation ?? '');
       authorCombo.setValue(d.authorId ?? '', d.authorName ?? '');
