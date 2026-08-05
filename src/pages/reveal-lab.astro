@@ -1,8 +1,22 @@
 ---
 /*
-  /reveal-lab — a LOCAL-ONLY bench for the citation reveal (docs/plans/17a,
-  §"Still open — the reveal itself"). Never rendered in production (dev-gated
-  below); never linked from anywhere. Delete it once the call is made.
+  /reveal-lab — a LOCAL-ONLY bench for the citation reveal (docs/plans/17a).
+  Never rendered in production (dev-gated below); never linked from anywhere.
+
+  ▶ DECIDED, SAME DAY: **B — the line itself.** Michael: "option B is
+  definitely the best option." It shipped as src/components/QuoteReveal.astro
+  and is live in the blog feed, the constellation suite and the composer's Read
+  view. This page is kept rather than deleted — the same call /sky-lab got —
+  because it is the only record of what the other three looked like, and the
+  argument for B is only legible next to them. Delete it when the question
+  stops being live.
+
+  ⚠ TWO THINGS THIS PAGE CAUGHT that a mockup would not have, both fixed in
+  the shipped component and pinned by tests/e2e/quote-reveal.anon.spec.ts:
+  the popover opened UPWARD over the quote being read, and clicking the
+  trigger again failed to close it (an `auto` popover light-dismisses on the
+  same pointerdown that the handler then treated as "open"). Michael found the
+  second one by using this page, which is the entire argument for building it.
 
   THE QUESTION. Michael, 2026-08-05: "There should be a very subtle citation
   reveal button." The Where is stored, derived and correct on all 76 quotes —
