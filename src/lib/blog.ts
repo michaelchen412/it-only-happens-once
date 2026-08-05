@@ -4,6 +4,7 @@
 // and rely on the public RLS policies (published, non-deleted fragments only).
 import type { createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
+import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -66,6 +67,16 @@ export interface QuoteItem {
   slug: string;
   body: string;
   attribution: string | null;
+  /**
+   * What the citation reveal opens onto — "Meditations, Book 2:2", "The Bible",
+   * "Michael Chen" — or `''` when there is genuinely nothing behind the line,
+   * in which case no control renders at all.
+   *
+   * Derived here rather than in the component so both public surfaces (the feed
+   * and a constellation suite) get the same string from one place. `attribution`
+   * stays the LINE and is still read straight from the column.
+   */
+  reveal: string;
   sourceUrl: string | null;
   occurredAt: string;
   precision: 'day' | 'year';
@@ -300,8 +311,12 @@ export async function listQuotes(
   const from = (page - 1) * QUOTES_PAGE_SIZE;
   let query = supabase
     .from('fragments')
+    // authors/works reach the public site for the first time here (2026-08-05,
+    // plan 17a) — only to build the reveal. Both are `select` -> true for anon
+    // in RLS, verified before this shipped; a policy change that closed them
+    // would empty the reveal rather than break the page.
     .select(
-      'id, slug, body, attribution, source_url, occurred_at, date_precision, fragment_subjects(subjects(name, slug))',
+      'id, slug, body, attribution, is_self, details, source_url, occurred_at, date_precision, authors(name), works(title), fragment_subjects(subjects(name, slug))',
       {
         count: 'exact',
       },
@@ -321,6 +336,7 @@ export async function listQuotes(
     slug: r.slug,
     body: r.body ?? '',
     attribution: r.attribution ?? null,
+    reveal: revealOf(r),
     sourceUrl: r.source_url ?? null,
     occurredAt: r.occurred_at,
     precision: r.date_precision,

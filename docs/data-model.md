@@ -186,7 +186,9 @@ create table works (
 
 That single rule is the **Bible rule**, and it is no longer a special case: a verse **displays** "Matthew 5:43-48" *because it has no author to lead with*, while **grouping** under the work "The Bible" — the collection name never leaks into the presented text. "All Bible verses" = `where work_id = <the-bible>`; "everything by Ocean Vuong" = `where author_id = <vuong>`. Managed at [`/admin/library`](admin.md).
 
-⚠ **`attribution` is derived-and-STORED, not derived-at-render** — for now. `QuoteCard` and `SuiteStanza` read the column and nothing else (no public query joins `authors` or `works`), so emptying it would blank the line on every published card. The column is written by `saveQuote` and only *typed* when it is a deliberate per-quote override, which no row currently is. See `docs/plans/17a`.
+⚠ **`attribution` is derived-and-STORED, not derived-at-render.** `QuoteCard` and `SuiteStanza` read the column for the LINE and nothing else, so emptying it would blank every published card. It is written by `saveQuote` and only *typed* when it is a deliberate per-quote override, which no row currently is. See `docs/plans/17a`.
+
+**The reveal is the other half, and it derives at render.** `authors` and `works` reach the public site for the first time since 2026-08-05 — the quote queries embed them (`lib/blog.ts`, `lib/constellations.ts`) and hand the three facts to `revealOf()` in [`src/lib/provenance.ts`](../src/lib/provenance.ts), which is the one place either surface can learn what a quote came from. Both tables are `select` → `true` for `anon` in RLS; closing that would empty the reveal rather than break the page.
 
 ⚠ **Two silences that mean opposite things.** `is_self` and "nothing known" both render no line. That is why the flag is a column rather than an inference from a blank field — a blank cannot mean both in a corpus that only grows, and the workshop has to be able to say `your words` where it otherwise says `source unknown`. **Michael is never a row in `authors`**: an author row would give the derivation a name to lead with and sign every one of his own aphorisms.
 

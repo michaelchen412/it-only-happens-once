@@ -118,6 +118,35 @@ export function deriveProvenance(p: Provenance): ProvenanceDisplay {
 export const provenanceLine = (p: Provenance): string => deriveProvenance(p).line;
 
 /**
+ * The reveal for a fragment row as the PUBLIC queries select it — one place, so
+ * the blog feed and a constellation suite can never disagree about what a quote
+ * came from (lib/blog.ts, lib/constellations.ts).
+ *
+ * Shaped around PostgREST's embed output rather than around anything tidier,
+ * because the alternative is each caller unpacking `details` by hand and one of
+ * them eventually forgetting `page`.
+ */
+export function revealOf(row: {
+  is_self?: boolean | null;
+  details?: unknown;
+  authors?: { name: string } | null;
+  works?: { title: string } | null;
+}): string {
+  const d = (row.details ?? {}) as Record<string, unknown>;
+  const citation = typeof d.citation === 'string' ? d.citation : '';
+  // `page` was folded into the locator by the 2026-08-05 migration and nothing
+  // writes it any more — this handles it anyway, so a row restored from an
+  // older backup renders its page rather than silently dropping it.
+  const page = typeof d.page === 'number' || typeof d.page === 'string' ? d.page : null;
+  return deriveProvenance({
+    isSelf: row.is_self,
+    who: row.authors?.name,
+    from: row.works?.title,
+    where: mergePage(citation, page),
+  }).reveal;
+}
+
+/**
  * Fold a page number into the Where. `p. 41` is a locator like any other, and
  * the two coexist rather than competing: Michael's Seneca row carries both a
  * letter reference and a page, and choosing between them loses real information

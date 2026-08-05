@@ -13,12 +13,17 @@
       convention the constellation suite uses (sky-lab round 1; Michael's
       call 2026-07-23: the blog follows the Sky here, not the reverse).
       Subjects + the date stay sans — they're chrome, not content.
+    · The attribution is also the CITATION REVEAL when there's something behind
+      it (QuoteReveal, chosen from /reveal-lab 2026-08-05). Nothing is added to
+      the line — no glyph, no icon — because every candidate that added one made
+      the quietest line on the site louder. See the component for the cost.
     · The date is intentionally last, after the tags, and labelled "Added …":
       a quote's date is provenance (when it entered Michael's life), NOT when
       it was said — putting a bare date next to the attribution wrongly
       implies the latter.
 */
 import Timestamp from './Timestamp.astro';
+import QuoteReveal from './QuoteReveal.astro';
 import Highlighted from './admin/Highlighted.astro';
 import { MIN_SEARCH } from '../lib/search-highlight';
 import type { QuoteItem } from '../lib/blog';
@@ -44,7 +49,12 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
     {
       item.attribution && (
         <span class="text-base-content/50 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
-          — {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}
+          {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
+              name, and underlining it on hover reads as a typo. */}
+          {'— '}
+          <QuoteReveal reveal={item.reveal}>
+            {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}
+          </QuoteReveal>
         </span>
       )
     }

@@ -7,6 +7,7 @@ import type { createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, SubjectRef } from './blog';
 import { PAIRED_SELECT, pairedMediaOf } from './blog';
+import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -27,7 +28,10 @@ export interface ConstellationRef {
  *  `SuiteStanza.astro` renders every variant, public and composer alike —
  *  a song plays where it was placed (design.md §14, resolved 2026-07-25). */
 export type SuiteItem =
-  | { kind: 'quote'; body: string; attribution: string | null }
+  /** `reveal` is what the citation control opens onto, or `''` for no control
+   *  at all — derived once in lib/provenance.ts so the suite and the blog feed
+   *  can never disagree about where a quote came from. */
+  | { kind: 'quote'; body: string; attribution: string | null; reveal: string }
   | { kind: 'writing'; item: WritingItem }
   /** `body` is the annotation — Michael's words on why this song (ADR-0009).
    *  Empty is normal: a song may say nothing and simply play. */
@@ -86,7 +90,11 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   const { data: rows } = await supabase
     .from('fragment_constellations')
     .select(
-      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, source_url, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
+      // `is_self`, `details`, `authors` and `works` are here only to build the
+      // quote reveal (2026-08-05, plan 17a). They cost one join on a query that
+      // already embeds three, and they are what stops the suite and the blog
+      // feed from being two places that decide what a quote came from.
+      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, occurred_at, updated_at, date_precision, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
     )
     .eq('constellation_id', c.id)
     .eq('fragments.status', 'published')
@@ -117,9 +125,12 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
         deleted_at: string | null;
       } | null;
       details?: unknown;
+      is_self?: boolean | null;
+      authors?: { name: string } | null;
+      works?: { title: string } | null;
     };
     if (f.type === 'quote') {
-      items.push({ kind: 'quote', body: f.body ?? '', attribution: f.attribution });
+      items.push({ kind: 'quote', body: f.body ?? '', attribution: f.attribution, reveal: revealOf(f) });
     } else if (f.type === 'writing') {
       const authored = (f.excerpt ?? '').trim();
       const lede = authored || excerpt(f.body, 400);

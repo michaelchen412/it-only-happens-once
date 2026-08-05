@@ -29,6 +29,7 @@
 import type { SuiteItem } from '../lib/constellations';
 import { renderMarkdown } from '../lib/markdown';
 import { parseSongRef, songEmbed } from '../lib/media';
+import QuoteReveal from './QuoteReveal.astro';
 
 interface Props {
   item: SuiteItem;
@@ -51,7 +52,8 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
       </blockquote>
       {item.attribution && (
         <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
-          — {item.attribution}
+          {'— '}
+          <QuoteReveal reveal={item.reveal}>{item.attribution}</QuoteReveal>
         </figcaption>
       )}
     </figure>
