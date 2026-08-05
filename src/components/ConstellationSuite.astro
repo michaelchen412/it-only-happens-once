@@ -184,6 +184,17 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
 <script>
   import { navigate } from 'astro:transitions/client';
   import { STAR_PATH } from '../lib/star-mark';
+  // Puts the overview back where you left it, so the name morphs home into its
+  // own line instead of flying to the top of the page. None of the ways out
+  // below know about it — it keys on ARRIVAL at `/`, which is the only reason
+  // all of them behave alike.
+  //
+  // ⚠ IMPORTED HERE, NOT ONLY FROM index.astro. `astro:after-swap` fires
+  // BEFORE the incoming page's scripts run, so a listener that only ships with
+  // `/` would not yet be registered on the first return of a session — deep
+  // link into a suite, press return, no restore. Loading it on this side means
+  // it is already listening while you read.
+  import '../scripts/sky-slot';
 
   const SVGNS = 'http://www.w3.org/2000/svg';
   type Pt = { x: number; y: number };

@@ -39,17 +39,42 @@ const tierOf = (count: number) => TIERS[tierIndex(count)];
 // Each star breathes on its own phase — synchronised pulsing reads as
 // machinery. Derived from the slug so it's stable across renders.
 const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
+
+// The stagger — ONE tier per row, chosen explicitly.
+//
+// This was `${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`,
+// and at i ≡ 5 (mod 6) both fired: `class="sm:pl-16 sm:pl-32"` really shipped.
+// Which one won was decided by Tailwind's generated source order, not by
+// anything written here — it happened to resolve to pl-32, which is what we
+// wanted, but by accident. The table below is that same output stated on
+// purpose, so a Tailwind upgrade can't quietly reorder the sky.
+const INDENTS = ['', 'sm:pl-16', 'sm:pl-32'];
+const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
 ---
 
 <SiteLayout description="A walkable self-portrait — constellations of writing, quotes, and music." active="home">
   <section class="mx-auto flex min-h-[80vh] max-w-4xl flex-col justify-center px-5 py-20 sm:px-8">
     {
+      /* The page's name, for a screen reader and a crawler only. This room had
+        ZERO headings of any level — the site's most load-bearing one, reading
+        as an undifferentiated list of links. "Constellations" and not "the Sky"
+        because Sky is internal design vocabulary (design.md §13); not the site
+        name either, which the wordmark two elements up already says. Follows
+        about.astro's pattern rather than inventing a second answer: sr-only h1
+        naming the room, h2 per item. It's `position: absolute`, so it stays out
+        of this flex column and moves nothing. */
+    }
+    <h1 class="sr-only">Constellations</h1>
+    {
       refs.length > 0 ? (
         <div class="flex flex-col gap-12 sm:gap-16">
           {refs.map((c, i) => (
-            <div class={`${i % 2 === 1 ? 'sm:pl-16' : ''} ${i % 3 === 2 ? 'sm:pl-32' : ''}`}>
+            <div class={indentOf(i)}>
               <a href={`/${c.slug}`} class:list={['group block', `cn-${c.color}`]}>
-                <span class="flex items-baseline gap-3">
+                {/* a DIV, not a span: it holds an h2, and a <span> may only
+                    contain phrasing content. Nothing in `npm run verify`
+                    catches that — astro check doesn't validate content models. */}
+                <div class="flex items-baseline gap-3">
                   <span
                     class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
                     style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}; --phase: ${phaseOf(c.slug)}`}
@@ -57,13 +82,22 @@ const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCode
                   >
                     <StarBloom />
                   </span>
-                  <span
+                  {/* The name is an h2 so the sky has a document outline. It
+                      keeps `transition:name` — a transition:name is an
+                      ATTRIBUTE, not an element type, so the morph into the
+                      suite's h1 is untouched. Preflight already zeroes a
+                      heading's margin, size and weight, so the retag is
+                      visually inert; the utilities below still decide
+                      everything. (This element is also what the scroll restore
+                      keys on — see scripts/sky-slot.ts.) */}
+                  <h2
                     class={`${tierOf(c.count)} sky-name font-display font-light transition-colors`}
                     transition:name={`c-${c.slug}`}
+                    data-sky-slot={c.slug}
                   >
                     {c.name}
-                  </span>
-                </span>
+                  </h2>
+                </div>
                 {/* why this constellation exists — the same words that greet
                     you as the epigraph inside, so the zoom carries meaning */}
                 {c.description && (
@@ -81,3 +115,10 @@ const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCode
     }
   </section>
 </SiteLayout>
+
+<script>
+  // The sky remembers where you were — see the file for why it is not
+  // optional. Imported HERE so the departure is recorded, and from
+  // ConstellationSuite so the restore listener already exists on the way back.
+  import '../scripts/sky-slot';
+</script>
