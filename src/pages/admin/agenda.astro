@@ -25,7 +25,7 @@ import AgendaTabs from '../../components/admin/AgendaTabs.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TagSheet from '../../components/admin/TagSheet.astro';
-import { today as hqToday, parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
+import { parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
 import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftMonth } from '../../lib/hq/dates';
 import {
   CELL_ROWS,
@@ -41,7 +41,7 @@ import {
 import { staleness } from '../../lib/hq/mirror';
 
 const supabase = Astro.locals.supabase;
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 
 const anchor = parseYmd(Astro.url.searchParams.get('date')) ?? todayYmd;
 const openDay = parseYmd(Astro.url.searchParams.get('day'));

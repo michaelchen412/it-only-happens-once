@@ -20,7 +20,9 @@
 // own answer.*
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '../database.types';
+import { attention, checkinSettled, dueToday, type Attention } from './attention';
 import { birthdayItem, eventItem, mirroredBetween, seenOn, type CalendarItem } from './calendar';
+import type { Checkin } from './checkin';
 import { briefsFor, type Brief } from './brief';
 import { driftList, type Drift } from './drift';
 import { OBSERVATION_DAYS, observationFor, type Observation } from './goals';
@@ -91,6 +93,39 @@ export async function liveAndAnswered(
     answeredToday: new Map(answered.map((e) => [e.tasks.id, e.outcome])),
     error: liveErr ?? eventErr ?? null,
   };
+}
+
+/**
+ * What the building is still waiting for — the badge's entire read (20 · §2).
+ *
+ * ⚠ IT COMPOSES `liveAndAnswered` RATHER THAN ASKING ITS OWN NARROWER QUESTION,
+ * and that is the decision worth keeping. The obvious cheaper read is
+ * `tasks where due_on = today and archived_at is null`, two columns, no second
+ * query — and it gives the right answer today only because `dispose()` moves
+ * `due_on` past today the instant you tick something. Counting the same rows the
+ * rooms RENDER means the badge cannot drift from the list: if the two ever
+ * disagree it is because `liveAndAnswered` changed, and then they change
+ * together. It also picks up the one state the cheap read gets wrong — a
+ * `dispose` whose event landed and whose `tasks` update then failed, which
+ * leaves a row that reads answered on screen and unanswered in the column.
+ *
+ * ⚠ NEVER CALL THIS FOR A DATE OFF THE DATE BAR. The badge always means TODAY —
+ * stepping back to backfill last Tuesday must not change the number in the
+ * sidebar, and must not let that backfill decrement it. Same distinction
+ * `admin/index.astro` already draws for the whole page: *only the check-in
+ * follows the date bar.* Middleware is the only caller, and it passes the day it
+ * resolved itself.
+ *
+ * A failed read degrades rather than throwing, like everything else here: no
+ * rows means no tasks counted, and a check-in that could not be read counts as
+ * unasked — which sends you to Today, where the real error is visible.
+ */
+export async function loadAttention(sb: DB, today: Ymd): Promise<Attention> {
+  const [{ data: checkin }, tasks] = await Promise.all([
+    sb.from('daily_checkins').select('*').eq('log_date', today).maybeSingle<Checkin>(),
+    liveAndAnswered(sb, today),
+  ]);
+  return attention(checkinSettled(checkin), dueToday(tasks.rows, new Set(tasks.answeredToday.keys()), today));
 }
 
 /** A past-due row, as the zone renders it. */

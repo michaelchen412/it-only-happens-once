@@ -19,6 +19,15 @@
   occurrences were never rows (ADR-0013). "6 overdue" would be a verdict about a
   person; a list is a fact about a list.
 
+  ⚠ A SIBLING NOW DOES COUNT, AND THE TWO ARE NOT IN CONFLICT — worth knowing
+  before you read the two as inconsistent and "fix" one of them. Since 2026-08-06
+  `lib/hq/attention.ts` puts a number in the sidebar and the tab title, under a
+  rule with four conditions, and **this zone is the one thing it deliberately
+  excludes**: past due is the single input that can grow while you are away,
+  which is the exact mechanism ADR-0013 exists to forbid. That module's header
+  carries the argument; the sentence above stays true about this file, and the
+  reason to keep it true is now written down somewhere else too.
+
   BOTH ANSWERS, ON THE ROW. There are two honest things to say to something that
   has gone past its date, and a circle beside a "Did it" chip is two paths to one
   outcome while saying nothing about the other one.

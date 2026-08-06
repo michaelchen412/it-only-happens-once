@@ -23,7 +23,7 @@ import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../../components/admin/AgendaTabs.astro';
 import GoalSheet from '../../../../components/admin/GoalSheet.astro';
 import TaskSheet from '../../../../components/admin/TaskSheet.astro';
-import { today as hqToday, shiftYmd } from '../../../../lib/hq/time';
+import { shiftYmd } from '../../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../../lib/hq/dates';
 import { OBSERVATION_DAYS, STATUSES, horizonLabel, observationFor } from '../../../../lib/hq/goals';
 import { byWhen, effortMeta, recurrenceWords } from '../../../../lib/hq/tasks';
@@ -39,7 +39,7 @@ const supabase = Astro.locals.supabase;
 const { data: goal } = await supabase.from('goals').select('*').eq('slug', slug!).maybeSingle();
 if (!goal) return Astro.redirect('/admin/agenda/goals', 302);
 
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 const since = shiftYmd(todayYmd, -OBSERVATION_DAYS);
 
 const [{ data: taskData }, { data: doneData }, { data: recent }, { data: activeGoals }] = await Promise.all([

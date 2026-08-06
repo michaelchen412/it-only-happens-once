@@ -23,7 +23,6 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import PersonSheet from '../../components/admin/PersonSheet.astro';
-import { today as hqToday } from '../../lib/hq/time';
 import { dmd } from '../../lib/hq/dates';
 import {
   CIRCLES,
@@ -42,7 +41,7 @@ import { seenOn } from '../../lib/hq/calendar';
 import BeenAWhile from '../../components/admin/BeenAWhile.astro';
 
 const supabase = Astro.locals.supabase;
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 
 const { data, error } = await supabase.from('people').select('*');
 const everyone: Person[] = data ?? [];

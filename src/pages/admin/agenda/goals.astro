@@ -24,7 +24,6 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import GoalSheet from '../../../components/admin/GoalSheet.astro';
-import { today as hqToday } from '../../../lib/hq/time';
 import { shiftYmd } from '../../../lib/hq/time';
 import { ACTIVE_CAP, OBSERVATION_DAYS, horizonLabel, observationFor, statusLabel } from '../../../lib/hq/goals';
 import type { Tables } from '../../../lib/database.types';
@@ -32,7 +31,7 @@ import type { Tables } from '../../../lib/database.types';
 type Goal = Tables<'goals'>;
 
 const supabase = Astro.locals.supabase;
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 // The window's boundary is computed HERE, from the configured home zone —
 // never by Postgres, whose `current_date` is UTC and would move the edge of
 // "the last 30 days" by a day for anyone west of Greenwich.

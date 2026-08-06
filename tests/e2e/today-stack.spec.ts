@@ -34,12 +34,20 @@ test.describe('what the page claims', () => {
     // broken app *and* as a list of things you have already failed to do. So a
     // zone is either present WITH rows, or not there at all — there is no third
     // state, and this is the assertion that keeps it that way.
+    //
+    // ⚠ `level: 2` IS LOAD-BEARING, and it went in after this went red on the
+    // page's own name. `Zone.astro` titles are `<h2>`; since 2026-08-06 the page
+    // also carries `<h1 class="sr-only">Today</h1>`, which the Agenda zone's
+    // title matches EXACTLY — so on a day with nothing on the agenda the zone
+    // was correctly absent and the assertion found the page's accessible name
+    // instead. Naming the level says what this actually means, which is *no
+    // ZONE heading* — a bare name match was only ever right by luck.
     for (const zone of ZONES) {
       const section = page.locator(zone.attr);
       if ((await section.count()) === 0) {
-        await expect(page.getByRole('heading', { name: zone.title, exact: true })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: zone.title, exact: true, level: 2 })).toHaveCount(0);
       } else {
-        await expect(section.getByRole('heading', { name: zone.title, exact: true })).toBeVisible();
+        await expect(section.getByRole('heading', { name: zone.title, exact: true, level: 2 })).toBeVisible();
         expect(await section.locator('.row, .sig, .brf, .bw__row').count()).toBeGreaterThan(0);
       }
     }

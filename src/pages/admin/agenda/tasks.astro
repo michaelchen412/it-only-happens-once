@@ -28,7 +28,6 @@ import DispositionChips from '../../../components/admin/DispositionChips.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
 import Tick from '../../../components/admin/Tick.astro';
-import { today as hqToday } from '../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
 import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
 import { liveAndAnswered } from '../../../lib/hq/today-data';
@@ -38,7 +37,7 @@ import type { Tables } from '../../../lib/database.types';
 type Task = Tables<'tasks'>;
 
 const supabase = Astro.locals.supabase;
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 
 const [{ rows, error }, { data: goalData }] = await Promise.all([
   // The merge Today also does, and it is the SAME function — the two rooms

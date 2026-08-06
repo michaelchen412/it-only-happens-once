@@ -27,7 +27,6 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PersonSheet from '../../../components/admin/PersonSheet.astro';
 import { renderMarkdown } from '../../../lib/markdown';
-import { today as hqToday } from '../../../lib/hq/time';
 import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
 import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
 import TimelineZone, { type TimelineEntry } from '../../../components/admin/TimelineZone.astro';
@@ -46,7 +45,7 @@ const { data: person } = await supabase.from('people').select('*').eq('slug', sl
 // wrong, and this is exactly where a stale bookmark lands.
 if (!person) Astro.response.status = 404;
 
-const { ymd: todayYmd } = await hqToday(supabase);
+const { ymd: todayYmd } = Astro.locals.today;
 
 /**
  * The timeline, in two queries rather than one clever embed.

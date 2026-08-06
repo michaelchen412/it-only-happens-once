@@ -48,13 +48,13 @@ import ComingUpZone from '../../components/admin/ComingUpZone.astro';
 import PastDueZone from '../../components/admin/PastDueZone.astro';
 import PeopleZone from '../../components/admin/PeopleZone.astro';
 import PracticeZone from '../../components/admin/PracticeZone.astro';
-import { today as hqToday, parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
+import { parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
 import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
 import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
 import { loadToday, type TodayData } from '../../lib/hq/today-data';
 
 const supabase = Astro.locals.supabase;
-const { tz, ymd: todayYmd } = await hqToday(supabase);
+const { tz, ymd: todayYmd } = Astro.locals.today;
 
 // Navigating is free; EDITING is not — the 3-day backfill limit belongs to the
 // check-in, not to the ability to look at a date. So no clamp here.

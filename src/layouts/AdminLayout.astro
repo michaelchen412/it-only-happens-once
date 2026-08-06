@@ -17,6 +17,7 @@ import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
+import { titlePrefix } from '../lib/hq/attention';
 
 interface Props {
   title?: string;
@@ -25,6 +26,25 @@ interface Props {
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
+
+/**
+ * `(2) Today — Observatory` (20 · §5).
+ *
+ * THE ONE SURFACE THAT REACHES YOU WHILE THE OBSERVATORY IS ONE OF TWENTY TABS.
+ * No install, no permission, no service worker; correct on every navigation
+ * because the whole page is server-rendered, which is most of Piece 7 for free.
+ *
+ * ⚠ NOTHING AT ZERO. `titlePrefix` returns '' rather than `(0)`, and the reason
+ * is the one `progressLabel()` already gives about `0 of 3 done`: a status line
+ * that is always there is a status line you stop reading. The prefix APPEARING
+ * is the signal.
+ *
+ * ⚠ AND IT SAYS TODAY ON EVERY PAGE. The count is about the building, not about
+ * the room you are standing in — `(2) People — Observatory` is correct and is
+ * the entire point, because the fault this fixes is that navigating away from
+ * Today used to make the system go silent.
+ */
+const prefix = titlePrefix(Astro.locals.attention.total);
 
 // Today first, and the corpus rooms after the rule: HQ is the daily half, the
 // corpus is the weekly one, and the divider is the boundary of ADR-0012 made
@@ -57,7 +77,7 @@ const nav = [
 ] as const;
 ---
 
-<Base title={`${title} — Observatory`}>
+<Base title={`${prefix}${title} — Observatory`}>
   {
     /* The Observatory installs to the home screen (docs/admin.md §9): its own
       icon, its own window, opening straight into /admin rather than the
