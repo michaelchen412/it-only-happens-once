@@ -83,10 +83,15 @@ test.describe('the check-in, before it has been answered', () => {
     await page.getByRole('button', { name: 'Start' }).click();
 
     const dream = await page.locator('[data-fs="dream"]').boundingBox();
-    const sleep = await page.locator('[data-fs="sleep"]').boundingBox();
-    const waking = await page.locator('[data-fs="waking"]').boundingBox();
-    expect(dream!.y).toBeLessThan(sleep!.y);
-    expect(sleep!.y).toBeLessThan(waking!.y);
+    const night = await page.locator('[data-fs="night"]').boundingBox();
+    const rating = await page.locator('[data-fs="rating"]').boundingBox();
+    const naps = await page.locator('[data-fs="naps"]').boundingBox();
+    expect(dream!.y).toBeLessThan(night!.y);
+    expect(night!.y).toBeLessThan(rating!.y);
+    // And naps are LAST, because they are the only section here about the day:
+    // unanswerable at 7am, so anywhere earlier puts a question you cannot answer
+    // in the middle of a card built to be finished in under a minute.
+    expect(rating!.y).toBeLessThan(naps!.y);
   });
 });
 
@@ -101,7 +106,7 @@ test.describe('answering it', () => {
 
     const first = payloads[0] as Record<string, unknown>;
     expect(first.logDate).toBe(dateIn(tz));
-    expect(first.dreamRecall).toBe('anxious');
+    expect(first.dreams).toEqual([{ tone: 'anxious', intensity: null, wokeYou: false, recurring: false }]);
     // The prefilled times ride along — they are part of the form's state, and
     // the action takes the whole form every time.
     expect(first.bed).toMatch(/^\d{2}:\d{2}$/);
@@ -111,24 +116,58 @@ test.describe('answering it', () => {
     expect((payloads[1] as Record<string, unknown>).sleepQuality).toBe(3);
   });
 
-  test('the dream details only exist once there is a dream', async ({ page }) => {
-    await stub(page);
+  test('two kinds of dream in one night, each with its own strength', async ({ page }) => {
+    // THE GAP THIS CLOSES (Michael, 2026-08-06): the tones used to be mutually
+    // exclusive, so a night with an anxious dream AND a distressing one kept
+    // whichever was tapped last, under a single intensity spanning both.
+    const { payloads, seen } = await stub(page);
     await page.goto('/admin');
     await page.getByRole('button', { name: 'Start' }).click();
 
-    const more = page.locator('[data-dream-more]');
+    await page.locator('[data-dream="anxious"]').click();
+    await page.locator('[data-dream="distressing"]').click();
+    await expect(page.locator('[data-dream-more="anxious"]')).toBeVisible();
+    await expect(page.locator('[data-dream-more="distressing"]')).toBeVisible();
+
+    await page.locator('[data-tb="intensity_anxious"][data-v="2"]').click();
+    await page.locator('[data-tb="intensity_distressing"][data-v="5"]').click();
+    // The clinical line between an anxiety dream and a nightmare — the question
+    // plan 11 opened with and could not measure until today.
+    await page.locator('[data-dream-more="distressing"] [data-flag="wokeYou"]').click();
+
+    await expect.poll(() => seen().length).toBe(5);
+    expect((payloads[4] as Record<string, unknown>).dreams).toEqual([
+      { tone: 'anxious', intensity: 2, wokeYou: false, recurring: false },
+      { tone: 'distressing', intensity: 5, wokeYou: true, recurring: false },
+    ]);
+    // Two tones, and neither strength leaked into the other.
+    await expect(page.locator('[data-tb="intensity_anxious"].tb--on')).toHaveCount(1);
+    await expect(page.locator('[data-tb="intensity_distressing"].tb--on')).toHaveCount(1);
+  });
+
+  test('the dream details only exist once there is a dream', async ({ page }) => {
+    const { payloads, seen } = await stub(page);
+    await page.goto('/admin');
+    await page.getByRole('button', { name: 'Start' }).click();
+
+    const more = page.locator('[data-dream-more="anxious"]');
     await expect(more).toBeHidden();
 
     await page.locator('[data-dream="anxious"]').click();
     await expect(more).toBeVisible();
 
-    // "Nothing" is a real answer and one tap — and choosing it must take the
-    // intensity and the text away with it, which is the same rule the table's
-    // CHECK constraint enforces.
-    await page.locator('[data-tb="dream_intensity"][data-v="4"]').click();
+    // "Nothing" is a real answer and one tap — and choosing it must take every
+    // tone's details away with it, which is the same rule the table's CHECK
+    // constraint and the action both enforce.
+    await page.locator('[data-tb="intensity_anxious"][data-v="4"]').click();
     await page.locator('[data-dream="none"]').click();
     await expect(more).toBeHidden();
-    await expect(page.locator('[data-tb="dream_intensity"].tb--on')).toHaveCount(0);
+    await expect(page.locator('[data-tb="intensity_anxious"].tb--on')).toHaveCount(0);
+
+    await expect.poll(() => seen().length).toBe(3);
+    const last = payloads[2] as Record<string, unknown>;
+    expect(last.dreams).toEqual([]);
+    expect(last.dreamless).toBe(true);
   });
 
   test('the two star scales stay two scales', async ({ page }) => {
@@ -171,6 +210,83 @@ test.describe('answering it', () => {
     await expect(derived).toHaveText('6h 50m in bed');
     await page.locator('[data-wake="few"]').click();
     await expect(derived).toHaveText('6h 50m in bed · ≈6h 16m asleep · 92%');
+  });
+
+  test('a broken night is representable, and it moves the efficiency', async ({ page }) => {
+    // ⚠ THE NIGHT THIS EXISTS FOR (Michael, 2026-08-06): *"I fell asleep for
+    // three hours, I was awake for three hours, and I went to bed again and only
+    // slept two hours."* `many` carried thirty minutes, so the card said 83%
+    // about a 54% night — twenty-nine points, on the one number CBT-I moves.
+    await stub(page);
+    await page.goto('/admin');
+    await page.getByRole('button', { name: 'Start' }).click();
+
+    const derived = page.locator('[data-derived]');
+    await page.locator('[data-field="bed"]').fill('23:00');
+    await page.locator('[data-field="woke"]').fill('07:30');
+    await page.locator('[data-field="gotUp"]').fill('07:45');
+    await page.locator('[data-lat="30_60"]').click();
+
+    // A timed waking appears only under a bucket that admits one.
+    await expect(page.locator('[data-wakings]')).toBeHidden();
+    await page.locator('[data-wake="many"]').click();
+    await expect(page.locator('[data-wakings]')).toBeVisible();
+    await expect(derived).toHaveText('8h 45m in bed · ≈7h 15m asleep · 83%');
+
+    await page.getByRole('button', { name: 'A long waking' }).click();
+    const waking = page.locator('[data-waking]').first();
+    await waking.locator('[data-t="woke"]').fill('02:30');
+    await waking.locator('[data-t="backAsleep"]').fill('05:30');
+    await expect(derived).toHaveText('8h 45m in bed · ≈4h 45m asleep · 54%');
+
+    // CBT-I stimulus control tells you to LEAVE THE BED. Until this existed,
+    // obeying it scored exactly the same as lying there ignoring it — the three
+    // hours sat in the denominator either way.
+    await waking.getByRole('button', { name: 'Got up' }).click();
+    await expect(derived).toHaveText('5h 45m in bed · ≈4h 45m asleep · 83%');
+  });
+
+  test('a nap is counted, and never folded into the night', async ({ page }) => {
+    await stub(page);
+    await page.goto('/admin');
+    await page.getByRole('button', { name: 'Start' }).click();
+
+    const derived = page.locator('[data-derived]');
+    await page.locator('[data-field="bed"]').fill('23:00');
+    await page.locator('[data-field="woke"]').fill('07:00');
+    await page.locator('[data-lat="under_15"]').click();
+    await page.locator('[data-wake="none"]').click();
+    await expect(derived).toHaveText('8h 00m in bed · ≈7h 52m asleep · 98%');
+
+    await page.getByRole('button', { name: 'Add a nap' }).first().click();
+    const nap = page.locator('[data-nap]').first();
+    await nap.locator('[data-t="start"]').fill('14:00');
+    await nap.locator('[data-t="end"]').fill('14:45');
+    // Efficiency is a claim about ONE NIGHT IN ONE BED. The nap rides at the
+    // end of the line and changes nothing inside it.
+    await expect(derived).toHaveText('8h 00m in bed · ≈7h 52m asleep · 98% · +45m napped');
+  });
+
+  test('"nothing taken" is a tap, not an empty answer', async ({ page }) => {
+    // Reading no selection as "took nothing" would silently invent the control
+    // group every correlation over this column depends on. `[]` is an answer;
+    // `null` is a question nobody answered.
+    const { payloads, seen } = await stub(page);
+    await page.goto('/admin');
+    await page.getByRole('button', { name: 'Start' }).click();
+
+    await page.locator('[data-aid="melatonin"]').click();
+    await expect.poll(() => seen().length).toBe(1);
+    expect((payloads[0] as Record<string, unknown>).sleepAids).toEqual(['melatonin']);
+
+    await page.locator('[data-aid="alcohol"]').click();
+    await expect.poll(() => seen().length).toBe(2);
+    expect((payloads[1] as Record<string, unknown>).sleepAids).toEqual(['melatonin', 'alcohol']);
+
+    // "Nothing" is exclusive, and it is not the same as never asking.
+    await page.locator('[data-aid="none"]').click();
+    await expect.poll(() => seen().length).toBe(3);
+    expect((payloads[2] as Record<string, unknown>).sleepAids).toEqual([]);
   });
 
   test('typing debounces instead of saving every keystroke', async ({ page }) => {

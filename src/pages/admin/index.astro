@@ -50,8 +50,18 @@ import PeopleZone from '../../components/admin/PeopleZone.astro';
 import PracticeZone from '../../components/admin/PracticeZone.astro';
 import { parseYmd, shiftYmd, utcToZonedTime, type Ymd } from '../../lib/hq/time';
 import { headerDate, monthGrid, monthTitle, shiftMonth } from '../../lib/hq/dates';
-import { BACKFILL_DAYS, DEFAULT_TIMES, medianClock, type Checkin } from '../../lib/hq/checkin';
+import {
+  BACKFILL_DAYS,
+  DEFAULT_TIMES,
+  medianClock,
+  type Checkin,
+  type DreamEntry,
+  type DreamTone,
+  type NapEntry,
+  type WakingEntry,
+} from '../../lib/hq/checkin';
 import { loadToday, type TodayData } from '../../lib/hq/today-data';
+import type { Database } from '../../lib/database.types';
 
 const supabase = Astro.locals.supabase;
 const { tz, ymd: todayYmd } = Astro.locals.today;
@@ -64,11 +74,27 @@ const offToday = selected !== todayYmd;
 // The same window the action enforces. Stated once, in the module both read.
 const writable = selected <= todayYmd && selected >= shiftYmd(todayYmd, -BACKFILL_DAYS);
 
+/**
+ * The night and its pieces, in ONE round trip.
+ *
+ * Since 2026-08-06 a night can hold several dream tones, several timed wakings
+ * and several naps. Embedding them in the parent's select rather than issuing
+ * three follow-up queries is not a micro-optimisation: this is the first query
+ * on the first card of the page every admin request begins with, and a
+ * four-deep waterfall in front of it would be felt.
+ */
+type Tables = Database['public']['Tables'];
+type CheckinWithNight = Checkin & {
+  checkin_dreams: Tables['checkin_dreams']['Row'][];
+  checkin_wakings: Tables['checkin_wakings']['Row'][];
+  checkin_naps: Tables['checkin_naps']['Row'][];
+};
+
 const { data: checkin } = await supabase
   .from('daily_checkins')
-  .select('*')
+  .select('*, checkin_dreams(*), checkin_wakings(*), checkin_naps(*)')
   .eq('log_date', selected)
-  .maybeSingle<Checkin>();
+  .maybeSingle<CheckinWithNight>();
 
 // Back out of UTC into wall-clock times, because that is what the pickers and
 // the summary both speak. The instants stay canonical in the database.
@@ -78,6 +104,31 @@ const times = {
   gotUp: checkin?.got_up_at ? utcToZonedTime(checkin.got_up_at, tz) : null,
   asleepAt: checkin?.asleep_at ? utcToZonedTime(checkin.asleep_at, tz) : null,
 };
+
+const clock = (ts: string | null) => (ts ? utcToZonedTime(ts, tz) : null);
+
+/** Nulls last, then oldest first — ISO instants sort as strings. */
+const byInstant = (a: string | null, b: string | null) => (a ?? '￿').localeCompare(b ?? '￿');
+
+const dreams: DreamEntry[] = (checkin?.checkin_dreams ?? []).map((d) => ({
+  tone: d.tone as DreamTone,
+  intensity: d.intensity,
+  wokeYou: d.woke_you,
+  recurring: d.recurring,
+}));
+
+// ORDER IS NOT GUARANTEED BY AN EMBEDDED SELECT, and these two are lists a
+// person reads down. A night whose wakings shuffled between reloads would look
+// like the record had changed when only the row order had.
+const wakings: WakingEntry[] = (checkin?.checkin_wakings ?? [])
+  .slice()
+  .sort((a, b) => byInstant(a.woke_at, b.woke_at))
+  .map((w) => ({ woke: clock(w.woke_at), backAsleep: clock(w.back_asleep_at), leftBed: w.left_bed }));
+
+const naps: NapEntry[] = (checkin?.checkin_naps ?? [])
+  .slice()
+  .sort((a, b) => byInstant(a.started_at, b.started_at))
+  .map((n) => ({ start: clock(n.started_at), end: clock(n.ended_at) }));
 
 /**
  * The median of recent bed and wake times — what keeps this under a minute,
@@ -277,13 +328,17 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       <div class="col-main">
         {
           /* ══ MORNING ══ pinned first, always, answered or not. Every field is
-            a real column on `daily_checkins`. ══ */
+            a real column on `daily_checkins` — or, since 2026-08-06, a real row
+            in one of its three child tables. ══ */
         }
         <CheckinZone
           logDate={selected}
           today={todayYmd}
           row={checkin ?? null}
           times={times}
+          dreams={dreams}
+          wakings={wakings}
+          naps={naps}
           prefill={prefill}
           writable={writable}
           tz={tz}

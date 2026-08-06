@@ -109,6 +109,99 @@ export type Database = {
         }
         Relationships: []
       }
+      checkin_dreams: {
+        Row: {
+          checkin_id: string
+          intensity: number | null
+          recurring: boolean
+          tone: Database["public"]["Enums"]["dream_recall"]
+          woke_you: boolean
+        }
+        Insert: {
+          checkin_id: string
+          intensity?: number | null
+          recurring?: boolean
+          tone: Database["public"]["Enums"]["dream_recall"]
+          woke_you?: boolean
+        }
+        Update: {
+          checkin_id?: string
+          intensity?: number | null
+          recurring?: boolean
+          tone?: Database["public"]["Enums"]["dream_recall"]
+          woke_you?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_dreams_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "daily_checkins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_naps: {
+        Row: {
+          checkin_id: string
+          ended_at: string | null
+          id: string
+          started_at: string | null
+        }
+        Insert: {
+          checkin_id: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string | null
+        }
+        Update: {
+          checkin_id?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_naps_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "daily_checkins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_wakings: {
+        Row: {
+          back_asleep_at: string | null
+          checkin_id: string
+          id: string
+          left_bed: boolean
+          woke_at: string | null
+        }
+        Insert: {
+          back_asleep_at?: string | null
+          checkin_id: string
+          id?: string
+          left_bed?: boolean
+          woke_at?: string | null
+        }
+        Update: {
+          back_asleep_at?: string | null
+          checkin_id?: string
+          id?: string
+          left_bed?: boolean
+          woke_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_wakings_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "daily_checkins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_checkins: {
         Row: {
           arousal: number | null
@@ -117,14 +210,14 @@ export type Database = {
           bed_at: string | null
           created_at: string
           dream_body: string | null
-          dream_intensity: number | null
-          dream_recall: Database["public"]["Enums"]["dream_recall"] | null
+          dreamless: boolean | null
           got_up_at: string | null
           id: string
           log_date: string
           note: string | null
           restedness: number | null
           skipped: boolean
+          sleep_aids: Database["public"]["Enums"]["sleep_aid"][] | null
           sleep_latency: Database["public"]["Enums"]["sleep_latency"] | null
           sleep_quality: number | null
           updated_at: string
@@ -138,14 +231,14 @@ export type Database = {
           bed_at?: string | null
           created_at?: string
           dream_body?: string | null
-          dream_intensity?: number | null
-          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          dreamless?: boolean | null
           got_up_at?: string | null
           id?: string
           log_date: string
           note?: string | null
           restedness?: number | null
           skipped?: boolean
+          sleep_aids?: Database["public"]["Enums"]["sleep_aid"][] | null
           sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
           sleep_quality?: number | null
           updated_at?: string
@@ -159,14 +252,14 @@ export type Database = {
           bed_at?: string | null
           created_at?: string
           dream_body?: string | null
-          dream_intensity?: number | null
-          dream_recall?: Database["public"]["Enums"]["dream_recall"] | null
+          dreamless?: boolean | null
           got_up_at?: string | null
           id?: string
           log_date?: string
           note?: string | null
           restedness?: number | null
           skipped?: boolean
+          sleep_aids?: Database["public"]["Enums"]["sleep_aid"][] | null
           sleep_latency?: Database["public"]["Enums"]["sleep_latency"] | null
           sleep_quality?: number | null
           updated_at?: string
@@ -987,6 +1080,13 @@ export type Database = {
       person_circle: "family" | "friends" | "professional"
       recurrence_mode: "after_completion" | "fixed"
       recurrence_unit: "days" | "weeks" | "months"
+      sleep_aid:
+        | "melatonin"
+        | "antihistamine"
+        | "prescription"
+        | "cannabis"
+        | "alcohol"
+        | "other"
       sleep_latency: "under_15" | "15_30" | "30_60" | "over_60"
       task_effort: "quick" | "sitting" | "block" | "project"
       task_outcome: "done" | "skipped"
@@ -1136,6 +1236,14 @@ export const Constants = {
       person_circle: ["family", "friends", "professional"],
       recurrence_mode: ["after_completion", "fixed"],
       recurrence_unit: ["days", "weeks", "months"],
+      sleep_aid: [
+        "melatonin",
+        "antihistamine",
+        "prescription",
+        "cannabis",
+        "alcohol",
+        "other",
+      ],
       sleep_latency: ["under_15", "15_30", "30_60", "over_60"],
       task_effort: ["quick", "sitting", "block", "project"],
       task_outcome: ["done", "skipped"],

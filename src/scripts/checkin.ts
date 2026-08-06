@@ -6,6 +6,12 @@
 // copy of the answers is a second thing that can be wrong, and the one that
 // would be wrong is the one nobody is looking at.
 //
+// THAT HELD WHEN THE CARD GREW REPEATERS (2026-08-06). A list of timed wakings
+// is exactly the shape that tempts a `let wakings = []` beside the markup —
+// and then a row removed from the array while its inputs are still on screen.
+// `collect()` walks the rows instead, so "what is on screen" and "what gets
+// saved" cannot come apart, and removing a row is a `remove()` and nothing else.
+//
 // TWO SAVE SPEEDS, on purpose:
 //   · a TAP saves immediately. It is one discrete decision, it is the common
 //     case, and debouncing it only creates a window in which a phone locking
@@ -27,10 +33,12 @@
 import { actions } from 'astro:actions';
 import {
   OPEN_ENDED_LATENCY,
+  TIMEABLE_WAKINGS,
   derive,
   deriveLine,
   wordFor,
   type Awakenings,
+  type DreamTone,
   type MarkField,
   type SleepLatency,
 } from '../lib/hq/checkin';
@@ -65,6 +73,12 @@ if (zone) {
     // ── reading the form ──────────────────────────────────────────────────
     const pressed = (attr: string): string | null =>
       $$(`[data-${attr}]`).find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset[attr] ?? null;
+    /** Every pressed member of a MULTI-select group, in the order rendered. */
+    const pressedAll = (attr: string): string[] =>
+      $$(`[data-${attr}]`)
+        .filter((b) => b.getAttribute('aria-pressed') === 'true')
+        .map((b) => b.dataset[attr]!)
+        .filter(Boolean);
     const stars = (field: string): number | null => {
       const on = $$(`[data-star="${field}"].st--on`);
       return on.length ? Math.max(...on.map((el) => Number(el.dataset.v))) : null;
@@ -76,6 +90,44 @@ if (zone) {
     const text = (field: string): string | null =>
       $<HTMLTextAreaElement>(`[data-field="${field}"]`)?.value.trim() || null;
     const time = (field: string): string | null => $<HTMLInputElement>(`[data-field="${field}"]`)?.value || null;
+    /** A time picker inside one repeater row — scoped, so rows cannot read each other. */
+    const rowTime = (row: HTMLElement, name: string): string | null =>
+      row.querySelector<HTMLInputElement>(`[data-t="${name}"]`)?.value || null;
+    const isOn = (el: Element | null): boolean => el?.getAttribute('aria-pressed') === 'true';
+
+    /** The tones that are pressed, each with everything under it. */
+    const dreams = () =>
+      (pressedAll('dream').filter((k) => k !== 'none') as DreamTone[]).map((tone) => {
+        const more = $<HTMLElement>(`[data-dream-more="${tone}"]`);
+        return {
+          tone,
+          intensity: track(`intensity_${tone}`),
+          wokeYou: isOn(more?.querySelector('[data-flag="wokeYou"]') ?? null),
+          recurring: isOn(more?.querySelector('[data-flag="recurring"]') ?? null),
+        };
+      });
+
+    const wakings = () =>
+      $$('[data-waking]').map((r) => ({
+        woke: rowTime(r, 'woke'),
+        backAsleep: rowTime(r, 'backAsleep'),
+        leftBed: isOn(r.querySelector('[data-left-bed]')),
+      }));
+
+    const naps = () => $$('[data-nap]').map((r) => ({ start: rowTime(r, 'start'), end: rowTime(r, 'end') }));
+
+    /**
+     * What was taken, and the difference between "nothing" and "unasked".
+     *
+     * `[]` is an answered "nothing tonight" and `null` is a question nobody
+     * answered — the column depends on the distinction, so the tap has to
+     * survive the trip. See `AIDS` in lib/hq/checkin.ts.
+     */
+    const sleepAids = (): string[] | null => {
+      if (isOn($('[data-aid="none"]'))) return [];
+      const taken = pressedAll('aid').filter((k) => k !== 'none');
+      return taken.length ? taken : null;
+    };
 
     const collect = () => ({
       logDate,
@@ -85,13 +137,18 @@ if (zone) {
       asleepAt: time('asleepAt'),
       sleepLatency: pressed('lat') as never,
       awakenings: pressed('wake') as never,
+      wakings: wakings(),
       sleepQuality: stars('sleep_quality'),
       restedness: stars('restedness'),
       valence: track('valence'),
       arousal: track('arousal'),
-      dreamRecall: pressed('dream') as never,
-      dreamIntensity: track('dream_intensity'),
+      // `true` only for an explicit "Nothing"; never `false` — the action
+      // derives that from the tones, so the two cannot contradict each other.
+      dreamless: isOn($('[data-dream="none"]')) ? true : null,
+      dreams: dreams(),
       dreamBody: text('dream_body'),
+      sleepAids: sleepAids() as never,
+      naps: naps(),
       note: text('note'),
     });
 
@@ -166,21 +223,28 @@ if (zone) {
     function recompute() {
       if (!derivedEl) return;
       derivedEl.textContent = deriveLine(
-        derive(
-          time('bed'),
-          time('woke'),
-          pressed('lat') as SleepLatency | null,
-          pressed('wake') as Awakenings | null,
-          time('gotUp'),
-          time('asleepAt'),
-        ),
+        derive({
+          bed: time('bed'),
+          woke: time('woke'),
+          latency: pressed('lat') as SleepLatency | null,
+          awakenings: pressed('wake') as Awakenings | null,
+          gotUp: time('gotUp'),
+          asleepAt: time('asleepAt'),
+          wakings: wakings(),
+          naps: naps(),
+        }),
       );
     }
 
     // ── the words beside the marks ────────────────────────────────────────
+    // Each tone's strength track is its own field (`intensity_anxious`), because
+    // three of them share one card and a shared name would let a tap on one
+    // clear another. They all read from the same five words.
     function setWord(field: string, value: number) {
       const el = $<HTMLElement>(`[data-w-for="${field}"]`);
-      if (el) el.textContent = wordFor(field as MarkField, value);
+      if (!el) return;
+      const words = field.startsWith('intensity_') ? 'dream_intensity' : field;
+      el.textContent = wordFor(words as MarkField, value);
     }
 
     // ── wiring ────────────────────────────────────────────────────────────
@@ -197,20 +261,65 @@ if (zone) {
       );
     }
 
-    group('dream', (value) => {
-      // Intensity and the text only exist once there is a dream, which is the
-      // same rule the table's CHECK enforces. Clearing them here means a change
-      // of mind cannot leave orphan data behind.
-      const more = $<HTMLElement>('[data-dream-more]');
-      const hasDream = value !== null && value !== 'none';
-      if (more) more.hidden = !hasDream;
-      if (!hasDream) {
-        $$('[data-tb="dream_intensity"]').forEach((el) => el.classList.remove('tb--on'));
-        setWord('dream_intensity', 0);
+    /**
+     * A MULTI-select group with one exclusive member.
+     *
+     * The exclusive one is the answer that denies the others — "Nothing" for
+     * dreams and for aids. Tapping it clears the rest; tapping any of the rest
+     * clears it. That is the whole rule, and it is shared because both rows
+     * mean the same thing by "nothing": a real answer, not an empty one.
+     */
+    function multi(attr: string, exclusive: string, after?: () => void) {
+      $$<HTMLButtonElement>(`[data-${attr}]`).forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const key = btn.dataset[attr]!;
+          const wasOn = btn.getAttribute('aria-pressed') === 'true';
+          if (key === exclusive) {
+            $$(`[data-${attr}]`).forEach((o) => o.setAttribute('aria-pressed', String(o === btn && !wasOn)));
+          } else {
+            btn.setAttribute('aria-pressed', String(!wasOn));
+            $(`[data-${attr}="${exclusive}"]`)?.setAttribute('aria-pressed', 'false');
+          }
+          after?.();
+          now();
+        }),
+      );
+    }
+
+    /** Every tone's follow-up block matches whether its chip is pressed. */
+    function syncDreamPanels() {
+      let any = false;
+      $$('[data-dream]').forEach((btn) => {
+        const key = btn.dataset.dream!;
+        if (key === 'none') return;
+        const on = btn.getAttribute('aria-pressed') === 'true';
+        any ||= on;
+        const more = $<HTMLElement>(`[data-dream-more="${key}"]`);
+        if (!more) return;
+        more.hidden = !on;
+        // A tone put away takes its own answers with it. Otherwise an intensity
+        // set on Tuesday's anxious dream would ride back in on Wednesday's
+        // distressing one the moment the chip was tapped again.
+        if (!on) {
+          more.querySelectorAll(`[data-tb="intensity_${key}"]`).forEach((el) => el.classList.remove('tb--on'));
+          setWord(`intensity_${key}`, 0);
+          more.querySelectorAll('[data-flag]').forEach((el) => el.setAttribute('aria-pressed', 'false'));
+        }
+      });
+      // The prose describes the night's dreaming, so it belongs to "was there
+      // any", not to any one tone — and it cannot outlive the answer that there
+      // was nothing to describe (the table's CHECK says so too).
+      const prose = $<HTMLElement>('[data-dream-prose]');
+      if (prose) prose.hidden = !any;
+      if (!any) {
         const ta = $<HTMLTextAreaElement>('[data-field="dream_body"]');
         if (ta) ta.value = '';
       }
-    });
+    }
+
+    multi('dream', 'none', syncDreamPanels);
+    multi('aid', 'none');
+
     group('lat', (value) => {
       // The refinement belongs to the open-ended bucket and to nothing else —
       // the same rule the table's CHECK enforces and the action re-applies.
@@ -224,7 +333,16 @@ if (zone) {
         if (input) input.value = '';
       }
     });
-    group('wake');
+
+    group('wake', (value) => {
+      // Same shape one bucket over: a timed waking refines "a few" and "many",
+      // and means nothing under "not at all". The action drops them too, so a
+      // change of mind is a change of mind rather than an error at 7am.
+      const more = $<HTMLElement>('[data-wakings]');
+      const open = TIMEABLE_WAKINGS.includes(value as Awakenings);
+      if (more) more.hidden = !open;
+      if (!open) $$('[data-waking]').forEach((r) => r.remove());
+    });
 
     $$<HTMLButtonElement>('[data-star]').forEach((btn) =>
       btn.addEventListener('click', () => {
@@ -236,24 +354,83 @@ if (zone) {
       }),
     );
 
-    $$<HTMLButtonElement>('[data-tb]').forEach((btn) =>
-      btn.addEventListener('click', () => {
-        const field = btn.dataset.tb!;
-        const v = Number(btn.dataset.v);
-        $$(`[data-tb="${field}"]`).forEach((o) => o.classList.toggle('tb--on', o === btn));
+    // ── repeaters ─────────────────────────────────────────────────────────
+    // THE ROW IS THE STATE, so an added row is complete the moment it exists —
+    // no array to keep in step, and no index to renumber when one in the middle
+    // is removed.
+    //
+    // ⚠ CLONED FROM A `<template>` THE SERVER RENDERED, never assembled from a
+    // string here. Building the markup twice would mean building it without
+    // `<Icon>` the second time, and a waking you just added would be missing
+    // glyphs that a waking you reloaded has.
+    function addRow(kind: string, listSel: string): HTMLElement | null {
+      const tpl = $<HTMLTemplateElement>(`[data-tpl="${kind}"]`);
+      const list = $<HTMLElement>(listSel);
+      if (!tpl || !list) return null;
+      const el = tpl.content.firstElementChild?.cloneNode(true) as HTMLElement | undefined;
+      if (!el) return null;
+      list.append(el);
+      return el;
+    }
+
+    const focusFirst = (row: HTMLElement | null) => row?.querySelector<HTMLInputElement>('input')?.focus();
+
+    $('[data-add-waking]')?.addEventListener('click', () => focusFirst(addRow('waking', '[data-waking-list]')));
+
+    const addNap = () => focusFirst(addRow('nap', '[data-nap-list]'));
+    $('[data-add-nap]')?.addEventListener('click', addNap);
+
+    // A nap arrives hours after this card was closed, so the summary offers its
+    // own way in — straight to an empty row, rather than back through a form
+    // about last night.
+    $('[data-add-nap-from-done]')?.addEventListener('click', () => {
+      show('fill');
+      const naps = $<HTMLElement>('[data-fs="naps"]');
+      naps?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      addNap();
+    });
+
+    // ── delegated, because half of these controls did not exist at load ────
+    // Every repeater row is built after this listener is attached, so binding
+    // per row would mean remembering to bind — and forgetting once is a "Got
+    // up" toggle that looks alive and never saves.
+    zone.addEventListener('click', (e) => {
+      const el = e.target as HTMLElement;
+
+      const flag = el.closest<HTMLElement>('[data-flag], [data-left-bed]');
+      if (flag) {
+        flag.setAttribute('aria-pressed', String(flag.getAttribute('aria-pressed') !== 'true'));
+        recompute();
+        now();
+        return;
+      }
+
+      const drop = el.closest<HTMLElement>('[data-drop]');
+      if (drop) {
+        drop.closest('.rep')?.remove();
+        recompute();
+        now();
+        return;
+      }
+
+      const tb = el.closest<HTMLElement>('[data-tb]');
+      if (tb) {
+        const field = tb.dataset.tb!;
+        const v = Number(tb.dataset.v);
+        $$(`[data-tb="${field}"]`).forEach((o) => o.classList.toggle('tb--on', o === tb));
         setWord(field, v);
         now();
-      }),
-    );
+      }
+    });
 
-    $$<HTMLInputElement>('input[type="time"]').forEach((input) =>
-      input.addEventListener('input', () => {
-        const hint = $<HTMLElement>('[data-prefill]');
-        if (hint) hint.hidden = true; // it is your time now, not a suggestion
-        recompute();
-        soon();
-      }),
-    );
+    zone.addEventListener('input', (e) => {
+      const el = e.target as HTMLElement;
+      if (!(el instanceof HTMLInputElement) || el.type !== 'time') return;
+      const hint = $<HTMLElement>('[data-prefill]');
+      if (hint) hint.hidden = true; // it is your time now, not a suggestion
+      recompute();
+      soon();
+    });
 
     $$<HTMLButtonElement>('[data-reveal]').forEach((btn) =>
       btn.addEventListener('click', () => {

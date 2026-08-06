@@ -12,13 +12,38 @@
 // one.
 import { test, expect } from '@playwright/test';
 
+/**
+ * Turn a toggle ON, whatever it was.
+ *
+ * ⚠ NOT `.click()`. Every option on this card clears itself when re-tapped —
+ * deliberately, so a mis-tap is undoable without a "clear" affordance — which
+ * means a blind click is only "select" on a control nobody has touched. Against
+ * the live project the card arrives carrying whatever the day actually holds,
+ * so a spec that clicks blindly switches the state OFF on precisely the days
+ * the data exists, then times out waiting for the panel it just closed.
+ */
+async function ensureOn(locator: import('@playwright/test').Locator) {
+  if ((await locator.getAttribute('aria-pressed')) !== 'true') await locator.click();
+}
+
 test.describe('the check-in at 390px', () => {
   test.beforeEach(async ({ page }) => {
     // Answered here rather than blocked, so the form can be driven without a
     // single request reaching Michael's real sleep log.
     await page.route('**/_actions/**', (route) => route.abort('failed'));
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+
+    // ⚠ EITHER DOOR INTO THE FORM, because which one is showing is not a fact
+    // about the layout — it is a fact about whether today happens to have been
+    // answered yet. Clicking only "Start" made every spec in this file fail the
+    // moment a check-in existed, which is to say: on any day the feature was
+    // actually used. That is an environmental failure wearing a bug's clothes,
+    // and it hid this file's real job (390px overflow) exactly when the card
+    // had the most in it.
+    const start = page.getByRole('button', { name: 'Start' });
+    if (await start.isVisible().catch(() => false)) await start.click();
+    else await page.locator('[data-edit]').click();
+
     await expect(page.locator('[data-panel="fill"]')).toBeVisible();
   });
 
@@ -46,12 +71,26 @@ test.describe('the check-in at 390px', () => {
     for (const [field, v] of [
       ['valence', 1], // "bleak"
       ['arousal', 4], // "restless"
-      ['dream_intensity', 5], // "consuming" — the one that was "overwhelming"
+      // Each tone's strength is its own field since 2026-08-06 — three of them
+      // share the card, and a shared name would let a tap on one clear another.
+      ['intensity_distressing', 5], // "consuming" — the one that was "overwhelming"
     ] as const) {
-      if (field === 'dream_intensity') await page.locator('[data-dream="distressing"]').click();
+      if (field === 'intensity_distressing') await ensureOn(page.locator('[data-dream="distressing"]'));
       await page.locator(`[data-tb="${field}"][data-v="${v}"]`).click();
     }
     await page.locator('[data-star="restedness"][data-v="1"]').click(); // "wrung out"
+
+    // And open everything the card can open, because the whole point of this
+    // spec is the WIDEST state — a follow-up that only appears on tap is a
+    // follow-up whose overflow nobody has ever measured. Three tones open at
+    // once is the tallest the dream section gets.
+    await ensureOn(page.locator('[data-dream="anxious"]'));
+    await ensureOn(page.locator('[data-dream="neutral"]'));
+    await ensureOn(page.locator('[data-lat="over_60"]'));
+    await ensureOn(page.locator('[data-wake="many"]'));
+    await ensureOn(page.locator('[data-aid="antihistamine"]'));
+    await page.getByRole('button', { name: 'A long waking' }).click();
+    await page.getByRole('button', { name: 'Add a nap' }).first().click();
 
     const escaping = await page.locator('.zone').evaluateAll((zones) =>
       zones.flatMap((zone) => {
@@ -84,8 +123,8 @@ test.describe('the check-in at 390px', () => {
   test('the value words are measured, not assumed to fit', async ({ page }) => {
     // `scrollWidth` lies once ellipsis applies, so the text is measured with a
     // Range — the width the glyphs actually want — against the box it has.
-    await page.locator('[data-dream="distressing"]').click();
-    await page.locator('[data-tb="dream_intensity"][data-v="5"]').click();
+    await ensureOn(page.locator('[data-dream="distressing"]'));
+    await page.locator('[data-tb="intensity_distressing"][data-v="5"]').click();
 
     const truncated = await page.locator('.mark__w').evaluateAll((els) =>
       els
@@ -102,6 +141,50 @@ test.describe('the check-in at 390px', () => {
         .filter((m) => m.wants > m.has),
     );
     expect(truncated, `value words clipped at 390px: ${JSON.stringify(truncated)}`).toHaveLength(0);
+  });
+
+  test('the meridiem is not shaved off a time picker', async ({ page }) => {
+    // ⚠ FOUND BY LOOKING, not by an assertion — `07:55 AM` was rendering as
+    // `07:55 AN` in the three-column row, and every check in this file passed
+    // while it did. Nothing above can see it: the glyphs live in the input's
+    // shadow DOM, so there is no element to measure, no overflow to report, and
+    // the "nothing is sheared off the card" pass is about the card's edge, not
+    // the input's. The 2026-08-05 pass already dropped this font to 0.875rem
+    // for the same symptom on Safari and left no way to notice the next one.
+    //
+    // So it is measured the only way it can be: what the glyphs want, in the
+    // input's own font, against the content box MINUS the calendar-picker
+    // indicator the browser puts in the same space. At 390px that was 70px of
+    // text and ~20px of indicator inside 91.3px — a pixel and a bit of margin.
+    const tight = await page.locator('.ck input[type="time"]').evaluateAll((els) =>
+      els
+        .map((el) => {
+          const cs = getComputedStyle(el);
+          const box = el.getBoundingClientRect();
+          const probe = document.createElement('span');
+          probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font};font-variant-numeric:${cs.fontVariantNumeric}`;
+          // The widest a 12-hour time gets. Every picker on this card renders
+          // one, so measuring the worst case measures all of them.
+          probe.textContent = '07:55 AM';
+          document.body.append(probe);
+          const wants = probe.getBoundingClientRect().width;
+          probe.remove();
+
+          const indicator = 20; // Chromium's picker glyph, measured 2026-08-06
+          const has =
+            box.width -
+            parseFloat(cs.paddingLeft) -
+            parseFloat(cs.paddingRight) -
+            parseFloat(cs.borderLeftWidth) -
+            parseFloat(cs.borderRightWidth) -
+            indicator;
+          return { field: (el as HTMLElement).dataset.field ?? (el as HTMLElement).dataset.t, wants, has };
+        })
+        // Four pixels of slack, so this fails on a real regression rather than
+        // on a font-metric rounding difference between machines.
+        .filter((m) => m.wants > m.has - 4),
+    );
+    expect(tight, `time text crowding its picker at 390px: ${JSON.stringify(tight)}`).toHaveLength(0);
   });
 
   test('every tap target clears the 44px floor', async ({ page }) => {

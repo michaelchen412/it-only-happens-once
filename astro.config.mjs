@@ -33,6 +33,7 @@ export default defineConfig({
           'caret-left',
           'caret-right',
           'arrow-right',
+          'arrow-counter-clockwise',
           'arrow-up',
           'arrow-up-right',
           'arrow-down',
@@ -50,6 +51,7 @@ export default defineConfig({
           'image',
           'note',
           'eye',
+          'footprints',
           // HQ (docs/plans/10-hq.md). Zone marks + the check-in's own controls.
           // `sun-horizon` is the Today room in the sidebar — deliberately not
           // `sun`, which the theme toggle already owns two blocks below it.

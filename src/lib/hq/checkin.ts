@@ -14,7 +14,38 @@ import type { Database } from '../database.types';
 export type DreamRecall = Database['public']['Enums']['dream_recall'];
 export type SleepLatency = Database['public']['Enums']['sleep_latency'];
 export type Awakenings = Database['public']['Enums']['awakenings'];
+export type SleepAid = Database['public']['Enums']['sleep_aid'];
 export type Checkin = Database['public']['Tables']['daily_checkins']['Row'];
+
+/** A dream tone — `none` is the *absence* of one, and lives on `dreamless`. */
+export type DreamTone = Exclude<DreamRecall, 'none'>;
+
+/**
+ * One tone's dream, as the card holds it. **One row per tone, not per dream**
+ * (Michael, 2026-08-06: *"no need for separately recordable for now — enough to
+ * summarize by the average of that type"*), which is why the tone is the key
+ * and nothing here carries an id or an ordinal.
+ */
+export interface DreamEntry {
+  tone: DreamTone;
+  intensity: number | null;
+  wokeYou: boolean;
+  recurring: boolean;
+}
+
+/** One timed waking inside the night, as wall-clock times. */
+export interface WakingEntry {
+  woke: string | null;
+  backAsleep: string | null;
+  /** Got *out* of bed — which takes the stretch out of the denominator. */
+  leftBed: boolean;
+}
+
+/** One daytime sleep on the log date. */
+export interface NapEntry {
+  start: string | null;
+  end: string | null;
+}
 
 /**
  * How far back a check-in may be filled in. **A data-quality limit, not a
@@ -60,12 +91,65 @@ export function wordFor(field: MarkField, value: number | null): string {
  * The tone is the one place a rest-zone element borrows the urgency axis, and
  * it earns it: a distressing night is the signal the whole instrument exists to
  * catch, so it must not read as violet like everything around it.
+ *
+ * ⚠ THE FOUR VALUES ARE UNCHANGED SINCE 2026-08-01 and are still settled. What
+ * changed on 2026-08-06 is that the three tones stopped being MUTUALLY
+ * EXCLUSIVE: a night can carry an anxious dream and a distressing one, each
+ * with its own strength. That is a change to how many answers fit, not to what
+ * the answers mean — which is exactly why it was affordable, and why the
+ * original warning about re-shaping collected categorical data still stands.
  */
 export const DREAMS: { key: DreamRecall; label: string; tone: string; icon: string }[] = [
   { key: 'none', label: 'Nothing', tone: 'u-none', icon: 'ph:moon' },
   { key: 'neutral', label: 'Just a dream', tone: 'u-info', icon: 'ph:moon' },
   { key: 'anxious', label: 'Anxious', tone: 'u-warn', icon: 'ph:warning' },
   { key: 'distressing', label: 'Distressing', tone: 'u-now', icon: 'ph:warning' },
+];
+
+/** The same list without `none`, which is an answer rather than a tone. */
+export const DREAM_TONES = DREAMS.filter((d) => d.key !== 'none') as {
+  key: DreamTone;
+  label: string;
+  tone: string;
+  icon: string;
+}[];
+
+/**
+ * The two facts about a dream that are worth one tap each.
+ *
+ * **`wokeYou` is the clinically load-bearing one.** Plan 11 opened by naming an
+ * uncertainty — *"anxiety dreams most nights, not quite nightmares"* — and
+ * waking *from* the dream is the line between the two. Until 2026-08-06 the
+ * instrument could not answer the question it was built around.
+ *
+ * `recurring` is what a therapist asks about next, and it is free to give.
+ */
+export const DREAM_FLAGS = [
+  { key: 'wokeYou', label: 'Woke me', icon: 'ph:eye' },
+  { key: 'recurring', label: 'Had it before', icon: 'ph:arrow-counter-clockwise' },
+] as const;
+
+/**
+ * What was taken to help sleep.
+ *
+ * ⚠ THE ONE NEW TAXONOMY on this card, and therefore the expensive part of the
+ * 2026-08-06 change — cheap to re-draw today and never again. Alcohol is in the
+ * list deliberately: it is not a medication, but the Consensus Sleep Diary
+ * counts whatever was taken *to help you sleep* including alcohol, and as a
+ * confounder of both latency and 3am wakings it outweighs most of the rest.
+ *
+ * **Nothing is a tap, not an absence** — the same rule as the dream row and as
+ * `skipped`. An empty answer read as "took nothing" would silently invent the
+ * control group every correlation over this column depends on, so `'{}'` is a
+ * recorded "nothing tonight" and `null` is a question nobody answered.
+ */
+export const AIDS: { key: SleepAid; label: string }[] = [
+  { key: 'melatonin', label: 'Melatonin' },
+  { key: 'antihistamine', label: 'Antihistamine' },
+  { key: 'prescription', label: 'Prescription' },
+  { key: 'cannabis', label: 'Cannabis' },
+  { key: 'alcohol', label: 'Alcohol' },
+  { key: 'other', label: 'Something else' },
 ];
 
 /**
@@ -91,12 +175,28 @@ export const LATENCIES: { key: SleepLatency; label: string; midpoint: number }[]
 /** The one bucket that asks a second question, because it cannot answer it. */
 export const OPEN_ENDED_LATENCY: SleepLatency = 'over_60';
 
-/** Same reason. Nobody knows the count. */
+/**
+ * Same reason. Nobody knows the count.
+ *
+ * ⚠ AND THE SAME INVERSION AT THE TOP, unnoticed here for three days after it
+ * was fixed for latency. `many` carries 30 minutes, so a night broken by three
+ * hours awake — bed 23:00, three hours asleep, three awake from 02:30, two more,
+ * woke 07:30 and up at 07:45 — derived ≈7h 15m at 83% against a truth of 4h 45m
+ * at 54%. Twenty-nine points, on the one number CBT-I moves, for exactly the
+ * reason `over_60` was twenty-five points out.
+ *
+ * The buckets are still the answer, and the midpoints below are still the right
+ * guess when there is nothing better. A TIMED WAKING is the refinement offered
+ * when there is — see `derive`.
+ */
 export const WAKINGS: { key: Awakenings; label: string; midpoint: number }[] = [
   { key: 'none', label: 'Not at all', midpoint: 0 },
   { key: 'few', label: 'A few', midpoint: 12 },
   { key: 'many', label: 'Many', midpoint: 30 },
 ];
+
+/** The buckets a timed waking can refine. `none` has nothing to time. */
+export const TIMEABLE_WAKINGS: Awakenings[] = ['few', 'many'];
 
 /** Used when there is no history to take a median from. */
 export const DEFAULT_TIMES = { bed: '23:30', woke: '07:00' };
@@ -137,19 +237,59 @@ export function span(from: string, to: string): number | null {
   return d < 0 ? d + 1440 : d;
 }
 
+/** Everything the night's arithmetic reads, as wall-clock times. */
+export interface Night {
+  bed: string | null;
+  woke: string | null;
+  latency: SleepLatency | null;
+  awakenings: Awakenings | null;
+  gotUp?: string | null;
+  asleepAt?: string | null;
+  /** Timed wakings, which refine the `awakenings` bucket rather than replace it. */
+  wakings?: WakingEntry[];
+  /** Daytime sleep. Counted separately and NEVER inside the night's efficiency. */
+  naps?: NapEntry[];
+}
+
 export interface Derived {
-  /** Minutes between getting into bed and getting OUT of it. */
+  /** Minutes between getting into bed and getting OUT of it, less excursions. */
   inBed: number;
   /** Of those, the minutes spent awake after the final waking. Zero if unsaid. */
   awakeInBed: number;
+  /** Minutes of the night spent out of bed entirely. Not in either side. */
+  outOfBed: number;
+  /** Minutes awake between falling asleep and the final waking. */
+  waso: number | null;
+  /** Were those minutes measured, or taken from the bucket's midpoint? */
+  wasoMeasured: boolean;
   /** Estimated minutes actually asleep — null until both buckets are answered. */
   asleep: number | null;
   /** Sleep efficiency as a percentage, null on the same condition. */
   efficiency: number | null;
+  /** Daytime sleep, in minutes. Zero when there was none. */
+  napped: number;
+  /** Are there two times to reason about? False on a nap-only day. */
+  hasNight: boolean;
 }
 
 /**
- * The live payback, from the wall-clock times and the two buckets.
+ * A wall-clock span that has to fall INSIDE the night to be believed.
+ *
+ * `span` wraps past midnight, which is right for a night and wrong for the
+ * pieces of one: a waking mis-typed backwards (05:00 → 02:00) wraps to
+ * twenty-one hours and would swallow the whole record. Anything that does not
+ * fit inside the night it belongs to is a mis-entry, and a mis-entry is dropped
+ * quietly rather than propagated — the same posture `asleepAt` has taken since
+ * 2026-08-05.
+ */
+function within(from: string | null, to: string | null, night: number): number | null {
+  if (!from || !to) return null;
+  const d = span(from, to);
+  return d !== null && d > 0 && d < night ? d : null;
+}
+
+/**
+ * The live payback, from the wall-clock times, the two buckets and the pieces.
  *
  * **TIME IN BED ENDS WHEN YOU GET OUT OF BED**, not when you wake. Efficiency
  * is asleep-over-in-bed, so the hour spent lying there at 5am belongs in the
@@ -168,36 +308,101 @@ export interface Derived {
  * between getting into bed and waking up; outside that it is a mis-entry and
  * the bucket wins, quietly, rather than producing a negative night.
  *
+ * **A TIMED WAKING REPLACES THE BUCKET'S MIDPOINT OUTRIGHT** (2026-08-06), and
+ * does not add to it. Both are estimates of the *same* quantity — total minutes
+ * awake after sleep onset — so summing them would double-count the very waking
+ * that was worth timing. The same rule `asleepAt` follows one line above, and
+ * for the same reason: a measurement and a guess at one quantity is not a
+ * better guess, it is the measurement.
+ *
+ * **GETTING OUT OF BED LEAVES THE DENOMINATOR.** CBT-I stimulus control tells
+ * you to leave the bed when you cannot sleep; before this existed, obeying it
+ * scored identically to lying there ignoring it, because the excursion sat in
+ * time-in-bed either way. Now the same three hours read 87% if you got up and
+ * 57% if you did not — which is the difference the protocol is trying to make.
+ *
+ * Naps are summed and returned, and they touch NOTHING else. Efficiency is a
+ * statement about one night in one bed; folding an afternoon into it would make
+ * the one number that moves under CBT-I mean something new every day.
+ *
  * `asleep` and `efficiency` stay null until BOTH buckets are in. Showing an
  * efficiency that silently assumed "fell asleep instantly, never woke" would be
  * a number the person did not give, presented as one they did.
  */
-export function derive(
-  bed: string | null,
-  woke: string | null,
-  latency: SleepLatency | null,
-  awakenings: Awakenings | null,
-  gotUp: string | null = null,
-  asleepAt: string | null = null,
-): Derived | null {
-  if (!bed || !woke) return null;
-  const night = span(bed, woke);
-  if (night === null) return null;
+export function derive(n: Night): Derived | null {
+  const napped = (n.naps ?? []).reduce((sum, nap) => {
+    const d = nap.start && nap.end ? span(nap.start, nap.end) : null;
+    // A nap is bounded by the day, not by the night, so `within` does not apply
+    // — but a nap longer than half a day is a mis-entry by any reading.
+    return sum + (d !== null && d > 0 && d <= 720 ? d : 0);
+  }, 0);
 
-  const wokeMin = clockMinutes(woke);
-  const upMin = gotUp ? clockMinutes(gotUp) : null;
+  // A NAP SURVIVES A NIGHT THAT WAS NEVER FILLED IN. Naps are added in the
+  // afternoon, hours after the card was closed, so "no times yet" is a state a
+  // nap can genuinely arrive into — and a total that silently vanished because
+  // its neighbour was blank is the kind of quiet loss this feature refuses.
+  const night = n.bed && n.woke ? span(n.bed, n.woke) : null;
+  if (night === null) {
+    if (napped === 0) return null;
+    return {
+      inBed: 0,
+      awakeInBed: 0,
+      outOfBed: 0,
+      waso: null,
+      wasoMeasured: false,
+      asleep: null,
+      efficiency: null,
+      napped,
+      hasNight: false,
+    };
+  }
+
+  const wokeMin = clockMinutes(n.woke!);
+  const upMin = n.gotUp ? clockMinutes(n.gotUp) : null;
   const awakeInBed = upMin !== null && wokeMin !== null && upMin > wokeMin ? upMin - wokeMin : 0;
-  const inBed = night + awakeInBed;
 
-  const bucket = LATENCIES.find((l) => l.key === latency)?.midpoint;
-  const wake = WAKINGS.find((w) => w.key === awakenings)?.midpoint;
-  if (bucket === undefined || wake === undefined) return { inBed, awakeInBed, asleep: null, efficiency: null };
+  // Only the wakings that land inside the night are believed, and only those
+  // marked `leftBed` come back out of the denominator.
+  const timed = (n.wakings ?? [])
+    .map((w) => ({ minutes: within(w.woke, w.backAsleep, night), leftBed: w.leftBed }))
+    .filter((w): w is { minutes: number; leftBed: boolean } => w.minutes !== null);
+  const outOfBed = timed.reduce((sum, w) => sum + (w.leftBed ? w.minutes : 0), 0);
+  const inBed = Math.max(0, night + awakeInBed - outOfBed);
 
-  const measured = asleepAt ? span(bed, asleepAt) : null;
-  const lat = measured !== null && measured > 0 && measured < night ? measured : bucket;
+  const bucket = LATENCIES.find((l) => l.key === n.latency)?.midpoint;
+  const wake = WAKINGS.find((w) => w.key === n.awakenings)?.midpoint;
+  if (bucket === undefined || wake === undefined) {
+    return {
+      inBed,
+      awakeInBed,
+      outOfBed,
+      waso: null,
+      wasoMeasured: false,
+      asleep: null,
+      efficiency: null,
+      napped,
+      hasNight: true,
+    };
+  }
 
-  const asleep = Math.max(0, night - lat - wake);
-  return { inBed, awakeInBed, asleep, efficiency: inBed ? Math.round((asleep / inBed) * 100) : null };
+  const measuredLatency = n.asleepAt ? within(n.bed, n.asleepAt, night) : null;
+  const lat = measuredLatency ?? bucket;
+
+  const wasoMeasured = timed.length > 0;
+  const waso = wasoMeasured ? timed.reduce((sum, w) => sum + w.minutes, 0) : wake;
+
+  const asleep = Math.max(0, night - lat - waso);
+  return {
+    inBed,
+    awakeInBed,
+    outOfBed,
+    waso,
+    wasoMeasured,
+    asleep,
+    efficiency: inBed ? Math.round((asleep / inBed) * 100) : null,
+    napped,
+    hasNight: true,
+  };
 }
 
 /**
@@ -208,11 +413,19 @@ export function derive(
  * before its inputs exist, and the `≈` is honest about what the estimate is.
  * (The trend view is held until there is real data to shape it against, so
  * until then this line is the entire payoff.)
+ *
+ * The nap rides on the END of the line and never inside the `≈…asleep · NN%`
+ * cluster, because it is not part of that sum and must not read as though it
+ * were.
  */
 export function deriveLine(d: Derived | null): string {
   if (!d) return '';
-  const parts = [`${hm(d.inBed)} in bed`];
-  if (d.asleep !== null) parts.push(`≈${hm(d.asleep)} asleep`, `${d.efficiency}%`);
+  const parts: string[] = [];
+  if (d.hasNight) {
+    parts.push(`${hm(d.inBed)} in bed`);
+    if (d.asleep !== null) parts.push(`≈${hm(d.asleep)} asleep`, `${d.efficiency}%`);
+  }
+  if (d.napped > 0) parts.push(d.hasNight ? `+${hm(d.napped)} napped` : `${hm(d.napped)} napped`);
   return parts.join(' · ');
 }
 
@@ -249,6 +462,13 @@ export function medianClock(times: string[], rotateHours: number): string | null
  * a completeness test — there is no "2 of 7 fields" meter anywhere and there
  * must not be. This only distinguishes a row that was started from one that
  * exists for some other reason.
+ *
+ * ⚠ IT READS THE PARENT ROW ONLY, and that is why `dreamless` carries a `false`
+ * that a join could otherwise derive. The attention badge runs this in
+ * middleware on every request, and the dream question is the FIRST thing on the
+ * card — so "tapped Anxious, put the phone down" is the likeliest half-finished
+ * state there is. Paying for a join on every request to notice it would be the
+ * wrong trade; writing one boolean in the same save is the right one.
  */
 export function hasAnswers(c: Checkin | null): boolean {
   if (!c) return false;
@@ -263,8 +483,9 @@ export function hasAnswers(c: Checkin | null): boolean {
     c.restedness,
     c.valence,
     c.arousal,
-    c.dream_recall,
+    c.dreamless,
     c.dream_body,
+    c.sleep_aids,
     c.note,
   ].some((v) => v !== null && v !== '');
 }
