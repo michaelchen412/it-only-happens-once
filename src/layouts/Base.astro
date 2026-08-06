@@ -87,6 +87,10 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
   <body class="bg-base-100 text-base-content">
     <slot />
     <script>
+      // The toggle itself — one implementation for both chromes, mounted here
+      // beside the no-flash picker above rather than copied into each layout.
+      import '../scripts/theme-toggle';
+
       // After each view-transition swap, re-apply the theme before paint so it
       // never flashes back to the default on client-side navigation. Same rule as
       // the initial pick: saved choice → system preference → dusk. Inert unless a

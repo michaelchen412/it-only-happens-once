@@ -24,7 +24,15 @@ const expanded = true;
 
 <div class="interest-row rounded-box border-base-300 bg-base-100 border">
   <div class="flex items-start gap-2 p-3">
-    <input class:list={['interest-term flex-1', field]} placeholder="Jazz" value={term} />
+    {
+      /* ⚠ `min-w-0` alongside `flex-1`. An <input> carries an intrinsic minimum
+        width of about twenty characters, and a flex item's default
+        `min-width: auto` refuses to shrink past it — so at 320px this row
+        pushed /admin/about 21px wider than the viewport and the whole page
+        scrolled sideways. `flex-1` is `flex: 1 1 0%` and does NOT relax that on
+        its own. Same fix `PageHeader` already uses for the same reason. */
+    }
+    <input class:list={['interest-term min-w-0 flex-1', field]} placeholder="Jazz" value={term} />
     <div class="text-base-content/45 flex shrink-0 items-center gap-1 pt-1 font-sans">
       <button
         type="button"

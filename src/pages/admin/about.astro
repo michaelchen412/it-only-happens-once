@@ -51,7 +51,17 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
     {/* Command bar */}
     <div class="border-base-300 bg-base-100/95 sticky top-14 z-10 border-b px-6 py-2 backdrop-blur md:top-0">
       <div class="mx-auto flex max-w-2xl items-center gap-3">
-        <span class="font-display text-lg">About page</span>
+        {
+          /* The <span> was the room's only title and carried no heading
+            semantics, so this page measured zero headings of any level. It is
+            an <h1> now: same styling, same position, nothing visual changes —
+            Tailwind preflight already zeroes a heading's margin, size and
+            weight, so the utilities below still decide everything. Visible
+            rather than `sr-only` (unlike Today) because there is a real title
+            on screen here; the rule is to promote the words that are already
+            doing the job, and only invent hidden ones where none exist. */
+        }
+        <h1 class="font-display text-lg">About page</h1>
         <div
           id="about-status"
           class="text-base-content/55 ml-auto flex items-center gap-2 font-sans text-xs"

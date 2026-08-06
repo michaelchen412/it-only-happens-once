@@ -1643,6 +1643,15 @@ html.reader-open .sky-return {
 /* Fragment-manager type filter — a segmented control with counts. */
 .seg {
   display: inline-flex;
+  /* WRAPS, because it is the one control that made a page scroll sideways.
+     /admin/fragments measured scrollWidth 331 against a 320px viewport, and
+     this type filter (All · Writing · Quote · Song, each with its count) was
+     the whole of the overflow — every other width from 375 to 1920 was clean
+     on every route. 320px is an iPhone SE. Wrapping keeps the counts, which
+     are the reason to look at the control at all; dropping them below `sm`
+     was the alternative and it trades a rare two-line filter for a filter
+     that says less on every small screen. */
+  flex-wrap: wrap;
   gap: 0.125rem;
   padding: 0.15rem;
   background: var(--color-base-200);

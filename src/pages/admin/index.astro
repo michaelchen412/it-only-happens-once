@@ -170,6 +170,19 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   </script>
 
   <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 pb-24 sm:px-6">
+    {
+      /* The room's name, for a screen reader and for heading navigation only.
+        This page had NO heading of any level — the Observatory's front door,
+        the one page opened every morning, presenting as an undifferentiated
+        pile of links.
+
+        ⚠ Not the date bar, which is the obvious candidate and the wrong one:
+        it is a CONTROL, and it says whatever `?date=` says, so on a backfill
+        the page's heading would announce last Tuesday while the room is still
+        Today. The room's name does not move. (Same reason, and the same
+        `sr-only` pattern, as `/` and `about.astro` — three rooms, one answer.) */
+    }
+    <h1 class="sr-only">Today</h1>
     {/* ── the date bar: the header IS the control ─────────────────────── */}
     <header class="datebar mb-6 pt-1">
       <a class="datebar__step" href={at(shiftYmd(selected, -1))} aria-label="Previous day">

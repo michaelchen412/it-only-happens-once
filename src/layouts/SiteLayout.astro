@@ -8,6 +8,20 @@
   ids). No footer: the colophon lives in the bar now. Wraps Base.astro (which
   owns <head>, fonts, the no-flash theme script, and opts this layout into view
   transitions). Pages set an `active` nav item.
+
+  ⚠ THE COLLAPSE POINT IS `md:` (768px), AND IT IS A DECISION, NOT A DEFAULT.
+  This nav collapsed at `sm:` (640px) while the Observatory's sidebar collapsed
+  at `md:`, so from 640–767px the public site showed a full desktop nav beside a
+  workshop still wearing a burger — two answers to one question, arrived at by
+  two defaults rather than by a choice. Unified on the LARGER of the two,
+  because the direction is asymmetric: showing the burger slightly early costs a
+  tap that the control is designed for, while showing a desktop nav slightly
+  early crowds three links, a theme toggle and the colophon into whatever the
+  wordmark leaves. Moving the admin down to `sm:` instead would have left a
+  240px sidebar sharing a 640px viewport with the workshop.
+
+  The one surviving `sm:` here is the wordmark's type step, which is typography
+  and has nothing to do with the nav.
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
@@ -55,7 +69,7 @@ const nav = [
       <button
         id="menu-toggle"
         type="button"
-        class="rounded-field text-base-content/60 hover:bg-base-200 hover:text-base-content p-1.5 sm:hidden"
+        class="rounded-field text-base-content/60 hover:bg-base-200 hover:text-base-content p-1.5 md:hidden"
         aria-label="Menu"
         aria-controls="site-menu"
         aria-expanded="false"
@@ -70,7 +84,7 @@ const nav = [
         class:list={[
           'site-menu items-center',
           'rounded-box border-base-300 bg-base-100 absolute top-full right-4 mt-2 hidden w-44 flex-col gap-1 border p-2 shadow-lg',
-          'sm:static sm:right-auto sm:mt-0 sm:flex sm:w-auto sm:flex-row sm:gap-5 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none',
+          'md:static md:right-auto md:mt-0 md:flex md:w-auto md:flex-row md:gap-5 md:border-0 md:bg-transparent md:p-0 md:shadow-none',
         ]}
       >
         {
@@ -79,10 +93,10 @@ const nav = [
               href={item.href}
               aria-current={active === item.key ? 'page' : undefined}
               class:list={[
-                'rounded-field w-full px-2 py-1.5 font-sans text-sm transition-colors sm:w-auto sm:rounded-none sm:p-0',
+                'rounded-field w-full px-2 py-1.5 font-sans text-sm transition-colors md:w-auto md:rounded-none md:p-0',
                 active === item.key
-                  ? 'text-base-content sm:border-primary sm:border-b sm:pb-0.5'
-                  : 'text-base-content/60 hover:bg-base-200 hover:text-base-content sm:hover:bg-transparent',
+                  ? 'text-base-content md:border-primary md:border-b md:pb-0.5'
+                  : 'text-base-content/60 hover:bg-base-200 hover:text-base-content md:hover:bg-transparent',
               ]}
             >
               {item.label}
@@ -92,7 +106,7 @@ const nav = [
 
         {/* Utilities: theme toggle + colophon (a divider above them on mobile). */}
         <div
-          class="border-base-300 mt-1 flex w-full items-center gap-1 border-t px-1 pt-2 sm:mt-0 sm:w-auto sm:border-0 sm:p-0"
+          class="border-base-300 mt-1 flex w-full items-center gap-1 border-t px-1 pt-2 md:mt-0 md:w-auto md:border-0 md:p-0"
         >
           <button
             id="theme-toggle"
@@ -124,21 +138,12 @@ const nav = [
   {backToTop && <BackToTop />}
 
   <script>
-    // ---- Theme toggle — dusk ⇄ paper, persisted. Delegated on document so it
-    // survives view-transition navigation without re-binding. ----
-    document.addEventListener('click', (e) => {
-      const btn = (e.target as Element)?.closest?.('#theme-toggle');
-      if (!btn) return;
-      const next = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
-      document.documentElement.dataset.theme = next;
-      try {
-        localStorage.setItem('theme', next);
-      } catch {}
-      btn.setAttribute('aria-pressed', String(next === 'paper'));
-    });
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'theme' && e.newValue) document.documentElement.dataset.theme = e.newValue;
-    });
+    // The theme toggle used to be implemented here too, and this copy was the
+    // wrong one: it set `aria-pressed` only inside its own click handler, so the
+    // attribute was absent until you pressed the button and absent again after
+    // every view transition replaced the DOM. It now lives once, in
+    // `scripts/theme-toggle.ts`, mounted from Base.astro beside the no-flash
+    // picker. Nothing about the markup changed.
 
     // ---- Mobile menu (delegated) ----
     const closeMenu = () => {

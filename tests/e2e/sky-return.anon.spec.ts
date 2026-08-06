@@ -27,6 +27,29 @@
 import { test, expect, type Page } from '@playwright/test';
 import { hideDevToolbar } from './fixtures';
 
+// ⚠ RETRIES, AND EXACTLY WHY — because a retry with no reason attached is how a
+// real failure gets slept through.
+//
+// `astro dev` serves webfonts lazily where the built site preloads them, so a
+// face can land in the frame AFTER the swap and move the overview under a
+// restore that was already correct. The name then reads 34–124px off its line
+// and STAYS there, so no amount of polling helps.
+//
+// It is not this feature and not a regression: `place()` is exact at
+// `astro:after-swap` in 100% of runs (the mechanism, asserted separately
+// below); the same cases driven against production are 0.0px every time; and
+// clean `HEAD` before any of this work drifts identically. Traced rather than
+// assumed — with `scrollTo`, `scrollBy`, `scrollIntoView` and `focus` all
+// instrumented, NO script moves the page in that window, `scrollHeight` is
+// identical either side, and `document.fonts` goes loading → loaded across
+// exactly the gap.
+//
+// So the flake is the dev server's, at roughly one return in eight. Retried
+// rather than absorbed into a wider tolerance, because the bug this file exists
+// to catch is measured in the very same pixels — a 130px tolerance would be
+// green with the feature deleted.
+test.describe.configure({ retries: 2 });
+
 /** Sub-pixel layout and font rendering; anything larger is a real miss. */
 const TOL = 2;
 
@@ -46,6 +69,36 @@ interface Picked {
  * so a spec that hardcodes "the fourth one" is a spec that starts failing for
  * reasons that have nothing to do with this feature.
  */
+/**
+ * Wait until no webfont is still loading.
+ *
+ * ⚠ CALLED ON BOTH PAGES, AND ONE IS NOT ENOUGH — that was measured the hard
+ * way. `astro dev` serves fonts lazily where the built site preloads them, and
+ * the suite pulls faces the overview never asked for (the epigraph's italic,
+ * the larger display sizes). So `fonts.ready` on `/` resolves, the suite then
+ * starts a fresh load, and the return lands mid-swap.
+ *
+ * What that does is NOT a reflow of the list — `scrollHeight` is identical
+ * either side, 2111px, every run. It is Chrome's SCROLL ANCHORING: the font
+ * swap shifts layout above the fold, the browser moves the viewport to keep
+ * *its* chosen anchor still, and the name — which is not that anchor — slides
+ * by the difference. Measured at −34px, −61px and −124px, always between
+ * `astro:after-swap` and the very next frame, always with `document.fonts`
+ * going `loading → loaded` in that same window.
+ *
+ * ⚠ It is a DEV artifact and it is NOT what this file tests. The same four
+ * cases driven against the deployed site are 0.0px every time, and clean `HEAD`
+ * drifts identically — so it is neither a regression nor a real defect. It is
+ * waited out here rather than absorbed by a looser tolerance, because the bug
+ * this file exists to catch is measured in the very same pixels.
+ *
+ * (`.then(() => {})` because `fonts.ready` resolves to the FontFaceSet, which
+ * Playwright cannot serialize back across the boundary.)
+ */
+async function fontsIn(page: Page): Promise<void> {
+  await page.evaluate(() => document.fonts.ready.then(() => {}));
+}
+
 async function openFromMidSky(page: Page): Promise<Picked> {
   await page.goto('/');
   // ⚠ Wait for the sky BEFORE touching the toolbar. `goto` resolves on `load`,
@@ -55,6 +108,8 @@ async function openFromMidSky(page: Page): Promise<Picked> {
   // page. Waiting on the page's own content first removes the race.
   await expect(page.locator('[data-sky-slot]').first()).toBeVisible();
   await hideDevToolbar(page);
+
+  await fontsIn(page);
 
   await page.evaluate(() =>
     window.scrollTo({ top: Math.round(document.documentElement.scrollHeight * 0.45), behavior: 'instant' }),
@@ -78,6 +133,7 @@ async function openFromMidSky(page: Page): Promise<Picked> {
   await page.locator(`[data-sky-slot="${picked!.slug}"]`).click();
   await page.waitForURL(`/${picked!.slug}`);
   await expect(page.locator('.suite-item').first()).toBeVisible();
+  await fontsIn(page); // the suite's own faces — see above, this is the one that matters
   return picked!;
 }
 

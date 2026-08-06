@@ -70,10 +70,10 @@ const workCount = tally(frs, 'work_id');
             <tr
               class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
             >
-              <th class="px-3 py-2 font-normal">Name</th>
-              <th class="px-3 py-2 font-normal">Definition</th>
-              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+              <th scope="col" class="px-3 py-2 font-normal">Name</th>
+              <th scope="col" class="px-3 py-2 font-normal">Definition</th>
+              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -85,7 +85,12 @@ const workCount = tally(frs, 'work_id');
                   data-id={s.id}
                 >
                   <td class="px-3 py-2">
-                    <input data-field="name" value={s.name} class="input input-xs input-bordered w-36" />
+                    <input
+                      data-field="name"
+                      value={s.name}
+                      aria-label="Subject name"
+                      class="input input-xs input-bordered w-36"
+                    />
                   </td>
                   <td class="px-3 py-2">
                     <input
@@ -129,10 +134,10 @@ const workCount = tally(frs, 'work_id');
             <tr
               class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
             >
-              <th class="px-3 py-2 font-normal">Name</th>
-              <th class="px-3 py-2 font-normal">Note</th>
-              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+              <th scope="col" class="px-3 py-2 font-normal">Name</th>
+              <th scope="col" class="px-3 py-2 font-normal">Note</th>
+              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -144,7 +149,12 @@ const workCount = tally(frs, 'work_id');
                   data-id={a.id}
                 >
                   <td class="px-3 py-2">
-                    <input data-field="name" value={a.name} class="input input-xs input-bordered w-44" />
+                    <input
+                      data-field="name"
+                      value={a.name}
+                      aria-label="Author name"
+                      class="input input-xs input-bordered w-44"
+                    />
                   </td>
                   <td class="px-3 py-2">
                     <input
@@ -188,11 +198,11 @@ const workCount = tally(frs, 'work_id');
             <tr
               class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
             >
-              <th class="px-3 py-2 font-normal">Title</th>
-              <th class="px-3 py-2 font-normal">Author</th>
-              <th class="w-16 px-3 py-2 font-normal">Year</th>
-              <th class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th class="w-64 px-3 py-2 font-normal">Actions</th>
+              <th scope="col" class="px-3 py-2 font-normal">Title</th>
+              <th scope="col" class="px-3 py-2 font-normal">Author</th>
+              <th scope="col" class="w-16 px-3 py-2 font-normal">Year</th>
+              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
+              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -200,7 +210,12 @@ const workCount = tally(frs, 'work_id');
               (works ?? []).map((w) => (
                 <tr class="lib-row border-base-300 border-b align-top last:border-0" data-entity="work" data-id={w.id}>
                   <td class="px-3 py-2">
-                    <input data-field="title" value={w.title} class="input input-xs input-bordered w-44" />
+                    <input
+                      data-field="title"
+                      value={w.title}
+                      aria-label="Work title"
+                      class="input input-xs input-bordered w-44"
+                    />
                   </td>
                   <td class="px-3 py-2">
                     <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
@@ -217,6 +232,7 @@ const workCount = tally(frs, 'work_id');
                       data-field="year"
                       type="number"
                       value={w.year ?? ''}
+                      aria-label="Year"
                       class="input input-xs input-bordered w-16"
                     />
                   </td>

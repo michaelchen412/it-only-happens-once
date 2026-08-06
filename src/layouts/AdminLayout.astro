@@ -82,6 +82,29 @@ const nav = [
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1511" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f6f1" />
   </Fragment>
+  {
+    /* Skip to the content. The Observatory is the one place on this site the
+      pattern clearly earns itself: eleven controls — the wordmark, seven nav
+      links, the theme toggle, Site ↗, Sign out — sit before <main> on EVERY
+      desktop page, and a keyboard user pays for all of them on every
+      navigation. The public rooms have three nav items and were left alone.
+
+      ⚠ Its value is desktop-only now, and that is the `inert` fix's doing
+      rather than an oversight: below 768px the closed drawer is out of the tab
+      order entirely, so the burger is already the first stop. Worth writing
+      down, because "the admin puts seven links before the content" was the
+      argument for this control and it is only half true after that change.
+
+      Visually hidden until focused — the standard shape, and the reason it is
+      a real anchor rather than a script: it must work on the first Tab, before
+      any module has run. */
+  }
+  <a
+    href="#admin-main"
+    class="bg-base-100 text-base-content border-base-300 rounded-field sr-only z-50 border px-3 py-2 text-sm shadow-lg focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+  >
+    Skip to content
+  </a>
   <div class="bg-base-100 flex min-h-screen font-sans">
     {/* Off-canvas backdrop (mobile only) */}
     <div
@@ -176,7 +199,7 @@ const nav = [
         <span class="font-display text-base leading-none">{title}</span>
       </header>
 
-      <main class="min-w-0 flex-1">
+      <main id="admin-main" class="min-w-0 flex-1" tabindex="-1">
         <slot />
       </main>
     </div>
@@ -208,39 +231,65 @@ const nav = [
     const sidebar = document.getElementById('sidebar');
     const backdrop = document.getElementById('sb-backdrop');
     const openBtn = document.getElementById('sb-open');
+
+    // ⚠ THE DRAWER CLOSES BY TRANSFORM, WHICH HIDES IT FROM THE EYE AND FROM
+    // NOBODY ELSE. `-translate-x-full` moves the <aside> off the left edge; it
+    // does not remove it from the document. Measured at 390px on all ten admin
+    // rooms: THIRTEEN controls sat at x=-228..-13 and stayed in the tab order,
+    // and they were the FIRST thirteen — so a keyboard or switch user pressing
+    // Tab on a phone walked into an invisible menu (the wordmark, seven nav
+    // links, close, theme, Site ↗, Sign out) before reaching anything on screen.
+    //
+    // `inert` is the fix because it removes the subtree from the tab order AND
+    // from the accessibility tree in one move. ⚠ Not `aria-hidden`, which hides
+    // it from a screen reader and LEAVES IT TABBABLE — strictly the worse half,
+    // and the more obvious-looking attribute.
+    const desktop = matchMedia('(min-width: 768px)');
+    let open = false;
+
+    // ⚠ WIDTH-AWARE, NOT JUST STATE-AWARE. The same <aside> is the permanent
+    // desktop sidebar above `md` (`md:translate-x-0`), where `open` is never
+    // true — so an `inert` that only tracked the open flag would make the real
+    // sidebar inert on every desktop page. The next person to read `inert` on a
+    // sidebar will assume it follows the drawer; it follows the drawer AND the
+    // viewport.
+    const syncInert = () => sidebar?.toggleAttribute('inert', !desktop.matches && !open);
+
     const openSidebar = () => {
+      open = true;
       sidebar?.classList.remove('-translate-x-full');
       backdrop?.classList.remove('opacity-0', 'pointer-events-none');
       openBtn?.setAttribute('aria-expanded', 'true');
+      syncInert();
     };
     const closeSidebar = () => {
+      // Take focus back BEFORE going inert. Closing while focus is inside the
+      // drawer would otherwise drop it on <body>, and the next Tab would start
+      // from the top of the document — which is the same "where am I?" the
+      // inert fix exists to remove, arriving by the other door.
+      if (sidebar?.contains(document.activeElement) && openBtn instanceof HTMLElement) openBtn.focus();
+      open = false;
       sidebar?.classList.add('-translate-x-full');
       backdrop?.classList.add('opacity-0', 'pointer-events-none');
       openBtn?.setAttribute('aria-expanded', 'false');
+      syncInert();
     };
+
     openBtn?.addEventListener('click', openSidebar);
     document.getElementById('sb-close')?.addEventListener('click', closeSidebar);
     backdrop?.addEventListener('click', closeSidebar);
-    document.addEventListener('keydown', (e) => e.key === 'Escape' && closeSidebar());
+    desktop.addEventListener('change', syncInert);
+    syncInert();
 
-    const themeBtn = document.getElementById('theme-toggle');
-    const syncThemeBtn = () =>
-      themeBtn?.setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'paper'));
-    syncThemeBtn();
-    themeBtn?.addEventListener('click', () => {
-      const next = document.documentElement.dataset.theme === 'paper' ? 'dusk' : 'paper';
-      document.documentElement.dataset.theme = next;
-      try {
-        localStorage.setItem('theme', next);
-      } catch {}
-      syncThemeBtn();
-    });
-    // keep other open tabs in sync
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'theme' && e.newValue) {
-        document.documentElement.dataset.theme = e.newValue;
-        syncThemeBtn();
-      }
+    // ⚠ GUARDED, AND IT MATTERS NOW THAT IT DIDN'T BEFORE. This is bound at
+    // document level, so it also fires while a modal sheet is open. That was
+    // harmless while closing an already-closed drawer was a no-op — closing it
+    // now moves focus and sets an attribute, so Escape-to-dismiss-a-sheet would
+    // have yanked focus to the burger behind it.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !open) return;
+      if (document.querySelector('dialog[open]')) return; // the sheet owns Escape
+      closeSidebar();
     });
   </script>
 </Base>

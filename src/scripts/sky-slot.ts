@@ -152,20 +152,34 @@ document.addEventListener('astro:after-swap', () => {
   const el = nameEl(slot.slug);
   if (!el) return;
 
-  // Once, and only here. A SECOND placement on `document.fonts.ready` was
-  // built and reverted 2026-08-05, and the reversal is the useful part:
+  // Once, and only here.
   //
-  // Returning to `/` within ~50ms of the suite loading — before the webfonts
-  // had finished — left the name up to 124px off its line, because the whole
-  // overview reflows when the font lands. Re-placing on `fonts.ready` looked
-  // like the obvious fix and measured no better (−34/−53/−89 with it against
-  // −81/−124 without, overlapping and noisy): it chases a layout that is still
-  // moving, so it can as easily land somewhere new as somewhere right.
+  // TWO SECOND PLACEMENTS WERE BUILT AND BOTH WERE REVERTED, and the reversals
+  // are the useful part. Returning to `/` before the webfonts have landed
+  // leaves the page 34–124px from where this handler correctly put it, so a
+  // corrective re-place looks obviously right:
   //
-  // What the same measurements DO show is that this single placement is exact
-  // — `window.scrollY` reads the remembered position at `astro:after-swap` in
-  // every run — and that the drift disappears entirely once the suite is given
-  // ~400ms to settle, i.e. for every visitor who actually reads anything. A
-  // sub-100ms round trip is a robot, not a reader.
+  //   - on `document.fonts.ready` — measured NO better (−34/−53/−89 with it
+  //     against −81/−124 without): that promise can resolve while layout is
+  //     still moving, so it chases and can land somewhere new.
+  //   - one `requestAnimationFrame` later, when layout HAS stopped (the next
+  //     frame, +100ms and +600ms all read the same number) — measured better,
+  //     7 runs in 8 against 5 in 8, and still not right.
+  //
+  // Neither survives the question they are both answered by: **it does not
+  // happen in production.** The built site preloads its faces, nothing
+  // reflows, and the same cases driven against the deployed site are 0.0px
+  // every time. `astro dev` serves fonts lazily; that is the entire symptom.
+  // Carrying ten lines of correction for a development-only artifact is how a
+  // codebase accumulates machinery nobody can later justify — and the delta
+  // would be 0 on every real visit, so it would be ten lines that never run.
+  //
+  // What every one of those measurements agrees on is that THIS placement is
+  // exact: `window.scrollY` reads the remembered position at
+  // `astro:after-swap` in 100% of runs, which is what aims the morph, which is
+  // what this file is for. Traced with `scrollTo`, `scrollBy`,
+  // `scrollIntoView` and `focus` instrumented — no script moves the page in
+  // that window; the browser does, while `document.fonts` goes loading →
+  // loaded.
   place(el, slot.top);
 });
