@@ -841,6 +841,51 @@ export type Database = {
           },
         ]
       }
+      push_day_claims: {
+        Row: {
+          delivered: number
+          sent_at: string
+          ymd: string
+        }
+        Insert: {
+          delivered?: number
+          sent_at?: string
+          ymd: string
+        }
+        Update: {
+          delivered?: number
+          sent_at?: string
+          ymd?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          last_seen_at: string
+          p256dh: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          last_seen_at?: string
+          p256dh: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          last_seen_at?: string
+          p256dh?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string

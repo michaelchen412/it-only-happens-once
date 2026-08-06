@@ -27,6 +27,7 @@ import { tasks } from './tasks';
 import { goals } from './goals';
 import { events } from './events';
 import { calendar } from './calendar';
+import { push } from './push';
 
 export const server = {
   fragments,
@@ -61,4 +62,11 @@ export const server = {
   // `calendar.events.readonly` — so the one-way rule is enforced by the token,
   // not by this list.
   calendar,
+  // ⚠ THE ONLY NAMESPACE HERE THAT CAN MAKE A PHONE RING (21 · Phase 2,
+  // ADR-0019). A row it writes is standing permission for the building to speak
+  // first, which nothing else in this list has ever been able to do. NOTE WHAT
+  // IS NOT HERE: nothing that SENDS. Sending is a scheduled Edge Function on
+  // Supabase with the service role, deliberately outside the app's write path,
+  // so no browser request can ever cause a notification to go out.
+  push,
 };
