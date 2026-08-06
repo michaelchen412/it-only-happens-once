@@ -15,11 +15,18 @@
   the tick (`task-list.ts`, on Today and in the Agenda room) and answering or
   skipping the check-in (`checkin.ts`).
 
-  ── THREE RENDERERS, ONE EVENT, ONE PLACE THAT DECIDES ──────────────────────
+  ── FOUR RENDERERS, ONE EVENT, ONE PLACE THAT DECIDES ───────────────────────
 
-  The sidebar pill, the burger pill and the window title all read the same
-  number. They are updated here, together, from one listener — the same
-  discipline `lib/hq/attention.ts` enforces on the server, spent on the browser.
+  The sidebar pill, the burger pill, the window title and — since 21 · Phase 0 —
+  the app icon all read the same number. They are updated here, together, from
+  one listener — the same discipline `lib/hq/attention.ts` enforces on the
+  server, spent on the browser.
+
+  ⚠ THE BADGE IS THE ODD ONE OUT IN TWO WAYS, and both are handled at the foot
+  of this file rather than by a second script. It has NO SERVER-RENDERED HALF,
+  so unlike the other three it has to be painted on mount as well as on the
+  event; and it is the ONE SURFACE READ WITHOUT OPENING ANYTHING, so it goes
+  dark in two situations where the other three are still fine (see `paintBadge`).
 
   ⚠ AND THE DECIDING HAPPENS HERE, NOT IN THE WRITERS. The two dispatchers say
   only what they did — *a task belonging to this date is now answered* — and
@@ -56,6 +63,41 @@ export function signalAttention(detail: AttentionSignal): void {
   document.dispatchEvent(new CustomEvent<AttentionSignal>('hq:attention', { detail }));
 }
 
+/*
+  ── THE NUMBER ON THE ICON (21 · Phase 0) ───────────────────────────────────
+
+  `navigator.setAppBadge(n)` puts a numeral on the installed app's icon — the
+  dock on macOS/Windows, the Home Screen on iOS. It runs only while this page
+  runs, which is the whole shape of this phase: WHILE-RUNNING, not desktop-only.
+  An installed app left running in the background keeps executing JS, so the
+  numeral tracks the count live; a phone gets the same code and the same
+  correction every time the app is opened, which is what keeps the icon honest
+  between the pushes 21 · Phases 2–3 will add.
+
+  ⚠ NOTHING HERE MAKES THE NUMBER TRUE WHILE THE APP IS CLOSED. That is a push
+  stack and it is deliberately not in this phase. What this phase must therefore
+  guarantee is that the icon is never CONFIDENTLY WRONG — see `paintBadge`.
+
+  Guarded on presence and swallowing failures: the API is absent in plenty of
+  browsers, and it can reject inside an installed app for reasons nothing here
+  can act on. A workshop does not owe the console an error about a dock icon.
+*/
+function setBadge(total: number): void {
+  if (!('setAppBadge' in navigator)) return;
+  // ⚠ `setAppBadge(0)` IS the clear, per the Badging API — so zero needs no
+  // special case here, and adding one would be a second way to say it.
+  navigator.setAppBadge(total).catch(() => {
+    // Nothing to do, and nothing worth saying.
+  });
+}
+
+function clearBadge(): void {
+  if (!('clearAppBadge' in navigator)) return;
+  navigator.clearAppBadge().catch(() => {
+    // As above.
+  });
+}
+
 function mount(): void {
   const hq = document.getElementById('hq');
   const today = hq?.dataset.today;
@@ -69,8 +111,29 @@ function mount(): void {
     tasks: Number(hq.dataset.tasks ?? 0),
   };
 
+  /** The number every surface renders. Halves clamped independently, so a
+   *  stray undo cannot push one of them below zero and hide the other. */
+  const count = (): number => Math.max(0, state.checkin) + Math.max(0, state.tasks);
+
+  /**
+   * ⚠ ONCE THE DAY HAS TURNED, THE ICON STAYS DARK — and this latch is why it
+   * cannot come back. `day-turn.ts` says the served day is over; every number
+   * on this page is now about yesterday. The three on-screen renderers keep
+   * theirs, because "The day has turned" is sitting right above them and a
+   * number with a caveat beside it is honest. The ICON has no room for a
+   * caveat — it is read from a dock or a Home Screen with nothing around it —
+   * so it says nothing instead, which is ADR-0014's whole argument.
+   *
+   * Without the latch this would undo itself: tick a row at 00:05 on the stale
+   * page and `s.on === today` still holds (both are yesterday), so `render()`
+   * would cheerfully repaint the icon with yesterday's count.
+   */
+  let turned = false;
+
+  const paintBadge = (): void => setBadge(turned ? 0 : count());
+
   function render(): void {
-    const total = Math.max(0, state.checkin) + Math.max(0, state.tasks);
+    const total = count();
 
     document.querySelectorAll<HTMLElement>('[data-attention-pill]').forEach((pill) => {
       pill.textContent = total > 0 ? String(total) : '';
@@ -88,6 +151,8 @@ function mount(): void {
     // ⚠ STRIP BEFORE PREFIXING, or the prefixes stack: `(1) (2) Today — …`
     // after two ticks. The room's own title is whatever is left.
     document.title = titlePrefix(total) + document.title.replace(/^\(\d+\) /, '');
+
+    paintBadge();
   }
 
   document.addEventListener('hq:attention', (e) => {
@@ -104,6 +169,40 @@ function mount(): void {
     }
     render();
   });
+
+  // The day turning is `day-turn.ts`'s observation, not this file's — it owns
+  // "what day is it" the way this one owns "what is the number". It reports the
+  // fact; the decision about what that costs each renderer is made here, which
+  // is the same split the two writers already get (see the header).
+  document.addEventListener('hq:dayturn', () => {
+    turned = true;
+    paintBadge();
+  });
+
+  // ⚠ THE ICON CLEARS WHEN THE PAGE GOES AWAY, and the loser is worth naming
+  // because it is the obvious build: LEAVING THE NUMBER THERE. A badge left
+  // standing is wrong every single night — at 00:01 the true count is 1 (a new
+  // check-in) and the icon still shows yesterday's — and it is wrong again the
+  // moment anything is answered on another device. Being reliably ABSENT beats
+  // being confidently WRONG, which is the argument ADR-0014 built `staleness()`
+  // around, arriving on the one surface that has nowhere to print a caveat.
+  //
+  // The rival — `clearAppBadge()` never, and let push correct it — is not
+  // available yet and is what 21 · Phases 2–3 are for. Until then the honest
+  // scope of this feature is "correct while the app is running".
+  //
+  // ⚠ IT ALSO FIRES ON EVERY ADMIN NAVIGATION, because the Observatory has no
+  // ClientRouter and each room is a real page load — so the numeral blinks off
+  // and is repainted a moment later by the next page's `mount()`. Accepted
+  // knowingly: the alternative is telling a close apart from a navigation,
+  // which `pagehide` cannot do, and a brief blink is a smaller fault than a
+  // stale number. If it reads badly on a real dock, that is a Phase 5 finding.
+  window.addEventListener('pagehide', clearBadge);
+
+  // The badge has no server-rendered half — the pills and the title arrive
+  // correct in the HTML and this file only has to keep them so. The icon starts
+  // at whatever the last page left on it, so the first paint is here.
+  paintBadge();
 }
 
 mount();

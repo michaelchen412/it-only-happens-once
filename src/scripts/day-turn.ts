@@ -85,6 +85,16 @@ function mount(): void {
     }
     clearTimeout(timer);
     el.hidden = false;
+
+    // ⚠ AND THE APP ICON GOES DARK (21 · Phase 0). Said as a FACT — *the day
+    // turned* — not as an instruction, because what it costs each surface is
+    // `attention.ts`'s call to make and it makes a different one for each: the
+    // pills and the title keep their number, which now sits under the notice
+    // above and is therefore caveated; the icon, which is read from a dock with
+    // nothing around it, clears. Same split the write path already uses, where
+    // the two dispatchers report and one listener decides.
+    document.dispatchEvent(new CustomEvent('hq:dayturn'));
+
     // Once it has turned there is nothing further to watch for — the notice is
     // already the strongest thing this file is allowed to say, and it stays
     // until the reader acts on it.

@@ -137,18 +137,18 @@ test.describe('the day has turned', () => {
   });
 });
 
+/** The day the server rendered — the only day the badge is ever about. */
+const servedDay = (page: import('@playwright/test').Page) =>
+  page.locator('#hq').evaluate((el) => (el as HTMLElement).dataset.today!);
+
+const signal = (page: import('@playwright/test').Page, on: string, kind: string, answered: boolean) =>
+  page.evaluate(
+    ([on, kind, answered]) =>
+      document.dispatchEvent(new CustomEvent('hq:attention', { detail: { kind, on, answered: answered === 'yes' } })),
+    [on, kind, answered ? 'yes' : 'no'],
+  );
+
 test.describe('the count moves when you answer', () => {
-  /** The day the server rendered — the only day the badge is ever about. */
-  const servedDay = (page: import('@playwright/test').Page) =>
-    page.locator('#hq').evaluate((el) => (el as HTMLElement).dataset.today!);
-
-  const signal = (page: import('@playwright/test').Page, on: string, kind: string, answered: boolean) =>
-    page.evaluate(
-      ([on, kind, answered]) =>
-        document.dispatchEvent(new CustomEvent('hq:attention', { detail: { kind, on, answered: answered === 'yes' } })),
-      [on, kind, answered ? 'yes' : 'no'],
-    );
-
   test('all three renderers move together, without a navigation', async ({ page }) => {
     // Driven by dispatching the event rather than by ticking a real row: the
     // suite is read-only against the live database by construction, and what is
@@ -197,5 +197,118 @@ test.describe('the count moves when you answer', () => {
     }
     expect(await page.title()).toBe(before);
     await expect(page.locator('[data-attention-pill]').first()).toBeHidden();
+  });
+});
+
+// ── the number on the icon (21 · Phase 0) ───────────────────────────────────
+//
+// ⚠ WHAT THESE PROVE, said plainly: WHEN this page calls the Badging API and
+// with WHAT. They do not prove a numeral appears on a dock — that needs an
+// installed app and a real desktop, and it is a Phase 5 hands item precisely
+// because no harness reaches it. The API is stubbed rather than exercised, so
+// the specs run identically whether or not headless chromium implements it.
+//
+// The log lives in `sessionStorage` for one reason: `pagehide` is the most
+// important call in the feature, and anything recorded on `window` dies with
+// the document that made it. sessionStorage survives the navigation that fires
+// the event, which is the only way to watch the clear happen.
+
+/** Record the Badging API instead of calling it. Must precede `goto`. */
+async function stubBadge(page: import('@playwright/test').Page): Promise<void> {
+  await page.addInitScript(() => {
+    const note = (entry: string) => {
+      const seen = JSON.parse(sessionStorage.getItem('__badge') ?? '[]') as string[];
+      seen.push(entry);
+      sessionStorage.setItem('__badge', JSON.stringify(seen));
+    };
+    // `defineProperty` on the instance, which shadows the prototype method
+    // where one exists and supplies it where one does not.
+    Object.defineProperty(navigator, 'setAppBadge', {
+      configurable: true,
+      value: (n?: number) => {
+        note(`set:${n ?? 0}`);
+        return Promise.resolve();
+      },
+    });
+    Object.defineProperty(navigator, 'clearAppBadge', {
+      configurable: true,
+      value: () => {
+        note('clear');
+        return Promise.resolve();
+      },
+    });
+  });
+}
+
+const badgeLog = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => JSON.parse(sessionStorage.getItem('__badge') ?? '[]') as string[]);
+
+/** checkin + tasks, as the server seeded them into `#hq`. */
+const seededTotal = (page: import('@playwright/test').Page) =>
+  page
+    .locator('#hq')
+    .evaluate((el) => Number((el as HTMLElement).dataset.checkin) + Number((el as HTMLElement).dataset.tasks));
+
+test.describe('the number on the icon', () => {
+  test('is painted on arrival, and agrees with the title', async ({ page }) => {
+    // The badge is the one renderer with no server-rendered half: the pills and
+    // the title arrive correct in the HTML, the icon carries whatever the last
+    // page left on it. So the first paint has to happen in script, and a
+    // regression here looks like "the icon is right only after you tick
+    // something" — which nobody would notice for weeks.
+    await stubBadge(page);
+    await page.goto('/admin');
+    const total = Number((await page.title()).match(/^\((\d+)\)/)?.[1] ?? 0);
+    await expect.poll(() => badgeLog(page)).toEqual([`set:${total}`]);
+  });
+
+  test('follows an answer without a navigation', async ({ page }) => {
+    await stubBadge(page);
+    await page.goto('/admin');
+    const seeded = await seededTotal(page);
+    await signal(page, await servedDay(page), 'task', false);
+    await expect.poll(() => badgeLog(page)).toEqual([`set:${seeded}`, `set:${seeded + 1}`]);
+  });
+
+  test('⚠ clears on the way out, and is repainted on arrival', async ({ page }) => {
+    // The decision this feature turns on. Leaving the number standing is wrong
+    // every single night — at 00:01 the true count is 1 and the icon still
+    // shows yesterday's — and reliably ABSENT beats confidently WRONG, which is
+    // the argument ADR-0014 built `staleness()` around.
+    //
+    // The third entry is the accepted cost, asserted rather than hidden: every
+    // admin navigation is a real page load, so the numeral blinks off and comes
+    // straight back. `pagehide` cannot tell a navigation from a close.
+    await stubBadge(page);
+    await page.goto('/admin');
+    const n = await seededTotal(page);
+    await page.goto('/admin/people');
+    await expect.poll(() => badgeLog(page)).toEqual([`set:${n}`, 'clear', `set:${n}`]);
+  });
+
+  test('⚠ goes dark when the day turns, and an answer cannot bring it back', async ({ page }) => {
+    // Piece 6's rollover reaches further than the notice it draws. Once the
+    // served day is over, every number on the page is about yesterday — the
+    // pills and the title keep theirs, because the notice is sitting right
+    // above them, and the ICON goes quiet because it is read from a dock with
+    // nothing around it to caveat it.
+    await stubBadge(page);
+    await page.clock.install();
+    await page.goto('/admin');
+    await page.clock.fastForward('25:00:00');
+    await expect(page.locator('#day-turn')).toBeVisible();
+    await expect.poll(async () => (await badgeLog(page)).at(-1)).toBe('set:0');
+
+    // ⚠ THE LATCH, which is the half that would rot silently. Answering
+    // something at 00:05 still passes the date guard — the served day and the
+    // signal's day are both yesterday — so without it `render()` would repaint
+    // the icon with yesterday's count. Proven by watching the pill MOVE (the
+    // signal really was processed) while the icon stays at zero.
+    const before = (await badgeLog(page)).length;
+    await signal(page, await servedDay(page), 'task', false);
+    await expect(page.locator('[data-attention-pill]').first()).toBeVisible();
+    const log = await badgeLog(page);
+    expect(log.length, 'the render did not repaint the badge at all').toBeGreaterThan(before);
+    expect(log.at(-1), 'the icon came back with yesterday’s number').toBe('set:0');
   });
 });
