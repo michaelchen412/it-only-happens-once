@@ -91,7 +91,9 @@ const [
   // 13 · Piece 3. The fourth source finally has a producer — until now `mirror`
   // was a kind of row nothing could create.
   mirroredBetween(supabase, from, to),
-  supabase.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
+  // `last_error_at` is read, not shown: `staleness()` needs it to tell a live
+  // failure from one the mirror has since synced past.
+  supabase.from('calendar_sync').select('synced_at, last_error, last_error_at').maybeSingle(),
 ]);
 
 // ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). A permanent "synced 4 minutes ago"

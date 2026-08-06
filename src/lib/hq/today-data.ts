@@ -216,7 +216,9 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     // 13 · Piece 3. Google's copy of today — a flight, a reservation, whatever
     // somebody else put there. It arrives read-only and joins the same union.
     mirroredBetween(sb, today, today),
-    sb.from('calendar_sync').select('synced_at, last_error').maybeSingle(),
+    // `last_error_at` is read, not shown: `staleness()` needs it to tell a live
+    // failure from one the mirror has since synced past.
+    sb.from('calendar_sync').select('synced_at, last_error, last_error_at').maybeSingle(),
   ]);
 
   const roster: Person[] = everyone ?? [];

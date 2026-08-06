@@ -208,6 +208,40 @@ describe('staleness', () => {
     });
   });
 
+  it('⚠ falls silent once the mirror has synced PAST the error', () => {
+    // A stuck error string is the one way this line goes permanently wrong in
+    // the direction that costs something: telling a reader their calendar is
+    // broken when it is not. The success path clears `last_error`, so this only
+    // catches a row left behind by an older build or a careless future writer —
+    // but the clock is a cheap second opinion and this is the cheap place.
+    expect(
+      staleness(
+        { synced_at: hoursAgo(1), last_error: 'Google Calendar is unavailable (503).', last_error_at: hoursAgo(2) },
+        now,
+      ),
+    ).toBeNull();
+  });
+
+  it('⚠ still speaks when the error is the NEWER of the two', () => {
+    // Which is exactly 2026-08-06: a failing sync stamped its error 127ms after
+    // the success it had raced. The clock cannot tell that apart from a real
+    // failure and must not try — concurrency is settled by the claim in
+    // `actions/calendar.ts`, not here.
+    expect(
+      staleness(
+        { synced_at: hoursAgo(2), last_error: 'Google Calendar is unavailable (503).', last_error_at: hoursAgo(1) },
+        now,
+      ),
+    ).toEqual({ stale: true, text: 'Google couldn’t be reached' });
+  });
+
+  it('speaks for an error carrying no timestamp at all', () => {
+    // Silence is the wrong default for a mirror ADR-0014 requires to fail
+    // loudly, so an error that cannot be dated is still an error.
+    expect(staleness({ synced_at: hoursAgo(1), last_error: 'something', last_error_at: null }, now)?.stale).toBe(true);
+    expect(staleness({ synced_at: hoursAgo(1), last_error: 'something' }, now)?.stale).toBe(true);
+  });
+
   it('says nothing about a mirror that was never set up', () => {
     // Never synced is not stale — it is absent, and a domain that does not
     // exist renders nothing (10-hq.md §10b).

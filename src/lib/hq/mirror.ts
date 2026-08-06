@@ -189,11 +189,31 @@ export interface Staleness {
  * broken, and the difference matters on a page whose job is to be trusted.
  */
 export function staleness(
-  sync: { synced_at: string | null; last_error: string | null } | null,
+  sync: { synced_at: string | null; last_error: string | null; last_error_at?: string | null } | null,
   now: Date = new Date(),
 ): Staleness | null {
   if (!sync) return null;
-  if (sync.last_error) return { stale: true, text: 'Google couldn’t be reached' };
+
+  // ⚠ AN ERROR THE MIRROR HAS ALREADY SYNCED PAST IS HISTORY, NOT NEWS. The
+  // success path clears `last_error`, so ordinarily this cannot arise — this is
+  // the guard for when it does anyway: a row left behind by an older build, or
+  // a future writer that records a failure without checking what it lands on.
+  // A stuck error string is the one way this line can be permanently wrong in
+  // the direction that matters, telling a reader their calendar is broken when
+  // it is not, so it is worth a cheap second opinion from the clock.
+  //
+  // ⚠ THIS IS NOT WHAT FIXED 2026-08-06 and must not be mistaken for it. That
+  // failure stamped its error 127ms AFTER the success it raced, so it is newer
+  // and would still speak here, correctly by this rule and wrongly in fact.
+  // Concurrency is settled by the claim in `actions/calendar.ts`; the clock can
+  // only ever settle order, and order was never the problem.
+  const failedAt = sync.last_error ? Date.parse(sync.last_error_at ?? '') : NaN;
+  const syncedAt = sync.synced_at ? Date.parse(sync.synced_at) : NaN;
+  // An error with no timestamp cannot be ruled out, so it speaks. Silence is
+  // the wrong default for a mirror ADR-0014 requires to fail loudly.
+  const supersededBySuccess = Number.isFinite(failedAt) && Number.isFinite(syncedAt) && syncedAt > failedAt;
+
+  if (sync.last_error && !supersededBySuccess) return { stale: true, text: 'Google couldn’t be reached' };
   // Never synced at all is not stale — it is not set up, and a mirror nobody has
   // configured has nothing to be wrong about.
   if (!sync.synced_at) return null;

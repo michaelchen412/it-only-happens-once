@@ -110,26 +110,52 @@ export const calendar = {
       const creds = credentials();
       if (!creds) return { configured: false, skipped: true, changed: 0, error: null };
 
-      const { data: state } = await sb.from('calendar_sync').select('*').maybeSingle();
       const full = v?.full === true;
 
-      // ⚠ THE THROTTLE IS ON THE SERVER, not only in the script that calls it.
-      // It also covers `last_error_at`, which is what stops a failing sync from
-      // being retried on every navigation — and, with the client's rule that a
-      // failure never triggers a reload, is why this cannot loop.
-      const lastTouch = Math.max(
-        state?.synced_at ? Date.parse(state.synced_at) : 0,
-        state?.last_error_at ? Date.parse(state.last_error_at) : 0,
-      );
-      if (!full && Date.now() - lastTouch < RESYNC_AFTER_MINUTES * 60_000) {
-        return { configured: true, skipped: true, changed: 0, error: null };
-      }
+      // ⚠ THE THROTTLE AND THE LOCK ARE THE SAME STATEMENT, AND THEY HAVE TO
+      // BE. This used to read the row, decide, and only write minutes later
+      // when Google finally answered — so every page opened inside that window
+      // passed the same gate and started its own sync. On 2026-08-06 two of
+      // them ran 127ms apart: one succeeded, the other caught a `503` and
+      // stamped `last_error` over the success, and Today then reported a
+      // mirror that was in fact perfectly current. No amount of care in the
+      // error path fixes that; the read and the decision have to be one
+      // operation that only one caller can win.
+      //
+      // So: a conditional UPDATE ... RETURNING. Postgres serialises the two
+      // writers on the row, the loser re-evaluates `updated_at` against the
+      // winner's fresh value, matches nothing, and is told it was skipped.
+      //
+      // ⚠ `updated_at` IS THE CLAIM, and it works because `moddatetime` stamps
+      // it on EVERY update to this row (see the table's migration) — the claim
+      // itself, the success, the failure. The value sent below is therefore
+      // ignored; the trigger's `now()` wins. Sending it is what makes the
+      // statement legal, not what sets the time.
+      //
+      // ⚠ AND IT IS A LEASE, NOT A LOCK, which is the property that matters
+      // when a serverless invocation dies mid-sync: nothing has to be released.
+      // The claim simply ages out, and the next visit is free to try again.
+      const cutoff = new Date(Date.now() - RESYNC_AFTER_MINUTES * 60_000).toISOString();
+      const claim = sb.from('calendar_sync').update({ updated_at: new Date().toISOString() }).eq('id', true);
+      // A forced full sync still takes the claim — it may jump the throttle,
+      // never the queue.
+      const { data: state, error: claimError } = await (full ? claim : claim.lt('updated_at', cutoff))
+        .select('*')
+        .maybeSingle();
+
+      // ⚠ A CLAIM THAT ERRORS IS NOT A THROTTLE. Both answer with no row, and
+      // reporting `skipped` for both would file a mirror that can NEVER sync —
+      // the policy revoked, the singleton row deleted — under the same quiet
+      // answer a healthy ten-minute throttle gives. There is nowhere to record
+      // it, since the row is the thing that failed, so it is handed back.
+      if (claimError) return { configured: true, skipped: false, changed: 0, error: claimError.message };
+      if (!state) return { configured: true, skipped: true, changed: 0, error: null };
 
       const tz = await homeTimezone(sb);
 
       try {
         const token = await accessToken(creds);
-        let usingToken = full ? null : (state?.sync_token ?? null);
+        let usingToken = full ? null : state.sync_token;
         let result: Harvest;
         let wasFull = usingToken === null;
 
@@ -195,18 +221,25 @@ export const calendar = {
           if (error) throw new Error(error.message);
         }
 
-        await sb
+        // ⚠ THE ERROR ON THIS WRITE IS CHECKED, and it is not ceremony. This is
+        // the statement that stores the cursor and clears `last_error`; if it
+        // fails silently the mirror reports itself broken for ever while
+        // syncing perfectly, and re-syncs from scratch every time doing it.
+        // Throwing hands it to the catch below, which is the one place that
+        // knows how to record a failure.
+        const { error: stateError } = await sb
           .from('calendar_sync')
           .update({
             // Keep the old cursor rather than clearing it if Google withheld a
             // new one: a null here forces a full sync next time, which is
             // correct but wasteful, and only ever right when we know it.
-            sync_token: result.syncToken ?? (wasFull ? null : (state?.sync_token ?? null)),
+            sync_token: result.syncToken ?? (wasFull ? null : state.sync_token),
             synced_at: new Date().toISOString(),
             last_error: null,
             last_error_at: null,
           })
           .eq('id', true);
+        if (stateError) throw new Error(stateError.message);
 
         return { configured: true, skipped: false, changed, error: null };
       } catch (err) {
@@ -215,6 +248,14 @@ export const calendar = {
         // Today over something the reader cannot act on. `staleness()` speaks
         // instead, on the next render, and speaks immediately for an error
         // rather than waiting out the staleness window.
+        //
+        // ⚠ AND IT MAY OVERWRITE FREELY, because of the claim above and only
+        // because of it: this sync is the only one that has run since it took
+        // the claim, so there is no success of anyone else's to trample. A
+        // transient fault has already been retried inside `gcal.ts` by the time
+        // it reaches here, so anything recorded is a real one — Google was down
+        // for seconds, or the credential is genuinely dead, and the stored
+        // message now says which.
         const message = err instanceof Error ? err.message : 'Google couldn’t be reached.';
         await sb
           .from('calendar_sync')
