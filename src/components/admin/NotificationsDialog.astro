@@ -1,0 +1,97 @@
+---
+/*
+  NotificationsDialog — where the building is granted permission to speak first
+  (docs/plans/21-push.md · Phase 2, ADR-0019).
+
+  ⚠ WHY THIS IS A ROOM-SIZED SURFACE FOR ONE BUTTON. Every other control in the
+  Observatory changes what a page SHOWS. This one changes what the building may
+  do while nobody is looking at it — and that deserves a sentence of explanation
+  rather than an icon and a shrug. It is also the only place the two facts that
+  make push confusing on iOS can be said plainly: it needs the installed app,
+  and a refusal is remembered by the system rather than by us.
+
+  ⚠ AND IT IS A DIALOG RATHER THAN A `/admin/settings` ROOM, deliberately. There
+  is no settings room in this building — `home_timezone` has never had a UI —
+  and inventing one for a switch you press once per device would add a ninth nav
+  item to a list whose whole argument is that it is short. Phase 3's time picker
+  and off switch land in HERE, beside the thing they configure.
+
+  Driven by src/scripts/push.ts. State is written as `data-state` on the root so
+  the CSS decides what shows and the script never hides things one at a time.
+*/
+import { Icon } from 'astro-icon/components';
+---
+
+<dialog id="push-dialog" class="modal-dialog w-full max-w-md" aria-labelledby="push-title">
+  <div id="push-body" data-state="loading" class="flex flex-col gap-4 p-6 font-sans">
+    <h2 id="push-title" class="font-display flex items-center gap-2 text-xl">
+      <Icon name="ph:bell" class="text-base-content/60 text-lg" />
+      Notifications
+    </h2>
+
+    {
+      /* One paragraph per state, shown by `data-state` on the wrapper. Rendered
+        always and revealed by CSS rather than built in script: the states are
+        the whole content of this dialog, and a reader (or a future edit) should
+        be able to see all four of them in the markup at once. */
+    }
+    <div class="text-base-content/70 space-y-3 text-sm">
+      <p data-when="loading">Checking this device…</p>
+
+      <p data-when="unsupported">
+        This device can’t receive them. On iPhone that usually means the Observatory is open in a browser tab rather
+        than installed — add it to the Home Screen from the Share menu, open it from its own icon, and come back here.
+      </p>
+
+      <p data-when="off">
+        The Observatory will stay quiet unless you turn this on. It sends <strong>at most one a day</strong>, only on a
+        morning you haven’t checked in — so a day that goes normally makes no sound at all.
+      </p>
+
+      <p data-when="on">
+        This device is subscribed. You’ll hear from the Observatory only on a morning the check-in is still open.
+      </p>
+
+      <p data-when="denied">
+        Notifications are blocked for this app, and iOS remembers that rather than asking again. To undo it, delete the
+        Observatory from your Home Screen, add it back, and turn this on when it asks.
+      </p>
+
+      <p data-when="error" class="text-error" id="push-error"></p>
+    </div>
+
+    <div class="mt-1 flex items-center justify-end gap-2">
+      <button type="button" id="push-close" class="btn btn-ghost btn-sm normal-case">Close</button>
+      {
+        /* ⚠ THE REQUEST MUST COME FROM A REAL CLICK. iOS refuses a permission
+          prompt raised on load and remembers the refusal — so this is a button
+          and can never become an effect. */
+      }
+      <button type="button" id="push-enable" data-when="off" class="btn btn-primary btn-sm normal-case">
+        Turn on notifications
+      </button>
+      <button type="button" id="push-disable" data-when="on" class="btn btn-ghost btn-sm normal-case">
+        <Icon name="ph:bell-slash" class="text-base" />
+        Turn off
+      </button>
+    </div>
+  </div>
+</dialog>
+
+<style>
+  /* The state machine, in CSS. `[data-when]` is hidden unless the wrapper's
+     `data-state` matches — so the script sets ONE attribute and every paragraph
+     and button follows, instead of the script toggling six `hidden` flags and
+     eventually forgetting one. */
+  #push-body [data-when] {
+    display: none;
+  }
+  #push-body[data-state='loading'] [data-when='loading'],
+  #push-body[data-state='unsupported'] [data-when='unsupported'],
+  #push-body[data-state='off'] [data-when='off'],
+  #push-body[data-state='on'] [data-when='on'],
+  #push-body[data-state='denied'] [data-when='denied'],
+  #push-body[data-state='error'] [data-when='error'] {
+    display: revert-layer;
+  }
+</style>

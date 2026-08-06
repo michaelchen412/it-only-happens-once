@@ -15,6 +15,7 @@ import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
 import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
+import NotificationsDialog from '../components/admin/NotificationsDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
 import { attentionLabel, titlePrefix } from '../lib/hq/attention';
@@ -239,6 +240,24 @@ const nav = [
             <Icon name="ph:sun" class="theme-icon-sun text-base" />
             <Icon name="ph:moon" class="theme-icon-moon text-base" />
           </button>
+          {
+            /* Notifications (21 · Phase 2). It sits with the theme toggle and
+              Sign out because those are the three controls about THIS DEVICE
+              and this session rather than about the corpus — and because push
+              is subscribed per device, so "on" here never means "on everywhere".
+
+              ⚠ NOT a nav item. There is no settings room in this building and
+              one switch does not justify inventing the ninth entry in a list
+              whose whole argument is that it is short. */
+          }
+          <button
+            id="push-open"
+            class="rounded-field hover:bg-base-200 hover:text-base-content p-1.5"
+            aria-label="Notifications, off for this device"
+            title="Notifications"
+          >
+            <Icon name="ph:bell" class="text-base" />
+          </button>
           <a href="/" class="rounded-field hover:bg-base-200 hover:text-base-content px-2 py-1" title="View the site"
             >Site ↗</a
           >
@@ -321,6 +340,8 @@ const nav = [
       mounted here, once, and every admin page gets it. */
   }
   <CaptureDialog />
+  {/* Where the building is granted permission to speak first (21 · Phase 2). */}
+  <NotificationsDialog />
   {/* the manager and library run long; the sheets bring their own */}
   <BackToTop />
 
@@ -337,6 +358,13 @@ const nav = [
     // and the window title honest between navigations.
     import '../scripts/day-turn';
     import '../scripts/attention';
+
+    // ⚠ MOUNTED FROM THE LAYOUT FOR A REASON THE OTHERS DO NOT HAVE. Its
+    // `sync()` re-asserts this device's push subscription on every admin load,
+    // and with no service worker that is the ONLY chance the app gets to notice
+    // a subscription has gone stale. Mounted per-page it would run only where
+    // somebody remembered it, which is the same as not running.
+    import '../scripts/push';
 
     import { createBrowserClient } from '@supabase/ssr';
     const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);

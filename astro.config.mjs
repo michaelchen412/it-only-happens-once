@@ -90,6 +90,12 @@ export default defineConfig({
           'quotes',
           'music-notes',
           'article',
+          // Push (21 · Phase 2). `bell` is the control that grants the building
+          // standing permission to interrupt; `bell-slash` is the same control
+          // saying it currently cannot. Deliberately NOT `warning` for the
+          // refused state — a device that was never asked is not an error.
+          'bell',
+          'bell-slash',
         ],
         'simple-icons': [
           'github',
