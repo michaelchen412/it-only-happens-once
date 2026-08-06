@@ -152,6 +152,7 @@ const payload = (t: Task) =>
                         ]}
                         data-task={payload(t)}
                         data-id={t.id}
+                        data-due-on={t.shownDueOn}
                       >
                         {/* ONE CLICK, AND IT STAYS (§10f). Not on a past-due row:
                             there the choice IS the interaction, and a circle

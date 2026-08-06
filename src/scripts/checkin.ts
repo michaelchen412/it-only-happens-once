@@ -31,6 +31,7 @@
 // and the one that would drift is the one on screen at 7am. The module is
 // type-only in its imports, so it costs the bundle nothing but the functions.
 import { actions } from 'astro:actions';
+import { signalAttention } from './attention';
 import {
   OPEN_ENDED_LATENCY,
   TIMEABLE_WAKINGS,
@@ -190,6 +191,21 @@ if (zone) {
           }
         } while (dirty);
         note('Saved');
+
+        // The sidebar pill, the burger pill and the window title (20 · §7).
+        //
+        // ⚠ THIS PATH AND NO OTHER. Skip, unskip and Done all end in
+        // `location.reload()`, so the server re-renders the count and an event
+        // there would be a second, racing answer to a question already settled.
+        // What is left is the case nothing else covers: the FIRST save of the
+        // morning, where the check-in becomes answered while you are still
+        // standing on the page that was asking.
+        //
+        // ⚠ `logDate` IS SENT, NOT ASSUMED TO BE TODAY. This card follows the
+        // date bar — backfilling last Tuesday saves against Tuesday — and the
+        // badge never does. `attention.ts` compares the two; passing it is what
+        // lets it.
+        signalAttention({ kind: 'checkin', on: logDate, answered: true });
       } catch {
         // ⚠ `astro:actions` THROWS on a dead network rather than returning
         // `{ error }` — the same trap that once left the AI button stuck on

@@ -16,6 +16,7 @@
 // surface designed for a sweep down the page.
 import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
+import { signalAttention } from './attention';
 
 // ⚠ EVERY LIST, NOT THE FIRST ONE. The tasks room has exactly one and this was a
 // `querySelector` for a day; Today has three — the day itself, Coming up and
@@ -91,6 +92,14 @@ for (const list of lists) {
       row.querySelectorAll<HTMLElement>('[data-answered]').forEach((el) => (el.hidden = !undoing));
       row.querySelectorAll<HTMLElement>('[data-unanswered]').forEach((el) => (el.hidden = undoing));
       repaint();
+
+      // The sidebar pill, the burger pill and the window title (20 · §7). This
+      // says only WHAT HAPPENED — the occurrence this row stands on is answered,
+      // or is not any more; `scripts/attention.ts` decides whether that is a day
+      // the badge counts. Deliberately not decided here: a past-due row is
+      // tickable and was never counted, and two files answering "does this
+      // count?" is how they come to disagree.
+      signalAttention({ kind: 'task', on: row.dataset.dueOn ?? null, answered: !undoing });
     } catch (err) {
       // ⚠ `astro:actions` THROWS on a dead network rather than returning
       // `{ error }`. Without this the row would sit there with dead controls

@@ -66,6 +66,7 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
               data-id={it.id}
               data-kind={it.kind}
               data-task={it.kind === 'task' ? '' : undefined}
+              data-due-on={it.kind === 'task' ? it.on : undefined}
             >
               {it.kind === 'task' ? (
                 <Tick answered={!!state} title={it.title} />

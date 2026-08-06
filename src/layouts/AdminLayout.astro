@@ -17,7 +17,7 @@ import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
-import { titlePrefix } from '../lib/hq/attention';
+import { attentionLabel, titlePrefix } from '../lib/hq/attention';
 
 interface Props {
   title?: string;
@@ -44,7 +44,25 @@ const user = Astro.locals.user;
  * the entire point, because the fault this fixes is that navigating away from
  * Today used to make the system go silent.
  */
-const prefix = titlePrefix(Astro.locals.attention.total);
+const total = Astro.locals.attention.total;
+const prefix = titlePrefix(total);
+
+/**
+ * The pill, on both chromes (20 · §3 and §4).
+ *
+ * ⚠ IT MUST NOT BE RED, and this is the decision most likely to be "improved"
+ * later. `PastDueZone` establishes the rule and states it: *"The one warm chip
+ * on the page. Semantic, not a domain hue — red means pressing here and nowhere
+ * [else]."* A red badge on Today EVERY SINGLE MORNING — because the check-in is
+ * unanswered every morning, that is what a check-in is — would spend the urgency
+ * hue on the most ordinary event in the building. It breaks the colour coding
+ * everywhere it is doing real work, and it delivers exactly the accusation
+ * ADR-0013 was written to prevent. Neutral: `base-300` ground, `base-content`
+ * numeral, the same weight as an active nav row.
+ *
+ * `tabular-nums` so 1 → 2 does not shift the row's width.
+ */
+const PILL = 'bg-base-300 text-base-content rounded-full text-xs leading-none font-medium tabular-nums';
 
 // Today first, and the corpus rooms after the rule: HQ is the daily half, the
 // corpus is the weekly one, and the divider is the boundary of ADR-0012 made
@@ -125,7 +143,21 @@ const nav = [
   >
     Skip to content
   </a>
-  <div class="bg-base-100 flex min-h-screen font-sans">
+  {
+    /* `#hq` carries the server's answer about NOW — the day, the configured
+      zone, and the two halves of the count. One element, because `day-turn.ts`
+      and `attention.ts` both need it and two elements could be rendered from
+      two different values. Data rather than a script tag so it is inspectable
+      and so nothing has to be serialised into JavaScript. */
+  }
+  <div
+    id="hq"
+    data-today={Astro.locals.today.ymd}
+    data-tz={Astro.locals.today.tz}
+    data-checkin={Astro.locals.attention.checkin}
+    data-tasks={Astro.locals.attention.tasks}
+    class="bg-base-100 flex min-h-screen font-sans"
+  >
     {/* Off-canvas backdrop (mobile only) */}
     <div
       id="sb-backdrop"
@@ -162,7 +194,9 @@ const nav = [
               {item.hr && <hr class="border-base-300 mx-3 my-2" />}
               <a
                 href={item.href}
+                id={item.key === 'today' ? 'nav-today' : undefined}
                 aria-current={active === item.key ? 'page' : undefined}
+                aria-label={item.key === 'today' ? attentionLabel(total) : undefined}
                 class:list={[
                   'rounded-field flex items-center gap-3 px-3 py-2 text-sm transition-colors',
                   active === item.key
@@ -172,6 +206,21 @@ const nav = [
               >
                 <Icon name={item.icon} class="text-lg" />
                 {item.label}
+                {/* ⚠ `aria-hidden`, and the LINK carries the meaning. A reader
+                    handed "Today 2" has been given a number and not what it
+                    counts; `attentionLabel` says "Today, 2 waiting". Rendered
+                    even at zero, hidden, so the live update has something to
+                    write into rather than a node to invent. */}
+                {item.key === 'today' && (
+                  <span
+                    data-attention-pill
+                    aria-hidden="true"
+                    hidden={total === 0}
+                    class:list={['ml-auto px-1.5 py-0.5', PILL]}
+                  >
+                    {total > 0 ? total : ''}
+                  </span>
+                )}
               </a>
             </>
           ))
@@ -206,18 +255,59 @@ const nav = [
       <header
         class="border-base-300 bg-base-100/90 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur md:hidden"
       >
+        {
+          /* ⚠ THE PIECE THAT MATTERS MOST, because on a phone the sidebar is
+            CLOSED — so the pill beside "Today" is invisible at exactly the
+            moment it is for. 11-checkin.md was designed around this surface and
+            ADR-0013 names it: *"the surface is opened first, and most reliably,
+            on the mornings that are hardest."*
+
+            A NUMBER, not a dot, and the argument is consistency: one signal, one
+            shape, every surface. A dot on the phone and a number on the desktop
+            is two answers to one question — which is the fault 19 · §7 already
+            files against these two chromes disagreeing about a breakpoint.
+
+            The ring is `bg-base-100`, the header's own colour, so the numeral
+            reads as a badge sitting ON the icon rather than as part of it. */
+        }
         <button
           id="sb-open"
-          class="rounded-field text-base-content/70 hover:bg-base-200 hover:text-base-content -ml-1 p-1.5"
-          aria-label="Open menu"
+          class="rounded-field text-base-content/70 hover:bg-base-200 hover:text-base-content relative -ml-1 p-1.5"
+          aria-label={total > 0 ? `Open menu, ${total} waiting` : 'Open menu'}
           aria-controls="sidebar"
           aria-expanded="false"
         >
           <Icon name="ph:list" class="text-xl" />
+          <span
+            data-attention-pill
+            aria-hidden="true"
+            hidden={total === 0}
+            class:list={['ring-base-100 absolute -top-0.5 -right-0.5 min-w-4 px-1 py-px text-center ring-2', PILL]}
+          >
+            {total > 0 ? total : ''}
+          </span>
         </button>
         <span class="text-primary text-lg leading-none"><StarMark /></span>
         <span class="font-display text-base leading-none">{title}</span>
       </header>
+
+      {
+        /* ⚠ THE DAY HAS TURNED (20 · §6). The Observatory is a desktop workshop
+          that lives in a tab, so it gets left open overnight — and at 00:01 the
+          date bar, the check-in, the agenda and the count in the title are all
+          about yesterday. This says so, in the layout, so no room has to
+          remember to (the reason `local-time` gives for living here too).
+
+          A LINK, NEVER A RELOAD — see the script's header for what an
+          auto-reload at midnight would throw away. Rendered hidden and revealed
+          by `day-turn.ts`; server-side it is always hidden, which is correct,
+          because at render time the served day IS today. */
+      }
+      <div id="day-turn" hidden class="border-base-300 bg-base-200/60 border-b px-4 py-2 text-sm sm:px-6">
+        <a href="/admin" class="text-base-content/70 hover:text-base-content underline-offset-2 hover:underline">
+          The day has turned — this page is about yesterday →
+        </a>
+      </div>
 
       <main id="admin-main" class="min-w-0 flex-1" tabindex="-1">
         <slot />
@@ -240,6 +330,14 @@ const nav = [
     // purpose: "no UTC on screen, anywhere" is a project rule, and a rule that
     // each page has to remember to opt into is a rule that gets forgotten.
     import '../scripts/local-time';
+
+    // Beside it, and for exactly the same reason: the day turning is a fact
+    // about the whole building, and a page that had to opt in would be the page
+    // that forgot. `day-turn` notices midnight; `attention` keeps the two pills
+    // and the window title honest between navigations.
+    import '../scripts/day-turn';
+    import '../scripts/attention';
+
     import { createBrowserClient } from '@supabase/ssr';
     const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
     document.getElementById('admin-signout')?.addEventListener('click', async () => {

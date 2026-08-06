@@ -371,6 +371,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                   data-id={it.id}
                   data-kind={it.kind}
                   data-task={it.kind === 'task' ? '' : undefined}
+                  data-due-on={it.kind === 'task' ? it.on : undefined}
                   data-event={
                     it.kind === 'event'
                       ? JSON.stringify({

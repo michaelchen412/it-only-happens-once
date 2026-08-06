@@ -170,7 +170,12 @@ const payload = (t: Task) =>
             ) : (
               <ul class="zone__list pb-2">
                 {scheduled.map((t) => (
-                  <li class:list={['task', `task--${t.priority}`]} data-task={payload(t)} data-id={t.id}>
+                  <li
+                    class:list={['task', `task--${t.priority}`]}
+                    data-task={payload(t)}
+                    data-id={t.id}
+                    data-due-on={t.due_on}
+                  >
                     <button type="button" class="tick" data-dispose="done" aria-label={`Mark “${t.title}” done`}>
                       <Icon name="ph:circle" class="tick__o" />
                       <Icon name="ph:check-circle" class="tick__x" />
@@ -232,7 +237,12 @@ const payload = (t: Task) =>
             ) : (
               <ul class="zone__list pb-2">
                 {unscheduled.map((t) => (
-                  <li class:list={['task', `task--${t.priority}`]} data-task={payload(t)} data-id={t.id}>
+                  <li
+                    class:list={['task', `task--${t.priority}`]}
+                    data-task={payload(t)}
+                    data-id={t.id}
+                    data-due-on={t.due_on}
+                  >
                     <button type="button" class="tick" data-dispose="done" aria-label={`Mark “${t.title}” done`}>
                       <Icon name="ph:circle" class="tick__o" />
                       <Icon name="ph:check-circle" class="tick__x" />
