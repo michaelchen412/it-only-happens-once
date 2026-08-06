@@ -44,10 +44,20 @@ test.describe('the document outline', () => {
   for (const route of ROOMS) {
     test(`${route} has exactly one h1`, async ({ page }) => {
       await settle(page, route);
-      const h1s = page.locator('h1');
-      const texts = await h1s.allTextContents();
-      expect(await h1s.count(), `h1s found: ${JSON.stringify(texts)}`).toBe(1);
-      expect((texts[0] ?? '').trim(), 'and it says something').not.toBe('');
+      // ⚠ `page.evaluate`, NOT `page.locator('h1')`, AND THE REASON IS NOT
+      // STYLE. Playwright's selector engine pierces shadow roots; Astro's dev
+      // toolbar lives in one, and its audit panel contains four `<h1>`s of its
+      // own — *"Audit"*, *"No islands detected."* and friends. So this went from
+      // 35/35 green to ten rooms red without a line of page code changing,
+      // purely because the toolbar had finished initialising by the time the
+      // spec looked. `document.querySelectorAll` does not cross a shadow
+      // boundary, which is what "the document outline" meant all along: the
+      // headings the PAGE ships, not everything the browser happens to hold.
+      const texts = await page.evaluate(() =>
+        [...document.querySelectorAll('h1')].map((h) => (h.textContent ?? '').trim()),
+      );
+      expect(texts.length, `h1s found: ${JSON.stringify(texts)}`).toBe(1);
+      expect(texts[0] ?? '', 'and it says something').not.toBe('');
     });
   }
 });
