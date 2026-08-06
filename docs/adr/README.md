@@ -39,6 +39,7 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0016](0016-hq-layering.md) | HQ's three layers — rules are pure, loaders gather, pages render; routing belongs to the page | Accepted |
 | [0017](0017-quote-provenance-three-facts.md) | A quote is three facts (Who / From / Where); the line under it is derived, and the citation opens behind the attribution itself | Accepted |
 | [0018](0018-notes-use-the-composer-editor.md) | Notes use the composer's editor on both surfaces; plan 14 §4's "plain `<textarea>`, ever" rule is retired, with the dictation trade on the record | Accepted |
+| [0019](0019-push-is-a-contract-you-sign.md) | Push: HQ may reach you when nothing is open — two contracts (ambient signal vs. an escalation you sign), no service worker, scheduler in Supabase | **Proposed** |
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —
