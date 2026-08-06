@@ -28,6 +28,11 @@ export default tseslint.config(
       'legacy/**',
       'docs/**',
       'src/lib/database.types.ts',
+      // Deno, not Node (21 · Phase 2). Supabase Edge Functions use `Deno.*` and
+      // `jsr:` specifiers; this config's parser and globals are the browser/Node
+      // ones, so every line here would be a false positive. Prettier still
+      // formats them — it needs no runtime to do that.
+      'supabase/functions/**',
     ],
   },
 

@@ -1,5 +1,14 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  "exclude": [
+    "dist",
+    // ⚠ DENO, NOT NODE — a different runtime with different globals. These are
+    // Supabase Edge Functions (21 · Phase 2, ADR-0019): they use `Deno.serve`,
+    // `Deno.env` and `jsr:` specifiers, none of which this project's TypeScript
+    // knows about, and typechecking them here would report ~a dozen errors for
+    // code that is correct where it actually runs. Supabase typechecks them on
+    // deploy, which is the compiler that has the right lib.
+    "supabase/functions"
+  ]
 }
