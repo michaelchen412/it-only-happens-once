@@ -410,6 +410,17 @@ test.describe('the chooser — four destinations, one question', () => {
   });
 });
 
+/**
+ * What the sheet actually puts in the title box: the dump's first line, capped.
+ *
+ * Mirrors `task-sheet.ts`'s `.slice(0, 200)` rather than restating the number in
+ * two assertions — the cap is product behaviour (an agenda row must stay
+ * readable), so a spec that expects the untruncated text is asserting something
+ * the app has never done.
+ */
+const TITLE_CAP = 200;
+const titleFrom = (text: string): string => text.split('\n')[0].trim().slice(0, TITLE_CAP);
+
 test.describe('note → the Agenda', () => {
   test('opens the real task sheet, with the dump already in it', async ({ page }) => {
     await stubActions(page, {});
@@ -430,7 +441,14 @@ test.describe('note → the Agenda', () => {
     await expect(sheet.locator('[data-effort]').first()).toBeVisible();
     // The first line becomes the title — a five-line thought in a title would
     // make the agenda unreadable.
-    await expect(sheet.locator('input[name="title"]')).toHaveValue(text.split('\n')[0].trim());
+    //
+    // ⚠ AND IT IS CAPPED, which this used to ignore. `task-sheet.ts` does
+    // `.slice(0, TITLE_CAP)` deliberately: the first LINE of a dump can still be
+    // a whole paragraph, and an agenda row is not a place to read one. The spec
+    // discovers a real note rather than seeding one, so it passed for as long as
+    // the top of the pile happened to be short and went red the day it wasn't —
+    // green by luck, which is worse than red.
+    await expect(sheet.locator('input[name="title"]')).toHaveValue(titleFrom(text));
   });
 
   test('saving files the dump: one task, the note consumed, and a way back', async ({ page }) => {
@@ -681,7 +699,7 @@ test.describe('the parser (14 · Piece 3)', () => {
     await page.locator('#dump-file [data-as="agenda"]').click();
     await page.waitForSelector('#task-sheet[open]');
 
-    await expect(page.locator('#task-sheet input[name="title"]')).toHaveValue(first);
+    await expect(page.locator('#task-sheet input[name="title"]')).toHaveValue(titleFrom(first));
     await expect(page.locator('#task-sheet [data-kindbar]')).toBeHidden(); // nothing was judged
     await expect(page.locator('#task-error')).toBeHidden(); // and nothing is wrong
   });
