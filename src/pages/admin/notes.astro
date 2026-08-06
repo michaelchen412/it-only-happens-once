@@ -31,12 +31,16 @@
 */
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import AltTextDialog from '../../components/admin/AltTextDialog.astro';
+import EditorToolbar from '../../components/admin/EditorToolbar.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
+import LinkDialog from '../../components/admin/LinkDialog.astro';
 import LogSheet from '../../components/admin/LogSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TaskSheet from '../../components/admin/TaskSheet.astro';
 import { elapsedSince } from '../../lib/hq/dates';
 import { homeTimezone, localToday } from '../../lib/hq/time';
+import { renderMarkdown } from '../../lib/markdown';
 
 const supabase = Astro.locals.supabase;
 
@@ -57,6 +61,18 @@ const { data: rows } = await supabase
 const notes = (rows ?? []).map((n) => ({
   id: n.id,
   body: n.body ?? '',
+  /*
+    ⚠ RENDERED, NOT PRINTED — since 2026-08-06 the pile's editor is TipTap, so
+    a dump's body is genuinely Markdown and the card has to show what it means
+    rather than how it is spelled.
+
+    `breaks: true` is what makes that safe for everything already in the
+    database. Every dump written before this change is plain text whose
+    newlines are its shape; with breaks off they would collapse into one
+    paragraph and the whole pile would silently reflow. Both spellings land in
+    the same place — see the `renderMarkdown` tests, which pin exactly that.
+  */
+  html: renderMarkdown(n.body, { breaks: true }),
   // Both ride the card so an edit needs no round trip to start: the slug so
   // `saveWriting` doesn't re-derive (and churn) it, the token so a stale tab
   // gets a CONFLICT instead of overwriting a newer edit.
@@ -131,24 +147,27 @@ const roster = rosterData ?? [];
         <ul id="notes-pile" class="space-y-3">
           {notes.map((n) => (
             <li class="dump" data-note={n.id} data-slug={n.slug} data-updated={n.updatedAt}>
-              {/* `pre-wrap` in the stylesheet, so the line breaks you typed are
-                  the line breaks you see. A dump's shape is part of what it
-                  says. */}
-              <div class:list={['dump__text', n.long && 'dump__text--clamped']} data-text>
-                {n.body}
-              </div>
+              {/* The words as they mean, not as they are spelled. Line breaks
+                  survive (`breaks: true` above), so a dump's shape is still
+                  part of what it says — bold is now bold as well. */}
+              <div
+                class:list={['dump__text', 'reading', 'jot-prose', n.long && 'dump__text--clamped']}
+                data-text
+                set:html={n.html}
+              />
               {n.long && (
                 <button type="button" class="dump__more" data-more>
                   more
                 </button>
               )}
-              {/* The editable twin, revealed in place by the pencil. Reading is
-                  the dominant motion in this room, so a tap must not put a
-                  cursor (and on a phone, a keyboard) into a card you were only
-                  scrolling past. */}
-              <textarea class="dump__edit" hidden aria-label="Edit this note" data-edit-box>
-                {n.body}
-              </textarea>
+              {/* ⚠ THE CARD'S MARKDOWN, AND IT NEVER SHOWS. The editor is ONE
+                  element shared by the whole pile (below), so a card cannot
+                  hold its own — but four motions need this card's text without
+                  one: the chooser's four destinations read it, and the save
+                  sends it. Hidden rather than a `data-` attribute because a
+                  jotting is multi-line and a textarea is the element that
+                  carries newlines without ceremony. */}
+              <textarea hidden data-edit-box set:text={n.body} />
 
               {/* THREE CONTROLS, NOT SIX (14 · Piece 2). Piece 1 shipped four —
                   edit, two ways out, delete — and Piece 2 adds two more ways
@@ -302,6 +321,30 @@ const roster = rosterData ?? [];
     <span data-undo-text></span>
     <button type="button" class="btn btn-xs font-sans" data-undo-do>Undo</button>
   </div>
+
+  {
+    /* ONE EDITOR FOR THE WHOLE PILE — the same rule the chooser and the piece
+      picker already follow in this room, and here it is not just tidiness. The
+      pencil now opens a full TipTap editor (2026-08-06, Michael: the writing
+      sheet's formatting is wanted here too, *"even though they take up a
+      little bit of UI space"*), and a room that lists a hundred jottings
+      cannot mount a hundred of those. So this shell is MOVED into whichever
+      card is being edited and moved back out again, and its home is here —
+      outside `#notes-pile`, so a card leaving the pile can never take the
+      room's only editor with it.
+
+      ⚠ THE TOOLBAR SITS BELOW THE SURFACE, not above it. Entering edit mode
+      must not make the words move — that is the one thing that would make
+      in-place editing feel like an "open" after all — so the editor takes the
+      text's place at the text's metrics and the controls appear underneath,
+      between the words and the card's own foot. */
+  }
+  <div id="dump-shell" class="dump__shell" hidden>
+    <div id="dump-editor"></div>
+    <EditorToolbar class="dump__tools" image />
+  </div>
+  <LinkDialog id="dump-link-dialog" />
+  <AltTextDialog id="dump-alt-dialog" />
 
   <script>
     import '../../scripts/notes';

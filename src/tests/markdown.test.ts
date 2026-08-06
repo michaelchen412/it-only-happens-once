@@ -6,6 +6,7 @@
 // These tests pin it.
 import { describe, it, expect } from 'vitest';
 import { renderMarkdown } from '../lib/markdown';
+import { stripMarkdown } from '../lib/markdown-plain';
 
 describe('renderMarkdown — what must never survive', () => {
   it('strips script tags', () => {
@@ -46,5 +47,53 @@ describe('renderMarkdown — what must survive', () => {
     expect(renderMarkdown('')).toBe('');
     expect(renderMarkdown(null)).toBe('');
     expect(renderMarkdown('   ')).toBe('');
+  });
+});
+
+// The notes pile renders with `breaks: true` (docs/admin.md §5b). What makes
+// that safe is that BOTH spellings of a line break collapse to one `<br>`: the
+// bare newlines in every dump typed before the editor was rich, and the
+// `\`-terminated breaks TipTap writes now. If these ever disagree, the pile
+// starts double-spacing the old jottings.
+describe('renderMarkdown — the notes pile’s line breaks', () => {
+  it('turns a lone newline into a break only when asked', () => {
+    expect(renderMarkdown('call mom\nbuy milk')).not.toMatch(/<br/);
+    expect(renderMarkdown('call mom\nbuy milk', { breaks: true })).toMatch(/<br\s*\/?>/);
+  });
+
+  it('renders a backslash break as ONE break under either setting', () => {
+    const plain = renderMarkdown('call mom\\\nbuy milk');
+    const broken = renderMarkdown('call mom\\\nbuy milk', { breaks: true });
+    expect(plain.match(/<br\s*\/?>/g)).toHaveLength(1);
+    expect(broken.match(/<br\s*\/?>/g)).toHaveLength(1);
+  });
+
+  it('still separates paragraphs rather than breaking them', () => {
+    expect(renderMarkdown('one\n\ntwo', { breaks: true })).toMatch(/<p>one<\/p>\s*<p>two<\/p>/);
+  });
+});
+
+describe('stripMarkdown — the words, for a field that cannot render them', () => {
+  it('unwraps inline marks', () => {
+    expect(stripMarkdown('**call** the *dentist* about ~~the~~ `thing`')).toBe('call the dentist about the thing');
+  });
+
+  it('keeps a link’s text and drops an image whole', () => {
+    expect(stripMarkdown('ask [Sam](https://example.com) first')).toBe('ask Sam first');
+    expect(stripMarkdown('![A snowy road at dusk](/x.jpg)the errand')).toBe('the errand');
+  });
+
+  it('drops block marks and keeps the line structure', () => {
+    expect(stripMarkdown('## Groceries\n- milk\n- bread')).toBe('Groceries\nmilk\nbread');
+    expect(stripMarkdown('> she said it twice')).toBe('she said it twice');
+  });
+
+  it('drops the backslash TipTap uses to spell a hard break', () => {
+    expect(stripMarkdown('call mom\\\nbuy milk')).toBe('call mom\nbuy milk');
+  });
+
+  it('leaves a jotting with no syntax in it exactly as it was', () => {
+    const plain = 'dinner with Ada — 7pm, the place on 4th';
+    expect(stripMarkdown(plain)).toBe(plain);
   });
 });

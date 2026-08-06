@@ -11,13 +11,23 @@
 // first words, and takes `status: 'note'`. A dump is a `writing` fragment in
 // the `note` tier; "make it a piece" is later a status flip on this same row,
 // with no copy and no second write path (14 §3).
+//
+// ⚠ THE BOX BECAME A TIPTAP EDITOR ON 2026-08-06, reversing 14 §4's "plain
+// <textarea>, ever" — see CaptureDialog.astro for the trade Michael accepted.
+// Only the surface changed: `getMarkdown()` stands where `box.value` stood, and
+// every promise about not losing the thought (the 700ms debounce, the flush on
+// close and on visibilitychange, ＋ New parking one under its own id) is the
+// same code it was.
 import { actions } from 'astro:actions';
+import { mountRichEditor } from './rich-editor';
+import { wireAltDialog } from './alt-dialog';
+import { uploadImage } from './upload';
 
 const fab = document.getElementById('cap-open') as HTMLButtonElement | null;
 const dialog = document.getElementById('cap-dialog') as HTMLDialogElement | null;
 
 if (fab && dialog) {
-  const box = document.getElementById('cap-box') as HTMLTextAreaElement;
+  const boxEl = document.getElementById('cap-box') as HTMLElement;
   const statusEl = document.getElementById('cap-status') as HTMLElement;
   const newBtn = document.getElementById('cap-new') as HTMLButtonElement;
   const doneBtn = document.getElementById('cap-done') as HTMLButtonElement;
@@ -57,10 +67,48 @@ if (fab && dialog) {
     }, 1400);
   }
 
-  function autoGrow() {
-    box.style.height = 'auto';
-    box.style.height = `${Math.max(box.scrollHeight, 140)}px`;
-  }
+  /**
+   * The box itself.
+   *
+   * `breaks: true` — a dump's line breaks ARE its structure (an errand list, a
+   * stanza), and every dump written before 2026-08-06 is plain text whose
+   * newlines mean exactly that. Parsed as soft wraps they would glue into one
+   * paragraph and the autosave would write that back. The pile renders the
+   * other end to match: `renderMarkdown(body, { breaks: true })`.
+   */
+  const { editor, getMarkdown } = mountRichEditor({
+    editorEl: boxEl,
+    toolbarRoot: dialog.querySelector('[role="toolbar"]') as HTMLElement,
+    linkDialog: document.getElementById('cap-link-dialog') as HTMLDialogElement,
+    placeholder: 'Write it down…',
+    ariaLabel: 'What are you thinking?',
+    breaks: true,
+    // A jotting's register, not an essay's — shared with the pile's cards.
+    docClass: 'jot-prose',
+    images: {
+      // ⚠ MINTS THE ID EARLY, and it has to. Files key on the fragment id the
+      // same way the writing sheet's do, but here the id is normally minted by
+      // the first save — and pasting a screenshot into an empty box is a save
+      // that has not happened yet. Claiming it now is free: `persist` uses
+      // whatever `currentId` holds, and ＋ New clears it so the next thought
+      // gets its own folder. The path is `essays/` rather than `notes/`
+      // because "make it a piece" is a status flip on this very row: the
+      // picture must not need moving when the thought graduates.
+      upload: async (file) =>
+        (
+          await uploadImage(file, {
+            pathFor: (hash, ext) => `essays/${(currentId ??= crypto.randomUUID())}/${hash}.${ext}`,
+          })
+        ).url,
+      askAlt: wireAltDialog(document.getElementById('cap-alt-dialog') as HTMLDialogElement),
+      onStatus: (m) => (m ? flash(m, true) : flash('')),
+      onError: (m) => flash(m, true),
+    },
+    onChange: () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(save, DEBOUNCE_MS);
+    },
+  });
 
   /**
    * One save. Quiet on failure, like the writing sheet's autosave: a banner
@@ -68,7 +116,7 @@ if (fab && dialog) {
    * screen. `lock` keeps New from racing an in-flight write.
    */
   async function persist(): Promise<void> {
-    const text = box.value;
+    const text = getMarkdown();
     if (!text.trim()) return; // an empty box is never a row — a stray ✚ leaves no ghost
     if (text === lastSaved) return;
 
@@ -107,12 +155,6 @@ if (fab && dialog) {
     return lock;
   };
 
-  box.addEventListener('input', () => {
-    autoGrow();
-    window.clearTimeout(timer);
-    timer = window.setTimeout(save, DEBOUNCE_MS);
-  });
-
   /** Park the current thought and hand over a blank one, still focused. */
   async function startNew() {
     window.clearTimeout(timer);
@@ -121,23 +163,47 @@ if (fab && dialog) {
     baseUpdatedAt = '';
     slug = '';
     lastSaved = '';
-    box.value = '';
-    autoGrow();
-    box.focus();
+    // emitUpdate: false — TipTap fires `update` on setContent, which would arm
+    // the debounce and try to save the blank we just handed over.
+    editor.commands.setContent('', { emitUpdate: false });
+    editor.commands.focus('end');
   }
 
   newBtn.addEventListener('click', () => void startNew());
-  box.addEventListener('keydown', (e) => {
+  // On the dialog rather than on the box: the shortcut has to work from the
+  // toolbar and the foot as well, and a keystroke inside the editor bubbles
+  // here anyway. Nothing in TipTap binds Mod-Enter, so nothing is being stolen.
+  dialog.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       void startNew();
+      return;
+    }
+    /*
+      ⚠ ESCAPE HAS TO BE CLOSED BY HAND, and this cost an e2e failure to find.
+
+      A `<dialog>` turns Escape into a close request only if the keydown's
+      default survives — and ProseMirror's `captureKeyDown` preventDefaults
+      keyCode 27 unconditionally (prosemirror-view, "Enter, Esc"). So the
+      moment the box became an editor, Escape stopped reaching `cancel`: the
+      dialog just sat there, which is the *one* thing this box may never do,
+      because Escape is how you leave and leaving is what flushes the save.
+
+      Calling preventDefault here as well is deliberate, not habit — it keeps
+      the two paths mutually exclusive. Focus on the toolbar or on Done is
+      OUTSIDE the editor, where nothing swallows the key and the native
+      `cancel` below still fires; claiming the default stops that one from
+      running a second close on top of this one.
+    */
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      void close();
     }
   });
 
   function open() {
     dialog!.showModal();
-    autoGrow();
-    box.focus();
+    editor.commands.focus('end');
   }
 
   /**

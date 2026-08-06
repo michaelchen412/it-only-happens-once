@@ -12,6 +12,11 @@
 // gap is the widest: nothing below proves it actually merges two bodies.
 import { test, expect, type Page } from '@playwright/test';
 import { hideDevToolbar, stubActions } from './fixtures';
+// ⚠ THE SAME FUNCTION THE ROOM USES, not a restatement of it. Triage hands the
+// sheets plain text, because a task's title is an `<input>` and a log entry's
+// body is a `<textarea>` — neither can render `**`. Asserting on the raw
+// Markdown would pass on today's plain dumps and fail the day one holds a mark.
+import { stripMarkdown } from '../../src/lib/markdown-plain';
 
 /** Pull one field out of a multipart body — enough to assert the contract. */
 function field(body: string | null, name: string): string | null {
@@ -20,6 +25,13 @@ function field(body: string | null, name: string): string | null {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * What you type into. ⚠ NOT `#cap-box` ITSELF since 2026-08-06 — that is the
+ * scroller now, and TipTap renders the editable element inside it. Every
+ * `fill`, `press` and focus assertion below wants the contenteditable.
+ */
+const capBox = (page: Page) => page.locator('#cap-box [contenteditable="true"]');
 
 const openBox = async (page: Page) => {
   await page.locator('#cap-open').click();
@@ -41,7 +53,7 @@ test.describe('the ✚ — one door, every room', () => {
     await stubActions(page, {});
     await page.goto('/admin/agenda');
     await openBox(page);
-    await expect(page.locator('#cap-box')).toBeFocused(); // land ready to type
+    await expect(capBox(page)).toBeFocused(); // land ready to type
     await expect(page).toHaveURL(/\/admin\/agenda$/); // still exactly where you were
   });
 
@@ -50,7 +62,7 @@ test.describe('the ✚ — one door, every room', () => {
     // Today answers "what is my day" and a dump box answers nothing about it.
     await page.goto('/admin');
     await expect(page.locator('#cap-box')).toBeHidden(); // present in the dialog, not on the page
-    await expect(page.locator('main').getByPlaceholder('Write it down…')).toHaveCount(0);
+    await expect(page.locator('main #cap-box')).toHaveCount(0);
   });
 });
 
@@ -69,7 +81,7 @@ test.describe('the box', () => {
 
     await page.goto('/admin');
     await openBox(page);
-    const box = page.locator('#cap-box');
+    const box = capBox(page);
 
     // 1. An empty box is never a row. Wait out the debounce and assert silence.
     await page.waitForTimeout(1200);
@@ -95,7 +107,7 @@ test.describe('the box', () => {
 
     // 4. ＋ New parks it and hands over a blank, still focused.
     await page.locator('#cap-new').click();
-    await expect(box).toHaveValue('');
+    await expect(box).toHaveText(''); // a contenteditable now, so text rather than value
     await expect(box).toBeFocused();
 
     // 5. The next thought is a NEW note — the bug that would matter most here
@@ -118,12 +130,12 @@ test.describe('the box', () => {
 
     await page.goto('/admin');
     await openBox(page);
-    const box = page.locator('#cap-box');
+    const box = capBox(page);
 
     await box.fill('one');
     await expect.poll(() => ids.length).toBe(1);
     await box.press('ControlOrMeta+Enter');
-    await expect(box).toHaveValue('');
+    await expect(box).toHaveText('');
 
     await box.fill('two');
     await expect.poll(() => ids.length).toBe(2);
@@ -143,9 +155,14 @@ test.describe('the box', () => {
     await openBox(page);
     // Type and leave IMMEDIATELY — inside the 700ms window, so the only thing
     // that can save this is the close handler.
-    await page.locator('#cap-box').fill('the thing I would have lost');
+    await capBox(page).fill('the thing I would have lost');
     await page.keyboard.press('Escape');
     await expect.poll(() => bodies).toContain('the thing I would have lost');
+    // ⚠ THE SECOND LINE IS NOT A FORMALITY, and it caught a real one. A
+    // <dialog> only treats Escape as a close request if the keydown's default
+    // survives, and ProseMirror preventDefaults Escape unconditionally — so
+    // the day the box became an editor this stopped closing, silently, with
+    // the save still working. capture.ts closes it by hand now.
     await expect(page.locator('#cap-dialog')).toBeHidden();
   });
 
@@ -225,17 +242,54 @@ test.describe('the pile', () => {
     const text = await card.locator('[data-text]').innerText();
     await card.locator('[data-edit]').click();
 
-    const box = card.locator('[data-edit-box]');
-    await expect(box).toBeVisible();
+    // ⚠ THE EDITOR IS IN THE CARD, not the card's own textarea — since
+    // 2026-08-06 the room has exactly ONE and moves it to whichever card you
+    // open. `#dump-shell` living inside `.dump` is the whole claim.
+    const shell = card.locator('#dump-shell');
+    await expect(shell).toBeVisible();
+    const box = shell.locator('[contenteditable="true"]');
     await expect(box).toBeFocused();
-    expect((await box.inputValue()).trim()).toBe(text.trim()); // the same words, not a fetch
+    expect((await box.innerText()).trim()).toBe(text.trim()); // the same words, not a fetch
     await expect(card.locator('[data-text]')).toBeHidden();
     await expect(page).toHaveURL(/\/admin\/notes$/);
 
-    // Escape returns to reading without asking anything.
+    // Escape returns to reading without asking anything, and the editor goes
+    // home — a card that kept it would leave the pencil dead everywhere else.
     await page.keyboard.press('Escape');
-    await expect(box).toBeHidden();
+    await expect(shell).toHaveCount(0);
     await expect(card.locator('[data-text]')).toBeVisible();
+  });
+
+  test('the card carries the writing sheet’s controls, and they format the words', async ({ page }) => {
+    // The ask this shipped for (2026-08-06): the same toolbar the composer has,
+    // in the pile. Bold is the cheapest proof that the whole chain works —
+    // toolbar → TipTap → Markdown → the body that gets saved.
+    const saved: Array<string | null> = [];
+    await stubActions(page, {
+      'fragments.saveWriting': (req) => {
+        saved.push(field(req.postData(), 'body'));
+        return { id: field(req.postData(), 'id'), slug: 'stub', updated_at: new Date().toISOString() };
+      },
+    });
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    await card.locator('[data-edit]').click();
+    const toolbar = card.locator('#dump-shell [role="toolbar"]');
+    // Not an assertion about a count: the claim is that these commands exist
+    // here, the same ones EditorToolbar gives the writing sheet.
+    for (const cmd of ['bold', 'italic', 'h2', 'bulletList', 'link', 'image']) {
+      await expect(toolbar.locator(`[data-cmd="${cmd}"]`)).toBeVisible();
+    }
+
+    const box = card.locator('#dump-shell [contenteditable="true"]');
+    await box.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await toolbar.locator('[data-cmd="bold"]').click();
+    // Not a count: select-all over a dump of several paragraphs marks each one,
+    // and how many blocks the first card happens to hold is not the claim.
+    expect(await box.locator('strong').count()).toBeGreaterThan(0); // bold on screen…
+    await expect.poll(() => saved.at(-1) ?? '').toMatch(/\*\*/); // …and bold in what was stored
   });
 
   test('an unchanged card saves nothing when you leave it', async ({ page }) => {
@@ -540,7 +594,7 @@ test.describe('note → log entry', () => {
     await stubActions(page, {});
     await needsRoster(page);
     const card = page.locator('.dump').first();
-    const text = await card.locator('[data-edit-box]').inputValue();
+    const text = stripMarkdown(await card.locator('[data-edit-box]').inputValue());
 
     await card.locator('[data-file]').click();
     await page.locator('#dump-file [data-as="log"]').click();
@@ -693,7 +747,9 @@ test.describe('the parser (14 · Piece 3)', () => {
     await page.goto('/admin/notes');
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
     const card = page.locator('.dump').first();
-    const first = (await card.locator('[data-edit-box]').inputValue()).split('\n')[0].trim();
+    const first = stripMarkdown(await card.locator('[data-edit-box]').inputValue())
+      .split('\n')[0]
+      .trim();
 
     await card.locator('[data-file]').click();
     await page.locator('#dump-file [data-as="agenda"]').click();

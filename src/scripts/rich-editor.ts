@@ -30,6 +30,24 @@ export interface RichEditorOptions {
   placeholder?: string;
   content?: string;
   ariaLabel?: string;
+  /**
+   * Treat a lone newline as a hard break, both ways through Markdown.
+   *
+   * ⚠ THE NOTE EDITORS NEED THIS AND AN ESSAY MUST NOT HAVE IT. Every dump
+   * written before this editor was rich is plain text whose newlines carry its
+   * shape — a list of errands, a stanza. Parsed with `breaks: false` those are
+   * soft wraps, so opening one would silently glue it into a single paragraph
+   * and the autosave would write that back. `mountMiniEditor` already made
+   * this exact call for a quote and a song annotation; render the other end
+   * with `renderMarkdown(body, { breaks: true })` to match.
+   */
+  breaks?: boolean;
+  /**
+   * Extra classes for the editable surface, beside `reading tiptap-doc`.
+   * The surface is created by TipTap, so a caller that needs to style it (the
+   * notes editors run at a jotting's scale, not an essay's) has no other hook.
+   */
+  docClass?: string;
   /** Called on every document change (the caller decides what to do). */
   onChange?: () => void;
   /**
@@ -87,7 +105,7 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
     element: opts.editorEl,
     extensions: [
       StarterKit,
-      Markdown.configure({ transformPastedText: true, transformCopiedText: true }),
+      Markdown.configure({ breaks: opts.breaks ?? false, transformPastedText: true, transformCopiedText: true }),
       Placeholder.configure({ placeholder: opts.placeholder ?? 'Start writing…' }),
       // `inline: false` — an image is its own block, which is what
       // `![alt](src)` round-trips to and what the reading column wants.
@@ -95,7 +113,10 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
     ],
     content: opts.content || '',
     editorProps: {
-      attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Body' },
+      attributes: {
+        class: `reading tiptap-doc focus:outline-none${opts.docClass ? ` ${opts.docClass}` : ''}`,
+        'aria-label': opts.ariaLabel ?? 'Body',
+      },
       // Paste and drop are the affordances that actually matter for writing —
       // a screenshot goes ⌘V, not through a file picker. Returning true claims
       // the event so ProseMirror doesn't also insert the file's name as text.

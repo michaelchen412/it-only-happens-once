@@ -28,10 +28,25 @@ const SANITIZE: sanitizeHtml.IOptions = {
   allowedSchemesByTag: { img: ['http', 'https', 'data'] },
 };
 
+export interface RenderOptions {
+  /**
+   * Treat a lone newline as a line break, the way the notes pile needs.
+   *
+   * ⚠ OFF for an essay, and that is the whole reason this is an option rather
+   * than a setting. In prose a wrapped source line is not a break, and turning
+   * every one into a `<br>` would shred fifty imported essays. A **jotting** is
+   * the opposite case: its line breaks are its structure, and the pile has to
+   * render the plain text typed before the editor was rich exactly as it looks
+   * in the box. Both forms land in the same place — a `\`-terminated hard break
+   * (what TipTap serializes) renders as one `<br>` either way.
+   */
+  breaks?: boolean;
+}
+
 /** Markdown string → sanitized HTML string (for `set:html`). Empty in → empty out. */
-export function renderMarkdown(md: string | null | undefined): string {
+export function renderMarkdown(md: string | null | undefined, opts: RenderOptions = {}): string {
   if (!md || !md.trim()) return '';
-  const html = marked.parse(md, { async: false }) as string;
+  const html = marked.parse(md, { async: false, breaks: opts.breaks ?? false }) as string;
   return sanitizeHtml(html, SANITIZE);
 }
 

@@ -14,10 +14,17 @@
 //   · add to a piece       — the one genuine copy, so the dump is consumed
 //
 // ⚠ READING IS THE DOMINANT MOTION HERE, which is why the text is a `<div>` and
-// the pencil is what turns it into a `<textarea>`. The alternative — a pile of
-// live textareas, always editable — was better on paper and worse in the hand:
+// the pencil is what puts an editor in its place. The alternative — a pile of
+// live editors, always editable — was better on paper and worse in the hand:
 // on a phone, every tap while scrolling past a thought would put a cursor in it
 // and throw the keyboard up over the pile you were trying to read.
+//
+// ⚠ AND THAT EDITOR IS TIPTAP NOW (2026-08-06), not a textarea. Michael asked
+// for the writing sheet's formatting in the pile as well — *"I think those are
+// important still to have, even though they take up a little bit of UI space"*
+// — so a dump's body is genuinely Markdown, the card renders it, and the
+// controls are the shared EditorToolbar. There is ONE editor for the whole
+// room, moved into whichever card is open; see notes.astro for why.
 //
 // THE SHEET-BASED DESTINATIONS ANNOUNCE RATHER THAN TIDY. `hq:note-filed`
 // arrives from task-sheet.ts, event-sheet.ts and log-sheet.ts; consuming the
@@ -26,7 +33,11 @@
 // destination.
 import { actions } from 'astro:actions';
 import { elapsedSince } from '../lib/hq/dates';
+import { stripMarkdown } from '../lib/markdown-plain';
+import { wireAltDialog } from './alt-dialog';
 import { anchorPopover } from './pop-anchor';
+import { mountRichEditor } from './rich-editor';
+import { uploadImage } from './upload';
 
 const pile = document.getElementById('notes-pile');
 const undoBar = document.getElementById('notes-undo');
@@ -67,6 +78,10 @@ if (undoBar) {
     window.clearTimeout(undoTimer);
     undoBar!.classList.remove('is-visible');
     if (!pending) return;
+    // Every way out flushes its edit first, so the editor should already be
+    // home. This is the belt: the room has exactly one, and a card taking it
+    // into the void would leave the pencil dead on every other card.
+    if (shell.parentElement === pending.card) homeShell();
     pending.card.remove();
     pending = null;
     // The empty state is server-rendered, so an emptied pile would otherwise
@@ -113,16 +128,64 @@ if (undoBar) {
   const textOf = (card: HTMLElement) => card.querySelector<HTMLElement>('[data-text]')!;
   const boxOf = (card: HTMLElement) => card.querySelector<HTMLTextAreaElement>('[data-edit-box]')!;
   const stampOf = (card: HTMLElement) => card.querySelector<HTMLTimeElement>('[data-ago]')!;
+  /** Put the stamp back to what it says at rest, after it has been borrowed. */
+  const restStamp = (card: HTMLElement) => {
+    stampOf(card).textContent = elapsedSince(card.dataset.updated!);
+  };
 
-  function autoGrow(box: HTMLTextAreaElement) {
-    box.style.height = 'auto';
-    box.style.height = `${Math.max(box.scrollHeight, 60)}px`;
-  }
+  /* ── the one editor ─────────────────────────────────────────────────────── */
+
+  // Its home is outside the pile, so a card leaving cannot take it along.
+  const shell = document.getElementById('dump-shell')!;
+  const shellHome = shell.parentElement!;
+
+  const { editor, getMarkdown } = mountRichEditor({
+    editorEl: document.getElementById('dump-editor')!,
+    toolbarRoot: shell.querySelector('[role="toolbar"]') as HTMLElement,
+    linkDialog: document.getElementById('dump-link-dialog') as HTMLDialogElement,
+    placeholder: 'Write it down…', // the ✚'s words, for a thought you emptied
+    ariaLabel: 'Edit this note',
+    // Matches `.dump__text` exactly, so opening a card does not move its words.
+    docClass: 'jot-prose',
+    // ⚠ A dump's newlines are its shape, and every one written before this
+    // editor existed is plain text. See rich-editor's `breaks` for the whole
+    // argument; the card renders to match.
+    breaks: true,
+    images: {
+      // `essays/<id>/` rather than `notes/<id>/`, because "make it a piece" is
+      // a status flip on this very row — the picture must not need moving when
+      // the thought graduates. The id is read at upload time from the card
+      // that is open, which is the only card an upload can come from.
+      upload: async (file) => {
+        const id = editing?.dataset.note;
+        if (!id) throw new Error('No note is open');
+        return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).url;
+      },
+      askAlt: wireAltDialog(document.getElementById('dump-alt-dialog') as HTMLDialogElement),
+      // The card's own stamp is the status line — this room has no other, and
+      // an upload notice belongs beside the thought it is going into.
+      onStatus: (m) => editing && (m ? (stampOf(editing).textContent = m) : restStamp(editing)),
+      onError: (m) => editing && (stampOf(editing).textContent = m),
+    },
+    onChange: () => {
+      if (!editing) return;
+      const card = editing;
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => void save(card), DEBOUNCE_MS);
+    },
+  });
+
+  /**
+   * This card's Markdown. From the editor while it is the one being edited,
+   * from its hidden carrier otherwise — the carrier is what the other cards
+   * have instead of an editor of their own.
+   */
+  const markdownOf = (card: HTMLElement) => (editing === card ? getMarkdown() : boxOf(card).value);
 
   /** One save of the card being edited. Quiet on failure — the words are still on screen. */
   async function persist(card: HTMLElement): Promise<void> {
     const box = boxOf(card);
-    const text = box.value;
+    const text = markdownOf(card);
     if (text === card.dataset.saved) return;
 
     const fd = new FormData();
@@ -144,6 +207,9 @@ if (undoBar) {
       card.dataset.updated = data.updated_at;
       card.dataset.slug = data.slug;
       card.dataset.saved = text;
+      // The carrier follows every save, so the four destinations behind → read
+      // what is actually stored even mid-edit.
+      box.value = text;
       stampOf(card).dateTime = data.updated_at;
       stampOf(card).textContent = elapsedSince(data.updated_at);
     } catch {
@@ -156,34 +222,74 @@ if (undoBar) {
     return lock;
   };
 
+  /** Move the editor out of whatever card has it and back to its home. */
+  function homeShell() {
+    shell.hidden = true;
+    shellHome.append(shell);
+  }
+
   function enterEdit(card: HTMLElement) {
     if (editing === card) return;
     if (editing) void leaveEdit(editing);
     editing = card;
-    const box = boxOf(card);
-    card.dataset.saved = box.value;
+
+    editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
+    /*
+      ⚠ THE BASELINE IS WHAT THE EDITOR WOULD WRITE, not what the server sent,
+      and the difference is the whole reason this line has a comment.
+
+      Opening a thought to re-read it must not rewrite the row — that would
+      move it to the top of a pile ordered by when it was last touched. But a
+      dump typed before this editor existed is plain text, and a round trip
+      through TipTap re-spells it (a newline becomes Markdown's `\` hard
+      break). Comparing against the server's copy would call that a change and
+      save it, on every card you so much as glanced at. Comparing against the
+      editor's own serialization asks the question that actually matters: did
+      the DOCUMENT change?
+    */
+    card.dataset.saved = getMarkdown();
+
+    // In the card, in the text's place — the text hides rather than moves.
+    card.insertBefore(shell, card.querySelector('.dump__foot'));
+    shell.hidden = false;
     textOf(card).hidden = true;
     card.querySelector<HTMLElement>('[data-more]')?.setAttribute('hidden', '');
-    box.hidden = false;
-    autoGrow(box);
-    box.focus();
-    box.setSelectionRange(box.value.length, box.value.length);
+    editor.commands.focus('end');
   }
 
-  async function leaveEdit(card: HTMLElement) {
+  /**
+   * Back to reading. ⚠ THE DOM WORK HAPPENS BEFORE THE AWAIT, deliberately:
+   * the editor is one element shared by the pile, so a save left in front of
+   * the hand-back would let the next card's `enterEdit` claim the shell and
+   * this card's tail then steal it away again. The promise is still returned,
+   * because the motions that move a card out of the pile need the save landed
+   * before they flip its status.
+   */
+  function leaveEdit(card: HTMLElement): Promise<unknown> {
     window.clearTimeout(saveTimer);
     editing = null;
-    await save(card);
+
     const box = boxOf(card);
+    box.value = getMarkdown();
     const text = textOf(card);
-    text.textContent = box.value;
+    /*
+      The rendered twin comes from the editor's own document rather than from a
+      Markdown round trip: it is the exact thing that was on screen a moment
+      ago, and it costs no parser in the browser. `innerHTML` is safe here in a
+      way it usually isn't — this string is written by ProseMirror's serializer
+      out of a schema with no script node and no event-handler attribute, so it
+      cannot express one. The public renderer still sanitizes (lib/markdown).
+    */
+    text.innerHTML = editor.getHTML();
+    homeShell();
     text.hidden = false;
-    box.hidden = true;
     // An edited thought may have grown past the clamp, or shrunk under it.
     const long = box.value.split('\n').length > 10 || box.value.length > 700;
     text.classList.toggle('dump__text--clamped', long && !text.dataset.expanded);
     const more = card.querySelector<HTMLElement>('[data-more]');
     if (more) more.hidden = !long || !!text.dataset.expanded;
+
+    return save(card);
   }
 
   /* ── the two ways out ───────────────────────────────────────────────────── */
@@ -238,7 +344,7 @@ if (undoBar) {
    * Piece 2. Nothing here can ever be worse than not having the parser.
    */
   async function toAgenda(card: HTMLElement) {
-    const text = textOfCard(card);
+    const text = plainOf(card);
     const stamp = stampOf(card);
     const wasSaying = stamp.textContent;
     stamp.textContent = 'reading…';
@@ -274,7 +380,17 @@ if (undoBar) {
   let choosing: HTMLElement | null = null;
   if (chooser) anchorPopover(chooser, () => choosing?.querySelector<HTMLElement>('[data-file]'));
 
-  const textOfCard = (card: HTMLElement) => boxOf(card).value;
+  /*
+   * What this card says, for a field that cannot render Markdown.
+   *
+   * ⚠ THE MARKS COME OFF ON THE WAY OUT. A task's title is an `<input>` and a
+   * log entry's body is a `<textarea>`; handing either `**call mom**` would
+   * leak the asterisks into a field you then have to clean by hand. Stripping
+   * is only right for these two doors — **Add to a piece…** appends Markdown
+   * to Markdown on the server, which is the one destination that wants it
+   * whole, and it never comes through here.
+   */
+  const plainOf = (card: HTMLElement) => stripMarkdown(markdownOf(card));
 
   chooser?.addEventListener('click', (e) => {
     const row = (e.target as Element).closest<HTMLElement>('[data-as]');
@@ -288,7 +404,7 @@ if (undoBar) {
         break;
       case 'log':
         document.dispatchEvent(
-          new CustomEvent('hq:log-open', { detail: { noteId: card.dataset.note, text: textOfCard(card) } }),
+          new CustomEvent('hq:log-open', { detail: { noteId: card.dataset.note, text: plainOf(card) } }),
         );
         break;
       case 'piece':
@@ -456,23 +572,22 @@ if (undoBar) {
     }
   });
 
-  pile?.addEventListener('input', (e) => {
-    const box = (e.target as Element).closest<HTMLTextAreaElement>('[data-edit-box]');
-    if (!box) return;
-    const card = box.closest<HTMLElement>('[data-note]')!;
-    autoGrow(box);
-    window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(() => void save(card), DEBOUNCE_MS);
+  /*
+   * Clicking away closes the card. ⚠ NOT `blur`, WHICH IS WHAT A TEXTAREA USED
+   * — a rich editor loses focus constantly and legitimately: to its own
+   * toolbar, to the link dialog, to the alt-text prompt, to the file picker.
+   * Every one of those would have read as "you're done here" and folded the
+   * card mid-motion. What actually means done is a pointer landing somewhere
+   * that is neither this card nor a window this card opened.
+   */
+  document.addEventListener('pointerdown', (e) => {
+    if (!editing) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
+    if (target.closest('.dump') === editing) return; // the card, its editor, its toolbar
+    if (target.closest('dialog, [popover]')) return; // link, alt text, the chooser, a sheet
+    void leaveEdit(editing);
   });
-
-  pile?.addEventListener(
-    'blur',
-    (e) => {
-      const box = (e.target as Element).closest<HTMLTextAreaElement>('[data-edit-box]');
-      if (box && editing) void leaveEdit(editing);
-    },
-    true, // blur does not bubble
-  );
 
   pile?.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !editing) return;

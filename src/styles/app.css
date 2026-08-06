@@ -4887,23 +4887,30 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .cap-shell {
   padding: 0.25rem;
 }
-/* ⚠ A PLAIN TEXTAREA, DELIBERATELY AND PERMANENTLY (14 §4). Wispr Flow dictates
-   into any text field, so voice capture costs nothing — provided nothing here
-   gets clever with input handling. Serif and large because a thought is easier
-   to re-read than to squint at; borderless because the dialog is already the
-   box, and a second frame inside it is chrome. */
+/* ⚠ WAS A PLAIN TEXTAREA UNTIL 2026-08-06, and that was a rule with a reason —
+   dictation types into any text field, so voice capture cost nothing as long as
+   nothing here got clever. Michael reversed it for the writing sheet's
+   formatting; the trade is written out in CaptureDialog.astro. What survives
+   unchanged is the look: serif and large because a thought is easier to re-read
+   than to squint at, borderless because the dialog is already the box and a
+   second frame inside it is chrome. Now the SCROLLER around the editor. */
 .cap-box {
   width: 100%;
-  resize: none;
-  padding: 1.25rem 1.25rem 0.75rem;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font-family: var(--font-serif);
-  font-size: 1.0625rem;
-  line-height: 1.65;
   max-height: min(60vh, 26rem);
   overflow-y: auto;
+}
+.cap-shell .jot-prose {
+  min-height: 8.5rem; /* the old textarea's floor, so the box opens the same size */
+  padding: 1.25rem 1.25rem 0.75rem;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+/* Under the box, never over it: the dialog has no title, and a strip of
+   controls above the words would be chrome introducing something that needs no
+   introduction. */
+.cap-tools {
+  padding: 0.375rem 0.75rem;
+  border-top: 1px solid var(--color-base-300);
 }
 .cap-foot {
   display: flex;
@@ -4939,36 +4946,107 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .dump:hover {
   border-color: color-mix(in oklch, var(--color-base-content) 20%, var(--color-base-300));
 }
+/* ── a jotting's prose register ─────────────────────────────────────────────
+   `.reading` is tuned for an essay in a wide column: 1.15rem at 1.8, with
+   1.4em between paragraphs. Every one of those is wrong inside a card that may
+   hold three words, so the note surfaces carry BOTH — `.reading` for what the
+   marks mean (bold, italic, a link, a list), this for the scale they mean it
+   at. Unlayered, so it wins over `@layer base`'s `.reading` rules without a
+   specificity contest.
+
+   ⚠ SHARED BY THE CARD AND ITS EDITOR ON PURPOSE. Entering edit mode must not
+   make the words move — that is the one thing that would make in-place editing
+   feel like an "open" after all — so the two must render identically. One
+   class is how that stays true. */
+.jot-prose {
+  font-family: var(--font-serif);
+  overflow-wrap: anywhere; /* a pasted URL must not widen the card */
+}
+.jot-prose > :first-child {
+  margin-top: 0;
+}
+.jot-prose > :last-child {
+  margin-bottom: 0;
+}
+.jot-prose :is(p, ul, ol, blockquote, pre) {
+  margin-block: 0.65em;
+}
+.jot-prose :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 1.15em;
+  line-height: 1.3;
+  margin-block: 0.9em 0.25em;
+}
+.jot-prose blockquote {
+  font-size: inherit;
+  line-height: inherit;
+  padding-inline-start: 0.85rem;
+}
+.jot-prose :is(ul, ol) {
+  padding-inline-start: 1.2em;
+}
+.jot-prose li {
+  margin-block: 0.15em;
+}
+.jot-prose img {
+  margin-block: 0.75em;
+  border-radius: var(--radius-field);
+}
+.jot-prose hr {
+  margin-block: 1em;
+}
+/* ⚠ THE PLACEHOLDER IS FOR AN EMPTY THOUGHT, not for an empty paragraph inside
+   one. `.tiptap-doc .is-empty::before` puts it on every empty node, which the
+   composer can afford; a dump's body routinely ends in a blank line, and the
+   caret lands there when you open a card — so a note you wrote last week was
+   greeting you with "Write it down…" under its own last paragraph. */
+.jot-prose .is-empty:not(.is-editor-empty)::before {
+  content: none;
+}
+
+/* ⚠ RENDERED MARKDOWN SINCE 2026-08-06, not printed text — so no `pre-wrap`.
+   The line breaks a dump was typed with are still its structure; they arrive
+   as `<br>` now, because the page renders with `breaks: true`. */
 .dump__text {
   padding: 0.875rem 1rem 0.5rem;
-  font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.6;
-  white-space: pre-wrap; /* a dump's line breaks ARE its structure */
-  overflow-wrap: anywhere; /* a pasted URL must not widen the card */
 }
 /* Long ones clamp rather than scroll: a demoted essay in a pile of jottings
    should take one card's worth of room, not thirty. `more` reveals it in place
-   — still never an "open". */
+   — still never an "open".
+
+   ⚠ A HEIGHT AND A FADE, NOT `-webkit-line-clamp`, and the swap was forced.
+   Line-clamp counts lines in a `-webkit-box`, which worked while this element
+   held one run of plain text — but it renders Markdown now, and with block
+   children Chromium puts the ellipsis on line 10 and then leaves the top of
+   line 11 showing under it. A cut with a visible remnant beneath is worse than
+   no cut at all; it reads as a rendering fault rather than as "there is more".
+
+   The fade is a mask, deliberately, not a gradient overlay in the card colour:
+   it goes to transparent, so it is correct in both themes and over the hover
+   background without knowing any of their values. */
 .dump__text--clamped {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 10;
+  max-height: 16rem;
   overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
 }
-/* The editable twin. Same metrics as `.dump__text`, so entering edit mode does
-   not make the words move — the one thing that would make in-place editing
-   feel like an "open" after all. */
-.dump__edit {
-  width: 100%;
-  resize: none;
+/* The editor, while it is in a card. ONE of these exists for the whole pile
+   (notes.astro), moved in and out — so these rules describe a guest, not part
+   of the card. Same metrics as `.dump__text` via `.jot-prose`, so the words do
+   not move when it arrives. */
+.dump__shell .jot-prose {
+  min-height: 3.25rem; /* not the composer's 24rem — this is a card, not a page */
   padding: 0.875rem 1rem 0.5rem;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.6;
+}
+/* The controls, between the words and the card's own foot. A hairline rather
+   than a filled bar: they belong to the thought above them, not to the row of
+   actions below. */
+.dump__tools {
+  padding: 0.25rem 0.625rem;
+  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
 }
 .dump__foot {
   display: flex;

@@ -19,10 +19,25 @@
   premise here is *as few decisions as possible between the thought and the
   saving of it*. Escape puts you back exactly where you were.
 
-  ⚠ THE BOX MUST STAY A PLAIN <textarea>. Wispr Flow dictates into any text
-  field, so voice capture works for free — but only while nothing gets clever
-  with the input handling. That is a constraint on future changes, not a
-  feature: no rich editor here, ever. (14 §4.)
+  ⚠ THE BOX WAS A PLAIN <textarea> UNTIL 2026-08-06, AND THAT WAS A RULE.
+  14 §4 said *no rich editor here, ever*: Wispr Flow dictates into any text
+  field, so voice capture worked for free as long as nothing got clever with
+  the input handling. Michael reversed it, having been shown the constraint —
+  the same formatting the writing sheet has is wanted here and in the pile,
+  *"even though they take up a little bit of UI space"*.
+
+  So the trade is now on the record rather than in the past: a `contenteditable`
+  is still a text field and dictation still types into it, but it is no longer
+  the *plainest possible* one, and if voice capture ever misbehaves this is the
+  first thing to suspect. What is NOT negotiable is what the rule was protecting
+  — the thought must survive the typing of it. Everything the box does to keep
+  that promise (the 700ms autosave, the flush on close, ⌘/Ctrl+Enter to park
+  one and start another) is unchanged.
+
+  THE TOOLBAR SITS BELOW THE BOX, not above it. The dialog has no title and no
+  instructions — *"the box says what it is by being a box with a cursor already
+  in it"* — and a strip of controls above the words would be the first thing
+  you meet, which is chrome introducing a box that needs no introduction.
 
   THE PILE IS NOT IN HERE. The room shows what you jotted; this shows a place
   to jot. Putting a recent list under the box would make the dialog a second,
@@ -30,6 +45,9 @@
   job is exactly the middle ground this workstream deleted.
 */
 import { Icon } from 'astro-icon/components';
+import EditorToolbar from './EditorToolbar.astro';
+import LinkDialog from './LinkDialog.astro';
+import AltTextDialog from './AltTextDialog.astro';
 ---
 
 {
@@ -57,10 +75,21 @@ import { Icon } from 'astro-icon/components';
       by being a box with a cursor already in it (10-hq §10i: if a sentence
       exists to justify a design decision, it belongs in the plan, not on the
       screen).
+
+      The mount point keeps the `cap-box` id it had as a <textarea>: TipTap
+      renders its own editable element inside this one, so anything looking for
+      what you type wants `#cap-box [contenteditable]`.
     */
     }
-    <textarea id="cap-box" class="cap-box" rows="5" placeholder="Write it down…" aria-label="What are you thinking?"
-    ></textarea>
+    <div id="cap-box" class="cap-box"></div>
+
+    {
+      /* Same toolbar as the writing sheet, images and all. `image` is on
+        because a dump is often a screenshot — and files key on the fragment
+        id, which "make it a piece" preserves, so a picture jotted here follows
+        the thought all the way into a published essay. */
+    }
+    <EditorToolbar class="cap-tools" image />
 
     <div class="cap-foot">
       {
@@ -86,6 +115,15 @@ import { Icon } from 'astro-icon/components';
     </div>
   </div>
 </dialog>
+
+{
+  /* Outside the capture dialog, not inside it: a <dialog> opened from within
+    another <dialog> stacks in the top layer above its opener, which is what we
+    want, but nesting the element would trap focus in the wrong one. Ids
+    because the pile mounts its own pair on the same page. */
+}
+<LinkDialog id="cap-link-dialog" />
+<AltTextDialog id="cap-alt-dialog" />
 
 <script>
   import '../../scripts/capture';

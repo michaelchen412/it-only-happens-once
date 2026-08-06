@@ -40,6 +40,7 @@ Durable records of what this site is and how it's built — so that neither a hu
 | HQ layering | **Rules are pure, loaders gather, pages render** — and routing belongs to the page | [0016](adr/0016-hq-layering.md) |
 | Editing a published piece | Never mutates the canonical row: edits autosave into a **draft version**, and **promotion** is a deliberate act that preserves what it replaces | [admin.md §5a](admin.md) |
 | Fragment tiers | **note → draft → published**, one linear promotion. Notes are a `status`, private by RLS allowlist | [admin.md §5b](admin.md) |
+| Notes editor | **The composer's editor on both note surfaces** — the ✚ box and the pile. Plan 14's "plain `<textarea>`, ever" rule is retired, and the dictation trade is on the record rather than in the past | [0018](adr/0018-notes-use-the-composer-editor.md) |
 
 ## Status
 

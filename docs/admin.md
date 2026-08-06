@@ -27,8 +27,8 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, the **timeline** in the main column with its log box open at the head, **About** and **Shared** in the rail, and a pencil on the block it edits. On a phone the order inverts: About first, because you open a profile there to remember who somebody is, not to scroll a year of entries. |
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
-| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one plain textarea that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
-| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil edits in place, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one box — a TipTap editor with the writing sheet's toolbar under it — that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil opens the room's one editor **in that card**, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
 | **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5c). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
@@ -222,21 +222,73 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   live PostgREST with the real anon key on 2026-07-30 — 0 rows by id, by slug,
   by status, and through the constellation join.
 - **One door, from every room.** The **✚** at the bottom-right of every
-  Observatory page opens a plain textarea that saves itself on a 700ms debounce
-  — shorter than the writing sheet's 1200ms, because a dump box is not a
-  document you sit in and the pause before *Saved* is the whole reassurance.
-  **＋ New** (or ⌘/Ctrl+Enter) parks the thought under its own id and hands over
-  a blank. An empty box is never a row. It is a `<dialog>`, so you keep the room
-  you were standing in, and there is no title field anywhere.
-- **⚠ It must stay a plain `<textarea>`.** Dictation software types into any
-  text field, so voice capture works for free — provided nothing gets clever
-  with the input handling. That is a constraint on future changes, not a
-  feature.
+  Observatory page opens a box that saves itself on a 700ms debounce — shorter
+  than the writing sheet's 1200ms, because a dump box is not a document you sit
+  in and the pause before *Saved* is the whole reassurance. **＋ New** (or
+  ⌘/Ctrl+Enter) parks the thought under its own id and hands over a blank. An
+  empty box is never a row. It is a `<dialog>`, so you keep the room you were
+  standing in, and there is no title field anywhere.
+- **⚠ Both note editors are TipTap, since 2026-08-06 — and until then the ✚
+  box was required to be a plain `<textarea>`, forever.** The decision, its
+  alternatives and the trade it accepts are
+  [ADR-0018](adr/0018-notes-use-the-composer-editor.md);
+  what follows is what it means in this room.
+  [Plan 14](plans/archive/14-capture.md)
+  §4 wrote that rule down for a reason: dictation software types into any text
+  field, so voice capture worked for free as long as nothing got clever with
+  the input handling. Michael reversed it, having been shown the constraint —
+  he wanted the writing sheet's formatting in the box and in the pile, *"even
+  though they take up a little bit of UI space"*. So the trade is on the record
+  rather than in the past: a `contenteditable` is still a text field and
+  dictation still types into it, but it is no longer the *plainest possible*
+  one, and it is the first thing to suspect if voice capture ever misbehaves.
+  What the rule was protecting is untouched — the debounce, the flush on close,
+  and ⌘/Ctrl+Enter are the same code they were.
+- **What that buys, and what it costs.** The shared `EditorToolbar` (undo/redo,
+  H2/H3, bold/italic/strike, quote, lists, link, divider, image) with the same
+  link and alt-text dialogs the composer uses. A dump's body is now genuinely
+  Markdown, so the pile **renders** it rather than printing it, and images key
+  on `essays/<fragment id>/` — the path a piece uses — because *make it a piece*
+  is a status flip on that same row, so a screenshot jotted here follows the
+  thought all the way into a published essay with nothing to move. The toolbar
+  sits **below** the words on both surfaces, never above: the ✚ dialog has no
+  title and a card's text must not shift when you open it.
+- **⚠ Both ends read `breaks: true`.** Every dump written before this was plain
+  text whose newlines are its shape — an errand list, a stanza. Parsed as soft
+  wraps they would collapse into one paragraph and the autosave would write
+  that back, so the editors set `breaks` and the pile renders with it. A
+  `\`-terminated hard break (what TipTap serializes) and a bare newline (what
+  the old dumps hold) both come out as one `<br>`; `src/tests/markdown.test.ts`
+  pins exactly that, because the day they disagree the whole pile reflows.
+- **⚠ The marks come off on the way out.** A task's title is an `<input>` and a
+  log entry's body is a `<textarea>`, so triage strips the syntax
+  (`lib/markdown-plain.ts` — dependency-free, because the real renderer must
+  never reach the browser). **Add to a piece…** is the exception and appends
+  Markdown to Markdown on the server, which is the one destination that wants
+  it whole.
 - **Its own room, showing the words.** `/admin/notes` renders each dump as its
-  own text, newest-touched first, with an elapsed stamp. A pencil turns the card
-  into a textarea in place — reading is the dominant motion there, so a tap
+  own text, newest-touched first, with an elapsed stamp. A pencil puts an
+  editor in the card in place — reading is the dominant motion there, so a tap
   while scrolling must not put a cursor (and on a phone, a keyboard) into a
   thought you were only passing.
+- **⚠ One editor for the whole pile, moved into the card you open.** The same
+  rule the chooser and the piece picker follow, and here it is not just
+  tidiness: a room that lists a hundred jottings cannot mount a hundred TipTap
+  instances. Its home is outside `#notes-pile`, so a card leaving cannot take
+  the room's only editor with it, and each card keeps its Markdown in a hidden
+  `<textarea>` — what the four destinations read from a card that has no editor
+  of its own. Two consequences worth knowing: leaving a card does its DOM work
+  **before** awaiting the save (otherwise the next card's open would race the
+  hand-back), and the "did this change?" baseline is what the editor would
+  *serialize*, not what the server sent — a plain-text dump re-spells on the
+  round trip, and comparing against the server's copy would rewrite every card
+  you merely glanced at, bumping it to the top of a pile ordered by touch.
+- **⚠ Clicking away closes the card, not blurring it.** A rich editor loses
+  focus constantly and legitimately — to its own toolbar, to the link dialog,
+  to the alt-text prompt, to the file picker — and every one of those read as
+  "you're done here" under the `blur` rule a textarea could use. What means
+  done is a pointer landing somewhere that is neither the card nor a window the
+  card opened.
 - **Four ways out, behind one → chooser.** Reading (a pencil) and discarding (a
   bin) are direct; the four destinations sit behind one control, because they
   are not four questions — they are one question, *what kind of thing is this?*,
