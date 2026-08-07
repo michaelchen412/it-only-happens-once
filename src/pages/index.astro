@@ -20,6 +20,20 @@ import StarBloom from '../components/StarBloom.astro';
 const supabase = Astro.locals.supabase;
 const refs = await listConstellations(supabase);
 
+/*
+  The front door is CDN-cached like the blog is (24 · Piece 3). It was the one
+  high-traffic public route with no cache header at all, so every visit ran the
+  function and its two reads — while `/blog`, `/blog/[slug]` and `/about`, which
+  change more often, were all cached. Same 60s / SWR-a-day pair, so the four
+  public rooms now answer the same way.
+
+  ⚠ UNCONDITIONAL HERE, AND BRANCHED ON `/[slug]` — that asymmetry is deliberate
+  and is explained at the branch. Briefly: `listConstellations` shows the PUBLIC
+  truth to every viewer including the admin (its own comment says so), so this
+  page cannot contain a draft. A constellation permalink can, and does.
+*/
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+
 // weight → type scale: distinct counts, heaviest first, share tiers on ties
 const TIERS = [
   'text-4xl sm:text-5xl',
@@ -70,7 +84,30 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
         <div class="flex flex-col gap-12 sm:gap-16">
           {refs.map((c, i) => (
             <div class={indentOf(i)}>
-              <a href={`/${c.slug}`} class:list={['group sky-row block', `cn-${c.color}`]}>
+              {/* ⚠ `viewport`, AND ONLY ON THESE ELEVEN ROWS (24 · Piece 6).
+                  `<ClientRouter />` turns prefetching on by itself — Astro calls
+                  `init({ prefetchAll: true })` from inside it, which nobody
+                  configured — but the default strategy is `hover`, and a phone
+                  does not hover. So the front door prefetched nothing at all on
+                  the device Michael was describing: *"I notice there is some
+                  lag if I am a public user just trying to browse
+                  constellations."*
+
+                  ⚠ NOT `prefetch.defaultStrategy: 'viewport'` in astro.config,
+                  which is the tidier-looking change and is the loser here. That
+                  setting is site-WIDE: the blog index would start fetching every
+                  post in the feed as you scrolled it, on a page built for
+                  scrolling. The sky is the one room where the number of links is
+                  small, fixed, and equal to the number of things you might do
+                  next — so the room opts in and the default stays `hover`.
+
+                  Astro declines this by itself on save-data and 2g
+                  (`isSlowConnection`), so there is no guard to write here. */}
+              <a
+                href={`/${c.slug}`}
+                data-astro-prefetch="viewport"
+                class:list={['group sky-row block', `cn-${c.color}`]}
+              >
                 {/* a DIV, not a span: it holds an h2, and a <span> may only
                     contain phrasing content. Nothing in `npm run verify`
                     catches that — astro check doesn't validate content models. */}

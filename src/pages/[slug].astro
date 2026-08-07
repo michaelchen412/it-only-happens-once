@@ -19,6 +19,31 @@ const constellation = await getConstellation(supabase, slug);
 if (!constellation || constellation.items.length === 0) {
   return Astro.redirect('/', 302);
 }
+
+/*
+  ⚠⚠ THE CACHE HEADER BRANCHES, AND THE BRANCH IS THE WHOLE PIECE (24 · Piece 3).
+
+  This route DOUBLES AS THE DRAFT PREVIEW — see `getConstellation`, and the note
+  at the top of this file: a draft is RLS-hidden from anon, so reaching one here
+  means the viewer is Michael. Setting `s-maxage` unconditionally would therefore
+  push an UNPUBLISHED constellation into the public CDN and serve it to everyone
+  for a minute. That is not a hypothetical; it is what the header does.
+
+  ⚠ THE TEST IS NEGATIVE — `!== 'published'`, not `=== 'draft'` — and
+  `blog/[slug].astro` states why in the same words: *"One rule, so a tier added
+  later can't quietly fall through to the public cache branch."* A third status
+  invented in a year is private by default rather than public by accident.
+
+  ⚠ AND `/` NEEDS NO SUCH BRANCH, which looks like an inconsistency and is two
+  different correct answers. `listConstellations` filters to `status =
+  'published'` for EVERY viewer, admin included, and says so — the overview is
+  the public truth by construction, so there is nothing there to leak.
+*/
+if (constellation.status !== 'published') {
+  Astro.response.headers.set('Cache-Control', 'private, no-store');
+} else {
+  Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+}
 ---
 
 <SiteLayout

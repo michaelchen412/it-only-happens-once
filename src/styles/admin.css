@@ -1684,3 +1684,105 @@ html.reader-open .sky-return {
 .pf-mark:hover {
   background: color-mix(in oklab, var(--color-primary) 20%, transparent);
 }
+
+/* ===========================================================================
+   THE CLICK LANDS FIRST — the navigation bar and the pending row.
+   docs/plans/24 · Piece 1. Driven by src/scripts/nav-progress.ts.
+
+   Every navigation in the Observatory is a full document load: `AdminLayout`
+   does not pass `transitions`, so no `<ClientRouter />` is mounted and no code
+   in the tree ran on a nav click. The browser answered with its tab spinner,
+   which a phone hides behind a collapsed URL bar. This is the answer that
+   arrives on the frame you press, rather than the one a second later.
+   ======================================================================== */
+#nav-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 60; /* over the sticky mobile header (z-20) and the drawer (z-40) */
+  height: 2px;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  /* Not `display: none` — an element that has to be created or unhidden cannot
+     paint on the frame the click happened, which is the one frame this exists
+     for. It is always here, always laid out, and simply flat. */
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ⚠ IT CREEPS AND NEVER COMPLETES, ON PURPOSE. A determinate bar would have to
+   know how long the page will take, and nothing here does — the wait is a
+   server round trip whose length is exactly the unknown. So the curve is front-
+   loaded (most of the width in the first half-second, where it reads as "heard
+   you") and then asymptotic at 92%, which is the honest shape of "still going".
+   The document being replaced is what ends it; `stop()` is only for the
+   navigations that never happen (a `download`, a declined 302).
+
+   The alternative was a spinner, and it lost on WHERE it can live: a spinner
+   needs a spot on the page, and the one thing every admin room disagrees about
+   is what sits at the top. A 2px line along the viewport edge belongs to the
+   window rather than to any room, so it needed no decision per room. */
+@keyframes nav-progress-creep {
+  0% {
+    transform: scaleX(0);
+  }
+  20% {
+    transform: scaleX(0.32);
+  }
+  50% {
+    transform: scaleX(0.62);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
+}
+
+#nav-progress.is-active {
+  opacity: 1;
+  animation: nav-progress-creep 10s cubic-bezier(0.15, 0.75, 0.35, 1) forwards;
+}
+
+/* ⚠ UNDER `prefers-reduced-motion` THIS DEGRADES CORRECTLY BY ACCIDENT, and the
+   accident is worth writing down so nobody "fixes" it. The global rule in
+   app.css zeroes every animation duration with `!important`, so the creep lands
+   on its 100% frame immediately: a static bar at 92%, present for exactly as
+   long as the navigation takes. That is the right reduced-motion answer — the
+   signal without the movement — and it needs no rule of its own. */
+
+/* THE SIDEBAR ANSWERS BEFORE THE PAGE DOES.
+   The row you pressed takes the active tint on the frame you press it, and the
+   row that WAS active gives it up in the same frame — so the highlight moves
+   once, rather than two rows glowing at each other until the document lands.
+
+   ⚠ UNLAYERED, AND THAT IS WHAT MAKES IT WORK. The nav rows carry their state
+   as Tailwind utilities (`bg-base-200 text-base-content font-medium` against
+   `text-base-content/60`), and utilities live in `@layer utilities`. Unlayered
+   author CSS beats every layered rule regardless of specificity, so these two
+   rules win without an `!important` and without touching the markup. Move this
+   block inside a layer and it silently stops working.
+
+   ⚠ `:has()` rather than a second attribute on the <nav>. The script sets ONE
+   attribute, on one element, and the cascade derives the rest — so there is no
+   way for the two halves to get out of step, which is the failure a
+   `data-nav-leaving` flag on the container would eventually have.
+
+   ⚠ THE HANDOVER CROSSFADES OVER 150ms, AND THAT IS THE ROWS' EXISTING
+   `transition-colors`, not something added here. Worth knowing because it makes
+   this block look broken to a test: `getComputedStyle` read in the same tick as
+   the attribute returns the crossfade's START value, so the old row still
+   reports the active tint for one frame. It cost a debugging round on
+   2026-08-07 and is now asserted after a delay in
+   `tests/e2e/nav-progress.spec.ts`, which says so at the assertion. The
+   crossfade is kept deliberately: hover on these rows already fades, and a
+   handover that snapped while hover fades would be two motions in one control. */
+#sidebar nav a[data-nav-pending] {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  font-weight: 500;
+}
+#sidebar nav:has(a[data-nav-pending]) a[aria-current='page']:not([data-nav-pending]) {
+  background: transparent;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  font-weight: 400;
+}

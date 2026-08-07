@@ -1,6 +1,6 @@
 /// <reference types="astro/client" />
 
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { JwtPayload, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './lib/database.types';
 import type { Attention } from './lib/hq/attention';
 import type { Ymd } from './lib/hq/time';
@@ -10,8 +10,22 @@ declare global {
     interface Locals {
       /** Request-bound Supabase client (reads/writes the auth cookie session). */
       supabase: SupabaseClient<Database>;
-      /** The signed-in Supabase user, or null. Set by middleware. */
-      user: User | null;
+      /**
+       * The signed-in user's VERIFIED TOKEN CLAIMS, or null. Set by middleware.
+       *
+       * ⚠ THIS WAS `User` UNTIL 2026-08-07 AND THE NAME DID NOT CHANGE, so the
+       * difference is worth being exact about (24 · Piece 8). It is no longer a
+       * user record fetched from the Auth server; it is the payload of a JWT
+       * whose signature middleware verified locally. Trustworthy for exactly
+       * the same decisions — the signature is what authorization rests on, and
+       * all four readers use only `email` and `app_metadata.role` — but it is a
+       * snapshot taken when the token was issued, not a live record.
+       *
+       * ⚠ THERE IS NO `.id`. The subject is `sub`. That is the one place this
+       * swap can bite, and it bites at runtime rather than here if somebody
+       * reaches for `user.id` through an `any`.
+       */
+      user: JwtPayload | null;
       /**
        * Today in the configured home zone, resolved once per admin request.
        *

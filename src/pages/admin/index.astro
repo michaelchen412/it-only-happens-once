@@ -90,11 +90,31 @@ type CheckinWithNight = Checkin & {
   checkin_naps: Tables['checkin_naps']['Row'][];
 };
 
-const { data: checkin } = await supabase
-  .from('daily_checkins')
-  .select('*, checkin_dreams(*), checkin_wakings(*), checkin_naps(*)')
-  .eq('log_date', selected)
-  .maybeSingle<CheckinWithNight>();
+/* ── the check-in and the stack, together (24 · Piece 2) ────────────────────
+   ⚠ THESE TWO DO NOT NEED EACH OTHER, and until 2026-08-07 they were ~100 lines
+   apart and therefore serial: the check-in read here, `loadToday` below the
+   night-times derivation. Nothing between them feeds `loadToday` — it takes
+   `todayYmd`, which middleware resolved before this page began. So the page paid
+   a full extra round trip (55–65ms measured) for source order.
+
+   ⚠ THE `offToday` GUARD STILL LIVES ON THIS PAGE, not inside `loadToday`, and
+   moving it here changes nothing about that. `loadToday`'s own header is
+   emphatic: every zone it fills is a statement about *now*, so stepping back to
+   backfill last Tuesday must cost ONE query rather than thirteen. That is why
+   the second element is a bare `null` rather than a call — the saving survives
+   the parallelising, which is the whole thing that had to be true.
+
+   ⚠ AND THE CHECK-IN IS THE ONE READ THAT FOLLOWS THE DATE BAR (`selected`),
+   while the stack is always about `todayYmd`. Two different days in one
+   `Promise.all` looks like a bug and is the entire design of this page. */
+const [{ data: checkin }, dataResult] = await Promise.all([
+  supabase
+    .from('daily_checkins')
+    .select('*, checkin_dreams(*), checkin_wakings(*), checkin_naps(*)')
+    .eq('log_date', selected)
+    .maybeSingle<CheckinWithNight>(),
+  offToday ? Promise.resolve(null) : loadToday(supabase, todayYmd),
+]);
 
 // Back out of UTC into wall-clock times, because that is what the pickers and
 // the summary both speak. The instants stay canonical in the database.
@@ -186,8 +206,15 @@ if (selected === todayYmd && !times.bed && !times.woke) {
 
    ⚠ THE GUARD LIVES HERE, NOT INSIDE `loadToday`. Putting it inside would read
    as tidier and would quietly turn that saving into thirteen queries behind an
-   `if`. The decision about which day this page is about belongs to the page. */
-const data: TodayData | null = offToday ? null : await loadToday(supabase, todayYmd);
+   `if`. The decision about which day this page is about belongs to the page.
+
+   ⚠ `data` IS FETCHED ~110 LINES ABOVE, beside the check-in (24 · Piece 2) —
+   the two are independent, so issuing them together removed a round trip. The
+   guard did not move: it is still on this page, still a bare `null` off today,
+   still costing one query rather than thirteen. This comment stays HERE, where
+   the stack is used, because this is where somebody wondering what `data` is
+   about will be standing. */
+const data: TodayData | null = dataResult;
 // `?cal=` is the month the popover is showing, and its presence is what keeps
 // the popover open across a month step. Stepping months is a real navigation
 // rather than a script, which is the price of rendering the grid server-side —

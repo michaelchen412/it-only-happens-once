@@ -38,11 +38,45 @@ function rendersChrome(request: Request, pathname: string): boolean {
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createSupabaseServerClient(context);
 
-  // Validate/refresh the session against Supabase. Returns null cheaply when
-  // there is no auth cookie, so public traffic isn't penalized.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Validate/refresh the session. Returns null cheaply when there is no auth
+  // cookie, so public traffic isn't penalized — verified 2026-08-07: with no
+  // cookie this short-circuits inside `_useSession` and makes no network call.
+  //
+  // ⚠ `getClaims`, NOT `getUser`, AND NOT `getSession` (24 · Piece 8).
+  //
+  // `getUser` asks the Auth server to confirm the token on EVERY request — a
+  // real round trip, measured at 44ms, in front of every page in the
+  // Observatory. `getClaims` verifies the JWT signature locally via WebCrypto
+  // against the project's JWKS, which auth-js caches in module scope
+  // (`GLOBAL_JWKS`, keyed by storage key, 10-minute TTL) — so the cache is
+  // shared across the per-request clients this function mints, which is the
+  // thing that had to be true for any of this to pay. Measured with fresh
+  // clients, exactly as here: **44ms → 1ms after the first call.**
+  //
+  // ⚠ NOT `getSession`, which would be the fast-looking wrong answer. Supabase
+  // is explicit: *"use `getClaims` to verify identity… `getSession` when you
+  // need the token directly, but don't rely on the user object it returns for
+  // authorization decisions."* The `role !== 'admin'` gate thirty lines below IS
+  // an authorization decision, so `getSession` here would be a security
+  // regression wearing a performance costume.
+  //
+  // ⚠ IT DEGRADES SAFELY BY ITSELF. If the project ever moves back to symmetric
+  // (HS*) signing keys, or WebCrypto is unavailable, auth-js falls back to
+  // `getUser(token)` internally — so this never silently trusts an unverified
+  // token, it just stops being fast. This project is on ES256 (asymmetric),
+  // confirmed from `/auth/v1/.well-known/jwks.json`.
+  //
+  // ⚠ THE SESSION REFRESH IS STILL HERE. `getClaims` calls `getSession` first,
+  // which is what refreshes an expiring token and lets @supabase/ssr write the
+  // new cookies back. Removing this call entirely — the "we don't need it on
+  // public pages" optimisation — is what randomly signs people out.
+  //
+  // ⚠ THE COST, STATED: claims come from a signed token, so a role revoked
+  // mid-session is not noticed until that token expires. For one account behind
+  // a Google-only allowlist that is an acceptable trade; it is written down so
+  // it stays a decision rather than becoming a surprise.
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims ?? null;
 
   context.locals.supabase = supabase;
   context.locals.user = user;

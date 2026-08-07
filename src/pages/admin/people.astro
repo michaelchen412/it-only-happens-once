@@ -44,18 +44,29 @@ import BeenAWhile from '../../components/admin/BeenAWhile.astro';
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = Astro.locals.today;
 
-const { data, error } = await supabase.from('people').select('*');
+// ⚠ THESE THREE ARE ONE ROUND TRIP, AND THE SHAPE IS THE POINT (24 · Piece 2).
+// They were three sequential `await`s — not because anything sequenced them, but
+// because that is the order they were written in. None of them reads the others:
+// the roster comes from `people`, last contact from the `person_last_contact`
+// view, today from `events`. Measured 2026-08-07, a PostgREST round trip is
+// 55–65ms from a laptop, so serialising three independent reads spent ~120ms of
+// every page load on nothing at all.
+//
+// ⚠ IF YOU ADD A FOURTH READ HERE, CHECK IT IS INDEPENDENT BEFORE PUTTING IT IN
+// THE ARRAY. `signPhotos` below is the counter-example and it is deliberately
+// NOT in here — see its own note.
+const [{ data, error }, lastContact, seenToday] = await Promise.all([
+  supabase.from('people').select('*'),
+  // One round trip for the whole roster, through the `person_last_contact` view —
+  // so the `max()` happens in Postgres over an indexed join rather than by
+  // pulling every interaction into this page.
+  lastContactMap(supabase),
+  // GUARD 2, live since 13 · Piece 4 (§8): anyone with an event today is never
+  // drifting. It applies to the card marker as well as the panel, so the roster
+  // cannot mark somebody you are seeing this evening.
+  seenOn(supabase, todayYmd),
+]);
 const everyone: Person[] = data ?? [];
-
-// One round trip for the whole roster, through the `person_last_contact` view —
-// so the `max()` happens in Postgres over an indexed join rather than by
-// pulling every interaction into this page.
-const lastContact = await lastContactMap(supabase);
-
-// GUARD 2, live since 13 · Piece 4 (§8): anyone with an event today is never
-// drifting. It applies to the card marker as well as the panel, so the roster
-// cannot mark somebody you are seeing this evening.
-const seenToday = await seenOn(supabase, todayYmd);
 
 // Archived people are OUT OF THE ROSTER AND OUT OF SEARCH (§3) — they live in
 // their own section at the bottom. Archiving is the only way somebody leaves,
@@ -74,6 +85,14 @@ const archived = everyone.filter((p) => p.archived_at).sort(rosterOrder);
 
 // One round trip for every face on the page. These URLs expire, which is why
 // they are minted here per render and never stored (lib/hq/people.ts).
+//
+// ⚠ THIS ONE STAYS SERIAL, AND IT IS NOT AN OVERSIGHT (24 · Piece 2). It cannot
+// join the batch above because it needs to know WHICH paths to sign, and that
+// answer is the result of the first read. The same hop exists for the same
+// reason in `today-data.ts`, where `signPhotos` sits after a twelve-query
+// `Promise.all`. A future session parallelising the reads on this page will
+// reach here last and be tempted; the only way to remove this hop is to stop
+// signing per-face, which `lib/hq/people.ts` already argues against.
 const photos = await signPhotos(
   supabase,
   everyone.map((p) => p.photo_path),

@@ -151,6 +151,24 @@ const nav = [
     Skip to content
   </a>
   {
+    /* THE CLICK LANDS FIRST (24 · Piece 1). Every navigation in here is a full
+      document load — no `<ClientRouter />` — so until this existed, pressing a
+      sidebar row was answered by nothing at all except the browser's tab
+      spinner, which a phone hides behind a collapsed URL bar.
+
+      Rendered here, always, and revealed by `nav-progress.ts` — the same shape
+      `#day-turn` below uses, and for the same reason: a script that has to
+      CREATE its own element can't paint on the first frame after a click, which
+      is the one frame this whole control exists for.
+
+      ⚠ `aria-hidden`. The bar says "the thing you just pressed is happening",
+      which a screen reader is already told by `aria-busy` on <main> — and a
+      progressbar role with no meaningful value would be announcing a number
+      this deliberately does not have (see admin.css: it creeps, it never
+      completes, because the page arrives when it arrives). */
+  }
+  <div id="nav-progress" aria-hidden="true"></div>
+  {
     /* `#hq` carries the server's answer about NOW — the day, the configured
       zone, and the two halves of the count. One element, because `day-turn.ts`
       and `attention.ts` both need it and two elements could be rendered from
@@ -215,11 +233,22 @@ const nav = [
           nav.map((item) => (
             <>
               {item.hr && <hr class="border-base-300 mx-3 my-2" />}
+              {/* ⚠ `data-nav-row` (24 · Piece 1) marks a row whose highlight may
+                  move the instant it is CLICKED, before the page it points at
+                  exists. `nav-progress.ts` moves it for these rows only — a link
+                  in the content moving a sidebar highlight would be a sidebar
+                  answering for something it is not about, which is worse than
+                  answering late. See admin.css for what `[data-nav-pending]`
+                  looks like and why it takes the tint the active row uses.
+                  ⚠ No apostrophes in here: inside this map expression the Astro
+                  compiler reads one as the start of a string literal, and the
+                  error it throws points at the `</a>` thirty lines below. */}
               <a
                 href={item.href}
                 id={item.key === 'today' ? 'nav-today' : undefined}
                 aria-current={active === item.key ? 'page' : undefined}
                 aria-label={item.key === 'today' ? attentionLabel(total) : undefined}
+                data-nav-row
                 class:list={[
                   'rounded-field flex items-center gap-3 px-3 py-2 text-sm transition-colors',
                   active === item.key
@@ -380,6 +409,14 @@ const nav = [
     // and the window title honest between navigations.
     import '../scripts/day-turn';
     import '../scripts/attention';
+
+    // And a third fact about the building rather than about a room: what happens
+    // in the second between pressing a nav row and the next document arriving
+    // (24 · Piece 1). Mounted here for the same reason as the two above — every
+    // room navigates, so a room that had to opt in would be the room that
+    // forgot — and because the control it paints, a bar along the top of the
+    // VIEWPORT, belongs to the window and not to any room.
+    import '../scripts/nav-progress';
 
     // ⚠ MOUNTED FROM THE LAYOUT FOR A REASON THE OTHERS DO NOT HAVE. Its
     // `sync()` re-asserts this device's push subscription on every admin load,

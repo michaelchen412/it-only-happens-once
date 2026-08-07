@@ -54,20 +54,65 @@ export function isValidTimezone(tz: string): boolean {
 }
 
 /**
+ * How long a resolved zone is reused before `settings` is read again.
+ *
+ * ⚠ SIXTY SECONDS IS THE WHOLE ARGUMENT, so it is a named constant rather than
+ * a number in a condition. See `homeTimezone`.
+ */
+const TZ_TTL_MS = 60_000;
+
+let tzCache: { tz: string; at: number } | null = null;
+
+/**
  * The configured home timezone.
  *
- * Deliberately NOT cached in module scope. It is one indexed read of a
- * single-row table on a page only one person opens, and a cache would mean the
- * `UPDATE` that this design exists to make sufficient ("moving cities is one
- * UPDATE, not a redeploy") would not take effect until a serverless instance
- * happened to recycle. Cheap and always true beats fast and occasionally stale.
+ * ⚠ CACHED FOR SIXTY SECONDS, AND THE PREVIOUS COMMENT ARGUED AGAINST CACHING —
+ * so read this before "fixing" it back. What it said, and it was right:
+ *
+ *   *"Deliberately NOT cached in module scope… a cache would mean the `UPDATE`
+ *   that this design exists to make sufficient ('moving cities is one UPDATE,
+ *   not a redeploy') would not take effect until a serverless instance happened
+ *   to recycle. Cheap and always true beats fast and occasionally stale."*
+ *
+ * That is an argument against an **unbounded** cache and it defeats one. A
+ * bounded one is a different object: the worst case is that moving cities takes
+ * effect within a minute instead of within a request, and the property the old
+ * comment was protecting — that an `UPDATE` is sufficient, that no redeploy is
+ * ever needed — survives intact. "Until an instance happens to recycle" is
+ * unbounded and unpredictable; sixty seconds is neither.
+ *
+ * What it buys (24 · Piece 2/8): middleware calls this on EVERY admin request,
+ * before `loadAttention` can start, because the day it resolves is what
+ * `loadAttention` filters on. So it was a serial round trip — 55–65ms measured
+ * — in front of every page in the Observatory, to re-read a single row that
+ * changes maybe once a year.
+ *
+ * ⚠ THE CACHE IS THE RESOLVED ZONE, NOT THE DAY. `localToday` is still computed
+ * per call, so midnight still turns on time and `day-turn.ts` keeps working. A
+ * cache of `{ tz, ymd }` would freeze the date for a minute, which is exactly
+ * the class of bug this module opens by promising to prevent.
  *
  * Never throws. A failure at 7am should give a slightly-wrong day, not a 500.
  */
 export async function homeTimezone(sb: SupabaseClient<Database>): Promise<string> {
+  const now = Date.now();
+  if (tzCache && now - tzCache.at < TZ_TTL_MS) return tzCache.tz;
+
   const { data } = await sb.from('settings').select('home_timezone').limit(1).maybeSingle();
-  const tz = data?.home_timezone;
-  return tz && isValidTimezone(tz) ? tz : FALLBACK_TIMEZONE;
+  const raw = data?.home_timezone;
+  const tz = raw && isValidTimezone(raw) ? raw : FALLBACK_TIMEZONE;
+
+  // ⚠ A FAILED READ IS NOT CACHED AS AN ANSWER. `data` is null both when the row
+  // says nothing and when the request failed, and pinning the fallback for a
+  // minute after one blip would turn a transient error into a minute of the
+  // wrong city. Only a zone that actually came out of the column is stored.
+  if (raw) tzCache = { tz, at: now };
+  return tz;
+}
+
+/** Drop the cached zone — for tests, so one case cannot leak into the next. */
+export function resetTimezoneCache(): void {
+  tzCache = null;
 }
 
 /**
