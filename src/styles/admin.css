@@ -1,0 +1,1686 @@
+/* ===========================================================================
+   ADMIN (the workshop) — see docs/admin.md. Kept here so app.css stays the
+   single source of truth for tokens/motion; these all reference semantic slots.
+   Motion respects prefers-reduced-motion via the global rule above (durations
+   are zeroed), so the open/close animations self-disable for that preference.
+   ======================================================================== */
+
+/* Animated native <dialog>s. `transition-behavior: allow-discrete` on display +
+   overlay lets the EXIT animate too; @starting-style provides the enter-from. */
+/* Top-layer centering — DO NOT REMOVE.
+   Tailwind's preflight resets `margin: 0` on every element (`*, ::before,
+   ::after, ::backdrop`), and an author rule beats the UA stylesheet whatever
+   its specificity. That silently defeats the UA's `dialog { margin: auto }`,
+   which is the ONLY thing centering a modal — so every <dialog> and [popover]
+   that doesn't set its own margin lands in the top-left corner. Restoring it
+   at element/attribute specificity keeps the two deliberate exceptions
+   working: .drawer-dialog pins itself right, .colophon-popover to its
+   trigger — both out-specify this. */
+dialog,
+[popover] {
+  margin: auto;
+}
+
+.modal-dialog,
+.drawer-dialog {
+  padding: 0;
+  color: var(--color-base-content);
+  background: var(--color-base-100);
+}
+.modal-dialog::backdrop,
+.drawer-dialog::backdrop {
+  background: color-mix(in oklab, var(--color-base-100) 62%, transparent);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition:
+    opacity 0.25s ease,
+    overlay 0.25s ease allow-discrete,
+    display 0.25s ease allow-discrete;
+}
+.modal-dialog[open]::backdrop,
+.drawer-dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  .modal-dialog[open]::backdrop,
+  .drawer-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* Centered modal — fade + subtle scale. */
+.modal-dialog {
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  opacity: 0;
+  scale: 0.97;
+  transition:
+    opacity 0.2s ease,
+    scale 0.2s ease,
+    overlay 0.2s ease allow-discrete,
+    display 0.2s ease allow-discrete;
+}
+.modal-dialog[open] {
+  opacity: 1;
+  scale: 1;
+}
+@starting-style {
+  .modal-dialog[open] {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+/* Right-hand drawer — slides in from the edge. */
+.drawer-dialog {
+  height: 100%;
+  max-height: 100%;
+  margin: 0 0 0 auto; /* pin to the right */
+  border-left: 1px solid var(--color-base-300);
+  box-shadow: -8px 0 30px -12px color-mix(in oklab, var(--shadow-color) 40%, transparent);
+  translate: 100% 0;
+  transition:
+    translate 0.28s ease,
+    overlay 0.28s ease allow-discrete,
+    display 0.28s ease allow-discrete;
+}
+.drawer-dialog[open] {
+  translate: 0 0;
+}
+@starting-style {
+  .drawer-dialog[open] {
+    translate: 100% 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reader — the PUBLIC in-context reading surface (components/Reader.astro).
+   Reuses .drawer-dialog above for the right-edge slide + backdrop: a full-height
+   sheet on desktop (a comfortable reading width), a full-screen sheet on phones.
+   Reused by the blog now and the constellation views later.
+   ------------------------------------------------------------------------- */
+html.reader-open {
+  overflow: hidden; /* freeze the feed behind the reader */
+  /* Pad by the now-hidden scrollbar's width (measured in Reader.astro) so the
+     page doesn't jump sideways. The strip sits under the backdrop, so unseen. */
+  padding-right: var(--reader-sbw, 0px);
+}
+.reader {
+  width: min(44rem, 100vw);
+  max-width: 100vw;
+  flex-direction: column;
+  /* height, right-pin, and the slide-in come from .drawer-dialog */
+}
+/* Lay the sheet out ONLY while it's open. A bare `.reader { display: flex }`
+   would beat the UA's `dialog:not([open]) { display: none }` — author origin
+   wins over UA regardless of specificity — so the CLOSED drawer stayed in the
+   layout: absolutely positioned, full height, translated 100% off the right at
+   the very end of the document. That phantom box is what produced the blank
+   scroll-space below and to the right of the feed, and it broke the native
+   discrete-display animation (close felt instant). Gating `display` on [open]
+   hands the closed state back to display:none, letting the allow-discrete
+   transition on .drawer-dialog animate the slide the SAME in both directions. */
+.reader[open] {
+  display: flex;
+}
+.reader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.reader-inner {
+  padding: 3.5rem 1.75rem 4rem;
+}
+.reader-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  display: inline-flex;
+  padding: 0.4rem;
+  border-radius: var(--radius-field);
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  background: color-mix(in oklab, var(--color-base-100) 70%, transparent);
+  backdrop-filter: blur(4px);
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.reader-close:hover {
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+}
+@media (max-width: 640px) {
+  /* Full-screen sheet on phones (the platform-correct pattern). */
+  .reader {
+    width: 100vw;
+    border-left: 0;
+  }
+  .reader-inner {
+    padding: 3.25rem 1.25rem 3rem;
+  }
+}
+
+/* The signature mark (components/StarMark.astro). Sized in em so it sits
+   inline with text at any scale; `currentColor` lets it take a
+   constellation's --cn wherever one is set. */
+.star-mark {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+/* ── The bloom ───────────────────────────────────────────────────────────────
+   components/StarBloom.astro. A constellation is the figure drawn BETWEEN
+   stars, so one ✦ standing for a whole constellation is a small lie. The mark
+   parts when you attend to it — the core recedes while companions arrive from
+   beyond — the way a point of light resolves into several under magnification.
+
+   The companions mean nothing countable; this is a gesture, not a chart.
+
+   Sized entirely in `em` so one component serves a 5xl name on the overview
+   and a 1rem floating control. Only the core is in flow — companions are
+   absolutely positioned — so a bloom never reflows the text beside it. The
+   trigger is `.group:hover`, so hovering a constellation's whole row blooms
+   its star, not merely the mark. */
+.star-bloom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Companions reach ~1.31em from the centre while the box in flow is only 1em
+     wide — so roughly 0.8em of an open bloom hangs outside its own box on each
+     side. Reserve that room at rest, or the mark lands on the name beside it
+     the moment it opens. (The box stays 1em rather than growing, so
+     `items-baseline` at every call site still aligns the STAR to the name's
+     baseline.) */
+  margin-inline: 0.85em;
+}
+/* …except inside the floating ✦, which already centres the mark in its own
+   2.75rem plate and which the companions are meant to overflow. */
+.sky-return .star-bloom {
+  margin-inline: 0;
+}
+.star-bloom__core {
+  display: inline-flex;
+  transition:
+    scale 0.42s cubic-bezier(0.22, 0.8, 0.3, 1),
+    opacity 0.42s ease;
+}
+/* Companions keep the PARENT's font-size so `--dx`/`--dy` resolve against the
+   mark they orbit; their own size comes from the inner .star-mark instead.
+   (Shrinking this element would silently shrink the offsets with it.) */
+.star-bloom__sat {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -0.24em 0 0 -0.24em; /* centres the 0.48em mark on the core */
+  display: inline-flex;
+  opacity: 0;
+  translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+  pointer-events: none;
+  transition:
+    translate 0.46s cubic-bezier(0.22, 0.8, 0.3, 1),
+    opacity 0.4s ease;
+}
+.star-bloom__sat .star-mark {
+  width: 0.48em;
+  height: 0.48em;
+}
+/* Held open — the constellation you are currently inside. The `.is-active`
+   flag is wrapped in `:where()` so it adds nothing to specificity, letting the
+   plain hover rules below win by weight rather than by source order. */
+.star-bloom:where(.is-active) .star-bloom__core {
+  scale: 0.72;
+  opacity: 0.75;
+}
+.star-bloom:where(.is-active) .star-bloom__sat {
+  opacity: 0.6;
+  translate: var(--dx) var(--dy);
+}
+
+/* ⚠ `.is-focus` FIRST, and it is the reason this gesture reaches anyone at all.
+   For its whole life this was hover-only, which means the most expressive thing
+   the overview does had never once been seen by a phone — the Sky's actual
+   audience. Attending to a row is now the trigger, and on touch that is
+   proximity (scripts/focus-mode.ts). Nothing new is drawn here; an existing
+   thing was merely made reachable.
+
+   It also lands LAST of the row's four responses: StarBloom's 0.42/0.46s is a
+   touch slower than the 0.45s colour, so the row says it is warm and then the
+   mark commits. */
+.sky-row.is-focus .star-bloom__core,
+.group:focus-visible .star-bloom__core {
+  scale: 0.72;
+  opacity: 0.75;
+}
+.sky-row.is-focus .star-bloom__sat,
+.group:focus-visible .star-bloom__sat {
+  opacity: 0.8;
+  translate: var(--dx) var(--dy);
+}
+@media (hover: hover) {
+  .group:hover .star-bloom__core,
+  .star-bloom:hover .star-bloom__core {
+    scale: 0.72;
+    opacity: 0.75;
+  }
+  .group:hover .star-bloom__sat,
+  .star-bloom:hover .star-bloom__sat {
+    opacity: 0.8;
+    translate: var(--dx) var(--dy);
+  }
+}
+
+/* …but an already-open mark runs the gesture BACKWARDS. Hover always previews
+   what the click will do: closed, that is opening; open, it is closing. So
+   pointing at the mark — or at the title beside it, which shares the `group` —
+   sends the companions back out the way they came and lets the single point
+   reassert. Here `.is-active` is deliberately NOT in `:where()`: these need to
+   outweigh the plain hover rules above, not merely follow them. */
+.sky-row.is-focus .star-bloom.is-active .star-bloom__core,
+.group:focus-visible .star-bloom.is-active .star-bloom__core {
+  scale: 1;
+  opacity: 1;
+}
+.sky-row.is-focus .star-bloom.is-active .star-bloom__sat,
+.group:focus-visible .star-bloom.is-active .star-bloom__sat {
+  opacity: 0;
+  translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+}
+@media (hover: hover) {
+  .group:hover .star-bloom.is-active .star-bloom__core,
+  .star-bloom.is-active:hover .star-bloom__core {
+    scale: 1;
+    opacity: 1;
+  }
+  .group:hover .star-bloom.is-active .star-bloom__sat,
+  .star-bloom.is-active:hover .star-bloom__sat {
+    opacity: 0;
+    translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+  }
+}
+/* Transitions only, so the global rule's duration clamp is enough — but land
+   the companions at rest rather than leaving them mid-flight. */
+@media (prefers-reduced-motion: reduce) {
+  .star-bloom__sat {
+    translate: var(--dx) var(--dy);
+  }
+}
+
+/* ── The way back ────────────────────────────────────────────────────────────
+   The return at the foot of a suite. It leans the way you're about to go: the
+   arrow eases out to the left on hover, opening the gap to the words rather
+   than sliding the whole control. Warm accent (--color-primary) rather than
+   the constellation's own --lamp, which on an ice or azure suite would not be
+   warm at all. */
+.return-arrow {
+  width: 0.62em;
+  height: 0.62em;
+  flex-shrink: 0;
+  transition: translate 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.group:hover .return-arrow,
+.group:focus-visible .return-arrow {
+  translate: -0.28em 0;
+}
+
+/* ── The overview's stars ────────────────────────────────────────────────────
+   Each constellation's ✦ out front, in its own colour. Weight is carried by
+   BRIGHTNESS more than size — magnitude is how bright a star looks, not how
+   large it is — so a heavy constellation burns rather than merely swells.
+
+   The breathing is deliberately slow and shallow, and every star gets its own
+   phase (--phase, set per row): synchronised pulsing reads as machinery, and
+   the whole point is that a sky is alive without asking to be watched. */
+.sky-star {
+  color: var(--cn, var(--color-primary));
+  animation: star-breathe 9s ease-in-out infinite;
+  animation-delay: var(--phase, 0s);
+  transition: opacity 0.4s ease;
+}
+/* The glow belongs to the MARKS, not to the container. A filter rasterises its
+   whole subtree and a descendant cannot opt out, so anything ever added inside
+   .sky-star — chrome, a plate, a badge — would silently be lit too. Keeping it
+   on .star-mark means the light stops at the stars' edges by construction. */
+.sky-star .star-mark {
+  filter: drop-shadow(
+    0 0 calc(7px * var(--glow, 0.6))
+      color-mix(in oklab, var(--cn, var(--color-primary)) calc(70% * var(--glow, 0.6)), transparent)
+  );
+  transition: filter 0.4s ease;
+}
+@keyframes star-breathe {
+  0%,
+  100% {
+    opacity: calc(0.46 + 0.34 * var(--glow, 0.6));
+  }
+  50% {
+    opacity: calc(0.68 + 0.32 * var(--glow, 0.6));
+  }
+}
+/* On the overview, a name warms toward its OWN colour rather than the house
+   lamplight — the constellation introducing itself.
+   ────────────────────────────────────────────────────────────────────────────
+   TWO INTENSITIES OF ONE COLOUR, not two signals (decided in /afford-lab,
+   2026-08-07). The name carries a TRACE of `--cn` at rest, so it is already not
+   the same ink as prose and a stranger who lands and never moves still sees
+   that these are links; and it comes to FULL `--cn` on the row being attended
+   to. Everything else the row does — the star's glow, the bloom, the word —
+   rides that same focus, so one gesture arrives rather than three effects
+   firing.
+
+   `.is-focus` is written by scripts/focus-mode.ts and means "the row the reader
+   is attending to", which is the cursor on a hovering device and the row
+   nearest the reading line on a phone — never both. The `:hover` rules below
+   are the no-JS floor and are gated, so they cannot double up on touch. */
+.sky-name {
+  color: color-mix(in oklab, var(--cn, var(--color-primary)) 34%, var(--color-base-content));
+  transition: color 0.3s ease;
+}
+.sky-row.is-focus .sky-name,
+.group:focus-visible .sky-name {
+  color: var(--cn, var(--color-primary));
+}
+
+/* The lamp turns toward the constellation you're considering — again on the
+   marks, not the container, for the reason given above. */
+.sky-row.is-focus .sky-star,
+.group:focus-visible .sky-star {
+  opacity: 1;
+}
+.sky-row.is-focus .sky-star .star-mark,
+.group:focus-visible .sky-star .star-mark {
+  filter: drop-shadow(
+    0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent)
+  );
+}
+/* Gated: with no cursor these can never fire, and leaving them ungated let a
+   tap strand a row in its hover colour with `.is-focus` already gone elsewhere
+   — two rows lit, which is the one thing this is built never to do. */
+@media (hover: hover) {
+  .group:hover .sky-name {
+    color: var(--cn, var(--color-primary));
+  }
+  .group:hover .sky-star {
+    opacity: 1;
+  }
+  .group:hover .sky-star .star-mark {
+    filter: drop-shadow(
+      0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent)
+    );
+  }
+}
+
+/* ── The invitation ──────────────────────────────────────────────────────────
+   A mark that is always there and a word that is always there, both resting at
+   the same muted value and warming together to the constellation's colour. The
+   word is NOT hidden at rest: its line is reserved either way, so hiding it
+   bought nothing and spent a visible gap — a lone arrow beside a hole where a
+   word evidently belongs.
+
+   Its own line, aligned to the description's `ml-6`, so it lands where your eye
+   finishes reading why the constellation exists, and so the row is exactly the
+   same height focused or not. */
+.sky-cta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin-top: 0.55rem;
+  margin-left: 1.5rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.09em;
+  font-variant: all-small-caps;
+  white-space: nowrap;
+}
+.sky-cta__word,
+.sky-cta__arrow {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  transition:
+    color 0.45s ease,
+    filter 0.45s ease;
+}
+/* The mark warms a beat first and the word follows — one thing arriving, not
+   two switching on. */
+.sky-cta__word {
+  transition-delay: 0.08s;
+}
+.sky-row.is-focus .sky-cta__word,
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__word,
+.group:focus-visible .sky-cta__arrow {
+  color: var(--cn, var(--color-primary));
+}
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__arrow {
+  filter: drop-shadow(0 0 7px color-mix(in oklab, var(--cn, var(--color-primary)) 65%, transparent));
+}
+@media (hover: hover) {
+  .group:hover .sky-cta__word,
+  .group:hover .sky-cta__arrow {
+    color: var(--cn, var(--color-primary));
+  }
+  .group:hover .sky-cta__arrow {
+    filter: drop-shadow(0 0 7px color-mix(in oklab, var(--cn, var(--color-primary)) 65%, transparent));
+  }
+}
+
+/* The beckon — a slow double-nudge, the shape of a "come here" gesture, with
+   most of the cycle spent perfectly still. A steady pulse reads as machinery
+   (the same reason each star breathes on its own phase); this reads as
+   something waiting for you. Only ever on the ONE focused row.
+
+   Transform only. The glow is a static focus state above rather than part of
+   the loop, because animating a filter re-rasterises the element every frame. */
+@keyframes sky-beckon {
+  0%,
+  58% {
+    translate: 0;
+  }
+  68% {
+    translate: 0.3em;
+  }
+  78% {
+    translate: 0;
+  }
+  86% {
+    translate: 0.16em;
+  }
+  94%,
+  100% {
+    translate: 0;
+  }
+}
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__arrow {
+  animation: sky-beckon 3.4s ease-in-out infinite;
+}
+/* The global reduced-motion rule only clamps DURATION, which would leave an
+   infinite animation flickering — kill it by NAME, as `.sky-star` does. The
+   colour still fades (a tint is not motion), so the signal survives whole. */
+@media (prefers-reduced-motion: reduce) {
+  .sky-cta__arrow {
+    animation-name: none;
+  }
+}
+/* The global reduced-motion rule only clamps DURATION, which would leave an
+   infinite animation flickering — kill it by NAME instead, and hold a steady
+   brightness. */
+@media (prefers-reduced-motion: reduce) {
+  .sky-star {
+    animation-name: none;
+    opacity: calc(0.6 + 0.4 * var(--glow, 0.6));
+  }
+}
+
+/* Back-to-top — a quiet floating return control (components/BackToTop.astro),
+   mounted once in SiteLayout. Hidden until you've scrolled a screen down, and
+   suppressed while the Reader owns the top layer. */
+.back-to-top,
+.sky-return {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 20; /* below the sticky header (z-30) and the reader's top layer */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  background: color-mix(in oklab, var(--color-base-100) 80%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--shadow-color) 50%, transparent);
+  /* Resting state: out of the way and inert until earned. */
+  opacity: 0;
+  translate: 0 0.75rem;
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    translate 0.22s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.back-to-top:hover,
+.sky-return:hover {
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+}
+.back-to-top.is-visible,
+.sky-return.is-visible {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+}
+/* Never bleed through the reader's backdrop. */
+/* Mounted INSIDE a dialog: the control belongs to the sheet, so it anchors to
+   the sheet's corner (absolute) and rides above its footer, rather than the
+   viewport's — where it would collide with the page's own control. */
+.back-to-top--in-sheet {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 5;
+}
+
+html.reader-open .back-to-top:not(.back-to-top--in-sheet),
+html.reader-open .sky-return {
+  opacity: 0;
+  pointer-events: none;
+}
+/* The sky-return ✦ is a return to the overview, not a scroll control — it
+   reads serif (a mark, not an icon) in the lamplight accent. */
+.sky-return {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: color-mix(in oklab, var(--color-primary) 70%, transparent);
+}
+/* …and it warms TOWARD that accent on hover, rather than to the neutral the
+   shared back-to-top rule above wants — the bloom underneath is an accent
+   gesture, and washing it grey at the exact moment it opens fights it. */
+.sky-return:hover {
+  color: var(--color-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   The Sky — the constellation suite (components/ConstellationSuite.astro).
+   Typeset, not carded (decided 2026-07-23, prototyped in /sky-lab): each
+   medium in its own register, star-marks in the margin joined by a drawn
+   line, and the fragment nearest the reading line takes a passing lamplight.
+   Lines are currentColor at low opacity; every color is a semantic token.
+   ------------------------------------------------------------------------- */
+.suite {
+  position: relative;
+}
+.suite-item {
+  position: relative;
+  z-index: 1;
+}
+/* asymmetric offsets (wide screens) — the drawn line gets its angles here */
+@media (min-width: 640px) {
+  .suite-item {
+    margin-inline-start: var(--indent, 0%);
+  }
+}
+/* the drawn line — an SVG injected behind the stanzas */
+.suite-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  /* SVG clips to its own box by default, and the leftmost marks sit close
+     enough to the edge that a star's points and glow were being sliced off
+     against the margin. There is no overflow risk: the widest star reaches
+     ~13px past the suite's content box, well inside the section's px-5. */
+  overflow: visible;
+}
+
+/* Stars at the figure's JOINTS — one per fragment, dropped into the gap each
+   arc leaves around its endpoints. So the stars line up with what you are
+   reading and the arcs read as drawn BETWEEN them, which is what a
+   constellation is. The halo pools around the fragment's glyph, which sits on
+   top of it (stanzas are z-index 1, the figure 0) and becomes the star's body.
+
+   `--lit` is written per scroll frame from each star's distance to the reading
+   line, on a much wider, softer falloff than the stanza lamplight: that one is
+   a spotlight on a single fragment, this is the ambient half — dozens alight
+   at once, brightest where you're reading and dimming outward, so the figure
+   kindles ahead of you and settles behind.
+
+   It is the site's own mark (STAR_PATH), not a dot, so a fragment's star is
+   the same object as the one on the overview at a smaller magnitude. The glow
+   is a drop-shadow at a FIXED blur radius — `--lit` drives opacity only, and
+   opacity fades the shadow along with the shape, so the two brighten together
+   without re-rasterising a blur on every scroll frame. `--lamp` throughout, so
+   the figure burns in the constellation's own colour. */
+.suite-star {
+  fill: var(--lamp);
+  opacity: calc(var(--lit, 0) * 0.7);
+  filter: drop-shadow(0 0 5px var(--lamp));
+}
+
+/* A song's annotation — Michael's words leading the stanza (ADR-0009). It takes
+   `.reading` for its prose typography, but a stanza sets FLUSH: the paragraph
+   margins `.reading` gives an article would push the first line off its mark in
+   the margin and leave a gap above the artist line. */
+.suite-note > :first-child {
+  margin-block-start: 0;
+}
+.suite-note > :last-child {
+  margin-block-end: 0;
+}
+
+/* one slow, even breath for every warming element (glow + hover). The
+   `suite-cta` pair is NOT here — it carries its own 0.45s with an 80ms delay on
+   the word, so the mark warms a beat ahead of it. */
+.suite-item blockquote,
+.suite-item figcaption,
+.suite-attrib,
+.suite-note,
+.sw-title,
+.sw-excerpt {
+  transition:
+    color 0.5s ease,
+    text-shadow 0.5s ease;
+}
+
+/* the passing lamplight — the fragment nearest the reading line warms,
+   SOFTER than hover: a tint and a faint halo, never the full amber.
+   (`.suite-mark` no longer takes a colour here: it holds no glyph as of
+   2026-08-07 and is an empty gutter, so there is nothing left to tint.) */
+.suite-item.is-lit blockquote {
+  color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
+}
+/* the attribution warms with its quote — same light, a step quieter.
+   `.suite-attrib` is the song's artist line: not a <figcaption>, same register. */
+.suite-item.is-lit figcaption,
+.suite-item.is-lit .suite-attrib {
+  color: color-mix(in oklab, var(--lamp) 30%, color-mix(in oklab, var(--color-base-content) 58%, transparent));
+}
+/* the annotation warms as the stanza's own content — a shade under a quote's
+   blockquote, since it sets at prose size rather than in the quote's register */
+.suite-item.is-lit .suite-note {
+  color: color-mix(in oklab, var(--lamp) 18%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 14%, transparent);
+}
+.suite-item.is-lit .sw-title {
+  color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 18%, transparent);
+}
+.suite-item.is-lit .sw-excerpt {
+  color: color-mix(in oklab, var(--lamp) 14%, color-mix(in oklab, var(--color-base-content) 76%, transparent));
+}
+
+/* ── The invitation, inside a constellation ──────────────────────────────────
+   An essay is a different ink from a quote BEFORE anything happens — the title
+   carries a trace of the lamp at rest — and comes to full lamp on the stanza
+   being attended to, where a "Read →" warms alongside it and beckons.
+
+   Only writing gets any of this, and that asymmetry is the whole design: the
+   lamplight touches every stanza, so it could never distinguish them by itself.
+   Give the openable ones a word for it to warm and the light becomes the
+   carrier of a signal rather than a signal that lies.
+
+   Kept AFTER the `.is-lit` rules so `.is-focus` wins at equal specificity. */
+.suite-writing .sw-title {
+  color: color-mix(in oklab, var(--lamp) 34%, var(--color-base-content));
+}
+.suite-writing.is-focus .sw-title {
+  color: var(--lamp);
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 22%, transparent);
+}
+.suite-writing.is-focus .sw-excerpt {
+  color: color-mix(in oklab, var(--lamp) 30%, var(--color-base-content));
+}
+/* The no-JS floor, and gated — on touch `:hover` sticks after a tap, which
+   would strand a stanza lit while `.is-focus` had already moved on. */
+@media (hover: hover) {
+  .suite-writing:hover .sw-title {
+    color: var(--lamp);
+  }
+  .suite-writing:hover .sw-excerpt {
+    color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
+  }
+}
+
+/* Its own line beneath the excerpt, in the text column — unlike the overview
+   there is no margin here that is not already the star's. The word rests
+   visible, not hidden: its line is reserved either way. */
+.suite-cta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin-top: 0.7rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.09em;
+  font-variant: all-small-caps;
+  white-space: nowrap;
+}
+.suite-cta__word,
+.suite-cta__arrow {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  transition:
+    color 0.45s ease,
+    filter 0.45s ease;
+}
+.suite-cta__word {
+  transition-delay: 0.08s;
+}
+.suite-writing.is-focus .suite-cta__word,
+.suite-writing.is-focus .suite-cta__arrow {
+  color: var(--lamp);
+}
+.suite-writing.is-focus .suite-cta__arrow {
+  filter: drop-shadow(0 0 7px color-mix(in oklab, var(--lamp) 65%, transparent));
+  animation: sky-beckon 3.4s ease-in-out infinite;
+}
+@media (hover: hover) {
+  .suite-writing:hover .suite-cta__word,
+  .suite-writing:hover .suite-cta__arrow {
+    color: var(--lamp);
+  }
+  .suite-writing:hover .suite-cta__arrow {
+    filter: drop-shadow(0 0 7px color-mix(in oklab, var(--lamp) 65%, transparent));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .suite-cta__arrow {
+    animation-name: none;
+  }
+}
+
+/* excerpts clamp with a true ellipsis (line-clamp at the call site); the
+   mask fades the tail but bottoms out at partial opacity so the … stays */
+.excerpt-fade {
+  mask-image: linear-gradient(to bottom, black 45%, color-mix(in srgb, black 38%, transparent) 100%);
+}
+
+/* Subjects rail (blog/index.astro) — a long taxonomy crowds the top of the
+   MOBILE page, so we cap it and reveal the tail behind "Show all". The desktop
+   rail has vertical room, so it always shows the whole list. */
+.subject-extra {
+  display: none;
+}
+[data-subjects].is-expanded .subject-extra {
+  display: block;
+}
+/* Never hide a selected filter, even collapsed — it must always be reachable
+   (so it can be removed). Selected tags carry aria-current="true". */
+[data-subjects] .subject-extra:has([aria-current='true']) {
+  display: block;
+}
+@media (min-width: 768px) {
+  .subject-extra {
+    display: block;
+  }
+}
+
+/* Blog feed — infinite-scroll sentinel (scripts/blog-feed.ts). The manual
+   "Load older" link is the no-JS fallback; while the next page is fetched it
+   swaps to a quiet loading state. */
+.feed-spin {
+  display: none;
+}
+.feed-sentinel.is-loading .feed-more {
+  display: none;
+}
+.feed-sentinel.is-loading .feed-spin {
+  display: inline-flex;
+}
+
+/* Blog feed cards (components/PostCard.astro) — the constellation's reading
+   surface brought to the feed (sky-lab round 2): the title + a faded, clamped
+   excerpt are ONE reader trigger. There is no "Read more" button — the fade +
+   ellipsis is the invitation, and the pair warms toward lamplight on hover (or
+   keyboard focus, so it's reachable without a mouse). Metadata stays as chrome;
+   motion self-disables under the global reduced-motion rule. */
+.post-title,
+.post-excerpt {
+  transition:
+    color 0.4s ease,
+    text-shadow 0.4s ease;
+}
+.post-read:hover .post-title,
+.post-read:focus-within .post-title {
+  color: var(--lamp);
+}
+.post-read:hover .post-excerpt,
+.post-read:focus-within .post-excerpt {
+  color: color-mix(in oklab, var(--lamp) 30%, var(--color-base-content));
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 15%, transparent);
+}
+/* The excerpt fades toward its clamped last line so the ellipsis reads as
+   "there's more" — the mask bottoms at partial opacity, keeping it legible. */
+.post-excerpt-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, color-mix(in srgb, black 45%, transparent) 100%);
+  mask-image: linear-gradient(to bottom, black 55%, color-mix(in srgb, black 45%, transparent) 100%);
+}
+
+/* Bulk-action bar — a floating pill that slides up from the bottom when rows
+   are selected. Always in the DOM (so it can transition); off-screen when idle. */
+.bulkbar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  /* ⚠ `width: max-content` is LOAD-BEARING, not tidying. A `position: fixed`
+     box with only `left` set shrink-to-fits against `100% - left` — so pinning
+     the bar at `left: 50%` silently capped it at HALF the viewport, however
+     much empty space sat either side of it. Nothing showed until Piece 4 made
+     the count longer than "3 selected": at "7 selected · 0 shown here" the
+     label wrapped to two lines and the pill went ragged, on a 1280px screen
+     with 600px to spare. Found by looking at a screenshot — `toHaveText`
+     normalises whitespace, so the spec asserting that exact string was green
+     the whole time. */
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  padding: 0.4rem 0.5rem 0.4rem 1.1rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+  background: var(--color-base-200);
+  box-shadow: 0 12px 34px -12px color-mix(in oklab, var(--shadow-color) 55%, transparent);
+  translate: -50% 160%;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate 0.22s ease,
+    opacity 0.22s ease;
+}
+.bulkbar.is-open {
+  translate: -50% 0;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The list region dims while a client-side filter fetch is in flight. */
+.list-loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* List-row edit affordance: revealed on hover/focus for pointer users, but
+   ALWAYS visible where there's no hover (touch), and on keyboard focus. */
+.row-edit {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.group:hover .row-edit,
+.group:focus-within .row-edit,
+.row-edit:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .row-edit {
+    opacity: 1;
+  }
+}
+
+/* The selection checkbox in a fragment row. It renders at 16×16 (daisyUI's
+   `checkbox-xs`), which is under WCAG 2.5.8 AA's 24px floor — tolerable while
+   ticking a box was a throwaway gesture undone by the next filter change, and
+   not tolerable now that the selection is a CART that persists across filters
+   and searches and drives bulk publish, bulk membership and bulk DELETE.
+
+   The box keeps its size; the TARGET grows around it with a transparent
+   pseudo-element, so the visual density of a dense table is unchanged and only
+   the thing your finger has to find gets bigger. `position: relative` on the
+   box itself is what the ::after anchors to.
+
+   (Found by the 2026-08-04 audit at ten widths — one of 366 instances of the
+   same measurement. This one is fixed HERE, with the piece that made the
+   control load-bearing, rather than waiting for the sweep.) */
+.row-check {
+  position: relative;
+}
+.row-check::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+/* ── Admin chrome primitives (docs/admin.md §2) ──────────────────────────────
+   One implementation each of the small pieces every workshop surface repeats:
+   status chips, count badges, field labels, inline alerts, back links. Before
+   these existed, four pages each rolled their own — and drifted. */
+
+/* Status chip: draft / published. Calm on purpose — a draft is a normal state
+   in the workshop, not a warning. */
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-radius: var(--radius-selector);
+}
+.admin-chip--on {
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+.admin-chip--off {
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  background: var(--color-base-300);
+}
+/* A note sits one step below a draft, so it reads one step quieter: outlined
+   rather than filled, the same way `--none` says absence in the membership
+   column. Nothing about it should look unfinished-and-worrying. */
+.admin-chip--note {
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+}
+/* Membership: which constellations a fragment lives in. `--none` is deliberately
+   a dashed OUTLINE against `--in`'s filled lamplight, so a column of orphans
+   reads as absence at a glance rather than as small print. */
+/* Tinted with the constellation's own colour (a `cn-*` class on the chip), so
+   you can tell which is which by hue before reading the name. Falls back to
+   lamplight if a constellation somehow has no slot. */
+.admin-chip--in {
+  color: var(--cn, var(--color-primary));
+  background: color-mix(in oklab, var(--cn, var(--color-primary)) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--cn, var(--color-primary)) 30%, transparent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.7rem;
+}
+.admin-chip--none {
+  color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+  background: transparent;
+  border: 1px dashed color-mix(in oklab, var(--color-base-content) 22%, transparent);
+}
+
+/* The membership cell AS A CONTROL — the chips are the door to this fragment's
+   Constellations tab (FragmentRow.astro says why it's one button, not one per
+   chip). Three rules hold this together:
+
+   1. HOVER IS NEVER THE ONLY SIGNAL. Touch has no hover and the keyboard has
+      none either, so the ＋ is visible at rest and hover/focus only raises it.
+      A control you can only discover with a mouse is a control half the ways
+      into this room can't find.
+   2. NOTHING MOVES. The ＋ has a reserved slot rather than being appended when
+      the pointer arrives — inserting a glyph beside wrapped chips reflows the
+      whole cell, and a dense table cannot afford to twitch under the cursor.
+   3. IT IS A DIFFERENT DOOR FROM THE ROW. The row already tints on hover and
+      already opens the editor; if this cell's hover looked like that one, it
+      would be saying it does the same thing. Hence its own outline. */
+.cn-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem 0.5rem;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-field);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+.cn-cell__chips {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.cn-cell__mark {
+  flex: none;
+  width: 0.85rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  text-align: center;
+  color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+/* Gated: on touch, `:hover` sticks after a tap and would leave one row lit
+   until you tapped elsewhere. The at-rest ＋ is what those devices get. */
+@media (hover: hover) {
+  .cn-cell:hover {
+    background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+    border-color: color-mix(in oklab, var(--color-primary) 32%, transparent);
+  }
+  .cn-cell:hover .cn-cell__mark {
+    opacity: 1;
+    color: var(--color-primary);
+  }
+}
+.cn-cell:focus-visible {
+  outline: none;
+  background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+  border-color: var(--color-primary);
+}
+.cn-cell:focus-visible .cn-cell__mark {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+/* Count badge — "▤ 5 writing". The mark keeps its type color inside. */
+.admin-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+}
+.admin-stat__n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.admin-stat__label {
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+/* A stat you can act on — the publish preflight's constellations chip opens the
+   tab that would change the number. Still reads as a chip, not a button: the
+   count is the point, and the affordance only shows up under the cursor. */
+.admin-stat--action {
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.admin-stat--action:hover {
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 45%, transparent);
+}
+
+/* Field label + helper text for admin forms. */
+.admin-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+.admin-hint {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+}
+
+/* Inline error banner (was hand-rolled on five separate pages). */
+.admin-alert {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--color-error);
+  background: color-mix(in oklab, var(--color-error) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent);
+  border-radius: var(--radius-field);
+}
+
+/* One level up — the workshop is never deeper than that, so this replaces a
+   breadcrumb trail that could only ever have two crumbs. */
+.admin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  transition: color 0.12s;
+}
+.admin-back:hover {
+  color: var(--color-base-content);
+}
+
+/* A name edited in place AS the page title (the constellation composer). Reads
+   as a heading; reveals its editability on hover/focus. */
+.admin-title-input {
+  width: 100%;
+  padding: 0.1rem 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--color-base-content);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.admin-title-input::placeholder {
+  color: color-mix(in oklab, var(--color-base-content) 25%, transparent);
+}
+.admin-title-input:hover {
+  border-bottom-color: var(--color-base-300);
+}
+.admin-title-input:focus {
+  border-bottom-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+
+/* ── Star colour, on /admin/constellations ─────────────────────────────────
+   The ✦ itself in each slot, so you pick the star you'll actually see rather
+   than an abstract colour chip.
+
+   THESE MOVED OUT OF THE COMPOSER (docs/plans/16 · Piece 3). Colour is a
+   comparative judgement — a slot only means anything against the other seven
+   and against what the neighbouring constellations already wear — so the
+   control now lives where the whole sky is on screen. The reasoning is also
+   written at both call sites; this note is here because the MARKUP changed
+   shape with the move, and the two bugs below travelled with it.
+
+   The trigger is a real <button> now, not a <label> wrapping an `sr-only`
+   radio. That was the composer's shape because it sat inside a form and
+   FormData had to carry it; on the index the click is the commit, so the input
+   has nothing to do — and losing it makes one of the two bugs structurally
+   impossible rather than merely fixed (see .cn-slot:focus-visible). */
+.cn-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--cn);
+  font-family: var(--font-display);
+  border: 1px solid transparent;
+  border-radius: var(--radius-field);
+  /* Resting opacity was 0.55, reaching 1 only on `:hover` — WHICH TOUCH DOES
+     NOT HAVE. On a phone that made the picker one lit star and seven dim ones
+     with no way to preview any of them. Raised so every slot is legible at
+     rest, and the selection is carried by .is-active's ring, glow and tinted
+     background instead of by everything else being faded out. */
+  opacity: 0.82;
+  transition:
+    opacity 0.12s,
+    border-color 0.12s,
+    background 0.12s;
+}
+.cn-slot:hover .cn-swatch {
+  opacity: 1;
+}
+.cn-swatch.is-active,
+.cn-slot.is-active .cn-swatch {
+  opacity: 1;
+  background: color-mix(in oklab, var(--cn) 14%, transparent);
+  border-color: color-mix(in oklab, var(--cn) 45%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--cn) 65%, transparent));
+}
+
+/* One slot in the picker: the star, with how many constellations wear it. */
+.cn-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.25rem 0.15rem 0.2rem;
+  cursor: pointer;
+  border-radius: var(--radius-field);
+}
+.cn-slot:hover {
+  background: color-mix(in oklab, var(--color-base-300) 40%, transparent);
+}
+/* ⚠ `:focus-visible`, NOT `:focus-within` — this is one of the two bugs the
+   move had to kill rather than rebuild. The composer painted a 2px PRIMARY
+   outline on `.cn-swatch:focus-within`, and `:focus-within` matches a MOUSE
+   click too, because the `sr-only` radio inside took focus. So the instant you
+   picked a colour you got a blue ring on the new swatch, competing with the
+   glow still sitting on the old one: two selection signals on screen, and
+   neither of them the actual selection. The keyboard ring is for the keyboard;
+   `.is-active` is the one thing that means "chosen". */
+.cn-slot:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+.cn-slot__n {
+  min-height: 0.85rem; /* reserved, so a count arriving doesn't resize the grid */
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+
+/* The row's star, once it became a control. It has to read as pressable
+   without becoming a button-shaped thing in a list of quiet rows. */
+.cn-star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-field);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    filter 0.12s;
+}
+.cn-star-btn:hover {
+  background: color-mix(in oklab, var(--cn) 16%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in oklab, var(--cn) 60%, transparent));
+}
+.cn-star-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* The picker itself. `position: fixed` with the offsets written by script —
+   the native top layer means viewport coordinates, and `inset: auto` undoes
+   the UA's centring default. */
+.cl-colors {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: 15rem;
+}
+.cl-colors::backdrop {
+  background: transparent;
+}
+
+/* Sheet tabs — an underline strip inside the editor drawers, so a fragment's
+   composition (which constellations it belongs to) is a peer of its content
+   rather than a popover hiding in the chrome. */
+.admin-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.admin-tab {
+  padding: 0.4rem 0.7rem;
+  margin-bottom: -1px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.12s,
+    border-color 0.12s;
+}
+.admin-tab:hover {
+  color: var(--color-base-content);
+}
+.admin-tab[aria-selected='true'] {
+  color: var(--color-base-content);
+  border-bottom-color: var(--color-primary);
+}
+.admin-tab:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: -2px;
+  border-radius: var(--radius-field);
+}
+.admin-tab__n {
+  display: inline-block;
+  /* Reserved, not fitted. A count arriving on save (Versions ³) would otherwise
+     widen its tab and shove the whole strip along — a shift you see out of the
+     corner of your eye mid-sentence. Two characters covers 1–99, which this
+     corpus will not outlive. The margin is spent whether or not there's a
+     number, so reserving the glyph box too costs almost nothing. */
+  min-width: 2ch;
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--color-primary) 85%, transparent);
+}
+
+/* ── The writing sheet's command row: stillness while you type ──────────────
+   (docs/plans/16 · Piece 1.) The complaint was layout shift, and every one of
+   these rules buys the same thing: a region whose width does not depend on
+   what it currently says.
+
+   The distinction that decides what gets reserved: an OPEN-TIME difference (a
+   published piece showing different controls than a draft) is a state, settled
+   before the drawer is in front of you. A MID-TYPING change is the fault. Only
+   the second kind is worth spending permanent width on — and it is spent, on
+   every piece, forever, which is why nothing here reserves more than it must. */
+
+/* The worst offender, because it's the one on a timer: a draft autosaves every
+   1.2s, so `hidden` on the spinner took ~1rem of row and gave it back, twice a
+   cycle, for as long as you kept writing. `visibility` keeps the box. */
+#ws-spinner {
+  visibility: hidden;
+  flex: none;
+}
+#ws-spinner.is-on {
+  visibility: visible;
+}
+
+/* ⚠ THE TWO WIDTHS BELOW WERE MEASURED IN THE BROWSER, NOT ESTIMATED. A first
+   pass sized them in `ch` by counting characters, and the row still moved 6px
+   on the first keystroke — `1ch` is the width of a DIGIT and these strings are
+   mostly lowercase, so a character count is not a width. The pixel figures in
+   the comments are what the real strings render at, at 12px, in this font.
+   It matters more than it looks, because the row has no slack to absorb a
+   mistake: its content fills the drawer, so there is nothing for `ml-auto` to
+   give back and anything that grows pushes Save changes along.
+
+   The status sentence changes under you: "Autosaves as you write" → "Saving…" →
+   "Saved 14:32" on every autosave of a draft, and "Up to date" → "Unsaved
+   changes" → "Kept as a draft version · not public yet" on a published piece.
+   Sized for the longest REPEATING message, not the longest possible one:
+   reserving all 200px of that last sentence would buy a single settle — it
+   arrives once, 1.2s after your first keystroke, and never changes again — at
+   the cost of 100px of row on every piece forever. */
+#ws-status-text {
+  display: inline-block;
+  min-width: 6.25rem; /* 100px ≥ "Unsaved changes" (97px) */
+}
+/* Right-aligned inside its reserved box so the trailing "·" stays put and the
+   number grows leftward into the slack — the separator is what the eye uses to
+   find where the sentence beside it begins.
+
+   Same rule: sized for what recurs. 120px covers every count up to "9,999 words
+   · 45 min ·"; a piece crossing ten thousand words shifts the row once, on the
+   ten-thousandth word, and never again. */
+#ws-count {
+  display: inline-block;
+  min-width: 7.5rem; /* 120px ≥ "9,999 words · 45 min ·" */
+  text-align: right;
+}
+
+/* THE TAB STRIP IS THE NAMED SHOCK ABSORBER, and naming it is the point of
+   these two rules. Something has to give when the status line reaches its
+   longest sentence, and left to itself flex shrinks every flexible item in
+   proportion — which spent part of the deficit on `#ws-status` and passed the
+   rest along to Save changes. A button that drifts 4px is exactly the failure
+   this piece exists to remove, so the deficit is aimed: `#ws-status` never
+   shrinks and the strip takes all of it. The strip is the right place for it —
+   four tabs and their counts outrun a 390px phone on their own, so it had to
+   scroll there regardless, and a strip that scrolls still reaches every tab
+   (`wireSheetTabs` scrolls the selected one into view). The alternative —
+   letting the ROW scroll — puts Save changes off-screen with nothing saying
+   it's there, which in a near-fullscreen drawer is the worst answer available. */
+#ws-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#ws-tabs::-webkit-scrollbar {
+  display: none;
+}
+#ws-status {
+  flex: none;
+}
+
+/* Below `sm` the row becomes two lines rather than scrolling sideways, for the
+   same reason: a top bar you have to swipe hides its own Save button. The
+   reservations above are what make wrapping safe — without them the row would
+   re-flow mid-sentence, which is the original complaint wearing a different
+   hat. */
+#ws-command-row {
+  flex-wrap: wrap;
+}
+@media (min-width: 40rem) {
+  #ws-command-row {
+    flex-wrap: nowrap;
+  }
+}
+
+/* Composer suite rows — hover lift, and a held row while dragging. */
+.suite-row {
+  transition: background 0.12s;
+}
+.suite-row:hover {
+  background: color-mix(in oklab, var(--color-base-300) 45%, transparent);
+}
+.suite-row.is-dragging {
+  opacity: 0.4;
+}
+/* Nudge arrows are the TOUCH reorder path only. With a pointer you drag and
+   with a keyboard you Alt+↑/↓, so on a hovering device they'd only reserve row
+   width for a duplicate of drag — `opacity: 0` (the .row-edit default) hides
+   them but still holds the space, which is the whole complaint. Remove them. */
+@media (hover: hover) {
+  .row-nudge {
+    display: none;
+  }
+}
+
+/* Fragment-manager type filter — a segmented control with counts. */
+.seg {
+  display: inline-flex;
+  /* WRAPS, because it is the one control that made a page scroll sideways.
+     /admin/fragments measured scrollWidth 331 against a 320px viewport, and
+     this type filter (All · Writing · Quote · Song, each with its count) was
+     the whole of the overflow — every other width from 375 to 1920 was clean
+     on every route. 320px is an iPhone SE. Wrapping keeps the counts, which
+     are the reason to look at the control at all; dropping them below `sm`
+     was the alternative and it trades a rare two-line filter for a filter
+     that says less on every small screen. */
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  padding: 0.15rem;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+}
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  border-radius: calc(var(--radius-field) - 0.15rem);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.type-badge:hover {
+  color: var(--color-base-content);
+}
+.type-badge.is-active {
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--shadow-color) 14%, transparent);
+}
+.type-badge__n {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, currentColor 55%, transparent);
+}
+
+/* Theme toggle — show the icon of the theme you'd switch TO. */
+[data-theme='dusk'] .theme-icon-moon {
+  display: none;
+}
+[data-theme='paper'] .theme-icon-sun {
+  display: none;
+}
+
+/* Subject filter combobox (searchable, multi-select; AND semantics). */
+.subject-filter {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2rem;
+  min-width: 11rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  background: var(--color-base-100);
+  cursor: text;
+  font-family: var(--font-sans);
+}
+.subject-filter:focus-within {
+  border-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+}
+.subject-filter__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.05rem 0.2rem 0.05rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+}
+.subject-filter__x {
+  display: inline-flex;
+  width: 0.9rem;
+  height: 0.9rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  opacity: 0.45;
+  border-radius: 999px;
+}
+.subject-filter__x:hover {
+  opacity: 1;
+  color: var(--color-error);
+}
+.subject-filter__field {
+  flex: 1;
+  min-width: 5rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-base-content);
+  font-size: 0.8rem;
+}
+.subject-filter__list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 30;
+  width: max(100%, 14rem);
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--shadow-color) 45%, transparent);
+  list-style: none;
+}
+.subject-filter__opt {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: calc(var(--radius-field) - 0.15rem);
+  cursor: pointer;
+}
+.subject-filter__opt:hover,
+.subject-filter__opt.is-active {
+  background: var(--color-base-200);
+}
+
+/* Search-term highlight in the Fragment Manager. */
+.hl {
+  background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+  color: var(--color-base-content);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* Row title control — looks like text, behaves like a link/button. */
+.row-open {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.row-open:hover {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  text-underline-offset: 2px;
+}
+
+/* Add ▾ menu items. */
+.add-item:hover,
+.add-item:focus-visible {
+  background: var(--color-base-200);
+  outline: none;
+}
+
+/* Consistent keyboard focus ring on custom interactive elements. */
+.type-badge:focus-visible,
+.sort-header:focus-visible,
+.row-edit:focus-visible,
+.tt-btn:focus-visible,
+.row-open:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-field);
+}
+
+/* Composer formatting toolbar buttons. */
+.tt-btn {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  border-radius: var(--radius-field);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.tt-btn:hover {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.tt-btn.is-active {
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+}
+
+/* TipTap document surface: placeholder + min height. (Content typography is
+   inherited from `.reading`, which the editor element also carries.) */
+.tiptap-doc {
+  min-height: 24rem;
+}
+.tiptap-doc p.is-editor-empty:first-child::before,
+.tiptap-doc .is-empty::before {
+  content: attr(data-placeholder);
+  color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Images in the composer render with the public `.reading img` rules, so what
+   you see is what ships. These two are editor-only affordances. */
+.tiptap-doc img {
+  cursor: pointer; /* clicking one re-opens the description prompt */
+}
+.tiptap-doc img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* Proofreading marks (docs/plans/22 · Piece 4).
+
+   ⚠ THIS MUST NOT LOOK LIKE THE BROWSER'S SPELLCHECKER, and that is not a
+   cosmetic note. `editorProps` sets no `spellcheck` attribute, so Chrome's own
+   red squiggle is ALREADY ON and already sitting under half these words. A red
+   underline from us would be either invisible or indistinguishable from the
+   browser's — the feature would read as broken while working perfectly. So:
+   accent colour, and a tint behind the span rather than a line under it.
+
+   ⚠ THE HIT AREA IS BIGGER THAN THE MARK, AND MUST NOT REFLOW. A five-character
+   underlined word is a ~35px target at 390px (docs/plans/19 · Piece 8). The
+   padding below buys a comfortable one — and the negative margin gives the space
+   straight back, because the composer promises that pressing Proofread moves
+   nothing. Padding alone pushes every subsequent word along the line, which is
+   the layout shift plan 16 spent a whole piece removing. */
+.pf-mark {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  border-bottom: 2px solid color-mix(in oklab, var(--color-primary) 55%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0.35em 0.2em;
+  margin: -0.35em -0.2em;
+}
+.pf-mark:hover {
+  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
