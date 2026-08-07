@@ -242,7 +242,13 @@ Deno.serve(async (req) => {
   // second push cannot be the schedule — it has to be the database. No row
   // returned means somebody already sent today, and that "somebody" includes a
   // retry, a manual run, and the November hour that happens twice.
-  if (!body.skipClaim) {
+  //
+  // ⚠ A DRY RUN MUST NOT CLAIM. It sends nothing, so a claim it left behind
+  // would silence the real tick an hour later — a diagnostic that costs you the
+  // morning it was diagnosing. `skipClaim` covers it only if you remember to
+  // pass it, and the whole point of `dry` is to be the safe thing to type.
+  const claiming = !body.skipClaim && mode !== 'dry';
+  if (claiming) {
     const { data: claimed, error: claimErr } = await db
       .from('push_day_claims')
       .insert({ ymd })
@@ -281,7 +287,23 @@ Deno.serve(async (req) => {
   }
 
   if (dead.length) await db.from('push_subscriptions').delete().in('endpoint', dead);
-  if (mode !== 'dry') await db.from('push_day_claims').update({ delivered }).eq('ymd', ymd);
+
+  // ⚠ A CLAIM THAT REACHED NOBODY IS RELEASED, and this is the difference
+  // between "we already sent today" and "we already TRIED today". The claim
+  // exists to stop a SECOND push; without this it also stopped a RETRY, so one
+  // 500 from Apple at 10:05 bought silence until midnight — on precisely the
+  // morning this feature exists for. Failure here is invisible: nothing throws
+  // where a person is watching, the phone simply never rings.
+  //
+  // It cannot spin: a device that answers 404/410 is pruned above, so the next
+  // tick finds an empty table and returns before it ever claims. And releasing
+  // keeps `push_day_claims` meaning what its own header says it means — the
+  // record of days this thing actually SPOKE, which is the evidence for whether
+  // the hour is set right.
+  if (claiming) {
+    if (delivered > 0) await db.from('push_day_claims').update({ delivered }).eq('ymd', ymd);
+    else await db.from('push_day_claims').delete().eq('ymd', ymd);
+  }
 
   return json({
     mode,
@@ -291,6 +313,10 @@ Deno.serve(async (req) => {
     title: title(tasks),
     delivered,
     pruned: dead.length,
+    // Whether the day is now spent. `false` after a failed send means the next
+    // hourly tick will try again — say so, rather than making a reader infer it
+    // from `delivered: 0`.
+    dayClaimed: claiming && delivered > 0,
     results,
   });
 });

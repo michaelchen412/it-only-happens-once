@@ -36,7 +36,7 @@ import { actions } from 'astro:actions';
  *  never leaves the Supabase Edge Function. */
 const VAPID_PUBLIC = import.meta.env.PUBLIC_VAPID_PUBLIC_KEY as string | undefined;
 
-type State = 'loading' | 'unsupported' | 'off' | 'on' | 'denied' | 'error';
+type State = 'loading' | 'unsupported' | 'unconfigured' | 'off' | 'on' | 'denied' | 'error';
 
 /**
  * base64url → bytes. Safari takes the raw string too, but the BufferSource form
@@ -54,10 +54,17 @@ function keyBytes(b64: string): Uint8Array<ArrayBuffer> {
 }
 
 /** `window.pushManager` is the declarative-push entry point and exists only
- *  where this feature can actually work. Everything else reads `unsupported`. */
+ *  where this feature can actually work. Everything else reads `unsupported`.
+ *
+ *  ⚠ THE MISSING KEY IS DELIBERATELY *NOT* CHECKED HERE. Folding it in was the
+ *  first shape of this function, and it made a DEPLOYMENT fault wear a DEVICE
+ *  fault's clothes: with `PUBLIC_VAPID_PUBLIC_KEY` unset in Vercel, an installed
+ *  iPhone app was told "this device can't receive them — add it to the Home
+ *  Screen", which is advice to do the thing you have already done. The two
+ *  conditions have nothing to do with each other and now answer separately. */
 function manager(): PushManager | null {
   const w = window as unknown as { pushManager?: PushManager };
-  if (!w.pushManager || typeof Notification === 'undefined' || !VAPID_PUBLIC) return null;
+  if (!w.pushManager || typeof Notification === 'undefined') return null;
   return w.pushManager;
 }
 
@@ -95,6 +102,11 @@ function mount(): void {
   async function sync(): Promise<void> {
     const pm = manager();
     if (!pm) return show('unsupported');
+    // ⚠ AFTER the capability check, not before. On a desktop browser both are
+    // true and "unsupported" is the permanent honest answer; on the installed
+    // phone `pushManager` exists, so this is the one that surfaces — which is
+    // the only place the distinction can be acted on.
+    if (!VAPID_PUBLIC) return show('unconfigured');
     if (Notification.permission === 'denied') return show('denied');
 
     try {
@@ -125,6 +137,7 @@ function mount(): void {
   document.getElementById('push-enable')?.addEventListener('click', async () => {
     const pm = manager();
     if (!pm) return show('unsupported');
+    if (!VAPID_PUBLIC) return show('unconfigured');
     show('loading');
     try {
       // ⚠ FROM THE CLICK, NEVER FROM LOAD. iOS refuses a prompt raised outside a
@@ -135,7 +148,7 @@ function mount(): void {
 
       const sub = await pm.subscribe({
         userVisibleOnly: true, // not advisory: WebKit permits no silent push
-        applicationServerKey: keyBytes(VAPID_PUBLIC!),
+        applicationServerKey: keyBytes(VAPID_PUBLIC),
       });
       await persist(sub);
       show('on');

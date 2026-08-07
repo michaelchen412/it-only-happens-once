@@ -183,6 +183,14 @@ async function vapidAuth(endpoint: string, vapid: Vapid): Promise<string> {
  * decides what it means, because the only interesting cases are 404 and 410
  * ("this subscription is dead, delete the row") and that is a database
  * decision rather than a transport one.
+ *
+ * ⚠ IT GIVES UP AFTER 10 SECONDS, and the timeout is not defensive padding. The
+ * caller is `pg_cron` via `pg_net`, which abandons the REQUEST at 30s but
+ * cannot stop this function from running — so a push service that accepts a
+ * connection and never answers would hold the invocation open with nobody left
+ * to hear the result. A rejected fetch is caught by the loop upstream and
+ * reported as a failure for that endpoint, which is exactly right: unreachable
+ * is a per-device fact, not a reason to abandon the other devices.
  */
 export async function sendPush(sub: Subscription, payload: string, vapid: Vapid, ttl = 60): Promise<number> {
   const body = await encrypt(payload, sub);
@@ -195,6 +203,7 @@ export async function sendPush(sub: Subscription, payload: string, vapid: Vapid,
       TTL: String(ttl),
     },
     body,
+    signal: AbortSignal.timeout(10_000),
   });
   return res.status;
 }

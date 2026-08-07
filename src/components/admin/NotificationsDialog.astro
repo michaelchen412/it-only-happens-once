@@ -13,8 +13,18 @@
   ⚠ AND IT IS A DIALOG RATHER THAN A `/admin/settings` ROOM, deliberately. There
   is no settings room in this building — `home_timezone` has never had a UI —
   and inventing one for a switch you press once per device would add a ninth nav
-  item to a list whose whole argument is that it is short. Phase 3's time picker
-  and off switch land in HERE, beside the thing they configure.
+  item to a list whose whole argument is that it is short.
+
+  ⚠ PHASE 3 SHIPPED WITH NEITHER OF THE CONTROLS THIS COMMENT ONCE PROMISED,
+  and both absences are decisions rather than gaps. There is no off switch
+  because `push.forget` already deletes the device's row and the sender cannot
+  reach an endpoint it does not have — a second global mute would be a way to be
+  "subscribed but silent", indistinguishable from off and a new place for the
+  feature to break quietly (see `20260806233341_push_time.sql`). And there is no
+  time picker: `settings.push_time` is set in SQL, because the hour is chosen
+  once from the evidence in `push_day_claims` and a control for it would invite
+  fiddling with the one number that decides whether this is a tripwire or a
+  nag. If either earns itself, HERE is still where it belongs.
 
   Driven by src/scripts/push.ts. State is written as `data-state` on the root so
   the CSS decides what shows and the script never hides things one at a time.
@@ -33,7 +43,7 @@ import { Icon } from 'astro-icon/components';
       /* One paragraph per state, shown by `data-state` on the wrapper. Rendered
         always and revealed by CSS rather than built in script: the states are
         the whole content of this dialog, and a reader (or a future edit) should
-        be able to see all four of them in the markup at once. */
+        be able to see every one of them in the markup at once. */
     }
     <div class="text-base-content/70 space-y-3 text-sm">
       <p data-when="loading">Checking this device…</p>
@@ -41,6 +51,19 @@ import { Icon } from 'astro-icon/components';
       <p data-when="unsupported">
         This device can’t receive them. On iPhone that usually means the Observatory is open in a browser tab rather
         than installed — add it to the Home Screen from the Share menu, open it from its own icon, and come back here.
+      </p>
+
+      {
+        /* ⚠ A DEPLOYMENT FAULT, SAID AS ONE. Without this it shared the
+          `unsupported` paragraph, so an unset `PUBLIC_VAPID_PUBLIC_KEY` told an
+          already-installed iPhone to go and install itself. It names the
+          variable because the only person who will ever read this sentence is
+          the one who can go and set it. */
+      }
+      <p data-when="unconfigured">
+        This device could receive them, but the app was built without its public key — <code
+          >PUBLIC_VAPID_PUBLIC_KEY</code
+        > is missing from the deployment’s environment. Nothing here is wrong with your phone.
       </p>
 
       <p data-when="off">
@@ -88,6 +111,7 @@ import { Icon } from 'astro-icon/components';
   }
   #push-body[data-state='loading'] [data-when='loading'],
   #push-body[data-state='unsupported'] [data-when='unsupported'],
+  #push-body[data-state='unconfigured'] [data-when='unconfigured'],
   #push-body[data-state='off'] [data-when='off'],
   #push-body[data-state='on'] [data-when='on'],
   #push-body[data-state='denied'] [data-when='denied'],
