@@ -425,9 +425,30 @@ const nav = [
     // somebody remembered it, which is the same as not running.
     import '../scripts/push';
 
-    import { createBrowserClient } from '@supabase/ssr';
-    const supabase = createBrowserClient(import.meta.env.PUBLIC_SUPABASE_URL, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
+    // ⚠ THE AUTH CLIENT IS IMPORTED INSIDE THE HANDLER, AND THE REASON IS ITS
+    // SIZE, NOT ITS SHAPE (24 · Piece 6). `createBrowserClient` is 218,532 B raw
+    // / 56,433 B gzip, and a static import at the top of this layout meant every
+    // admin page in the building fetched, parsed and ran all of it so that ONE
+    // button in the sidebar footer would work — a button pressed, at most, once
+    // a session.
+    //
+    // Sign-out gains a module fetch it can trivially afford: it is already an
+    // action that ends in a full page load, and nobody presses it expecting to
+    // stay. Nothing else on the admin needs this client — `upload.ts` has its
+    // own, and that one now arrives lazily with the composer.
+    //
+    // ⚠ THE DURABLE ANSWER IS A SERVER ROUTE that clears the session cookies, so
+    // the browser needs no auth client at all. It is not done here because it
+    // wants care about which cookies @supabase/ssr actually wrote, and this
+    // three-line version captures the whole saving today. If a second browser-
+    // side auth need ever appears, build the route instead of importing this
+    // twice.
     document.getElementById('admin-signout')?.addEventListener('click', async () => {
+      const { createBrowserClient } = await import('@supabase/ssr');
+      const supabase = createBrowserClient(
+        import.meta.env.PUBLIC_SUPABASE_URL,
+        import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+      );
       await supabase.auth.signOut();
       window.location.href = '/';
     });

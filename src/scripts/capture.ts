@@ -18,15 +18,52 @@
 // every promise about not losing the thought (the 700ms debounce, the flush on
 // close and on visibilitychange, ＋ New parking one under its own id) is the
 // same code it was.
+// ⚠ THE ✚ COSTS THE WHOLE COMPOSER, ON EVERY ADMIN PAGE — that is what the
+// three dynamic imports below are about (24 · Piece 5).
+//
+// `CaptureDialog` is mounted from `AdminLayout`, on purpose (10-hq §10c: *"the
+// ✚ belongs to the building, not to a room"*), and that decision is NOT in
+// question here. But this module used to `import` TipTap statically, so Today,
+// People, Agenda, Notes, Fragments, Constellations, Library and About each
+// fetched, parsed and executed it whether or not anybody opened the box.
+// Measured 2026-08-07, transitively from this file: **725.2 KB raw / 228.4 KB
+// gzip**, of which `rich-editor` is 509 KB and the Supabase browser client
+// `upload` drags in is another 218 KB. HTTP-cached, so the cost is re-parse on
+// every navigation rather than re-download — which on a phone is real time with
+// the main thread held.
+//
+// ⚠ WARMED ON IDLE, NOT IMPORTED ON CLICK, and the difference is the design.
+// The obvious shape — `await import()` inside the click handler — puts a fetch
+// between the tap and a usable editor, taxing the one interaction plan 14
+// exists to keep instant. Warming after first paint takes the parse off the
+// critical path while leaving the editor already resident by the time a ✚ is
+// pressed in anger. `pointerdown`/`focusin` are belt and braces for the tap
+// that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
-import { mountRichEditor } from './rich-editor';
-import { wireAltDialog } from './alt-dialog';
-import { uploadImage } from './upload';
 
 const fab = document.getElementById('cap-open') as HTMLButtonElement | null;
 const dialog = document.getElementById('cap-dialog') as HTMLDialogElement | null;
 
-if (fab && dialog) {
+/**
+ * Build the box. Everything below this line is exactly what used to run at
+ * import time — the `dialog` parameter shadows the module-level lookup
+ * deliberately, so the body needed no edit at all and `git diff` shows the
+ * wrapper rather than a 230-line reindent.
+ *
+ * ⚠ It takes no `fab`. The ✚ is the DOOR and the door is wired outside, because
+ * the click that triggers the boot has already happened by the time this
+ * resolves and could never be replayed from in here.
+ */
+async function boot(dialog: HTMLDialogElement) {
+  // One await, three modules — they are independent and `rich-editor` is the
+  // long pole; serialising them would make the warm-up three round trips of
+  // parse latency instead of one.
+  const [{ mountRichEditor }, { wireAltDialog }, { uploadImage }] = await Promise.all([
+    import('./rich-editor'),
+    import('./alt-dialog'),
+    import('./upload'),
+  ]);
+
   const boxEl = document.getElementById('cap-box') as HTMLElement;
   const statusEl = document.getElementById('cap-status') as HTMLElement;
   const newBtn = document.getElementById('cap-new') as HTMLButtonElement;
@@ -223,7 +260,9 @@ if (fab && dialog) {
     if (savedAnything && document.getElementById('notes-pile')) window.location.reload();
   }
 
-  fab.addEventListener('click', open);
+  // ⚠ NOT `fab.addEventListener('click', open)` ANY MORE — the door is wired
+  // below, outside `boot`, because by the time this line runs the click that
+  // caused the boot has already happened and would never be replayed.
   doneBtn.addEventListener('click', () => void close());
   // `cancel` fires for Escape and precedes `close`; take it over so the flush
   // has somewhere to happen before the dialog goes.
@@ -241,7 +280,32 @@ if (fab && dialog) {
     if (document.visibilityState === 'hidden') void save();
   });
 
-  // The PWA shortcut lands here: long-press the home-screen icon → New note →
-  // /admin/notes?new=1, which is the room with the box already open.
-  if (new URLSearchParams(window.location.search).get('new') !== null) open();
+  return { open };
+}
+
+if (fab && dialog) {
+  // One boot per page, whichever door reaches it first.
+  let booted: ReturnType<typeof boot> | null = null;
+  const warm = () => (booted ??= boot(dialog));
+
+  // The tap that beats the idle warm-up. `pointerdown` fires before `click`, so
+  // a press already has the import in flight by the time the finger lifts.
+  fab.addEventListener('pointerdown', () => void warm());
+  fab.addEventListener('focusin', () => void warm());
+  fab.addEventListener('click', () => void warm().then((box) => box.open()));
+
+  // ⚠ THE PWA SHORTCUT BOOTS IMMEDIATELY, NOT ON IDLE. Long-pressing the
+  // home-screen icon → New note lands on /admin/notes?new=1, which is the room
+  // with the box ALREADY OPEN — so there is no click to wait for and no idle to
+  // be patient about. Waiting here would show the room with no box in it.
+  if (new URLSearchParams(window.location.search).get('new') !== null) {
+    void warm().then((box) => box.open());
+  } else {
+    // Otherwise: off the critical path, but resident before it is wanted.
+    // `requestIdleCallback` is still missing on some Safari versions Michael
+    // actually uses, and a missing warm-up would silently move the cost back
+    // onto the first ✚ press — which is precisely the trade this piece refuses.
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
+    idle(() => void warm());
+  }
 }
