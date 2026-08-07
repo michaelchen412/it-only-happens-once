@@ -166,3 +166,51 @@ setup('mint an admin session and find fixtures', async () => {
   // The session has to actually work, or every spec below fails confusingly.
   expect(published?.slug, 'no published essay in the database to test against').toBeTruthy();
 });
+
+/**
+ * Warm the dev server's module graph before any spec measures anything.
+ *
+ * ⚠ THIS EXISTS BECAUSE A COLD SERVER MANUFACTURES A FALSE BUG REPORT, and the
+ * false report is expensive: on 2026-08-07 a cold run failed all nine
+ * `sky-return.anon.spec.ts` cases, with the overview returning to scroll 0
+ * instead of the remembered position — exactly the symptom the feature exists
+ * to prevent. It read as a broken feature on a live site. It was not. Driving
+ * the identical journey by hand restored to the pixel, and the same suite ran
+ * 13/13 green against the warmed server in 17 seconds, having taken 4.4 minutes
+ * to fail before.
+ *
+ * The mechanism, so nobody re-diagnoses it: `astro dev` compiles a route on
+ * first request and Vite may RE-OPTIMIZE dependencies once it sees what that
+ * route imports. Re-optimization invalidates already-served modules — the
+ * browser gets `504 (Outdated Optimize Dep)` — and Vite recovers by pushing a
+ * full page reload down the HMR socket. A full reload lands mid-navigation, so
+ * the view transition never completes and the page ends up at scroll 0. Nothing
+ * about that is the code under test; it is the server compiling while being
+ * measured.
+ *
+ * `sky-return.anon.spec.ts` already knew half of this — it waits for the sky's
+ * own content before touching the toolbar, "because a cold Vite compile of this
+ * route can still send a full-reload down the HMR socket". That guard covers
+ * `/`. Nothing covered the SUITE route, which is the heavier of the two: it
+ * pulls in the constellation script, the star drawing and focus-mode.
+ *
+ * So both routes get walked once, here, before any assertion depends on them.
+ * The cost is a couple of seconds on a cold server and ~0 on a warm one.
+ */
+setup('warm the routes the specs measure', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-sky-slot]').first()).toBeVisible();
+
+  // The suite route, reached the way a reader reaches it. Discovered from the
+  // page rather than hard-coded, for the same reason the fixtures above are
+  // discovered: a slug in a test file is a slug that goes stale.
+  const slug = await page.locator('[data-sky-slot]').first().getAttribute('data-sky-slot');
+  if (!slug) return;
+  await page.goto(`/${slug}`);
+  await expect(page.locator('.suite-item').first()).toBeVisible();
+
+  // Back once more, so the return path's modules are compiled too — the reload
+  // this is here to prevent lands precisely on that navigation.
+  await page.goto('/');
+  await expect(page.locator('[data-sky-slot]').first()).toBeVisible();
+});
