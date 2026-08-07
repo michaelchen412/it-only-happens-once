@@ -1,0 +1,240 @@
+---
+/*
+  The DONE panel of the Morning card — the compact summary of a night already
+  recorded, with the pencil in the zone header as the way back into the form.
+
+  Split out of CheckinZone.astro on 2026-08-07 (quality audit). It was 183 lines
+  of one 847-line file, and the split is along the seam the card already had:
+  the four panels are shown one at a time and share no markup, so "the summary"
+  and "the form" were never entangled — only adjacent.
+
+  ⚠ THE DOM IT RENDERS IS UNCHANGED, DELIBERATELY AND TO THE ATTRIBUTE. Astro
+  components add no wrapper element, so this still emits the same
+  `[data-panel="done"]` div in the same place. `src/scripts/checkin.ts` finds
+  every panel by selector and knows nothing about which file drew it — which is
+  exactly why this was safe to move and would not have been safe to "tidy".
+
+  `data-src` attributes are load-bearing documentation, not decoration: each one
+  names the column or table a number came from. Keep them on anything derived.
+*/
+import { Icon } from 'astro-icon/components';
+import {
+  AIDS,
+  DREAM_TONES,
+  STARS,
+  TRACKS,
+  hm,
+  t12,
+  wordFor,
+  type Checkin,
+  type Derived,
+  type DreamEntry,
+} from '../../../lib/hq/checkin';
+import { clockIn } from '../../../lib/hq/time';
+import { renderMarkdown } from '../../../lib/markdown';
+
+interface Props {
+  /** The row for this date, if there is one. */
+  row: Checkin | null;
+  /** Local `HH:MM` times off the row, already converted out of UTC. */
+  times: { bed: string | null; woke: string | null; gotUp: string | null; asleepAt: string | null };
+  /** One entry per dream TONE, never per dream — see `checkin_dreams`. */
+  dreams: DreamEntry[];
+  /** The derived night. Computed once by the parent so the summary and the
+      form's live `deriveLine` can never disagree about the same row. */
+  summary: Derived | null;
+  /** Is this date inside the backfill window? (Gates "Add a nap".) */
+  writable: boolean;
+  /** The configured home zone — the no-JavaScript fallback for save stamps. */
+  tz: string;
+}
+const { row, times, dreams, summary, writable, tz } = Astro.props;
+
+const dreamOf = (tone: string) => dreams.find((d) => d.tone === tone);
+const aids = row?.sleep_aids ?? null;
+const aidsTaken = AIDS.filter((a) => aids?.includes(a.key));
+---
+
+{/* ════════════ DONE ════════════ */}
+<div class="zone__body" data-panel="done" hidden>
+  <div class="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+    {
+      /* The night, and everything that qualifies it. The dream badge and the
+        save stamp live HERE rather than in a strip of their own below a
+        divider — on an ordinary morning, with no dream text and no note, that
+        strip was a mostly empty band carrying two small things (Michael,
+        2026-08-02). A divider now appears only when there is prose under it. */
+    }
+    <div class="flex flex-col gap-2">
+      {
+        summary && (
+          /* Read straight off the derived values, never off the formatted
+             line: splitting `deriveLine` apart put two `≈` on the estimate. */
+          <div data-src="derived: got_up_at (or woke_at) − bed_at, less any out-of-bed waking; never stored">
+            {summary.hasNight && (
+              <Fragment>
+                <p class="font-display text-3xl leading-none font-light">{hm(summary.inBed)}</p>
+                <p class="admin-hint mt-1.5 text-xs">
+                  {times.bed && times.woke ? `${t12(times.bed)} → ${t12(times.woke)}` : ''}
+                  {/* The third time only appears when it says something the first
+                      two do not. It is the span the big number now includes and
+                      the estimate deliberately does not — so on a morning that
+                      ended with an hour of lying there, the gap between them is
+                      the visible answer rather than a silent adjustment. */}
+                  {summary.awakeInBed > 0 && times.gotUp && ` · up ${t12(times.gotUp)}`}
+                </p>
+              </Fragment>
+            )}
+            {summary.asleep !== null && (
+              <p class="admin-hint mt-0.5 text-xs">
+                ≈{hm(summary.asleep)} asleep · {summary.efficiency}%
+                {summary.awakeInBed > 0 && ` · ${hm(summary.awakeInBed)} awake in bed`}
+              </p>
+            )}
+            {/* MEASURED WAKINGS GET THEIR OWN LINE, never a footnote on the
+                efficiency. Three hours awake at 4am is the fact of that night,
+                and until 2026-08-06 the bucket rounded it to thirty minutes
+                and the number above came out twenty-nine points high. Whether
+                the bed was left is on the same line because it is what makes
+                the two nights score differently. */}
+            {summary.wasoMeasured && summary.waso !== null && (
+              <p class="admin-hint mt-0.5 text-xs" data-src="checkin_wakings">
+                {hm(summary.waso)} awake in the night
+                {summary.outOfBed > 0 && ` · ${hm(summary.outOfBed)} out of bed`}
+              </p>
+            )}
+            {summary.napped > 0 && (
+              <p class="admin-hint mt-0.5 text-xs" data-src="checkin_naps">
+                {hm(summary.napped)} napped
+              </p>
+            )}
+          </div>
+        )
+      }
+      {
+        /* ONE CHIP PER TONE — the change of 2026-08-06 made visible. Two
+          dreams of different kinds used to collapse into whichever was tapped
+          last; now an anxious night and a distressing one in the same night
+          both say so, each carrying its own strength word. */
+        dreams.length > 0 && (
+          <div class="flex flex-wrap gap-1.5" data-src="checkin_dreams">
+            {DREAM_TONES.filter((t) => dreamOf(t.key)).map((t) => {
+              const d = dreamOf(t.key)!;
+              return (
+                <span class:list={['chip', t.tone]}>
+                  <Icon name={t.icon} />
+                  {t.label}
+                  {d.intensity ? ` · ${wordFor('dream_intensity', d.intensity)}` : ''}
+                  {d.wokeYou && <Icon name="ph:eye" title="Woke me" />}
+                  {d.recurring && <Icon name="ph:arrow-counter-clockwise" title="Had it before" />}
+                </span>
+              );
+            })}
+          </div>
+        )
+      }
+      {
+        row?.dreamless === true && (
+          <span class="chip u-none self-start" data-src="daily_checkins.dreamless">
+            <Icon name="ph:moon" />
+            No dream recalled
+          </span>
+        )
+      }
+      {
+        aidsTaken.length > 0 && (
+          <p class="admin-hint text-xs" data-src="daily_checkins.sleep_aids">
+            Took {aidsTaken.map((a) => a.label.toLowerCase()).join(' · ')}
+          </p>
+        )
+      }
+      {
+        row?.updated_at && (
+          /* Resumable: what is missing is simply absent. No "2 of 7 fields"
+             meter and no "incomplete" badge — the pencil re-opens the row.
+             NEVER UTC: the server renders the configured home zone and
+             `local-time.ts` rewrites it into the device's. */
+          <p class="admin-hint text-xs" data-src="daily_checkins.updated_at">
+            Saved{' '}
+            <time datetime={row.updated_at} data-local="time">
+              {clockIn(row.updated_at, tz)}
+            </time>
+          </p>
+        )
+      }
+    </div>
+    <dl class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
+      {
+        STARS.map((s) =>
+          row?.[s.field] ? (
+            <Fragment>
+              <dt class="rate__label">{s.summaryLabel}</dt>
+              <dd class="rate" data-src={`daily_checkins.${s.field}`}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Icon
+                    name={n <= row[s.field]! ? 'ph:star-fill' : 'ph:star'}
+                    class:list={['rate__s', n <= row[s.field]! && 'rate__s--on']}
+                  />
+                ))}
+              </dd>
+            </Fragment>
+          ) : null,
+        )
+      }
+      {
+        TRACKS.map((t) =>
+          row?.[t.field] ? (
+            <Fragment>
+              <dt class="rate__label">{t.label}</dt>
+              <dd class="flex items-center gap-2" data-src={`daily_checkins.${t.field}`}>
+                <span class="track">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <i class:list={['track__t', n === row[t.field] && 'track__t--on']} />
+                  ))}
+                </span>
+                <span class="admin-hint text-xs">{wordFor(t.field, row[t.field])}</span>
+              </dd>
+            </Fragment>
+          ) : null,
+        )
+      }
+    </dl>
+  </div>
+
+  {
+    /* Below the divider: only what you actually wrote. On a morning with
+      neither, there is no divider and no band — the card just ends. */
+  }
+  {
+    (row?.dream_body || row?.note) && (
+      <div class="border-base-300 mt-4 space-y-2 border-t pt-3">
+        {row.dream_body && (
+          <div
+            class="reading text-base-content/75 font-serif text-sm"
+            data-src="daily_checkins.dream_body (Markdown)"
+            set:html={renderMarkdown(row.dream_body)}
+          />
+        )}
+        {row.note && (
+          <div
+            class="reading text-base-content/75 font-serif text-sm"
+            data-src="daily_checkins.note"
+            set:html={renderMarkdown(row.note)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  {
+    /* A NAP ARRIVES HOURS AFTER THIS CARD CLOSED, which is the whole reason
+      this button exists: reaching the day's record at 3pm must not mean
+      walking back through a form about last night. It opens the form at the
+      nap section with an empty row already waiting. */
+    writable && (
+      <button type="button" class="addline mt-3" data-add-nap-from-done>
+        <Icon name="ph:plus" /> Add a nap
+      </button>
+    )
+  }
+</div>

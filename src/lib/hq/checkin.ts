@@ -79,9 +79,50 @@ export const WORDS = {
 /** The fields that have a word beside their marks. */
 export type MarkField = keyof typeof WORDS;
 
+/**
+ * The marks that are COLUMNS ON THE ROW — every `MarkField` except
+ * `dream_intensity`, which belongs to a `checkin_dreams` entry rather than to
+ * `daily_checkins`.
+ *
+ * ⚠ THE DISTINCTION IS LOAD-BEARING and it was found by the compiler, not by
+ * reading: `STARS`/`TRACKS` were `as const` inside a component, so `row[field]`
+ * narrowed to real columns by accident. Annotating them `MarkField` on the way
+ * out widened it to include `dream_intensity` and TypeScript correctly refused
+ * to index a row with a column that does not exist. Naming the narrower set
+ * keeps the annotation honest instead of reaching for a cast.
+ */
+export type RowMarkField = Extract<MarkField, keyof Checkin>;
+
 export function wordFor(field: MarkField, value: number | null): string {
   return value && value >= 1 && value <= 5 ? WORDS[field][value - 1] : '';
 }
+
+/**
+ * The four 1–5 marks of "How it went", in the two pairs they are asked in.
+ *
+ * ⚠ TWO PAIRS, FOUR FIELDS, AND NONE OF THEM MERGE. Quality and Rested are two
+ * columns because eight solid hours that leave you wrung out is the signature
+ * this instrument exists to catch. Feeling and Energy are two axes because
+ * "calm but hollow" and "wired and afraid" are different mornings calling for
+ * different responses. They share a block and a control, never a column.
+ *
+ * `summaryLabel` differs from `label` on purpose: the form asks "Quality" under
+ * a "Sleep" sub-heading, while the summary has no heading to lean on and must
+ * say "Sleep" itself.
+ *
+ * Here rather than in a component because BOTH panels need them — the form
+ * draws the controls and the summary reads them back. They lived in
+ * CheckinZone.astro until the panels were split out (2026-08-07), at which
+ * point the only alternative was declaring them twice and hoping.
+ */
+export const STARS: { field: RowMarkField; key: string; label: string; summaryLabel: string }[] = [
+  { field: 'sleep_quality', key: 'sleep', label: 'Quality', summaryLabel: 'Sleep' },
+  { field: 'restedness', key: 'rested', label: 'Rested', summaryLabel: 'Rested' },
+];
+export const TRACKS: { field: RowMarkField; key: string; label: string; hint: string }[] = [
+  { field: 'valence', key: 'valence', label: 'Feeling', hint: '1 unpleasant ↔ 5 pleasant' },
+  { field: 'arousal', key: 'arousal', label: 'Energy', hint: '1 calm ↔ 5 activated' },
+];
 
 /**
  * The dream taxonomy. `none` IS ONE TAP AND IS REAL DATA, not a hole — recall

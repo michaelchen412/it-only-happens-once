@@ -1,0 +1,565 @@
+---
+/*
+  The FILL panel of the Morning card — the check-in form itself.
+
+  Split out of CheckinZone.astro on 2026-08-07 (quality audit): 452 of that
+  file's 847 lines were this one panel, so the file you opened to read "the
+  Morning card" was really the form, with the card around it.
+
+  ⚠ THE DOM IT RENDERS IS UNCHANGED, DELIBERATELY AND TO THE ATTRIBUTE. Astro
+  adds no wrapper element, so this still emits the same `[data-panel="fill"]`
+  div in the same place. `src/scripts/checkin.ts` binds everything here by
+  selector — `data-field`, `data-dream`, `data-tb`, `data-aid`, `data-lat`,
+  `data-wake`, `data-nap` — and knows nothing about which file drew it.
+
+  THE GRAMMAR OF THIS FORM IS THREE CONTROLS, and it is the reason the card
+  reads as a handful of questions rather than a wall: a row of chips, a 1–5 mark
+  with a word beside it, or a native time picker. Every follow-up sits in a
+  `.sub` — indented, under an accent rule, attached to the answer that summoned
+  it. Anything added here must be one of those three, in one of those two
+  places. Inventing a fourth shape is how "a sea of different fields" comes
+  back; the reasoning is kept in full in CheckinZone.astro's header.
+
+  It renders ONLY when `writable` — the parent gates it, so nothing here has to
+  ask whether the day can still be edited.
+*/
+import { Icon } from 'astro-icon/components';
+import {
+  AIDS,
+  DREAMS,
+  DREAM_FLAGS,
+  DREAM_TONES,
+  LATENCIES,
+  OPEN_ENDED_LATENCY,
+  STARS,
+  TIMEABLE_WAKINGS,
+  TRACKS,
+  WAKINGS,
+  deriveLine,
+  wordFor,
+  type Checkin,
+  type Derived,
+  type DreamEntry,
+  type NapEntry,
+  type WakingEntry,
+} from '../../../lib/hq/checkin';
+import { headerDate } from '../../../lib/hq/dates';
+
+interface Props {
+  /** The date being looked at. */
+  logDate: string;
+  /** Is `logDate` today? Drives the backfill banner and the skip wording. */
+  isToday: boolean;
+  /** The row for this date, if there is one. */
+  row: Checkin | null;
+  /** Local `HH:MM` times off the row, already converted out of UTC. */
+  times: { bed: string | null; woke: string | null; gotUp: string | null; asleepAt: string | null };
+  /** One entry per dream TONE, never per dream — see `checkin_dreams`. */
+  dreams: DreamEntry[];
+  /** Timed wakings, as local `HH:MM`, in the order they happened. */
+  wakings: WakingEntry[];
+  /** Daytime sleep on this date, as local `HH:MM`. */
+  naps: NapEntry[];
+  /** The derived night, for the live `deriveLine` under the times. */
+  summary: Derived | null;
+  /** Median times from recent rows — suggested only, and only for today.
+      Already resolved to null by the parent for a backfill. */
+  suggest: { bed: string; woke: string; up?: string } | null;
+  /** The time inputs' starting values: the row's own, else the suggestion. */
+  bedValue: string;
+  wokeValue: string;
+}
+const { logDate, isToday, row, times, dreams, wakings, naps, summary, suggest, bedValue, wokeValue } = Astro.props;
+
+const dreamOf = (tone: string) => dreams.find((d) => d.tone === tone);
+const aids = row?.sleep_aids ?? null;
+const tookNothing = aids !== null && aids.length === 0;
+
+// The two buckets that can be refined by a time. Rendered open when the row
+// already carries one, so a reload never hides an answer that exists.
+const timeable = TIMEABLE_WAKINGS.includes(row?.awakenings as never);
+---
+
+<div class="zone__body ck" data-panel="fill" hidden>
+  <div class="bf" data-bf hidden={isToday} data-src="log_date ≠ localToday(); inside the 3-day window">
+    <p class="bf__k">
+      <Icon name="ph:clock-light" />
+      {headerDate(logDate)}
+    </p>
+  </div>
+
+  {
+    /* ── DREAMS ─────────────────────────────────────────────────────────
+        FIRST, and this was the one ordering argument worth having. Recall
+        decays within MINUTES of waking; the times and the ratings are
+        stable and answerable at 9am. So the perishable field goes where you
+        are most likely to still have it. Settled 2026-08-02.
+
+        MULTI-SELECT SINCE 2026-08-06, and the common case did not get one
+        tap longer: one dream is still one tap, and a second kind of dream
+        costs exactly the tap it is worth. "Nothing" stays exclusive,
+        because it is the answer that there was nothing to have a kind. */
+  }
+  <fieldset class="fs" data-fs="dream">
+    <legend class="fs__k">Did you dream?</legend>
+    <div class="opts opts--2" data-src="daily_checkins.dreamless + checkin_dreams.tone">
+      {
+        DREAMS.map((d) => (
+          <button
+            type="button"
+            class:list={['opt', `opt--${d.key}`]}
+            data-dream={d.key}
+            aria-pressed={
+              d.key === 'none' ? (row?.dreamless === true ? 'true' : 'false') : dreamOf(d.key) ? 'true' : 'false'
+            }
+          >
+            <Icon name={d.icon} class="opt__i" />
+            {d.label}
+          </button>
+        ))
+      }
+    </div>
+
+    {
+      /* ONE FOLLOW-UP PER TONE, and every one of them is a `.sub` — the
+          indent and the accent rule are what keep three open tones reading
+          as three refinements of one answer rather than nine loose
+          controls. Present in the DOM for all three and revealed on tap, so
+          the server and the browser agree without either re-rendering. */
+    }
+    {
+      DREAM_TONES.map((t) => {
+        const d = dreamOf(t.key);
+        return (
+          <div class="sub" data-dream-more={t.key} hidden={!d}>
+            <p class="sub__k">{t.label}</p>
+            <div class="mark">
+              <span class="mark__k">Strength</span>
+              <span class="trackbtns" data-src={`checkin_dreams.intensity (${t.key})`}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    type="button"
+                    class:list={['tb', d?.intensity === n && 'tb--on']}
+                    data-tb={`intensity_${t.key}`}
+                    data-v={n}
+                    aria-label={`${t.label} intensity ${n} of 5`}
+                  >
+                    <i />
+                  </button>
+                ))}
+              </span>
+              <span class="mark__w" data-w-for={`intensity_${t.key}`}>
+                {wordFor('dream_intensity', d?.intensity ?? null)}
+              </span>
+            </div>
+            {/* Two taps that the four-value taxonomy cannot express. "Woke
+                me" is the clinical line between an anxiety dream and a
+                nightmare — the uncertainty plan 11 opened with and could
+                not measure until today. */}
+            <div class="flags" data-src={`checkin_dreams.woke_you / recurring (${t.key})`}>
+              {DREAM_FLAGS.map((f) => (
+                <button
+                  type="button"
+                  class="flag"
+                  data-flag={f.key}
+                  data-tone={t.key}
+                  aria-pressed={d?.[f.key] ? 'true' : 'false'}
+                >
+                  <Icon name={f.icon} />
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })
+    }
+
+    {
+      /* The one field that summons a keyboard at 7am, so it is behind a
+          tap. Optional, and skipping it is the normal case. It describes
+          the night's dreaming rather than any one tone, which is why it
+          stayed on the parent row when the tones moved off it. */
+    }
+    <div data-dream-prose hidden={row?.dreamless !== false}>
+      <button type="button" class="addline mt-2" data-reveal="dream_body" hidden={!!row?.dream_body}>
+        <Icon name="ph:plus" /> What you remember
+      </button>
+      <textarea
+        rows="3"
+        class="ta mt-2"
+        hidden={!row?.dream_body}
+        data-field="dream_body"
+        placeholder="What you remember."
+        data-src="daily_checkins.dream_body (Markdown)"
+        set:text={row?.dream_body ?? ''}
+      />
+    </div>
+  </fieldset>
+
+  {
+    /* ── THE NIGHT ────────────────────────────────────────────────────
+        CHRONOLOGICAL WITHIN ITSELF: into bed → what you took → how long to
+        go off → what broke it. Half-awake, "what happened next" is an
+        easier thread to follow than "all the times, then all the buckets",
+        and it is free — the order costs nothing and the alternative was
+        arbitrary. */
+  }
+  <fieldset class="fs" data-fs="night">
+    <legend class="fs__k">The night</legend>
+
+    {
+      /* THREE TIMES, NOT TWO. Efficiency is asleep over time IN BED, and
+          time in bed ends when you get OUT of it — so the hour spent lying
+          there at 5am belongs in the denominator. With "Woke" doing both
+          jobs it was either erased or scored as sleep depending on which
+          time got typed, and an early waking is the signature this whole
+          instrument is watching for. "Up" is optional: blank means you got
+          up when you woke, which is what every row before 2026-08-05 said.
+
+          The arrow between the first two is gone rather than repeated: at
+          390px three pickers and two glyphs do not fit, and the labels were
+          always the thing carrying the sequence. */
+    }
+    <div class="times" data-src="daily_checkins.bed_at / woke_at / got_up_at (full timestamptz — crosses midnight)">
+      <label class="tm">
+        <span class="tm__k">In bed</span>
+        <input type="time" data-field="bed" value={bedValue} />
+      </label>
+      <label class="tm">
+        <span class="tm__k">Woke</span>
+        <input type="time" data-field="woke" value={wokeValue} />
+      </label>
+      <label class="tm">
+        <span class="tm__k">Up</span>
+        <input type="time" data-field="gotUp" value={times.gotUp ?? suggest?.up ?? ''} />
+      </label>
+    </div>
+    {
+      suggest && (
+        <p class="prefill" data-prefill data-src="median of the last ~14 rows">
+          Your usual times.
+        </p>
+      )
+    }
+
+    <p class="derived" data-derived data-src="derived: time in bed, est. sleep, efficiency — never stored">
+      {deriveLine(summary)}
+    </p>
+
+    {
+      /* ── what you took ──────────────────────────────────────────────
+          The v1 exclusion list grouped naps and aids with caffeine and
+          exercise, on the argument that the agenda workstream would supply
+          behavioural context for free. IT NEVER WILL FOR THESE TWO. No
+          calendar knows you took melatonin, and none ever will.
+
+          "Nothing" is a tap and is real data, exactly as it is one row up.
+          An empty answer read as "took nothing" would silently invent the
+          control group every correlation over this column depends on. */
+    }
+    <div class="mt-3">
+      <span class="fs__sub">Took anything to sleep</span>
+      <div class="chips" data-src="daily_checkins.sleep_aids (NULL unanswered · '{}' answered nothing)">
+        <button
+          type="button"
+          class="opt opt--sm opt--none"
+          data-aid="none"
+          aria-pressed={tookNothing ? 'true' : 'false'}
+        >
+          Nothing
+        </button>
+        {
+          AIDS.map((a) => (
+            <button
+              type="button"
+              class="opt opt--sm"
+              data-aid={a.key}
+              aria-pressed={aids?.includes(a.key) ? 'true' : 'false'}
+            >
+              {a.label}
+            </button>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <span class="fs__sub">Fell asleep in</span>
+      <div class="opts opts--4" data-src="daily_checkins.sleep_latency">
+        {
+          LATENCIES.map((l) => (
+            <button
+              type="button"
+              class="opt opt--sm"
+              data-lat={l.key}
+              aria-pressed={row?.sleep_latency === l.key ? 'true' : 'false'}
+            >
+              {l.label}
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        /* ONLY UNDER THE OPEN-ENDED BUCKET, which is the one that cannot
+            answer its own question. "60m +" carries a midpoint of 75, so a
+            night awake until 3am scored an hour and a quarter and the
+            efficiency came out ~25 points high — on the number CBT-I
+            actually moves. The buckets are still right below this: nobody
+            knows whether it was twelve minutes or twenty. Everybody knows
+            when it was three hours.
+
+            A TIME, not a duration, and that is the whole reason it is one
+            tap. You remember "I finally went off around three", never "it
+            took me 187 minutes" — and it is the same native picker already
+            on this card twice, rather than a stepper invented for 7am. */
+      }
+      <div class="sub" data-asleep-at hidden={row?.sleep_latency !== OPEN_ENDED_LATENCY}>
+        <label class="tm tm--wide">
+          <span class="tm__k">Went off around</span>
+          <input type="time" data-field="asleepAt" value={times.asleepAt ?? ''} />
+        </label>
+        <p class="sub__note">Optional — without it, this bucket counts as 1h 15m.</p>
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <span class="fs__sub">Woke in the night</span>
+      <div class="opts opts--3" data-src="daily_checkins.awakenings">
+        {
+          WAKINGS.map((w) => (
+            <button
+              type="button"
+              class="opt opt--sm"
+              data-wake={w.key}
+              aria-pressed={row?.awakenings === w.key ? 'true' : 'false'}
+            >
+              {w.label}
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        /* THE SAME ARGUMENT AS `asleep_at`, one bucket over, and it took
+            until 2026-08-06 to notice. `many` carries thirty minutes, so
+            the night that went three hours asleep → THREE HOURS AWAKE → two
+            more scored ≈7h 15m at 83% against a truth of 4h 45m at 54%.
+
+            "Got up" is not decoration. CBT-I stimulus control tells you to
+            leave the bed when you cannot sleep — and until this existed,
+            obeying it scored exactly the same as lying there ignoring it,
+            because the excursion stayed inside the denominator either way.
+
+            Adding one is optional and costs nothing on an ordinary night:
+            the buckets above are still the answer, and this is the second
+            question only the top of the scale needs. */
+      }
+      <div class="sub" data-wakings hidden={!timeable}>
+        <div data-waking-list>
+          {
+            wakings.map((w) => (
+              <div class="rep" data-waking>
+                <label class="tm">
+                  <span class="tm__k">Woke</span>
+                  <input type="time" data-t="woke" value={w.woke ?? ''} />
+                </label>
+                <label class="tm">
+                  <span class="tm__k">Back asleep</span>
+                  <input type="time" data-t="backAsleep" value={w.backAsleep ?? ''} />
+                </label>
+                <button type="button" class="flag flag--tall" data-left-bed aria-pressed={w.leftBed ? 'true' : 'false'}>
+                  <Icon name="ph:footprints" />
+                  Got up
+                </button>
+                <button type="button" class="rep__x" data-drop aria-label="Remove this waking">
+                  <Icon name="ph:x" />
+                </button>
+              </div>
+            ))
+          }
+        </div>
+        <button type="button" class="addline" data-add-waking>
+          <Icon name="ph:plus" /> A long waking
+        </button>
+        <p class="sub__note">Optional — a short one is already in the bucket above.</p>
+
+        {
+          /* ⚠ THE BLANK ROW IS RENDERED HERE, NOT BUILT IN JAVASCRIPT.
+              A template string in the client would have to re-declare this
+              markup without `<Icon>`, so a waking you added would be missing
+              the glyphs a waking you reloaded has — the same row, two
+              appearances, depending on how it got there. Cloning keeps one
+              definition, and it is the reason `astro-icon` can be used
+              inside a control that does not exist until it is tapped. */
+        }
+        <template data-tpl="waking">
+          <div class="rep" data-waking>
+            <label class="tm">
+              <span class="tm__k">Woke</span>
+              <input type="time" data-t="woke" />
+            </label>
+            <label class="tm">
+              <span class="tm__k">Back asleep</span>
+              <input type="time" data-t="backAsleep" />
+            </label>
+            <button type="button" class="flag flag--tall" data-left-bed aria-pressed="false">
+              <Icon name="ph:footprints" />
+              Got up
+            </button>
+            <button type="button" class="rep__x" data-drop aria-label="Remove this waking">
+              <Icon name="ph:x" />
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </fieldset>
+
+  {
+    /* ── HOW IT WENT ──────────────────────────────────────────────────
+        ⚠ FOUR MARKS IN ONE BLOCK IS A LAYOUT DECISION AND NOT A MERGE OF
+        FIELDS. Quality and Rested stay two columns on purpose: eight solid
+        hours that still leave you wrung out is the exact signature being
+        investigated, and one "how did you sleep" score erases it. Feeling
+        and Energy stay two axes on purpose: a single mood score cannot tell
+        "calm but hollow" from "wired and afraid", and those are different
+        mornings calling for different responses. DO NOT MERGE ANY OF THEM.
+
+        What they share is the CONTROL and therefore the block. Four rows of
+        one shape under two sub-labels read as one gesture; the same four
+        split across two sections read as two more things to get through. */
+  }
+  <fieldset class="fs" data-fs="rating">
+    <legend class="fs__k">How it went</legend>
+
+    <span class="fs__sub">Sleep</span>
+    {
+      STARS.map((s) => (
+        <div class="mark">
+          <span class="mark__k">{s.label}</span>
+          <span class="stars" data-src={`daily_checkins.${s.field}`}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                type="button"
+                class:list={['st', (row?.[s.field] ?? 0) >= n && 'st--on']}
+                data-star={s.field}
+                data-v={n}
+                aria-label={`${s.label} ${n} of 5`}
+              >
+                <Icon name="ph:star-fill" />
+              </button>
+            ))}
+          </span>
+          <span class="mark__w" data-w-for={s.field}>
+            {wordFor(s.field, row?.[s.field] ?? null)}
+          </span>
+        </div>
+      ))
+    }
+
+    <span class="fs__sub mt-3">Waking up</span>
+    {
+      TRACKS.map((t) => (
+        <div class="mark">
+          <span class="mark__k">{t.label}</span>
+          <span class="trackbtns" data-src={`daily_checkins.${t.field} (${t.hint})`}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                type="button"
+                class:list={['tb', row?.[t.field] === n && 'tb--on']}
+                data-tb={t.field}
+                data-v={n}
+                aria-label={`${t.label} ${n} of 5`}
+              >
+                <i />
+              </button>
+            ))}
+          </span>
+          <span class="mark__w" data-w-for={t.field}>
+            {wordFor(t.field, row?.[t.field] ?? null)}
+          </span>
+        </div>
+      ))
+    }
+
+    <button type="button" class="addline mt-3" data-reveal="note" hidden={!!row?.note}>
+      <Icon name="ph:plus" /> A line about today
+    </button>
+    <textarea
+      rows="2"
+      class="ta mt-2"
+      hidden={!row?.note}
+      data-field="note"
+      placeholder="Anything at all."
+      data-src="daily_checkins.note"
+      set:text={row?.note ?? ''}
+    />
+  </fieldset>
+
+  {
+    /* ── NAPS ─────────────────────────────────────────────────────────
+        LAST, AND THE ONLY SECTION HERE ABOUT THE DAY. Everything above is
+        answerable at 7am; this one is not answerable until the afternoon,
+        so putting it anywhere earlier would place an unanswerable question
+        in the middle of a card built to be finished in under a minute.
+
+        Naps were excluded in v1 alongside caffeine and exercise, and that
+        grouping was the mistake: a nap does not correlate with sleep, IT IS
+        SLEEP. It breaks the 24-hour total, and an unrecorded one is exactly
+        what defeats sleep restriction. It stays out of the night's
+        efficiency, which is a statement about one night in one bed. */
+  }
+  <fieldset class="fs" data-fs="naps">
+    <legend class="fs__k">Naps</legend>
+    <div data-nap-list>
+      {
+        naps.map((n) => (
+          <div class="rep" data-nap>
+            <label class="tm">
+              <span class="tm__k">Fell asleep</span>
+              <input type="time" data-t="start" value={n.start ?? ''} />
+            </label>
+            <label class="tm">
+              <span class="tm__k">Woke</span>
+              <input type="time" data-t="end" value={n.end ?? ''} />
+            </label>
+            <button type="button" class="rep__x" data-drop aria-label="Remove this nap">
+              <Icon name="ph:x" />
+            </button>
+          </div>
+        ))
+      }
+    </div>
+    <button type="button" class="addline" data-add-nap>
+      <Icon name="ph:plus" /> Add a nap
+    </button>
+
+    {/* Cloned, for the same reason the waking row is — see above. */}
+    <template data-tpl="nap">
+      <div class="rep" data-nap>
+        <label class="tm">
+          <span class="tm__k">Fell asleep</span>
+          <input type="time" data-t="start" />
+        </label>
+        <label class="tm">
+          <span class="tm__k">Woke</span>
+          <input type="time" data-t="end" />
+        </label>
+        <button type="button" class="rep__x" data-drop aria-label="Remove this nap">
+          <Icon name="ph:x" />
+        </button>
+      </div>
+    </template>
+  </fieldset>
+
+  {/* No submit. One row per date, upserted — "Done" only closes the card. */}
+  <div class="ck__foot">
+    <button type="button" class="btn btn-ghost btn-sm font-sans" data-skip>
+      {isToday ? 'Skip today' : 'Skip this day'}
+    </button>
+    <span class="admin-hint text-xs" data-saved> Saves as you go </span>
+    <button type="button" class="btn btn-sm zone__cta font-sans" data-done> Done </button>
+  </div>
+</div>
