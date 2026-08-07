@@ -198,9 +198,14 @@ test.describe('the event sheet', () => {
     await openSheet(page);
     await stubActions(page, {});
     await page.locator('#event-form input[name="title"]').fill('Not going anywhere');
-    await page.locator('[data-submit]').click();
+    // ⚠ SCOPED TO THE FORM. `/admin/agenda` mounts EventSheet AND TagSheet, and
+    // both carry a `[data-submit]`, so the bare selector is a strict-mode
+    // violation rather than a click — it resolved to "Add event" and TagSheet's
+    // "Save" together. Every other spec that presses one of these already
+    // scopes it (`#goal-form`, `#task-sheet`); this one was the exception.
+    await page.locator('#event-form [data-submit]').click();
     await expect(page.locator('#event-sheet-error')).toBeVisible();
-    await expect(page.locator('[data-submit]')).toBeEnabled();
+    await expect(page.locator('#event-form [data-submit]')).toBeEnabled();
     await expect(page.locator('#event-sheet')).toBeVisible();
   });
 });

@@ -78,9 +78,43 @@ async function stub(page: import('@playwright/test').Page) {
   return { payloads, seen };
 }
 
+/**
+ * Open the form on a day with NOTHING on it yet.
+ *
+ * ⚠ THESE SPECS NEED A BLANK MORNING, AND UNTIL 2026-08-07 THEY PRETENDED NOT
+ * TO. Fifteen of them clicked "Start" directly — a button the server only
+ * renders on a date with no answers — so from the moment Michael did his own
+ * check-in, every one of them failed for thirty seconds and then reported a
+ * timeout. That is the exact failure this file warns about two helpers up: an
+ * environmental failure wearing a bug's clothes. It cost a real
+ * misdiagnosis: a refactor of the Morning card was read as having broken the
+ * check-in, and was only cleared by reverting it and watching the same fifteen
+ * fail identically.
+ *
+ * ⚠ AND IT IS `skip`, NOT `openForm`. The pencil would get these tests INTO the
+ * form on an answered day, and every one of them would then assert against a
+ * form prefilled with a real night — `payloads[4].dreams` would carry Michael's
+ * dreams as well as the tapped ones. Reaching the form is not the precondition;
+ * an EMPTY one is. The backfill block below is the model: assert what holds
+ * unconditionally, and gate the rest on `blank()` rather than faking it.
+ *
+ * The honest cost, stated so nobody discovers it as a surprise: on a day already
+ * answered these skip rather than run, and there is no blank day to borrow —
+ * the window is three days and it is usually full. They exercise on a morning
+ * before the check-in, and say plainly that they did not otherwise.
+ */
+async function startBlank(page: import('@playwright/test').Page) {
+  test.skip(!(await blank(page)), 'today is already answered — these assert against an empty form');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.locator('[data-panel="fill"]')).toBeVisible();
+}
+
 test.describe('the check-in, before it has been answered', () => {
   test('asks once, offers a skip, and blocks nothing', async ({ page }) => {
     await page.goto('/admin');
+    // Same precondition as `startBlank`, spelled out because this one asserts
+    // the ASK panel itself rather than opening the form from it.
+    test.skip(!(await blank(page)), 'today is already answered — the ask has correctly been replaced');
     const zone = page.locator('[data-checkin]');
 
     await expect(zone.getByText('How did you sleep?')).toBeVisible();
@@ -105,7 +139,7 @@ test.describe('the check-in, before it has been answered', () => {
   test('Start opens the form without a round trip', async ({ page }) => {
     const { seen } = await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     await expect(page.locator('[data-panel="fill"]')).toBeVisible();
     await expect(page.locator('[data-panel="ask"]')).toBeHidden();
@@ -120,7 +154,7 @@ test.describe('the check-in, before it has been answered', () => {
     // rendered GEOMETRY, not source order, because the ordering is done with
     // flex `order` and source order says nothing about what you see.
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     const dream = await page.locator('[data-fs="dream"]').boundingBox();
     const night = await page.locator('[data-fs="night"]').boundingBox();
@@ -139,7 +173,7 @@ test.describe('answering it', () => {
   test('a tap saves immediately, and carries what was tapped', async ({ page }) => {
     const { payloads, seen } = await stub(page);
     const tz = await page.goto('/admin').then(() => zoneOf(page));
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     await page.locator('[data-dream="anxious"]').click();
     await expect.poll(() => seen().length).toBe(1);
@@ -162,7 +196,7 @@ test.describe('answering it', () => {
     // whichever was tapped last, under a single intensity spanning both.
     const { payloads, seen } = await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     await page.locator('[data-dream="anxious"]').click();
     await page.locator('[data-dream="distressing"]').click();
@@ -188,7 +222,7 @@ test.describe('answering it', () => {
   test('the dream details only exist once there is a dream', async ({ page }) => {
     const { payloads, seen } = await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     const more = page.locator('[data-dream-more="anxious"]');
     await expect(more).toBeHidden();
@@ -215,7 +249,7 @@ test.describe('answering it', () => {
     // investigated, and one combined score erases it. If a later pass ever
     // merges these, this is the spec that should go red.
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
     await expect(page.locator('[data-star="sleep_quality"]')).toHaveCount(5);
     await expect(page.locator('[data-star="restedness"]')).toHaveCount(5);
     await expect(page.locator('[data-tb="valence"]')).toHaveCount(5);
@@ -225,7 +259,7 @@ test.describe('answering it', () => {
   test('every scale carries a word, and stars deliberately do not', async ({ page }) => {
     await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     await page.locator('[data-tb="valence"][data-v="1"]').click();
     await expect(page.locator('[data-w-for="valence"]')).toHaveText('bleak');
@@ -236,7 +270,7 @@ test.describe('answering it', () => {
   test('the derived line grows as the answers arrive, and claims nothing early', async ({ page }) => {
     await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     const derived = page.locator('[data-derived]');
     await page.locator('[data-field="bed"]').fill('23:35');
@@ -259,7 +293,7 @@ test.describe('answering it', () => {
     // about a 54% night — twenty-nine points, on the one number CBT-I moves.
     await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     const derived = page.locator('[data-derived]');
     await page.locator('[data-field="bed"]').fill('23:00');
@@ -289,7 +323,7 @@ test.describe('answering it', () => {
   test('a nap is counted, and never folded into the night', async ({ page }) => {
     await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     const derived = page.locator('[data-derived]');
     await page.locator('[data-field="bed"]').fill('23:00');
@@ -313,7 +347,7 @@ test.describe('answering it', () => {
     // `null` is a question nobody answered.
     const { payloads, seen } = await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
 
     await page.locator('[data-aid="melatonin"]').click();
     await expect.poll(() => seen().length).toBe(1);
@@ -332,7 +366,7 @@ test.describe('answering it', () => {
   test('typing debounces instead of saving every keystroke', async ({ page }) => {
     const { seen } = await stub(page);
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
     await page.locator('[data-dream="neutral"]').click();
     await expect.poll(() => seen().length).toBe(1);
 
@@ -351,7 +385,7 @@ test.describe('answering it', () => {
     // have; on this table that would mean losing the worst morning of a month.
     await page.route('**/_actions/**', (route) => route.abort('failed'));
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await startBlank(page);
     await page.locator('[data-star="restedness"][data-v="2"]').click();
 
     const saved = page.locator('[data-saved]');
@@ -364,6 +398,10 @@ test.describe('skipping', () => {
   test('is an explicit answer, not a gap', async ({ page }) => {
     const { payloads, seen } = await stub(page);
     const tz = await page.goto('/admin').then(() => zoneOf(page));
+    // The bare "Skip" lives on the ASK panel, so it needs the same blank
+    // morning `startBlank` does — the FILL panel's is "Skip today", and
+    // matching that one instead would test a different button.
+    test.skip(!(await blank(page)), 'today is already answered — the ask, and its Skip, are gone');
     await page.getByRole('button', { name: 'Skip', exact: true }).click();
 
     await expect.poll(() => seen()).toEqual(['checkin.setSkipped']);
