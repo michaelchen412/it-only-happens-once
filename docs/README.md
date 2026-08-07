@@ -26,6 +26,7 @@ Durable records of what this site is and how it's built — so that neither a hu
 | Content store | **Supabase** is the single source of truth; **no** content collections | [0004](adr/0004-supabase-over-content-collections.md) |
 | Type direction | **Editorial** — Newsreader + Atkinson Hyperlegible | `design.md` |
 | Themes | **dusk** (dark) / **paper** (light), OKLCH, semantic tokens only | `design.md` |
+| Theme default | **dusk always** — the OS `prefers-color-scheme` is not consulted; `paper` is a sticky opt-in via the toggle | [0021](adr/0021-dark-is-the-default-not-the-system-preference.md) |
 | Composer editor | **TipTap** (ProseMirror), fixed toolbar, stores Markdown | [0006](adr/0006-composer-editor-tiptap.md) |
 | AI subject tagging | **Claude Haiku 4.5**, structured output, human-in-loop | [0007](adr/0007-ai-subject-tagging.md) |
 | Provenance | **authors/works** as query facets (the browse axis) | [0008](adr/0008-provenance-and-facets.md) |
