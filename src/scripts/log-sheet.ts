@@ -97,8 +97,14 @@ if (root && sheet) {
     }),
   );
   $<HTMLInputElement>('[data-date-input]')?.addEventListener('change', (e) => {
-    const value = (e.target as HTMLInputElement).value;
+    const el = e.target as HTMLInputElement;
+    const value = el.value;
     if (!value) return;
+    // ⚠ The same half-typed-year trap the log box paid for: a date input fires
+    // `change` on every segment, so the first digit of the year reads as 0002
+    // and used to close this picker mid-typing. The input's `min` makes those
+    // partial years range errors; we wait them out. See log-box.ts.
+    if (el.validity.rangeUnderflow) return;
     $$('[data-day]').forEach((o) => o.classList.remove('is-on'));
     const d = new Date(`${value}T00:00:00Z`);
     setDate(value, `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);

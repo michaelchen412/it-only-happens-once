@@ -111,8 +111,16 @@ if (zone) {
     }),
   );
   $<HTMLInputElement>('[data-date-input]')?.addEventListener('change', (e) => {
-    const value = (e.target as HTMLInputElement).value;
+    const el = e.target as HTMLInputElement;
+    const value = el.value;
     if (!value) return;
+    // ⚠ A DATE INPUT FIRES `change` PER SEGMENT, not when you are finished with
+    // it. Once month and day are filled, the FIRST digit of the year completes
+    // a "valid" date — 2 arrives as the year 0002 — so this handler used to
+    // commit that and close the picker before `2026` could be typed. Waiting
+    // for the year to land inside the input's own `min`/`max` is the fix: 0002,
+    // 0020 and 0202 are all range errors, and we simply sit through them.
+    if (el.validity.rangeUnderflow) return;
     $$('[data-day]').forEach((o) => o.classList.remove('is-on'));
     const d = new Date(`${value}T00:00:00Z`);
     setDate(value, `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);

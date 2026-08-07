@@ -106,6 +106,32 @@ test.describe('the log box', () => {
     await expect(page.locator('[data-date-input]')).toHaveAttribute('type', 'date');
   });
 
+  // The picker used to close on the FIRST digit of the year: a date input
+  // reports its value per segment, so `2` in `2026` arrives as the year 0002 —
+  // a complete, past, in-`max` date the handler happily committed. Typing has
+  // to be driven key by key here; `fill()` sets all three segments at once and
+  // never reproduces it.
+  test('a year survives all four of its digits', async ({ page }) => {
+    await type(page, 'x');
+    await page.locator('[data-date-open]').click();
+    const input = page.locator('[data-date-input]');
+    const pop = page.locator('[data-pop="date"]');
+
+    // Focus ONCE, then keep typing on the page's keyboard: every locator-level
+    // press re-focuses the input, which sends the caret back to the month
+    // segment and silently types a different date than the one you wrote.
+    await input.focus();
+    await page.keyboard.type('0115');
+    await page.keyboard.type('2');
+    await expect(pop).toBeVisible();
+    await page.keyboard.type('02');
+    await expect(pop).toBeVisible();
+
+    await page.keyboard.type('4');
+    await expect(pop).toBeHidden();
+    await expect(page.locator('[data-date-label]')).toHaveText('1/15');
+  });
+
   test('cannot offer a future date', async ({ page }) => {
     await type(page, 'x');
     await page.locator('[data-date-open]').click();

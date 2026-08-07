@@ -137,7 +137,11 @@ const { roster, today } = Astro.props;
       }
       <label class="pop__date">
         <span>Another day</span>
-        <input type="date" max={today} data-date-input />
+        {
+          /* `min` is not decoration — it is what lets the script tell a
+            half-typed year from a finished one. See log-sheet.ts. */
+        }
+        <input type="date" min="1900-01-01" max={today} data-date-input />
       </label>
     </div>
   </div>

@@ -123,7 +123,13 @@ const { person, entries, roster, today } = Astro.props;
       }
       <label class="pop__date">
         <span>Another day</span>
-        <input type="date" max={today} data-date-input />
+        {
+          /* `min` is not decoration — it is what lets the script tell a
+            half-typed year from a finished one. Chrome reports the value the
+            instant three segments are filled, so the first keystroke of 2026
+            arrives as the year 0002. See log-box.ts. */
+        }
+        <input type="date" min="1900-01-01" max={today} data-date-input />
       </label>
     </div>
 
