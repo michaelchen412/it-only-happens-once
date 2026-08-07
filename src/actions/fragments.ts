@@ -469,6 +469,54 @@ export const fragments = {
     },
   }),
 
+  /**
+   * Proofread a piece of writing (read-only; no DB write). Outright mistakes
+   * only — the body's are marked in the editor where the typo is, the title's
+   * are reported in the status chip because an `<input>` cannot hold a
+   * decoration. Second tenant of ANTHROPIC_API_KEY (docs/plans/22); the subject
+   * call above is deliberately not shared with — see that plan's §1.
+   */
+  proofread: defineAction({
+    input: z.object({
+      // TWO FIELDS, NOT ONE STRING. A title fix has no ProseMirror position, so
+      // it has to be tellable apart from a body fix after the model answers.
+      // Concatenating them here would throw that away at the only moment it is
+      // free to keep.
+      title: z.string().max(300).optional(),
+      // A guard, not a budget: the composer refuses (out loud) before it ever
+      // sends something this long, because a proofread that quietly skipped the
+      // last third is the exact failure this feature exists to prevent.
+      text: z.string().min(1).max(20_000),
+    }),
+    handler: async ({ title, text }, ctx) => {
+      requireAdmin(ctx);
+      const apiKey = getSecret('ANTHROPIC_API_KEY');
+      if (!apiKey) throw fail('Proofreading isn’t configured — add ANTHROPIC_API_KEY.', 'BAD_REQUEST');
+      // Imported outside the try so the catch can name the incomplete case,
+      // while still keeping the SDK out of everything that doesn't call it.
+      const { proofread, IncompleteProofread } = await import('../lib/proofread');
+      try {
+        return await proofread(title ?? '', text, apiKey);
+      } catch (e) {
+        // "It came back half-finished" and "it never answered" are both zero
+        // fixes and need completely different sentences — only one of them
+        // means try again.
+        if (e instanceof IncompleteProofread) throw fail(e.message, 'INTERNAL_SERVER_ERROR');
+        // Same lesson as suggestSubjects above, and copied deliberately: a 400
+        // whose body said, in plain words, that the account was out of credit
+        // was being reported as "couldn't reach the model", which sends you
+        // looking at your network for a billing problem. Admin-gated, so the
+        // API's own message is both safe to show and the only thing that says
+        // where to go.
+        const err = e as { status?: number; error?: { error?: { message?: string } } } | null;
+        const detail = err?.error?.error?.message;
+        console.error('[proofread] model call failed', err?.status ?? '', detail ?? e);
+        if (detail) throw fail(`The model refused this: ${detail}`, 'BAD_REQUEST');
+        throw fail('Couldn’t reach the model — this one you proofread yourself.', 'INTERNAL_SERVER_ERROR');
+      }
+    },
+  }),
+
   /** Soft-delete: move a fragment to Trash (recoverable). */
   trash: defineAction({
     accept: 'form',
