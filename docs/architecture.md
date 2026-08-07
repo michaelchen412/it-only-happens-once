@@ -25,7 +25,7 @@ All three are the same Astro app, sharing the design system and components. The 
 | Layer | Choice | Notes |
 |---|---|---|
 | Framework | **Astro 7** | `output: 'server'` (on-demand rendering) |
-| Styling | **Tailwind 4 + daisyUI 5** | CSS-first; single source of truth in `src/styles/app.css` |
+| Styling | **Tailwind 4 + daisyUI 5** | CSS-first; tokens and themes in `src/styles/app.css`, which imports `admin.css` and `hq.css` |
 | Fonts | **Astro Fonts API** | self-hosted Newsreader + Atkinson Hyperlegible |
 | Icons | **astro-icon + Phosphor** | only used icons bundled |
 | Database | **Supabase (Postgres)** | single source of truth for all content |
@@ -132,10 +132,14 @@ As it stands. *(This section describes the tree today; history lives in the ADRs
 
 ```
 src/
-  styles/app.css           ← single source of truth (theme, type, base, every component class)
+  styles/
+    app.css                ← the law: theme, type, base — and it imports the other two, LAST
+    admin.css              ← the workshop's component classes (.admin-*, the sheets, the rows)
+    hq.css                 ← the Observatory's primitives (.zone, .row, .chip, .stamp, …)
   layouts/                 ← Base · SiteLayout (public) · AdminLayout (the Observatory)
   components/              ← public primitives: PostCard, Reader, Timestamp, StarMark, …
     admin/                 ← private ones: Zone, PageHeader, the *Sheet dialogs, the *Zone cards
+      checkin/             ← the Morning card's two heavy panels (DonePanel, FillPanel)
   lib/
     supabase.ts            ← client factories (browser / server session via @supabase/ssr)
     database.types.ts      ← GENERATED from the live schema; never hand-edit
