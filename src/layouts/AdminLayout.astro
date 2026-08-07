@@ -149,14 +149,30 @@ const nav = [
       zone, and the two halves of the count. One element, because `day-turn.ts`
       and `attention.ts` both need it and two elements could be rendered from
       two different values. Data rather than a script tag so it is inspectable
-      and so nothing has to be serialised into JavaScript. */
+      and so nothing has to be serialised into JavaScript.
+
+      ⚠ THE COUNTS ARE NAMESPACED `data-count-*`, AND THAT PREFIX IS LOAD-BEARING.
+      They shipped as bare `data-checkin` / `data-tasks`, and `data-checkin`
+      collided head-on with the Morning zone's own hook (CheckinZone.astro) —
+      the convention Zone.astro documents, where every zone is found by
+      `[data-<zone>]`. This div WRAPS every zone and comes first in document
+      order, so `document.querySelector('[data-checkin]')` in checkin.ts
+      returned the page shell instead of the card. It has no `data-panel-initial`
+      and no `data-writable`, so the script hid every panel and bound nothing:
+      the Morning card rendered as a bare title with no buttons at all, and
+      there was no error anywhere to say so. Three e2e specs resolved the same
+      selector to two elements at the same moment.
+
+      A page-wide wrapper must not claim a bare domain name. `data-count-*`
+      says what these are — counts about the day — and leaves the domain names
+      to the zones that ARE those domains. */
   }
   <div
     id="hq"
     data-today={Astro.locals.today.ymd}
     data-tz={Astro.locals.today.tz}
-    data-checkin={Astro.locals.attention.checkin}
-    data-tasks={Astro.locals.attention.tasks}
+    data-count-checkin={Astro.locals.attention.checkin}
+    data-count-tasks={Astro.locals.attention.tasks}
     class="bg-base-100 flex min-h-screen font-sans"
   >
     {/* Off-canvas backdrop (mobile only) */}

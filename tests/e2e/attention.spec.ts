@@ -177,7 +177,7 @@ test.describe('the count moves when you answer', () => {
     // start lying on the first day something is actually due.
     await page.goto('/admin');
     const day = await servedDay(page);
-    const tasks = Number(await page.locator('#hq').evaluate((el) => (el as HTMLElement).dataset.tasks));
+    const tasks = Number(await page.locator('#hq').evaluate((el) => (el as HTMLElement).dataset.countTasks));
     await signal(page, day, 'checkin', false); // → checkin = 1, whatever it was
     await signal(page, day, 'task', false);
     await signal(page, day, 'task', false);
@@ -190,13 +190,21 @@ test.describe('the count moves when you answer', () => {
     // posts whatever `logDate` the page is showing, so without the comparison
     // in `attention.ts` this is exactly what would go wrong.
     await page.goto('/admin');
+    const pill = page.locator('[data-attention-pill]').first();
     const before = await page.title();
+    // ⚠ WHAT THE PILL SAID, not whether it said nothing. This asserted
+    // `toBeHidden()`, which is a claim about today's real count rather than
+    // about the thing under test — so it passed only on a morning that happened
+    // to be fully answered, and failed on every morning the count was doing its
+    // job. The rule here is that a foreign date moves NOTHING, so the honest
+    // assertion is that the pill reads exactly what it read before.
+    const pillBefore = { hidden: await pill.isHidden(), text: await pill.textContent() };
     for (const day of ['2026-01-01', '2025-06-15']) {
       await signal(page, day, 'checkin', false);
       await signal(page, day, 'task', false);
     }
     expect(await page.title()).toBe(before);
-    await expect(page.locator('[data-attention-pill]').first()).toBeHidden();
+    expect({ hidden: await pill.isHidden(), text: await pill.textContent() }).toEqual(pillBefore);
   });
 });
 
@@ -247,7 +255,9 @@ const badgeLog = (page: import('@playwright/test').Page) =>
 const seededTotal = (page: import('@playwright/test').Page) =>
   page
     .locator('#hq')
-    .evaluate((el) => Number((el as HTMLElement).dataset.checkin) + Number((el as HTMLElement).dataset.tasks));
+    .evaluate(
+      (el) => Number((el as HTMLElement).dataset.countCheckin) + Number((el as HTMLElement).dataset.countTasks),
+    );
 
 test.describe('the number on the icon', () => {
   test('is painted on arrival, and agrees with the title', async ({ page }) => {

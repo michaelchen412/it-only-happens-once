@@ -107,8 +107,10 @@ function mount(): void {
   // rooms show a filtered slice of the day, so anything derived from what is on
   // screen would be a different number on every route.
   const state = {
-    checkin: Number(hq.dataset.checkin ?? 0),
-    tasks: Number(hq.dataset.tasks ?? 0),
+    // `data-count-*`, not `data-checkin` — the bare name belongs to the Morning
+    // zone, and taking it here silently blanked that whole card. See AdminLayout.
+    checkin: Number(hq.dataset.countCheckin ?? 0),
+    tasks: Number(hq.dataset.countTasks ?? 0),
   };
 
   /** The number every surface renders. Halves clamped independently, so a
