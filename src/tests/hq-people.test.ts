@@ -14,6 +14,7 @@
 //    units renders half a character.
 import { describe, expect, it } from 'vitest';
 import {
+  byKnownSince,
   daysToMonths,
   hueFor,
   knownFor,
@@ -156,6 +157,50 @@ describe('knownFor', () => {
 
   it('is absent when unknown', () => {
     expect(knownFor(null, '2026-08-02')).toBeNull();
+  });
+});
+
+describe('byKnownSince', () => {
+  // The tiebreak the roster actually passes is `byLastContact`. Here it is a
+  // marker instead, so these assertions pin WHEN the fallback is reached rather
+  // than re-testing what it does once it is.
+  const never = () => 0;
+  const marker = () => -1;
+
+  it('puts the longest-known first', () => {
+    const order = [
+      person({ display_name: 'Colleague', known_since_year: 2022 }),
+      person({ display_name: 'Mum', known_since_year: 1997 }),
+      person({ display_name: 'Friend', known_since_year: 2011 }),
+    ]
+      .sort(byKnownSince(never))
+      .map((p) => p.display_name);
+    expect(order).toEqual(['Mum', 'Friend', 'Colleague']);
+  });
+
+  it('leaves the same year to the tiebreak — three people at 1997 is no answer', () => {
+    const a = person({ display_name: 'A', known_since_year: 1997 });
+    const b = person({ display_name: 'B', known_since_year: 1997 });
+    expect(byKnownSince(marker)(a, b)).toBe(-1);
+  });
+
+  // NOT FIRST. Null is "not filled in", and reading it as year zero would hand
+  // the top of the section to whoever was added most carelessly.
+  it('sinks a missing year to the bottom', () => {
+    const order = [
+      person({ display_name: 'Unknown', known_since_year: null }),
+      person({ display_name: 'Colleague', known_since_year: 2022 }),
+      person({ display_name: 'Mum', known_since_year: 1997 }),
+    ]
+      .sort(byKnownSince(never))
+      .map((p) => p.display_name);
+    expect(order).toEqual(['Mum', 'Colleague', 'Unknown']);
+  });
+
+  it('leaves two missing years to the tiebreak as well', () => {
+    const a = person({ display_name: 'A' });
+    const b = person({ display_name: 'B' });
+    expect(byKnownSince(marker)(a, b)).toBe(-1);
   });
 });
 

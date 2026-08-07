@@ -106,16 +106,19 @@ export async function lastContactMap(sb: {
 }
 
 /**
- * Roster order within a circle: **last interaction, descending** (§3).
+ * **Last interaction, descending** — people you are actually in touch with
+ * float up.
  *
- * This replaces Piece 1's alphabetical fallback, and the ordering is the whole
- * point rather than a detail — people you are actually in touch with float up
- * and drift sinks on its own. That is the same fact a red badge would deliver,
- * delivered kindly: information without accusation.
+ * ⚠ NO LONGER THE ROSTER'S ORDER. It was, from Piece 2 until 2026-08-07, and it
+ * is now what `byKnownSince` falls through to when two people have been known
+ * the same number of years — see that function for why the roster stopped
+ * ranking by recency. Kept whole rather than inlined there, because it is still
+ * the correct answer to "who have I spoken to lately" and something else will
+ * ask that.
  *
- * Somebody with NO entries sorts last within their section, not first. They are
- * new rather than neglected, but the top of a section is for people there is
- * something to say about, and a name with no history is not that.
+ * Somebody with NO entries sorts last, not first. They are new rather than
+ * neglected, but the top of a list is for people there is something to say
+ * about, and a name with no history is not that.
  */
 export function byLastContact(map: Map<string, LastContact>) {
   return (a: { id: string; sort_name: string | null; display_name: string }, b: typeof a): number => {

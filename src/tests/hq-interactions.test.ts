@@ -7,9 +7,9 @@
 //    no year, so a contact two years old rendered as "7/20 Sat" and READ AS
 //    LAST MONTH — found in the people lab, not in review. A duration cannot lie
 //    that way, and these tests pin the boundaries where it changes register.
-//  · `byLastContact` is §3's "information without accusation": people you are
-//    actually in touch with float up and drift sinks on its own. The case that
-//    matters most is the one with NO entries — new, not neglected.
+//  · `byLastContact` is no longer the roster's order — it is what `byKnownSince`
+//    falls through to on a tie — but it still has to be right, and the case that
+//    matters most is the one with NO entries: new, not neglected.
 import { describe, expect, it } from 'vitest';
 import { KINDS, KIND_ICON, byLastContact, since, type LastContact } from '../lib/hq/interactions';
 

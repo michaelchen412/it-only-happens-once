@@ -199,20 +199,53 @@ export function knownFor(year: number | null, today: Ymd): string | null {
 }
 
 /**
- * Roster order within a circle section.
+ * Alphabetical, by `sort_name` when there is one.
  *
- * ⚠ TEMPORARY, AND THE COMMENT IS THE POINT. §3 settles this as "last
- * interaction, descending" — people he is actually in touch with float up and
- * drift sinks naturally, which is information without accusation. That ordering
- * needs `interactions`, so until Piece 2 lands the only honest fallback is
- * alphabetical: it is stable, it is predictable, and it asserts nothing the
- * database cannot back up. Ordering by `created_at` was the alternative and is
- * worse — the roster would reshuffle itself every time somebody was added, for
- * a reason nobody could see.
+ * This was the roster's order in Piece 1 and is now only the ARCHIVED drawer's
+ * — "how long" and "how recently" are both questions you ask of the roster, and
+ * neither is a question you ask of a drawer. A name is what you look somebody up
+ * by once they are in it.
  */
 export function rosterOrder(a: Person, b: Person): number {
   const key = (p: Person) => (p.sort_name || p.display_name).toLocaleLowerCase();
   return key(a).localeCompare(key(b));
+}
+
+/**
+ * Roster order within a circle section: **longest-known first** (§3, revised
+ * 2026-08-07).
+ *
+ * This replaces "last interaction, descending", and the change is a change of
+ * QUESTION rather than a tweak. Recency ordering made each section a live feed —
+ * it reshuffled every time an interaction was logged, so a section never looked
+ * the same way twice and nothing about it was memorable. `known_since_year`
+ * barely moves: Mum is above the friend from 2011 who is above the colleague
+ * from 2022, this year and next, and a roster you can navigate from muscle
+ * memory is worth more than one that re-sorts itself behind your back.
+ *
+ * NOTHING IS LOST BY DEMOTING RECENCY, which is the only reason this is safe:
+ * drift never depended on the sort. It is named in "Been a while" above the
+ * sections and marked on the card itself (`is-drifting`), so the fact still
+ * arrives — it just stops arriving as a rank.
+ *
+ * SAME YEAR FALLS THROUGH TO `tiebreak`, and the caller passes the old rule.
+ * Whole years tie constantly — three people share 1997 in family alone — and
+ * "you have known these three exactly as long" is genuinely no answer, so the
+ * ordering it replaced decides it rather than nothing deciding it.
+ *
+ * A MISSING YEAR SORTS LAST, never first. Null is "not filled in", and reading
+ * it as year zero would put whoever you added most carelessly at the top of the
+ * section — the loudest possible position for the least information.
+ */
+export function byKnownSince(tiebreak: (a: Person, b: Person) => number) {
+  return (a: Person, b: Person): number => {
+    const ay = a.known_since_year;
+    const by = b.known_since_year;
+    if (ay != null && by != null && ay !== by) return ay - by;
+    if (ay == null && by != null) return 1;
+    if (by == null && ay != null) return -1;
+    return tiebreak(a, b);
+  };
 }
 
 /**

@@ -27,6 +27,7 @@ import { dmd } from '../../lib/hq/dates';
 import {
   CIRCLES,
   SEARCH_APPEARS_ABOVE,
+  byKnownSince,
   hueFor,
   monogram,
   rosterOrder,
@@ -61,13 +62,14 @@ const seenToday = await seenOn(supabase, todayYmd);
 // it is always an explicit click, and it is reversible: putting a photo in a
 // drawer, not a judgement.
 //
-// SORTED BY LAST INTERACTION, DESCENDING (§3) — this is what Piece 1 left as
-// alphabetical because it had no interactions to sort by. People you are
-// actually in touch with float up and drift sinks on its own: the same fact a
-// red badge would deliver, delivered kindly. The archived section keeps the
-// alphabetical order, since "how recently" is not the question you are asking
-// of a drawer.
-const roster = everyone.filter((p) => !p.archived_at).sort(byLastContact(lastContact));
+// SORTED BY HOW LONG YOU HAVE KNOWN THEM, LONGEST FIRST — oldest ties broken by
+// the rule this replaced (last interaction, descending), and the whole argument
+// is on `byKnownSince`. Briefly: recency made every section a feed that never
+// looked the same twice, and drift was never carried by the sort anyway — it is
+// named in "Been a while" and marked on the card. The archived drawer stays
+// alphabetical, since neither "how long" nor "how recently" is the question you
+// ask of a drawer.
+const roster = everyone.filter((p) => !p.archived_at).sort(byKnownSince(byLastContact(lastContact)));
 const archived = everyone.filter((p) => p.archived_at).sort(rosterOrder);
 
 // One round trip for every face on the page. These URLs expire, which is why
