@@ -40,6 +40,8 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0017](0017-quote-provenance-three-facts.md) | A quote is three facts (Who / From / Where); the line under it is derived, and the citation opens behind the attribution itself | Accepted |
 | [0018](0018-notes-use-the-composer-editor.md) | Notes use the composer's editor on both surfaces; plan 14 §4's "plain `<textarea>`, ever" rule is retired, with the dictation trade on the record | Accepted |
 | [0019](0019-push-is-a-contract-you-sign.md) | Push: HQ may reach you when nothing is open — two contracts (ambient signal vs. an escalation you sign), no service worker, scheduler in Supabase | **Proposed** |
+| [0020](0020-the-about-page-does-not-summarise.md) | The About page does not summarise the sky — interests, headline and thesis are removed; no surface restates what a constellation delivers | **Proposed** |
+| [0021](0021-dark-is-the-default-not-the-system-preference.md) | Dark is the default, not the system preference: `dusk` is unconditional and `paper` is a sticky opt-in; scoped to `prefers-color-scheme` only | **Proposed** |
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —
