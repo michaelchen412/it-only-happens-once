@@ -21,9 +21,9 @@ export type DB = SupabaseClient<Database>;
 // that is cheaper to copy than to import will be copied.
 export const blankToUndef = (v: unknown) => (v === '' || v == null ? undefined : v);
 export const optText = z.preprocess(blankToUndef, z.string().optional());
-export const optUrl = z.preprocess(blankToUndef, z.string().url('That doesn’t look like a URL').optional());
+export const optUrl = z.preprocess(blankToUndef, z.url('That doesn’t look like a URL').optional());
 export const optInt = z.preprocess(blankToUndef, z.coerce.number().int().optional());
-export const optUuid = z.preprocess(blankToUndef, z.string().uuid().optional());
+export const optUuid = z.preprocess(blankToUndef, z.uuid().optional());
 
 /**
  * The two scalars HQ passes around as strings rather than as `Date`s.

@@ -71,7 +71,7 @@ export const versions = {
   saveWorking: defineAction({
     accept: 'form',
     input: z.object({
-      fragment_id: z.string().uuid(),
+      fragment_id: z.uuid(),
       title: optText,
       excerpt: optText,
       body: optText,
@@ -115,7 +115,7 @@ export const versions = {
    * edit under the whole archive.
    */
   list: defineAction({
-    input: z.object({ fragment_id: z.string().uuid() }),
+    input: z.object({ fragment_id: z.uuid() }),
     handler: async ({ fragment_id }, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
@@ -156,7 +156,7 @@ export const versions = {
 
   /** One version's full words — the preview pane, and the restore path. */
   get: defineAction({
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async ({ id }, ctx) => {
       requireAdmin(ctx);
       const { data, error } = await ctx.locals.supabase
@@ -191,7 +191,7 @@ export const versions = {
    */
   promote: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
@@ -244,7 +244,7 @@ export const versions = {
    */
   keep: defineAction({
     accept: 'form',
-    input: z.object({ fragment_id: z.string().uuid(), label: optText }),
+    input: z.object({ fragment_id: z.uuid(), label: optText }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
@@ -269,7 +269,7 @@ export const versions = {
    */
   discardWorking: defineAction({
     accept: 'form',
-    input: z.object({ fragment_id: z.string().uuid() }),
+    input: z.object({ fragment_id: z.uuid() }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const { error } = await ctx.locals.supabase
@@ -285,7 +285,7 @@ export const versions = {
   /** Throw a version away. Hard delete — a version is already the safety net. */
   remove: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const { error } = await ctx.locals.supabase.from('fragment_versions').delete().eq('id', input.id);

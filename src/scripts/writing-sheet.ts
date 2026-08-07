@@ -502,8 +502,12 @@ window.addEventListener('beforeunload', (e) => {
   // in a draft version by now (plan 07), but "usually" is the whole point: the
   // debounce may not have fired, and this is the last chance to say so.
   if (sheet.open && dirty) {
+    // `preventDefault()` is the whole trigger. The `e.returnValue = ''` that
+    // used to sit here was the legacy spelling for Chrome/Edge before 119
+    // (Oct 2023) and is deprecated; every browser that can sign into this
+    // admin area honours the standard form. Removed 2026-08-07 — and only
+    // here, in rooms one person uses, never on a public page.
     e.preventDefault();
-    e.returnValue = '';
   }
 });
 

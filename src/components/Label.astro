@@ -16,11 +16,38 @@
 */
 interface Props {
   variant?: 'voice' | 'chrome';
-  as?: string;
+  /* The exact set this component documents above, not `string` and not
+     `keyof HTMLElementTagNameMap` — an eyebrow is a `<p>` or a heading that
+     joins the outline, and nothing else. Widen it deliberately if that changes.
+     (It is also the only spelling ESLint accepts: `HTMLElementTagNameMap` is a
+     type-only interface with no runtime value, so `no-undef` reads it as an
+     undefined global inside `.astro` frontmatter.)
+     Narrowing is safe only because the annotation below made `Props` real. */
+  as?: 'p' | 'h2' | 'h3' | 'span';
   class?: string;
 }
-const { variant = 'voice', as: tag = 'p', class: className = '' } = Astro.props;
-const Tag = tag as any;
+
+/**
+ * ⚠ THE `: Props` ANNOTATION IS LOAD-BEARING. DO NOT DROP IT.
+ *
+ * Every other component here writes a bare `= Astro.props` and gets typed
+ * props for free. This one cannot: **a prop named `as` silently breaks Astro's
+ * automatic `Props` inference**, and it fails OPEN. `Astro.props` becomes
+ * `any`, so nothing errors — the component type-checks, the site builds, and
+ * `Props` quietly describes nothing at all.
+ *
+ * What that cost, measured 2026-08-07: all 38 `<Label>` call sites had been
+ * unchecked for the life of the component. `<Label variant="typo" />` was
+ * accepted in silence, and the two casts that used to sit here (`tag as any`,
+ * `variant as keyof typeof register`) were not stylistic — they were the
+ * workarounds the missing types made necessary.
+ *
+ * Isolated with a pair of probe components: an `as` prop alone reproduces it;
+ * a dynamic `<Tag>` alone does not. Annotating explicitly restores checking
+ * both inside here AND at every caller, which is why this is the fix rather
+ * than renaming the prop — `as=` is the idiomatic name and is used 28 times.
+ */
+const { variant = 'voice', as: Tag = 'p', class: className = '' }: Props = Astro.props;
 
 const register = {
   voice: 'font-serif tracking-[0.09em] text-base-content/50 [font-variant:all-small-caps]',
@@ -28,4 +55,4 @@ const register = {
 };
 ---
 
-<Tag class:list={[register[variant as keyof typeof register], className]}><slot /></Tag>
+<Tag class:list={[register[variant], className]}><slot /></Tag>

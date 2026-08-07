@@ -15,8 +15,14 @@ import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import astro from 'eslint-plugin-astro';
+// ESLint's own helper, which replaced `tseslint.config()` (deprecated upstream).
+// The two differ in ONE way that could bite: when a block's `extends` overrides
+// `files`, `tseslint.config` replaced the base list while `defineConfig`
+// intersects it. Nothing here uses `extends` inside a block, so the swap is
+// behaviour-for-behaviour identical — but that is why it was safe, not luck.
+import { defineConfig } from 'eslint/config';
 
-export default tseslint.config(
+export default defineConfig(
   {
     // Generated, vendored, or built. `database.types.ts` is regenerated from
     // the live schema and must never be hand-edited to satisfy a linter.
@@ -54,9 +60,27 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
-      // `any` is a warning rather than an error: it is real debt, but the
-      // Supabase relation boundary genuinely needs a few, and they are confined
-      // to `src/lib/hq/relations.ts` where a comment explains why.
+      // `any` is a warning rather than an error: it is real debt, and it is
+      // currently about a dozen sites, each one a boundary where the type
+      // system genuinely runs out rather than a shortcut.
+      //
+      // ⚠ THIS LIST WAS WRONG ONCE — it named `src/lib/hq/relations.ts` as the
+      // only home, and that file contains no `any` at all; it takes `unknown`
+      // and argues in its own header that returning `any` "would have been
+      // strictly worse". Corrected 2026-08-07 during a quality audit. In a
+      // codebase where the comments are the design record, a comment that sends
+      // you to the wrong file costs more than the debt it was describing, so
+      // this one names shapes rather than a single address:
+      //
+      //   - `(document as any).fonts` ×3 — `FontFaceSet` is missing from the
+      //     TS DOM lib at our target; the call is feature-detected anyway.
+      //   - `fragment-query.ts` — a structural constraint over PostgREST's
+      //     builder, which has no exported interface to name.
+      //   - `action-error.ts` — formats a CAUGHT value, and a `catch` binding
+      //     is genuinely unknown until it has been narrowed.
+      //
+      // Prefer `unknown` plus a narrow. Reach for `any` only at a boundary a
+      // reader can see, and say which one in a comment beside it.
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
 
@@ -91,6 +115,28 @@ export default tseslint.config(
       // toward the bug it spent two days removing.
       'no-useless-assignment': 'off',
     },
+  },
+
+  {
+    // ── `no-undef` is off inside .astro frontmatter, and it is a BUG FIX ─────
+    //
+    // typescript-eslint turns this rule off for `.ts` (its `eslint-recommended`
+    // override), on the grounds that TypeScript already does the job properly
+    // and ESLint cannot. That override's glob does not cover `.astro`, so
+    // frontmatter was the one place in this project still running it.
+    //
+    // The failure is not theoretical — it is why this block exists. Typing a
+    // component prop as `keyof HTMLElementTagNameMap` errored with
+    // "'HTMLElementTagNameMap' is not defined", because it is a TYPE-ONLY
+    // interface: `globals.browser` lists the DOM's runtime constructors, and a
+    // type that never existed at runtime is not among them. The rule was
+    // reporting correct code, and the only way to satisfy it was to write a
+    // worse type.
+    //
+    // Nothing is lost. A genuinely undefined identifier is still an error —
+    // `astro check` reports it, and `astro check` is in `npm run verify`.
+    files: ['**/*.astro'],
+    rules: { 'no-undef': 'off' },
   },
 
   {

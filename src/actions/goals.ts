@@ -108,7 +108,7 @@ export const goals = {
   setStatus: defineAction({
     accept: 'json',
     input: z.object({
-      id: z.string().uuid(),
+      id: z.uuid(),
       status: z.enum(['active', 'paused', 'achieved', 'let_go']),
     }),
     handler: async (v, ctx) => {
@@ -132,7 +132,7 @@ export const goals = {
    */
   remove: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

@@ -211,7 +211,7 @@ export const tasks = {
   dispose: defineAction({
     accept: 'json',
     input: z.object({
-      id: z.string().uuid(),
+      id: z.uuid(),
       outcome: z.enum(['done', 'skipped']),
     }),
     handler: async (v, ctx) => {
@@ -275,7 +275,7 @@ export const tasks = {
    */
   undo: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -316,7 +316,7 @@ export const tasks = {
    */
   remove: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

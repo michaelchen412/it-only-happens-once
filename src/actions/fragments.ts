@@ -320,7 +320,7 @@ export const fragments = {
     accept: 'form',
     input: z.object({
       id: optText,
-      spotify_url: z.string().url('Paste a Spotify or YouTube link'),
+      spotify_url: z.url('Paste a Spotify or YouTube link'),
       title: z.string().min(1, 'A song title is required'),
       attribution: z.string().min(1, 'Who’s the artist?'),
       album: optText,
@@ -387,7 +387,7 @@ export const fragments = {
    * Fetched on demand so the manager table doesn't embed every essay body.
    */
   get: defineAction({
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async ({ id }, ctx) => {
       requireAdmin(ctx);
       const { data, error } = await ctx.locals.supabase
@@ -598,7 +598,7 @@ export const fragments = {
    * A marker would be a thing to delete every single time.
    */
   appendToPiece: defineAction({
-    input: z.object({ noteId: z.string().uuid(), targetId: z.string().uuid() }),
+    input: z.object({ noteId: z.uuid(), targetId: z.uuid() }),
     handler: async ({ noteId, targetId }, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
@@ -759,7 +759,7 @@ export const songs = {
    * where it can be a sentence instead of a constraint name.
    */
   pair: defineAction({
-    input: z.object({ fragment_id: z.string().uuid(), song_id: optUuid }),
+    input: z.object({ fragment_id: z.uuid(), song_id: optUuid }),
     handler: async ({ fragment_id, song_id }, ctx) => {
       const sb = ctx.locals.supabase;
       if (song_id) {

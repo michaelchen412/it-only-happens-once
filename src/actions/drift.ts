@@ -49,7 +49,7 @@ export const drift = {
    */
   reachedOut: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid() }),
+    input: z.object({ personId: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -91,7 +91,7 @@ export const drift = {
    */
   mute: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid() }),
+    input: z.object({ personId: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

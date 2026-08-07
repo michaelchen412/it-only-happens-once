@@ -12,7 +12,7 @@ import { fail, uniqueSlug, optText, optInt } from './_shared';
 export const subjects = {
   update: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid(), name: z.string().min(1), definition: optText }),
+    input: z.object({ id: z.uuid(), name: z.string().min(1), definition: optText }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
@@ -26,7 +26,7 @@ export const subjects = {
   }),
   remove: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       const { error } = await ctx.locals.supabase.from('subjects').delete().eq('id', input.id);
       if (error) throw fail(error.message);
@@ -35,7 +35,7 @@ export const subjects = {
   }),
   merge: defineAction({
     accept: 'form',
-    input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+    input: z.object({ from: z.uuid(), into: z.uuid() }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       if (input.from === input.into) throw fail('Pick two different subjects', 'BAD_REQUEST');
@@ -59,7 +59,7 @@ export const subjects = {
 export const authors = {
   update: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid(), name: z.string().min(1), note: optText }),
+    input: z.object({ id: z.uuid(), name: z.string().min(1), note: optText }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const slug = await uniqueSlug(sb, slugify(input.name), input.id).catch(() => slugify(input.name));
@@ -73,7 +73,7 @@ export const authors = {
   }),
   remove: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       const { error } = await ctx.locals.supabase.from('authors').delete().eq('id', input.id);
       if (error) throw fail(error.message);
@@ -82,7 +82,7 @@ export const authors = {
   }),
   merge: defineAction({
     accept: 'form',
-    input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+    input: z.object({ from: z.uuid(), into: z.uuid() }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       if (input.from === input.into) throw fail('Pick two different authors', 'BAD_REQUEST');
@@ -99,7 +99,7 @@ export const works = {
   update: defineAction({
     accept: 'form',
     input: z.object({
-      id: z.string().uuid(),
+      id: z.uuid(),
       title: z.string().min(1),
       author_id: optText,
       year: optInt,
@@ -124,7 +124,7 @@ export const works = {
   }),
   remove: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       const { error } = await ctx.locals.supabase.from('works').delete().eq('id', input.id);
       if (error) throw fail(error.message);
@@ -133,7 +133,7 @@ export const works = {
   }),
   merge: defineAction({
     accept: 'form',
-    input: z.object({ from: z.string().uuid(), into: z.string().uuid() }),
+    input: z.object({ from: z.uuid(), into: z.uuid() }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       if (input.from === input.into) throw fail('Pick two different works', 'BAD_REQUEST');

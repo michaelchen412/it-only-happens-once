@@ -85,7 +85,7 @@ export const constellations = {
   }),
   remove: defineAction({
     accept: 'form',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
       // Placements cascade away; fragments are never touched.
       const { error } = await ctx.locals.supabase.from('constellations').delete().eq('id', input.id);
@@ -113,7 +113,7 @@ export const constellations = {
   /** Append a fragment to a suite (idempotent — re-placing is a no-op). */
   place: defineAction({
     accept: 'form',
-    input: z.object({ constellation_id: z.string().uuid(), fragment_id: z.string().uuid() }),
+    input: z.object({ constellation_id: z.uuid(), fragment_id: z.uuid() }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const { data: last } = await sb
@@ -137,7 +137,7 @@ export const constellations = {
   /** Remove from the suite — unplacing, never deleting the fragment. */
   unplace: defineAction({
     accept: 'form',
-    input: z.object({ constellation_id: z.string().uuid(), fragment_id: z.string().uuid() }),
+    input: z.object({ constellation_id: z.uuid(), fragment_id: z.uuid() }),
     handler: async (input, ctx) => {
       const { error } = await ctx.locals.supabase
         .from('fragment_constellations')
@@ -157,7 +157,7 @@ export const constellations = {
   setMembership: defineAction({
     accept: 'form',
     input: z.object({
-      fragment_id: z.string().uuid(),
+      fragment_id: z.uuid(),
       /** Comma-separated constellation ids; EMPTY means "belongs to none". */
       constellation_ids: idList,
     }),
@@ -212,7 +212,7 @@ export const constellations = {
   bulkMembership: defineAction({
     accept: 'form',
     input: z.object({
-      constellation_id: z.string().uuid(),
+      constellation_id: z.uuid(),
       fragment_ids: z.string().min(1),
       op: z.enum(['add', 'remove']),
     }),
@@ -257,7 +257,7 @@ export const constellations = {
   /** The composed order: positions rewritten 1..n from the given list. */
   reorderPlacements: defineAction({
     accept: 'form',
-    input: z.object({ constellation_id: z.string().uuid(), fragment_ids: z.string().min(1) }),
+    input: z.object({ constellation_id: z.uuid(), fragment_ids: z.string().min(1) }),
     handler: async (input, ctx) => {
       const sb = ctx.locals.supabase;
       const ids = input.fragment_ids.split(',').filter(Boolean);

@@ -173,7 +173,7 @@ export const people = {
    */
   saveBio: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid(), bio: nullableText(20_000) }),
+    input: z.object({ id: z.uuid(), bio: nullableText(20_000) }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -197,7 +197,7 @@ export const people = {
    */
   setPhoto: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid(), path: z.string().max(400).nullable() }),
+    input: z.object({ id: z.uuid(), path: z.string().max(400).nullable() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -240,7 +240,7 @@ export const people = {
    */
   setArchived: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid(), archived: z.boolean() }),
+    input: z.object({ id: z.uuid(), archived: z.boolean() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

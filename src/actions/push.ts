@@ -34,7 +34,7 @@ import { fail, requireAdmin, type DB } from './_shared';
  * junk, never to decide who may receive a push.
  */
 const subscription = z.object({
-  endpoint: z.string().url('That is not a push endpoint'),
+  endpoint: z.url('That is not a push endpoint'),
   p256dh: z.string().min(1),
   auth: z.string().min(1),
 });
@@ -87,7 +87,7 @@ export const push = {
    */
   touch: defineAction({
     accept: 'json',
-    input: z.object({ endpoint: z.string().url() }),
+    input: z.object({ endpoint: z.url() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -118,7 +118,7 @@ export const push = {
    */
   forget: defineAction({
     accept: 'json',
-    input: z.object({ endpoint: z.string().url() }),
+    input: z.object({ endpoint: z.url() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

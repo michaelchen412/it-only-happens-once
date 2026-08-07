@@ -10,6 +10,13 @@
   302 from `/admin` could not have carried it, because a hash never leaves the
   browser.
 */
-const { id } = Astro.params;
-return Astro.redirect(!id || id === 'new' ? '/admin/fragments#new-writing' : `/admin/fragments#edit=${id}`);
+/* Read inline rather than via a `const`. Astro's generated module reports a
+   frontmatter binding used ONLY inside a top-level `return` as unused (ts6133),
+   which is wrong but not suppressible — and a page this small does not need a
+   name for a value it forwards once. */
+return Astro.redirect(
+  !Astro.params.id || Astro.params.id === 'new'
+    ? '/admin/fragments#new-writing'
+    : `/admin/fragments#edit=${Astro.params.id}`,
+);
 ---

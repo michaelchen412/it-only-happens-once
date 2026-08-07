@@ -1,9 +1,26 @@
 ---
+/*
+  /styleguide — the design system on one page: swatches, type scale, the marks,
+  the primitives. Working scaffolding for building the site, not a room a reader
+  is meant to find.
+
+  ⚠ DEV-GATED 2026-08-07, to match /sky-lab, /reveal-lab and /afford-lab. It had
+  been the only one of the four reachable in production — not by decision, just
+  by never having been asked the question. It is linked from nowhere, so nothing
+  regressed; what changed is that the four bench pages now answer "is this
+  public?" the same way, instead of three answering it one way and one drifting.
+
+  Reverting is one line, and the case for reverting is real: a styleguide is the
+  most defensible of the four to publish. Make that call deliberately if you
+  make it.
+*/
 import Base from '../layouts/Base.astro';
 import StarMark from '../components/StarMark.astro';
 import FragmentCard from '../components/FragmentCard.astro';
 import Timestamp from '../components/Timestamp.astro';
 import Label from '../components/Label.astro';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
 // live sample dates so the relative labels actually demonstrate the range
 const now = new Date();

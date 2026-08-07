@@ -23,9 +23,9 @@ const input = z.object({
   /** Absent on create. */
   id: optUuid,
   /** Whose profile this was logged from. Always a participant. */
-  personId: z.string().uuid(),
+  personId: z.uuid(),
   /** Everyone else who was there. */
-  withIds: z.array(z.string().uuid()).max(50).default([]),
+  withIds: z.array(z.uuid()).max(50).default([]),
   occurredOn: ymd,
   kind: z.enum(['hangout', 'call', 'message', 'gift', 'shared', 'note']).default('hangout'),
   body: z.string().trim().min(1, 'An entry needs some words.').max(20_000),
@@ -112,7 +112,7 @@ export const interactions = {
    */
   remove: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

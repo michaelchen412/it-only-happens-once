@@ -50,7 +50,7 @@ export const links = {
    */
   work: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid(), workId: z.string().uuid(), note }),
+    input: z.object({ personId: z.uuid(), workId: z.uuid(), note }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -66,7 +66,7 @@ export const links = {
 
   unlinkWork: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid(), workId: z.string().uuid() }),
+    input: z.object({ personId: z.uuid(), workId: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -79,7 +79,7 @@ export const links = {
   /** Attach one fragment directly — a song they sent, a line they said out loud. */
   fragment: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid(), fragmentId: z.string().uuid(), note }),
+    input: z.object({ personId: z.uuid(), fragmentId: z.uuid(), note }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -98,7 +98,7 @@ export const links = {
 
   unlinkFragment: defineAction({
     accept: 'json',
-    input: z.object({ personId: z.string().uuid(), fragmentId: z.string().uuid() }),
+    input: z.object({ personId: z.uuid(), fragmentId: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
@@ -125,7 +125,7 @@ export const links = {
    */
   setPeople: defineAction({
     accept: 'json',
-    input: z.object({ fragmentId: z.string().uuid(), personIds: z.array(z.string().uuid()).max(50) }),
+    input: z.object({ fragmentId: z.uuid(), personIds: z.array(z.uuid()).max(50) }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

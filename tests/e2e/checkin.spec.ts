@@ -337,7 +337,10 @@ test.describe('answering it', () => {
     await expect.poll(() => seen().length).toBe(1);
 
     await page.getByRole('button', { name: 'What you remember' }).click();
-    await page.locator('[data-field="dream_body"]').type('a long corridor');
+    // ⚠ `pressSequentially`, NOT `fill`. This types character by character on
+    // purpose — the assertion below is about the DEBOUNCE, and `fill` sets the
+    // value in one shot, which would make the test pass without exercising it.
+    await page.locator('[data-field="dream_body"]').pressSequentially('a long corridor');
     // Fifteen characters must not be fifteen round trips.
     await expect.poll(() => seen().length, { timeout: 3000 }).toBe(2);
   });

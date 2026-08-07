@@ -228,7 +228,8 @@ saveBtn.addEventListener('click', async () => {
 // warn on navigating away with unsaved edits
 window.addEventListener('beforeunload', (e) => {
   if (dirty) {
+    // `preventDefault()` alone triggers the prompt; the legacy `returnValue`
+    // spelling (Chrome/Edge < 119) is deprecated. See writing-sheet.ts.
     e.preventDefault();
-    e.returnValue = '';
   }
 });

@@ -28,7 +28,7 @@ const input = z.object({
   location: z.preprocess(blankToUndef, z.string().max(300).optional()),
   notes: z.preprocess(blankToUndef, z.string().max(10_000).optional()),
   /** Who is there — replaces the whole list, like `interactions`. */
-  personIds: z.array(z.string().uuid()).max(50).default([]),
+  personIds: z.array(z.uuid()).max(50).default([]),
 });
 
 /**
@@ -102,9 +102,9 @@ export const events = {
     accept: 'json',
     input: z
       .object({
-        eventId: z.preprocess(blankToUndef, z.string().uuid().optional()),
+        eventId: z.preprocess(blankToUndef, z.uuid().optional()),
         externalId: z.preprocess(blankToUndef, z.string().max(1024).optional()),
-        personIds: z.array(z.string().uuid()).max(50).default([]),
+        personIds: z.array(z.uuid()).max(50).default([]),
       })
       // The same rule the CHECK constraint holds, said early enough to be a
       // sentence: exactly one subject.
@@ -141,7 +141,7 @@ export const events = {
    */
   remove: defineAction({
     accept: 'json',
-    input: z.object({ id: z.string().uuid() }),
+    input: z.object({ id: z.uuid() }),
     handler: async (v, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;

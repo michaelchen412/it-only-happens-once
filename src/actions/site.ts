@@ -87,7 +87,14 @@ export const contact = {
   send: defineAction({
     input: z.object({
       name: z.string().trim().min(1, 'Please add your name').max(120),
-      email: z.string().trim().email('Please use a valid email').max(200),
+      // ⚠ THE TRIM MUST HAPPEN BEFORE THE FORMAT CHECK, which is why this is a
+      // `preprocess` and not the tidier-looking `z.email().trim()`. Zod 4
+      // deprecated `z.string().email()` in favour of the top-level `z.email()`,
+      // but the two do not compose the same way: `.trim()` chained AFTER
+      // `z.email()` runs as a later transform, so the address is validated
+      // while it still has whitespace on it. A pasted " me@example.com " —
+      // which is most of them, on a phone — would start being rejected.
+      email: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.email('Please use a valid email').max(200)),
       message: z.string().trim().min(1, 'Please write a message').max(5000),
       // Honeypot: a hidden field real people never fill in.
       company: z.string().optional(),
