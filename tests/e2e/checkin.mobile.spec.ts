@@ -156,8 +156,20 @@ test.describe('the check-in at 390px', () => {
     // input's own font, against the content box MINUS the calendar-picker
     // indicator the browser puts in the same space. At 390px that was 70px of
     // text and ~20px of indicator inside 91.3px — a pixel and a bit of margin.
+    // "Went off around" lives in a `.sub` that only opens under the top latency
+    // bucket, so it has to be SUMMONED before it can be measured — and it is
+    // worth summoning, because it is the one picker on the card with its own
+    // width (`.tm--wide`) rather than a third of the three-column row.
+    await ensureOn(page.locator('[data-lat="over_60"]'));
+    await expect(page.locator('[data-asleep-at]')).toBeVisible();
+
     const tight = await page.locator('.ck input[type="time"]').evaluateAll((els) =>
       els
+        // ⚠ ONLY WHAT IS ON SCREEN. A picker inside a closed `.sub` has no box
+        // at all, so every term below comes out of a zero width and the row
+        // reports a deficit of its own padding — a failure that says nothing
+        // about whether the glyphs fit, on a control nobody can see.
+        .filter((el) => el.getClientRects().length > 0)
         .map((el) => {
           const cs = getComputedStyle(el);
           const box = el.getBoundingClientRect();

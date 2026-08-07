@@ -28,10 +28,36 @@ async function zoneOf(page: import('@playwright/test').Page) {
   return tz!;
 }
 
+/**
+ * Has this date got nothing on it yet?
+ *
+ * ⚠ THE HARNESS RUNS AGAINST THE LIVE PROJECT, so which panel a date opens on
+ * is a fact about Michael's actual sleep log rather than about the code — and a
+ * spec that assumes "ask" is a spec that passes until the feature gets used.
+ * The server's own answer is on the zone, so it is read rather than guessed.
+ */
+const panelOf = (page: import('@playwright/test').Page) =>
+  page.locator('[data-checkin]').getAttribute('data-panel-initial');
+
+const blank = async (page: import('@playwright/test').Page) => (await panelOf(page)) === 'ask';
+
+/**
+ * EITHER DOOR INTO THE FORM — "Start" on a date with nothing on it, the pencil
+ * on one already answered. Same reasoning as `checkin.mobile.spec.ts`: which
+ * door is showing is not a fact about the backfill window, and waiting for the
+ * wrong one is an environmental failure wearing a bug's clothes.
+ */
+async function openForm(page: import('@playwright/test').Page) {
+  const start = page.getByRole('button', { name: 'Start' });
+  if (await start.isVisible().catch(() => false)) await start.click();
+  else await page.locator('[data-edit]').click();
+  await expect(page.locator('[data-panel="fill"]')).toBeVisible();
+}
+
 /** Answer every check-in call with the row it asked for. Nothing is written. */
 async function stub(page: import('@playwright/test').Page) {
   const payloads: Record<string, unknown>[] = [];
-  const seen = await stubActions(page, {
+  const all = await stubActions(page, {
     'checkin.save': (req) => {
       payloads.push(req.postDataJSON());
       return { id: 'stub', log_date: (req.postDataJSON() as { logDate: string }).logDate };
@@ -41,6 +67,14 @@ async function stub(page: import('@playwright/test').Page) {
       return { id: 'stub' };
     },
   });
+  // ⚠ FILTERED TO THIS CARD'S OWN CALLS, because `stubActions` records EVERY
+  // action the page makes and Today makes one that has nothing to do with the
+  // check-in: `calendar-sync.ts` asks Google the moment the page is drawn
+  // (13 · Piece 3). Unfiltered, every count here read one high — so "a tap
+  // saves once" failed while the tap was saving exactly once, and the number it
+  // was really counting was a page load. `seen()` must mean what the assertions
+  // say it means, and they all say "saves from this card".
+  const seen = () => all().filter((n) => n.startsWith('checkin.'));
   return { payloads, seen };
 }
 
@@ -59,7 +93,13 @@ test.describe('the check-in, before it has been answered', () => {
     await expect(zone).toBeVisible();
 
     // NO STREAK, EVER, and nothing counting what was missed.
-    await expect(page.getByText(/streak|in a row|missed|you haven.t/i)).toHaveCount(0);
+    //
+    // ⚠ SCOPED TO THE ZONE, and it has to be. Over the whole page this matched
+    // the push opt-in's own copy — "only on a morning you haven't checked in" —
+    // which is a promise about when the Observatory stays quiet, not a scold on
+    // the card. The rule being defended is about THIS card: nothing here counts
+    // what you missed.
+    await expect(zone.getByText(/streak|in a row|missed|you haven.t/i)).toHaveCount(0);
   });
 
   test('Start opens the form without a round trip', async ({ page }) => {
@@ -335,7 +375,7 @@ test.describe('backfill', () => {
     // Three days back: fillable, and it says which day it is talking about.
     await page.goto(`/admin?date=${dateIn(tz, -3)}`);
     await expect(page.locator('[data-checkin]')).toHaveAttribute('data-writable', 'true');
-    await page.getByRole('button', { name: 'Start' }).click();
+    await openForm(page);
     await expect(page.locator('[data-bf]')).toBeVisible();
 
     // Four days back: readable, not writable, and no prompt to fill it.
@@ -343,7 +383,15 @@ test.describe('backfill', () => {
     await expect(page.locator('[data-checkin]')).toHaveAttribute('data-writable', 'false');
     await expect(page.locator('[data-panel="fill"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Start' })).toHaveCount(0);
-    await expect(page.getByText('Nothing recorded.')).toBeVisible();
+    // ⚠ WHAT IT SAYS DEPENDS ON WHETHER THAT NIGHT EXISTS, and both answers are
+    // right: a day outside the window is READABLE, so one with a record shows
+    // the record, and one without is simply absent. Asserting "Nothing
+    // recorded." unconditionally was asserting that Michael had not used the
+    // feature four days ago. What is unconditional is everything above — no
+    // form, no prompt — and that exactly one of these two panels is showing.
+    const panel = await panelOf(page);
+    expect(['closed', 'done']).toContain(panel);
+    await expect(page.locator(`[data-panel="${panel}"]`)).toBeVisible();
 
     // And it is never framed as a failure — no count, no catching up.
     await expect(page.getByText(/missed|behind|catch up/i)).toHaveCount(0);
@@ -352,17 +400,32 @@ test.describe('backfill', () => {
   test('prefill is OFF on a past day, and on today it is on', async ({ page }) => {
     const tz = await page.goto('/admin').then(() => zoneOf(page));
 
-    await page.getByRole('button', { name: 'Start' }).click();
-    await expect(page.locator('[data-field="bed"]')).not.toHaveValue('');
-    await expect(page.locator('[data-prefill]')).toBeVisible();
+    // ⚠ THE SUGGESTION ONLY EXISTS ON A MORNING WITH NOTHING ON IT — the page
+    // withholds it the moment either time is already recorded, which is the
+    // point of it. So the positive half is asserted on the day it can be, and
+    // skipped rather than faked on a day already answered.
+    const untouched = await blank(page);
+    await openForm(page);
+    if (untouched) {
+      await expect(page.locator('[data-field="bed"]')).not.toHaveValue('');
+      await expect(page.locator('[data-prefill]')).toBeVisible();
+    }
 
     // A plausible suggested time on a day you are RECONSTRUCTING gets confirmed
     // without ever being recalled, and that manufactures data.
     await page.goto(`/admin?date=${dateIn(tz, -2)}`);
-    await page.getByRole('button', { name: 'Start' }).click();
-    await expect(page.locator('[data-field="bed"]')).toHaveValue('');
-    await expect(page.locator('[data-field="woke"]')).toHaveValue('');
+    const pastIsBlank = await blank(page);
+    await openForm(page);
+    // The rule itself, and it holds whatever that day already carries: the hint
+    // is rendered for today and for no other date.
     await expect(page.locator('[data-prefill]')).toHaveCount(0);
+    // The times are only expected empty when the day genuinely is. On a day
+    // with a real night on it they carry that night — which is the record, not
+    // a suggestion, and is exactly the distinction being defended.
+    if (pastIsBlank) {
+      await expect(page.locator('[data-field="bed"]')).toHaveValue('');
+      await expect(page.locator('[data-field="woke"]')).toHaveValue('');
+    }
   });
 
   test('the future is not offered at all', async ({ page }) => {
