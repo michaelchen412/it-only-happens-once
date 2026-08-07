@@ -33,26 +33,21 @@ export const pages = {
       // The About page is two co-equal movements: `me` (who I am) and `site`
       // (what this place is), plus an optional contact line. See docs/admin.md.
       content: z.object({
+        // ⚠ `me.interests[]`, `me.headline` and `site.thesis` were removed
+        // 2026-08-07 — ADR-0020. They are absent from this schema on purpose, and
+        // Zod strips unknown keys, so an older row's copies stop round-tripping on
+        // the next save. Do not re-add them without reading that ADR: the one
+        // change that looks like an improvement (promote each interest's insight
+        // to its heading) is the one it argues is strictly worse.
         me: z
           .object({
-            headline: z.string().default(''),
             portrait: z.string().nullable().default(null),
             portrait_caption: z.string().default(''),
             body: z.string().default(''),
-            interests: z
-              .array(
-                z.object({
-                  term: z.string().default(''),
-                  // A few sentences (Markdown) on why this is part of who I am.
-                  note: z.string().default(''),
-                }),
-              )
-              .default([]),
           })
           .prefault({}),
         site: z
           .object({
-            thesis: z.string().default(''),
             body: z.string().default(''),
             name: z
               .object({

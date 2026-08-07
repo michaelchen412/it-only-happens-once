@@ -5,8 +5,30 @@
 // movement has its own TipTap body (the shared editor supports multiple
 // instances). The portrait uploads to the public `site` bucket using the admin's
 // browser session (RLS enforces is_admin()). No autosave — About is always live.
+//
+// ⚠ An interests repeater lived here until 2026-08-07 — a per-row TipTap instance
+// in a WeakMap, a clone <template>, and four delegated buttons. Removed with the
+// section it served (ADR-0020; the reasoning is in src/pages/about.astro's header).
+//
+// ⚠ AND IF YOU ADD OR REMOVE A FIELD HERE, READ THIS FIRST. `$` below is
+// `getElementById(id) as T` with no null check — the cast lies. A reference to an
+// element that no longer exists throws a TypeError at module top level, and
+// everything below the throw never runs. Put such a reference ABOVE the
+// `saveBtn.addEventListener` at the foot of this file and the Save button never
+// gets its listener: the room looks completely normal and silently cannot save.
+// TypeScript cannot see it (the cast) and neither can `astro check`.
+//
+// ⚠ The ordering is the whole subtlety, and it was measured rather than assumed
+// (2026-08-07). The same broken reference appended at the very END of this file
+// leaves saving perfectly functional, because the listener was already
+// registered. So "a stray reference kills the module" is only half true — it
+// kills whatever had not yet executed. The repeater removed above lived exactly
+// where it is dangerous: between the editors and the save block.
+//
+// `tests/e2e/about-builder.spec.ts` now guards this, and was watched failing
+// against a deliberate break in that position before being trusted.
 import { actions } from 'astro:actions';
-import { mountRichEditor, type RichEditorHandle } from './rich-editor';
+import { mountRichEditor } from './rich-editor';
 import { formatActionError, nowTime } from './action-error';
 import { uploadImage } from './upload';
 
@@ -101,80 +123,6 @@ portraitRemove.addEventListener('click', () => {
   markDirty();
 });
 
-// ---- interests repeater ----
-const list = $('interests-list');
-const template = $('interest-template') as HTMLTemplateElement;
-
-// Each row owns a slim, link-free rich editor for its note. Keyed by the row so
-// we can harvest it at save time and tear it down on remove. The note's initial
-// Markdown rides in the row's hidden `.interest-note-src` textarea.
-const interestEditors = new WeakMap<Element, RichEditorHandle>();
-
-function mountInterestRow(row: Element) {
-  if (interestEditors.has(row)) return;
-  const editorEl = row.querySelector<HTMLElement>('.interest-note-editor');
-  const toolbar = row.querySelector<HTMLElement>('.interest-toolbar');
-  const src = row.querySelector<HTMLTextAreaElement>('.interest-note-src');
-  if (!editorEl || !toolbar) return;
-  interestEditors.set(
-    row,
-    mountRichEditor({
-      editorEl,
-      toolbarRoot: toolbar,
-      placeholder: 'Why this is part of who I am…',
-      content: src?.value ?? '',
-      ariaLabel: 'Why this matters',
-      onChange: markDirty,
-    }),
-  );
-}
-
-// Mount the server-rendered rows up front (so their notes save even if never expanded).
-list.querySelectorAll('.interest-row').forEach(mountInterestRow);
-
-$('interest-add').addEventListener('click', () => {
-  const row = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-  list.appendChild(row);
-  mountInterestRow(row);
-  row.querySelector<HTMLInputElement>('.interest-term')?.focus();
-  markDirty();
-});
-list.addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest('button');
-  if (!btn) return;
-  const row = btn.closest('.interest-row');
-  if (!row) return;
-  if (btn.classList.contains('interest-remove')) {
-    interestEditors.get(row)?.editor.destroy();
-    interestEditors.delete(row);
-    row.remove();
-    markDirty();
-  } else if (btn.classList.contains('interest-toggle')) {
-    const wrap = row.querySelector<HTMLElement>('.interest-note-wrap');
-    if (!wrap) return;
-    const opening = wrap.hasAttribute('hidden');
-    wrap.toggleAttribute('hidden', !opening);
-    btn.setAttribute('aria-expanded', String(opening));
-    row.querySelector('.interest-caret')?.classList.toggle('rotate-180', opening);
-    if (opening) interestEditors.get(row)?.editor.commands.focus();
-  } else if (btn.classList.contains('interest-up') && row.previousElementSibling) {
-    row.parentElement!.insertBefore(row, row.previousElementSibling);
-    markDirty();
-  } else if (btn.classList.contains('interest-down') && row.nextElementSibling) {
-    row.parentElement!.insertBefore(row.nextElementSibling, row);
-    markDirty();
-  }
-});
-
-function readInterests() {
-  return Array.from(list.querySelectorAll('.interest-row'))
-    .map((row) => ({
-      term: (row.querySelector('.interest-term') as HTMLInputElement)?.value.trim() ?? '',
-      note: interestEditors.get(row)?.getMarkdown().trim() ?? '',
-    }))
-    .filter((it) => it.term || it.note);
-}
-
 // ---- save ----
 function showError(msg: string) {
   errorBox.textContent = msg;
@@ -194,14 +142,11 @@ saveBtn.addEventListener('click', async () => {
 
   const content = {
     me: {
-      headline: val('f-me-headline'),
       portrait: portraitPath.value || null,
       portrait_caption: val('f-portrait-caption'),
       body: meEditor.getMarkdown(),
-      interests: readInterests(),
     },
     site: {
-      thesis: val('f-site-thesis'),
       body: siteEditor.getMarkdown(),
       name: {
         blurb: val('f-blurb'),

@@ -5,34 +5,39 @@
   movements: WHO I AM (me) and WHAT THIS IS (site), plus an optional contact line.
   Each movement has its own rich-text body (the shared TipTap editor supports
   multiple instances). Always live; saved deliberately (no autosave).
+
+  ⚠ THREE CONTROLS WERE REMOVED HERE — ADR-0020, 2026-08-07: the "My Interests"
+  repeater (an InterestRow list, a "+ Add" button and a clone <template>), the
+  "Headline" input, and the "Thesis — the large opening statement" textarea. The
+  reasoning is on the public page (`src/pages/about.astro`) and in the ADR; the
+  reason it matters HERE is that an empty field in an editor is a standing
+  invitation. "Thesis — the large opening statement" is a sentence that asks to be
+  filled in, and leaving it while intending never to use it was the rejected
+  alternative: a decision not recorded in the schema is a decision that gets
+  re-made.
 */
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import EditorToolbar from '../../components/admin/EditorToolbar.astro';
 import LinkDialog from '../../components/admin/LinkDialog.astro';
-import InterestRow from '../../components/admin/InterestRow.astro';
 import { Icon } from 'astro-icon/components';
 import { jsonForScript } from '../../lib/serialize';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content').eq('slug', 'about').single();
 
-type Interest = { term: string; note?: string };
 const c = (page?.content ?? {}) as {
   me?: {
-    headline?: string;
     portrait?: string | null;
     portrait_caption?: string;
     body?: string;
-    interests?: Interest[];
   };
-  site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
+  site?: { body?: string; name?: { blurb?: string; spotify_url?: string } };
   contact?: { intro?: string };
 };
 const me = c.me ?? {};
 const site = c.site ?? {};
 const siteName = site.name ?? {};
 const contact = c.contact ?? {};
-const interests: Interest[] = Array.isArray(me.interests) ? me.interests : [];
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const portraitPath = me.portrait ?? '';
@@ -85,13 +90,6 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           <p class="text-base-content/45 mt-1 font-sans text-xs">
             The person. Weave your heritage and origin into the prose — no facts row.
           </p>
-        </div>
-
-        <div class="space-y-1">
-          <label for="f-me-headline" class={fieldLabel}
-            >Headline — a short opening line (optional; e.g. your name)</label
-          >
-          <input id="f-me-headline" type="text" class={input} value={me.headline ?? ''} />
         </div>
 
         <div class="space-y-2">
@@ -149,19 +147,6 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
             <div id="me-editor" class="reading px-4 py-4"></div>
           </div>
         </div>
-
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class={fieldLabel}>My Interests</span>
-            <button type="button" id="interest-add" class="btn btn-ghost btn-xs normal-case">+ Add</button>
-          </div>
-          <p class="text-base-content/45 font-sans text-xs">
-            Each is a name and a few sentences on why it’s part of who you are.
-          </p>
-          <div id="interests-list" class="space-y-3">
-            {interests.map((it) => <InterestRow term={it.term} note={it.note} />)}
-          </div>
-        </div>
       </section>
 
       <hr class="border-base-300 my-12" />
@@ -173,11 +158,6 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           <p class="text-base-content/45 mt-1 font-sans text-xs">
             The site and its ethos — why you write, and where the name came from.
           </p>
-        </div>
-
-        <div class="space-y-1">
-          <label for="f-site-thesis" class={fieldLabel}>Thesis — the large opening statement</label>
-          <textarea id="f-site-thesis" rows="3" class={input}>{site.thesis ?? ''}</textarea>
         </div>
 
         <div class="space-y-1">
@@ -230,9 +210,6 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
       </section>
     </form>
   </div>
-
-  {/* one interest row, cloned by the client for "+ Add" (same source as the list) */}
-  <template id="interest-template"><InterestRow /></template>
 
   <LinkDialog id="me-link" />
   <LinkDialog id="site-link" />

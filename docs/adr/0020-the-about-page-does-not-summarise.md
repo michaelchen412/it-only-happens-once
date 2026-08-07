@@ -1,10 +1,10 @@
 # 0020 — The About page does not summarise the sky
 
-Status: **Proposed** *(2026-08-07. Becomes **Accepted** with the commit that
-removes the three fields — [plan 23](../plans/23-about-stops-summarising.md).
-Written now rather than after, because the reasoning is the part that has to
-survive: three sessions could each re-derive "the About page should introduce his
-interests" from first principles and each be wrong for the same reason.)*
+Status: **Accepted** *(2026-08-07, with the commit that removes the three fields —
+[plan 23](../plans/23-about-stops-summarising.md). Written before the removal
+rather than after, because the reasoning is the part that has to survive: three
+sessions could each re-derive "the About page should introduce his interests" from
+first principles and each be wrong for the same reason.)*
 Date: 2026-08-07
 
 ## Context

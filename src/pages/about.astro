@@ -7,6 +7,32 @@
   Editorial treatment (not SaaS): quiet serif small-caps section labels, no accent
   eyebrows, and a floated portrait the prose wraps around. Heading outline: a
   visually-hidden h1 names the page; each section is a <section> headed by an h2.
+
+  ⚠ THREE THINGS ARE DELIBERATELY ABSENT — ADR-0020, 2026-08-07. There was a
+  "My Interests" list (term + note), a `headline` display line, and a `thesis`
+  pull-quote above the blog prose. All three are gone, and the reason is one rule:
+  a conclusion may not outrank the thing that earns it.
+
+    · The interests notes restated what the sky already delivers. The Jazz note WAS
+      the closing lines of "The Spirit of Jazz" — 8,242 published characters, in
+      the `wayfinding` constellation — compressed to one sentence. So it spent the
+      essay's ending without the essay. Cooking had no essay behind it at all, so
+      it read as an IOU. One form, two failure modes, and no rewrite reaches
+      either: the shape `{term, note}` can hold only a claim ABOUT an interest.
+    · `thesis` rendered as text-xl italic behind a left rule, ABOVE the prose —
+      i.e. a deck, which is a genre for readers who won't read (SaaS) or are
+      deciding whether to (editorial standfirst). This page presumes someone who
+      came to read.
+
+  ⚠ The change that looks like the fix is the one ADR-0020 argues is WORSE:
+  promoting each interest's insight to its heading ("Ideas are not property")
+  turns the section into a table of contents for the sky's punchlines. If you are
+  about to re-add any of this, read that ADR's register table first.
+
+  ⚠ And note what did NOT go: *practical empathy* stays. vision.md §8 calls it
+  this page's SPINE — which runs the length of a body, not across the front of it.
+  It belongs inside `me.body`, arrived at. Removing the field removed a container,
+  never the idea.
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
@@ -17,25 +43,19 @@ import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/m
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
 
-type Interest = { term: string; note?: string };
 const c = (page?.content ?? {}) as {
   me?: {
-    headline?: string;
     portrait?: string | null;
     portrait_caption?: string;
     body?: string;
-    interests?: Interest[];
   };
-  site?: { thesis?: string; body?: string; name?: { blurb?: string; spotify_url?: string } };
+  site?: { body?: string; name?: { blurb?: string; spotify_url?: string } };
   contact?: { intro?: string };
 };
 const me = c.me ?? {};
 const site = c.site ?? {};
 const siteName = site.name ?? {};
 const contact = c.contact ?? {};
-const interests = (Array.isArray(me.interests) ? me.interests : [])
-  .filter((it) => it.term || it.note)
-  .map((it) => ({ ...it, noteHtml: renderMarkdown(it.note) }));
 
 const meBodyHtml = renderMarkdown(me.body);
 const siteBodyHtml = renderMarkdown(site.body);
@@ -50,8 +70,8 @@ const embed = siteName.spotify_url ? parseSpotifyEmbed(siteName.spotify_url) : n
 const embedSrc = embed ? spotifyEmbedSrc(embed) : '';
 const embedHeight = embed ? spotifyEmbedHeight(embed.kind) : 352;
 
-const hasMe = !!(me.headline || meBodyHtml || portraitUrl || interests.length);
-const hasSite = !!(site.thesis || siteBodyHtml || blurbHtml || embedSrc);
+const hasMe = !!(meBodyHtml || portraitUrl);
+const hasSite = !!(siteBodyHtml || blurbHtml || embedSrc);
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 ---
@@ -78,7 +98,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                   <figure class="mb-5 sm:float-right sm:mb-2 sm:ml-10 sm:w-56">
                     <img
                       src={portraitUrl}
-                      alt={me.headline ? `Portrait of ${me.headline}` : 'Portrait of the author'}
+                      alt="Portrait of the author"
                       class="rounded-box border-base-300 w-full border object-cover"
                       style="aspect-ratio: 4 / 5"
                     />
@@ -89,30 +109,8 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                     )}
                   </figure>
                 )}
-                {me.headline && (
-                  <p class="font-display mb-2 text-4xl leading-[1.08] font-light sm:text-5xl">{me.headline}</p>
-                )}
                 {meBodyHtml && <div class="reading" set:html={meBodyHtml} />}
               </div>
-
-              {interests.length > 0 && (
-                <div class="mt-14">
-                  <Label as="h3">My Interests</Label>
-                  <div class="mt-6 space-y-9">
-                    {interests.map((it) => (
-                      <div>
-                        <h4 class="font-serif text-2xl">{it.term}</h4>
-                        {it.noteHtml && (
-                          <div
-                            class="text-base-content/55 mt-1.5 max-w-xl space-y-2 font-sans text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-5"
-                            set:html={it.noteHtml}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </section>
           )}
 
@@ -125,11 +123,6 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                 <Label as="span">About the Blog</Label>
               </h2>
 
-              {site.thesis && (
-                <blockquote class="border-base-300 text-base-content/80 mt-8 border-l-2 pl-6 font-serif text-xl leading-relaxed italic">
-                  {site.thesis}
-                </blockquote>
-              )}
               {siteBodyHtml && <div class="reading mt-8" set:html={siteBodyHtml} />}
 
               {(blurbHtml || embedSrc) && (

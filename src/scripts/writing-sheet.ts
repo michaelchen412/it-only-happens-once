@@ -71,8 +71,9 @@ const {
   proofread: marks,
 } = mountRichEditor({
   // The composer is the only editor that asks for this — the capture box, the
-  // interest notes and the About builder all mount the same function and get
-  // none of it (docs/plans/22 · Piece 4).
+  // notes room and the About builder's two bodies all mount the same function and
+  // get none of it (docs/plans/22 · Piece 4). *Said "the interest notes" until
+  // 2026-08-07; that editor was removed with ADR-0020.*
   proofread: true,
   editorEl: document.getElementById('ws-editor')!,
   toolbarRoot: sheet.querySelector('[role="toolbar"]') as HTMLElement,

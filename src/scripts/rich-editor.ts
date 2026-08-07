@@ -26,8 +26,14 @@ export interface RichEditorOptions {
   toolbarRoot: HTMLElement;
   /**
    * The `<dialog>` from LinkDialog.astro (inner controls are class-scoped).
-   * Optional: omit it for a slim, link-free toolbar (e.g. the interest notes) —
-   * the link command becomes a no-op and no dialog is required.
+   * Optional: omit it for a slim, link-free toolbar — the link command becomes a
+   * no-op and no dialog is required.
+   *
+   * ⚠ As of 2026-08-07 NO caller omits it. The only one that ever did was the
+   * About page's interest-note editor, removed with its section (ADR-0020). Kept
+   * optional rather than made required: it is a real affordance for the next slim
+   * editor, and the alternative is a breaking signature change for zero gain. The
+   * example is named here so nobody goes looking for a caller that exists.
    */
   linkDialog?: HTMLDialogElement | null;
   placeholder?: string;
@@ -64,10 +70,16 @@ export interface RichEditorOptions {
    * with it `handle.proofread`.
    *
    * ⚠ OPT-IN, AND IT HAS TO BE. This function has five callers — the composer,
-   * the capture box, the interest notes and three editors in the About builder.
-   * Adding the plugin unconditionally would ship it into all of them, four of
-   * which have no trigger for it and no chip to report into. Same shape as
+   * the capture box, the notes room, and two editors in the About builder (`me`
+   * and `site`). Adding the plugin unconditionally would ship it into all of them,
+   * four of which have no trigger for it and no chip to report into. Same shape as
    * `images` and `linkDialog` above, for the same reason.
+   *
+   * ⚠ The list was corrected 2026-08-07. It previously read "the interest notes
+   * and three editors in the About builder" — two errors: `notes.ts` is the notes
+   * room, never interest notes, and the About builder's third editor (the
+   * per-interest note) is gone with ADR-0020. The count of five is right again by
+   * coincidence, not because the list was.
    */
   proofread?: boolean;
 }
