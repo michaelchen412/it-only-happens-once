@@ -70,7 +70,7 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
         <div class="flex flex-col gap-12 sm:gap-16">
           {refs.map((c, i) => (
             <div class={indentOf(i)}>
-              <a href={`/${c.slug}`} class:list={['group block', `cn-${c.color}`]}>
+              <a href={`/${c.slug}`} class:list={['group sky-row block', `cn-${c.color}`]}>
                 {/* a DIV, not a span: it holds an h2, and a <span> may only
                     contain phrasing content. Nothing in `npm run verify`
                     catches that — astro check doesn't validate content models. */}
@@ -105,6 +105,22 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
                     {c.description}
                   </p>
                 )}
+                {/* The invitation. It sits on its OWN line, aligned to the
+                    description's ml-6, so it lands where your eye finishes
+                    reading why this constellation exists — and so its space is
+                    reserved permanently and the row is the same height focused
+                    or not. (Inline after the name was the alternative, and it
+                    loses: any width it holds there is width stolen from the
+                    name, which pushes a long one onto an extra line on a phone
+                    — the exact device this whole treatment is for.)
+
+                    aria-hidden: the row is already a link with an accessible
+                    name, and reading "Explore →" out after all eleven of them
+                    would say nothing the word "link" has not already said. */}
+                <span class="sky-cta" aria-hidden="true">
+                  <span class="sky-cta__word">Explore</span>
+                  <span class="sky-cta__arrow">→</span>
+                </span>
               </a>
             </div>
           ))}
@@ -121,4 +137,38 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
   // optional. Imported HERE so the departure is recorded, and from
   // ConstellationSuite so the restore listener already exists on the way back.
   import '../scripts/sky-slot';
+  import { focusTracker, isTouch, nearest, type FocusTracker } from '../scripts/focus-mode';
+
+  // Which constellation is the reader attending to. On a hovering device that
+  // is simply the one under the cursor and this file does almost nothing; on a
+  // phone, where no such thing exists, it is the row nearest the reading line.
+  // See scripts/focus-mode.ts for why those are two models rather than one.
+  let tracker: FocusTracker | null = null;
+  let rows: HTMLElement[] = [];
+  let raf = 0;
+
+  // A fixed line, not the suite's drifting one: the overview is a short page
+  // read by glancing rather than a long one read top to bottom, so scroll
+  // progress says nothing worth acting on.
+  const READING_LINE = () => window.innerHeight * 0.45;
+
+  function onScroll() {
+    if (!tracker || !isTouch()) return; // proximity is not consulted with a cursor
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => tracker?.setProximate(nearest(rows, READING_LINE())));
+  }
+
+  function init() {
+    tracker?.destroy();
+    rows = [...document.querySelectorAll<HTMLElement>('.sky-row')];
+    tracker = rows.length ? focusTracker(rows) : null;
+    // Not behind the isTouch() guard in onScroll: the first pass has to run once
+    // on a phone that lands and never scrolls at all.
+    tracker?.setProximate(isTouch() ? nearest(rows, READING_LINE()) : null);
+  }
+
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  document.addEventListener('astro:page-load', init);
+  init();
 </script>

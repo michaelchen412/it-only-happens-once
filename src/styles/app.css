@@ -664,17 +664,37 @@ html.reader-open {
   translate: var(--dx) var(--dy);
 }
 
-.group:hover .star-bloom__core,
-.group:focus-visible .star-bloom__core,
-.star-bloom:hover .star-bloom__core {
+/* ⚠ `.is-focus` FIRST, and it is the reason this gesture reaches anyone at all.
+   For its whole life this was hover-only, which means the most expressive thing
+   the overview does had never once been seen by a phone — the Sky's actual
+   audience. Attending to a row is now the trigger, and on touch that is
+   proximity (scripts/focus-mode.ts). Nothing new is drawn here; an existing
+   thing was merely made reachable.
+
+   It also lands LAST of the row's four responses: StarBloom's 0.42/0.46s is a
+   touch slower than the 0.45s colour, so the row says it is warm and then the
+   mark commits. */
+.sky-row.is-focus .star-bloom__core,
+.group:focus-visible .star-bloom__core {
   scale: 0.72;
   opacity: 0.75;
 }
-.group:hover .star-bloom__sat,
-.group:focus-visible .star-bloom__sat,
-.star-bloom:hover .star-bloom__sat {
+.sky-row.is-focus .star-bloom__sat,
+.group:focus-visible .star-bloom__sat {
   opacity: 0.8;
   translate: var(--dx) var(--dy);
+}
+@media (hover: hover) {
+  .group:hover .star-bloom__core,
+  .star-bloom:hover .star-bloom__core {
+    scale: 0.72;
+    opacity: 0.75;
+  }
+  .group:hover .star-bloom__sat,
+  .star-bloom:hover .star-bloom__sat {
+    opacity: 0.8;
+    translate: var(--dx) var(--dy);
+  }
 }
 
 /* …but an already-open mark runs the gesture BACKWARDS. Hover always previews
@@ -683,17 +703,27 @@ html.reader-open {
    sends the companions back out the way they came and lets the single point
    reassert. Here `.is-active` is deliberately NOT in `:where()`: these need to
    outweigh the plain hover rules above, not merely follow them. */
-.group:hover .star-bloom.is-active .star-bloom__core,
-.group:focus-visible .star-bloom.is-active .star-bloom__core,
-.star-bloom.is-active:hover .star-bloom__core {
+.sky-row.is-focus .star-bloom.is-active .star-bloom__core,
+.group:focus-visible .star-bloom.is-active .star-bloom__core {
   scale: 1;
   opacity: 1;
 }
-.group:hover .star-bloom.is-active .star-bloom__sat,
-.group:focus-visible .star-bloom.is-active .star-bloom__sat,
-.star-bloom.is-active:hover .star-bloom__sat {
+.sky-row.is-focus .star-bloom.is-active .star-bloom__sat,
+.group:focus-visible .star-bloom.is-active .star-bloom__sat {
   opacity: 0;
   translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+}
+@media (hover: hover) {
+  .group:hover .star-bloom.is-active .star-bloom__core,
+  .star-bloom.is-active:hover .star-bloom__core {
+    scale: 1;
+    opacity: 1;
+  }
+  .group:hover .star-bloom.is-active .star-bloom__sat,
+  .star-bloom.is-active:hover .star-bloom__sat {
+    opacity: 0;
+    translate: calc(var(--dx) * 2.1) calc(var(--dy) * 2.1);
+  }
 }
 /* Transitions only, so the global rule's duration clamp is enough — but land
    the companions at rest rather than leaving them mid-flight. */
@@ -755,26 +785,149 @@ html.reader-open {
   }
 }
 /* On the overview, a name warms toward its OWN colour rather than the house
-   lamplight — the hover is the constellation introducing itself. */
+   lamplight — the constellation introducing itself.
+   ────────────────────────────────────────────────────────────────────────────
+   TWO INTENSITIES OF ONE COLOUR, not two signals (decided in /afford-lab,
+   2026-08-07). The name carries a TRACE of `--cn` at rest, so it is already not
+   the same ink as prose and a stranger who lands and never moves still sees
+   that these are links; and it comes to FULL `--cn` on the row being attended
+   to. Everything else the row does — the star's glow, the bloom, the word —
+   rides that same focus, so one gesture arrives rather than three effects
+   firing.
+
+   `.is-focus` is written by scripts/focus-mode.ts and means "the row the reader
+   is attending to", which is the cursor on a hovering device and the row
+   nearest the reading line on a phone — never both. The `:hover` rules below
+   are the no-JS floor and are gated, so they cannot double up on touch. */
 .sky-name {
+  color: color-mix(in oklab, var(--cn, var(--color-primary)) 34%, var(--color-base-content));
   transition: color 0.3s ease;
 }
-.group:hover .sky-name,
+.sky-row.is-focus .sky-name,
 .group:focus-visible .sky-name {
   color: var(--cn, var(--color-primary));
 }
 
 /* The lamp turns toward the constellation you're considering — again on the
-   marks, for the same reason. */
-.group:hover .sky-star,
+   marks, not the container, for the reason given above. */
+.sky-row.is-focus .sky-star,
 .group:focus-visible .sky-star {
   opacity: 1;
 }
-.group:hover .sky-star .star-mark,
+.sky-row.is-focus .sky-star .star-mark,
 .group:focus-visible .sky-star .star-mark {
   filter: drop-shadow(
     0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent)
   );
+}
+/* Gated: with no cursor these can never fire, and leaving them ungated let a
+   tap strand a row in its hover colour with `.is-focus` already gone elsewhere
+   — two rows lit, which is the one thing this is built never to do. */
+@media (hover: hover) {
+  .group:hover .sky-name {
+    color: var(--cn, var(--color-primary));
+  }
+  .group:hover .sky-star {
+    opacity: 1;
+  }
+  .group:hover .sky-star .star-mark {
+    filter: drop-shadow(
+      0 0 calc(12px * var(--glow, 0.6)) color-mix(in oklab, var(--cn, var(--color-primary)) 85%, transparent)
+    );
+  }
+}
+
+/* ── The invitation ──────────────────────────────────────────────────────────
+   A mark that is always there and a word that is always there, both resting at
+   the same muted value and warming together to the constellation's colour. The
+   word is NOT hidden at rest: its line is reserved either way, so hiding it
+   bought nothing and spent a visible gap — a lone arrow beside a hole where a
+   word evidently belongs.
+
+   Its own line, aligned to the description's `ml-6`, so it lands where your eye
+   finishes reading why the constellation exists, and so the row is exactly the
+   same height focused or not. */
+.sky-cta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin-top: 0.55rem;
+  margin-left: 1.5rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.09em;
+  font-variant: all-small-caps;
+  white-space: nowrap;
+}
+.sky-cta__word,
+.sky-cta__arrow {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  transition:
+    color 0.45s ease,
+    filter 0.45s ease;
+}
+/* The mark warms a beat first and the word follows — one thing arriving, not
+   two switching on. */
+.sky-cta__word {
+  transition-delay: 0.08s;
+}
+.sky-row.is-focus .sky-cta__word,
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__word,
+.group:focus-visible .sky-cta__arrow {
+  color: var(--cn, var(--color-primary));
+}
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__arrow {
+  filter: drop-shadow(0 0 7px color-mix(in oklab, var(--cn, var(--color-primary)) 65%, transparent));
+}
+@media (hover: hover) {
+  .group:hover .sky-cta__word,
+  .group:hover .sky-cta__arrow {
+    color: var(--cn, var(--color-primary));
+  }
+  .group:hover .sky-cta__arrow {
+    filter: drop-shadow(0 0 7px color-mix(in oklab, var(--cn, var(--color-primary)) 65%, transparent));
+  }
+}
+
+/* The beckon — a slow double-nudge, the shape of a "come here" gesture, with
+   most of the cycle spent perfectly still. A steady pulse reads as machinery
+   (the same reason each star breathes on its own phase); this reads as
+   something waiting for you. Only ever on the ONE focused row.
+
+   Transform only. The glow is a static focus state above rather than part of
+   the loop, because animating a filter re-rasterises the element every frame. */
+@keyframes sky-beckon {
+  0%,
+  58% {
+    translate: 0;
+  }
+  68% {
+    translate: 0.3em;
+  }
+  78% {
+    translate: 0;
+  }
+  86% {
+    translate: 0.16em;
+  }
+  94%,
+  100% {
+    translate: 0;
+  }
+}
+.sky-row.is-focus .sky-cta__arrow,
+.group:focus-visible .sky-cta__arrow {
+  animation: sky-beckon 3.4s ease-in-out infinite;
+}
+/* The global reduced-motion rule only clamps DURATION, which would leave an
+   infinite animation flickering — kill it by NAME, as `.sky-star` does. The
+   colour still fades (a tint is not motion), so the signal survives whole. */
+@media (prefers-reduced-motion: reduce) {
+  .sky-cta__arrow {
+    animation-name: none;
+  }
 }
 /* The global reduced-motion rule only clamps DURATION, which would leave an
    infinite animation flickering — kill it by NAME instead, and hold a steady
@@ -927,8 +1080,9 @@ html.reader-open .sky-return {
   margin-block-end: 0;
 }
 
-/* one slow, even breath for every warming element (glow + hover) */
-.suite-mark,
+/* one slow, even breath for every warming element (glow + hover). The
+   `suite-cta` pair is NOT here — it carries its own 0.45s with an 80ms delay on
+   the word, so the mark warms a beat ahead of it. */
 .suite-item blockquote,
 .suite-item figcaption,
 .suite-attrib,
@@ -941,10 +1095,9 @@ html.reader-open .sky-return {
 }
 
 /* the passing lamplight — the fragment nearest the reading line warms,
-   SOFTER than hover: a tint and a faint halo, never the full amber */
-.suite-item.is-lit .suite-mark {
-  color: color-mix(in oklab, var(--lamp) 55%, transparent);
-}
+   SOFTER than hover: a tint and a faint halo, never the full amber.
+   (`.suite-mark` no longer takes a colour here: it holds no glyph as of
+   2026-08-07 and is an empty gutter, so there is nothing left to tint.) */
 .suite-item.is-lit blockquote {
   color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
   text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
@@ -969,16 +1122,83 @@ html.reader-open .sky-return {
   color: color-mix(in oklab, var(--lamp) 14%, color-mix(in oklab, var(--color-base-content) 76%, transparent));
 }
 
-/* writing carries no chrome — hover is the stronger, deliberate light
-   (kept AFTER the .is-lit rules so it wins at equal specificity) */
-.suite-writing:hover .sw-title {
+/* ── The invitation, inside a constellation ──────────────────────────────────
+   An essay is a different ink from a quote BEFORE anything happens — the title
+   carries a trace of the lamp at rest — and comes to full lamp on the stanza
+   being attended to, where a "Read →" warms alongside it and beckons.
+
+   Only writing gets any of this, and that asymmetry is the whole design: the
+   lamplight touches every stanza, so it could never distinguish them by itself.
+   Give the openable ones a word for it to warm and the light becomes the
+   carrier of a signal rather than a signal that lies.
+
+   Kept AFTER the `.is-lit` rules so `.is-focus` wins at equal specificity. */
+.suite-writing .sw-title {
+  color: color-mix(in oklab, var(--lamp) 34%, var(--color-base-content));
+}
+.suite-writing.is-focus .sw-title {
+  color: var(--lamp);
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 22%, transparent);
+}
+.suite-writing.is-focus .sw-excerpt {
+  color: color-mix(in oklab, var(--lamp) 30%, var(--color-base-content));
+}
+/* The no-JS floor, and gated — on touch `:hover` sticks after a tap, which
+   would strand a stanza lit while `.is-focus` had already moved on. */
+@media (hover: hover) {
+  .suite-writing:hover .sw-title {
+    color: var(--lamp);
+  }
+  .suite-writing:hover .sw-excerpt {
+    color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
+  }
+}
+
+/* Its own line beneath the excerpt, in the text column — unlike the overview
+   there is no margin here that is not already the star's. The word rests
+   visible, not hidden: its line is reserved either way. */
+.suite-cta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin-top: 0.7rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.09em;
+  font-variant: all-small-caps;
+  white-space: nowrap;
+}
+.suite-cta__word,
+.suite-cta__arrow {
+  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  transition:
+    color 0.45s ease,
+    filter 0.45s ease;
+}
+.suite-cta__word {
+  transition-delay: 0.08s;
+}
+.suite-writing.is-focus .suite-cta__word,
+.suite-writing.is-focus .suite-cta__arrow {
   color: var(--lamp);
 }
-.suite-writing:hover .sw-excerpt {
-  color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
+.suite-writing.is-focus .suite-cta__arrow {
+  filter: drop-shadow(0 0 7px color-mix(in oklab, var(--lamp) 65%, transparent));
+  animation: sky-beckon 3.4s ease-in-out infinite;
 }
-.suite-writing:hover .suite-mark {
-  color: color-mix(in oklab, var(--lamp) 75%, transparent);
+@media (hover: hover) {
+  .suite-writing:hover .suite-cta__word,
+  .suite-writing:hover .suite-cta__arrow {
+    color: var(--lamp);
+  }
+  .suite-writing:hover .suite-cta__arrow {
+    filter: drop-shadow(0 0 7px color-mix(in oklab, var(--lamp) 65%, transparent));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .suite-cta__arrow {
+    animation-name: none;
+  }
 }
 
 /* excerpts clamp with a true ellipsis (line-clamp at the call site); the

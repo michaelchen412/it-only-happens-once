@@ -12,6 +12,19 @@
   stars, on a far wider smoothstep falloff, so a dozen are alight at once and
   the figure kindles ahead of you and settles behind.
 
+  ⚠ THE LAMPLIGHT IS ATMOSPHERE, NOT AN AFFORDANCE, and for a while it was
+  quietly pretending to be one. It warms a quote's blockquote and an essay's
+  title with the same gesture, so on a phone — where hover, the only thing that
+  ever distinguished them, does not exist — the one dynamic thing on screen was
+  teaching "everything here glows". A reader could not tell which stanzas open.
+
+  The fix was not to take the light away. It was to give only the OPENABLE
+  stanzas a word for it to warm (`suite-cta`, writing only): the light then
+  stops being the signal and becomes the carrier of one, and a quote still
+  glows but has nothing to say. `.is-focus` — scripts/focus-mode.ts — is what
+  warms it, which is the lamplight on touch and the cursor on a desktop, never
+  both at once.
+
   Each stanza's own register lives in `SuiteStanza.astro` — quotes set whole,
   writing as title + fading excerpt opening the blog's Reader, songs when they
   land — shared verbatim with the composer's Read view so the workshop shows
@@ -33,7 +46,6 @@ import Label from './Label.astro';
 import type { Constellation, SuiteItem } from '../lib/constellations';
 import type { WritingItem } from '../lib/blog';
 import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/media';
-import { TYPE_META } from '../lib/fragments-display';
 import StarBloom from './StarBloom.astro';
 
 interface Props {
@@ -41,11 +53,6 @@ interface Props {
 }
 const { constellation } = Astro.props;
 
-// the signature marks come from the one map (design.md §2: no second copy)
-const glyph = Object.fromEntries(Object.entries(TYPE_META).map(([k, v]) => [k, v.glyph])) as Record<
-  keyof typeof TYPE_META,
-  string
->;
 // asymmetric offsets (sm+) — the drawn line gets its angles from these
 const INDENTS = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
 
@@ -121,14 +128,49 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
           class:list={['suite-item flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
           style={`--indent:${INDENTS[i % INDENTS.length]}`}
         >
-          <span
-            class="suite-mark text-base-content/35 mt-1.5 w-5 shrink-0 text-center font-serif text-base select-none"
-            aria-hidden="true"
-          >
-            {glyph[f.kind]}
-          </span>
+          {/* The margin column. It carries NO type glyph any more (2026-08-07):
+              ” ♪ ▤ answered a question nobody asked — a reader can see that a
+              quote is a quote — while spending the one piece of margin the star
+              needs, and read as an unexplained symbol rather than as meaning.
+              The star says "a fragment lives here", in the site's own
+              vocabulary, and says it better alone.
+
+              The span STAYS, empty. It is the gutter that holds the text column
+              off the margin AND the box `drawLine()` measures each joint from.
+              (Measured before removing the glyph: this box stretches to the
+              stanza's height either way, so the figure did not move a pixel.)
+
+              ⚠ `mt-1.5` went WITH the glyph, and had to. Those 6px existed to
+              drop the glyph onto the first line's baseline — but the box they
+              offset is the one every star is centred in, so with nothing left
+              to align they were just pushing all eleven stars 3px below their
+              stanzas' centres, for a reason that had been deleted. */}
+          <span class="suite-mark w-5 shrink-0 select-none" aria-hidden="true" />
           <div class="min-w-0 grow">
             <SuiteStanza item={f} />
+            {
+              /* The invitation, on writing only — and that is the entire point.
+                The lamplight passes over every stanza alike, which is what made
+                it a liar: a warming quote and a warming essay said the same
+                thing. Give ONLY the openable ones a word for the light to warm
+                and the light stops being the signal and becomes the carrier of
+                one. The quote still glows; it simply has nothing to say.
+
+                aria-hidden + tabindex="-1": this duplicates the stanza's own
+                link, which already has the accessible name and the tab stop. */
+              f.kind === 'writing' && (
+                <a
+                  href={`/blog/${f.item.slug}`}
+                  data-read={f.item.slug}
+                  class="suite-cta"
+                  tabindex="-1"
+                  aria-hidden="true"
+                >
+                  <span class="suite-cta__word">Read</span>
+                  <span class="suite-cta__arrow">→</span>
+                </a>
+              )
+            }
           </div>
         </article>
       ))
@@ -195,11 +237,13 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
   // link into a suite, press return, no restore. Loading it on this side means
   // it is already listening while you read.
   import '../scripts/sky-slot';
+  import { focusTracker, isTouch, type FocusTracker } from '../scripts/focus-mode';
 
   const SVGNS = 'http://www.w3.org/2000/svg';
   type Pt = { x: number; y: number };
   type Star = { x: number; y: number; size: number };
 
+  let tracker: FocusTracker | null = null;
   let suiteEl: HTMLElement | null = null;
   let items: HTMLElement[] = [];
   let svg: SVGSVGElement | null = null;
@@ -334,6 +378,13 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
       best?.classList.add('is-lit');
       lit = best;
     }
+    // ⚠ The lamplight itself is NOT input-conditional and runs on every device —
+    // it is atmosphere and it shipped long before any of this. What is
+    // touch-only is the AFFORDANCE riding it: on a desktop the stanzas still
+    // warm as you scroll, but the "Read →" answers the cursor alone, so the two
+    // never narrate at once. Feeding it here rather than in its own pass keeps
+    // one definition of "nearest" for both.
+    if (isTouch()) tracker?.setProximate(lit);
   }
 
   // The stars answer to the SAME reading line, but on a far wider and softer
@@ -386,8 +437,13 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
     ro?.disconnect();
     ro = null;
     lit = null;
+    // Before the early return: leaving a suite for a page without one must
+    // still drop the old tracker, or every navigation leaks one onto a dead DOM.
+    tracker?.destroy();
+    tracker = null;
     if (!suiteEl) return;
     items = [...suiteEl.querySelectorAll<HTMLElement>('.suite-item')];
+    tracker = focusTracker(items);
     drawLine();
     updateGlow();
     updateStars();
