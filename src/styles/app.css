@@ -2080,6 +2080,33 @@ html.reader-open .sky-return {
   outline-offset: 3px;
 }
 
+/* Proofreading marks (docs/plans/22 · Piece 4).
+
+   ⚠ THIS MUST NOT LOOK LIKE THE BROWSER'S SPELLCHECKER, and that is not a
+   cosmetic note. `editorProps` sets no `spellcheck` attribute, so Chrome's own
+   red squiggle is ALREADY ON and already sitting under half these words. A red
+   underline from us would be either invisible or indistinguishable from the
+   browser's — the feature would read as broken while working perfectly. So:
+   accent colour, and a tint behind the span rather than a line under it.
+
+   ⚠ THE HIT AREA IS BIGGER THAN THE MARK, AND MUST NOT REFLOW. A five-character
+   underlined word is a ~35px target at 390px (docs/plans/19 · Piece 8). The
+   padding below buys a comfortable one — and the negative margin gives the space
+   straight back, because the composer promises that pressing Proofread moves
+   nothing. Padding alone pushes every subsequent word along the line, which is
+   the layout shift plan 16 spent a whole piece removing. */
+.pf-mark {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  border-bottom: 2px solid color-mix(in oklab, var(--color-primary) 55%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0.35em 0.2em;
+  margin: -0.35em -0.2em;
+}
+.pf-mark:hover {
+  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+
 /* ===========================================================================
    HQ — the Observatory's private half (docs/admin.md §1, ADR-0012/0015).
 

@@ -156,6 +156,31 @@ const { subjects, constellations = [] } = Astro.props;
           }
           <span id="ws-spinner" class="loading loading-spinner loading-xs"></span>
           <span id="ws-status-text">Autosaves as you write</span>
+          {
+            /* THE PROOFREAD CHIP (docs/plans/22 · Piece 6). Its own element
+              rather than borrowing `#ws-status-text`, which is autosave's
+              channel — an autosave landing a second later would wipe the count
+              mid-read, and autosave fires every 1.2s.
+
+              No `aria-live` of its own: `#ws-status` above already carries
+              `aria-live="polite"` on the CONTAINER, so anything appearing in
+              here is announced for free. A nested live region is the obvious
+              mistake to make at this point, not a safeguard.
+
+              Hidden at rest, so it costs the row no width until it has
+              something to say — which is the whole argument for a chip over a
+              permanent counter. */
+          }
+          <span id="ws-pf-chip" hidden class="text-primary flex items-center gap-1.5 whitespace-nowrap">
+            <span id="ws-pf-count"></span>
+            <button type="button" id="ws-pf-title" hidden class="underline underline-offset-2">in the title</button>
+            <button
+              type="button"
+              id="ws-pf-dismiss"
+              aria-label="Dismiss proofreading"
+              class="text-base-content/40 hover:text-base-content">✕</button
+            >
+          </span>
         </div>
 
         {
@@ -206,6 +231,24 @@ const { subjects, constellations = [] } = Astro.props;
             role="menu"
             class="rounded-box border-base-300 bg-base-100 absolute right-0 z-50 mt-1 w-52 border py-1 shadow-lg"
           >
+            {
+              /* PROOFREAD LIVES HERE, NOT IN THE ROW (docs/plans/22 · Piece 6).
+                16 · Piece 1 measured the command row at 896px: its content came
+                to ~1020px even after four buttons moved behind ⋯ and even at
+                rest, which was silently clipping the Versions tab. A fifth
+                top-level control re-opens a bug that was already paid for.
+
+                ⚠ And this is the item that makes ⋯ permanent. `syncMoreMenu`
+                hides the button when nothing behind it is visible, which on a
+                plain draft was everything — so a Proofread in here would have
+                been unreachable in exactly the state you proofread in. It is in
+                that visibility list now, which means the door is always there.
+                That is the trade: one always-present button in the row, in
+                exchange for the control being where you can press it. */
+            }
+            <button type="button" id="ws-proofread" role="menuitem" class="add-item w-full px-3 py-2 text-left text-sm"
+              >Proofread</button
+            >
             {
               /* Notes promote one step at a time — note → draft → published —
                 but nothing stops a finished note going straight out via
@@ -375,6 +418,29 @@ const { subjects, constellations = [] } = Astro.props;
       </div>
     </div>
     <BackToTop scroller="#wsheet .grow.overflow-y-auto" inDialog />
+
+    {
+      /* ONE POPOVER, EVERY MARK (docs/plans/22 · Piece 5). `anchorPopover` takes
+        its trigger as a CALLBACK rather than an element precisely so one popover
+        can serve a pile of things and say which one opened it — that is the
+        notes room's shape, and "one popover, many inline marks" is the same
+        shape. The title `<input>` is just another trigger.
+
+        Native `popover` (auto), so opening, Escape, light-dismiss and
+        one-at-a-time all belong to the browser, and the top layer keeps it clear
+        of the drawer's own clipping — trap 7 in app.css. */
+    }
+    <div class="pop" popover id="ws-pf-pop">
+      <p class="px-1 py-0.5 text-sm">
+        <s id="ws-pf-before" class="text-base-content/50"></s>
+        <span aria-hidden="true">→</span>
+        <strong id="ws-pf-after"></strong>
+      </p>
+      <div class="mt-1 flex items-center gap-1">
+        <button type="button" id="ws-pf-fix" class="btn btn-primary btn-xs normal-case">Fix it</button>
+        <button type="button" id="ws-pf-ignore" class="btn btn-ghost btn-xs normal-case">Ignore</button>
+      </div>
+    </div>
   </form>
 </dialog>
 

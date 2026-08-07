@@ -10,10 +10,13 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
+import { ProofreadMarks, proofreadHandle, type ProofreadHandle } from './proofread-marks';
 
 export interface RichEditorHandle {
   editor: Editor;
   getMarkdown: () => string;
+  /** Present only when `proofread` was asked for (docs/plans/22 · Piece 4). */
+  proofread?: ProofreadHandle;
 }
 
 export interface RichEditorOptions {
@@ -56,6 +59,17 @@ export interface RichEditorOptions {
    * and song editors want.
    */
   images?: ImageSupport;
+  /**
+   * Enables the proofreading decoration plugin (docs/plans/22 · Piece 4), and
+   * with it `handle.proofread`.
+   *
+   * ⚠ OPT-IN, AND IT HAS TO BE. This function has five callers — the composer,
+   * the capture box, the interest notes and three editors in the About builder.
+   * Adding the plugin unconditionally would ship it into all of them, four of
+   * which have no trigger for it and no chip to report into. Same shape as
+   * `images` and `linkDialog` above, for the same reason.
+   */
+  proofread?: boolean;
 }
 
 export interface ImageSupport {
@@ -110,6 +124,7 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
       // `inline: false` — an image is its own block, which is what
       // `![alt](src)` round-trips to and what the reading column wants.
       ...(img ? [Image.configure({ inline: false, allowBase64: false })] : []),
+      ...(opts.proofread ? [ProofreadMarks] : []),
     ],
     content: opts.content || '',
     editorProps: {
@@ -263,7 +278,7 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
     });
   }
 
-  return { editor, getMarkdown };
+  return { editor, getMarkdown, proofread: opts.proofread ? proofreadHandle(editor) : undefined };
 }
 
 export interface MiniEditorOptions {
