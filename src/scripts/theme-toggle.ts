@@ -23,10 +23,21 @@ type Theme = 'dusk' | 'paper';
 
 const current = (): Theme => (document.documentElement.dataset.theme === 'paper' ? 'paper' : 'dusk');
 
+/** The two `--color-base-100` values, literal because <meta> cannot read a
+ *  custom property. Keep in step with `styles/app.css`. */
+const STATUS_BAR: Record<Theme, string> = { dusk: '#1a1511', paper: '#f9f6f1' };
+
 /** Tell the button which way it is pointing. `paper` is the pressed state:
- *  dusk is the default, so "pressed" reads as "you turned the light on". */
+ *  dusk is the default, so "pressed" reads as "you turned the light on".
+ *
+ *  Also re-tints the standalone app's status bar (the Observatory's
+ *  `theme-color` meta; absent on the public site, hence the optional call).
+ *  That used to follow `prefers-color-scheme` on its own, which only worked
+ *  while the page did too — see the note in `AdminLayout.astro`. */
 function sync(): void {
-  document.getElementById('theme-toggle')?.setAttribute('aria-pressed', String(current() === 'paper'));
+  const theme = current();
+  document.getElementById('theme-toggle')?.setAttribute('aria-pressed', String(theme === 'paper'));
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', STATUS_BAR[theme]);
 }
 
 function apply(next: Theme): void {

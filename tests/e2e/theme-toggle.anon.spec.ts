@@ -68,6 +68,29 @@ test.describe('the toggle says which way it is pointing', () => {
   });
 });
 
+test.describe('dark is the default, whatever the machine says', () => {
+  // The pick used to be saved-choice → system-preference → dusk, so a reader on
+  // a light OS met `paper` first. It is saved-choice → dusk now: this site was
+  // drawn at dusk and light is the opt-in. See the note in `Base.astro`.
+  test.use({ colorScheme: 'light' });
+
+  test('a light machine, no saved choice, still lands on dusk', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dusk');
+    await expect(page.locator(TOGGLE), 'and the toggle says so').toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('and the explicit choice still outranks it', async ({ page }) => {
+    // The other direction of the same rule: the OS cannot force paper, but the
+    // reader can, and a reload must not hand it back.
+    await page.goto('/');
+    await page.locator(TOGGLE).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+  });
+});
+
 test.describe('the nav collapses at one breakpoint, not two', () => {
   // plan 19 · §7: the public nav collapsed at 640px while the Observatory's
   // sidebar collapsed at 768px, so 640–767px showed a desktop nav beside a

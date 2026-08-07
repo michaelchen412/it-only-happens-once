@@ -114,12 +114,18 @@ const nav = [
     {/* iOS reads its home-screen icon from here, never from the manifest. */}
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     {
-      /* Tints the standalone app's status bar. Follows the SYSTEM scheme, not the
-        theme toggle — a forced theme can leave it a shade out, which is the
-        honest cost of not duplicating the toggle's logic into <head>. */
+      /* Tints the standalone app's status bar. Rendered at dusk because that is
+        now the site's default regardless of the OS, and kept in step with the
+        toggle by `scripts/theme-toggle.ts`.
+
+        ⚠ It used to be two `media="(prefers-color-scheme: …)"` metas, on the
+        grounds that following the system was close enough and cheaper than
+        duplicating the toggle's logic. That stopped being true the moment dusk
+        became unconditional: a light-machine user would get the dark app under
+        a paper-coloured status bar EVERY time, which is the mismatch the
+        media-query version was supposed to avoid. */
     }
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1511" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f6f1" />
+    <meta name="theme-color" content="#1a1511" />
   </Fragment>
   {
     /* Skip to the content. The Observatory is the one place on this site the

@@ -518,9 +518,12 @@ deliberately rather than left as a TODO.
 scripts/build-app-icons.mjs`), which reads `STAR_PATH` out of
 [`src/lib/star-mark.ts`](../src/lib/star-mark.ts) so the star is never copied.
 It writes the favicon (both formats) and the app icons together — redraw the
-mark, re-run it once, and everything follows. One small known seam: the
-standalone status-bar tint follows the **system** colour scheme, so forcing the
-theme toggle against it can leave the bar a shade out.
+mark, re-run it once, and everything follows. The standalone **status-bar tint**
+is rendered at dusk and re-tinted by
+[`scripts/theme-toggle.ts`](../src/scripts/theme-toggle.ts), so it tracks the
+theme you actually chose. *(It followed the system colour scheme until
+2026-08-07, which was close enough only while the page did too — see
+[ADR 0021](adr/0021-dark-is-the-default-not-the-system-preference.md).)*
 
 ## 10. Deferred (not in admin v1)
 

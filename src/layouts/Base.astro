@@ -60,14 +60,25 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
   <head>
     <meta charset="utf-8" />
     {
-      /* Pick the theme before paint (no flash): a saved choice wins; otherwise
-        follow the system preference; otherwise default to dusk (dark). */
+      /* Pick the theme before paint (no flash): a saved choice wins, and dusk
+        otherwise.
+
+        ⚠ THE SYSTEM PREFERENCE IS DELIBERATELY NOT CONSULTED. It used to be —
+        `prefers-color-scheme: light` handed a first-time reader `paper`. But
+        this site was drawn at dusk: the Sky only reads as a sky against dark,
+        the accent OKLCH ramps were tuned there, and paper is the concession
+        rather than the design. Following the OS meant most visitors met the
+        weaker of the two themes without ever knowing there was another one.
+
+        So dark is the site's own default and light is an opt-in — the toggle,
+        which persists. The cost is real and accepted: a reader who keeps their
+        whole machine light gets a dark page they did not ask for, and has to
+        press the sun once. That is one click, remembered forever, against a
+        first impression of the site as it was actually designed. */
     }
     <script is:inline>
       try {
-        const t = localStorage.getItem('theme');
-        document.documentElement.dataset.theme =
-          t || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'paper' : 'dusk');
+        document.documentElement.dataset.theme = localStorage.getItem('theme') === 'paper' ? 'paper' : 'dusk';
       } catch {}
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -93,13 +104,11 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
 
       // After each view-transition swap, re-apply the theme before paint so it
       // never flashes back to the default on client-side navigation. Same rule as
-      // the initial pick: saved choice → system preference → dusk. Inert unless a
+      // the initial pick: a saved `paper` wins, dusk otherwise. Inert unless a
       // page opted into transitions (the event never fires otherwise).
       document.addEventListener('astro:after-swap', () => {
         try {
-          const t = localStorage.getItem('theme');
-          document.documentElement.dataset.theme =
-            t || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'paper' : 'dusk');
+          document.documentElement.dataset.theme = localStorage.getItem('theme') === 'paper' ? 'paper' : 'dusk';
         } catch {}
       });
     </script>
