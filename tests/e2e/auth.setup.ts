@@ -148,6 +148,21 @@ setup('mint an admin session and find fixtures', async () => {
   }
   const composed = [...byConstellation.entries()].find(([, n]) => n >= 2)?.[0] ?? null;
 
+  // A DRAFT constellation, for the cache-header branch on `/[slug]` (24 · Piece
+  // 3). That route doubles as the draft preview, so it must answer
+  // `private, no-store` to the admin and `public, s-maxage=…` to everyone else —
+  // and the failure mode is an unpublished constellation sitting in a public CDN
+  // for a minute. Anonymously it is unreachable (RLS hides it and the page
+  // redirects home), so THE ADMIN SESSION IS THE ONLY WAY TO TEST THE BRANCH
+  // THAT MATTERS. Discovered like everything else here; the spec skips if the
+  // sky happens to have no draft in it.
+  const { data: draftConstellation } = await service
+    .from('constellations')
+    .select('slug')
+    .neq('status', 'published')
+    .limit(1)
+    .maybeSingle();
+
   fs.writeFileSync(
     FIXTURES_FILE,
     JSON.stringify(
@@ -157,6 +172,7 @@ setup('mint an admin session and find fixtures', async () => {
         publishedSlug: published?.slug ?? null,
         constellationId: constellation?.id ?? null,
         composedConstellationId: composed,
+        draftConstellationSlug: draftConstellation?.slug ?? null,
       },
       null,
       2,

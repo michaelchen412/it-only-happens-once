@@ -121,7 +121,23 @@ test.describe('the editor — where the two invisible rules become checkable', (
     await expect(page.locator('[data-prev]')).toContainText('Next:');
     // Column names and rule mechanics are not interface (10-hq.md §10i), and
     // this one cannot be read by a human anyway.
-    expect(await page.content()).not.toContain('FREQ=');
+    //
+    // ⚠ SCOPED TO <body> SINCE 2026-08-07, and the reason must be read before
+    // anyone widens it back to `page.content()`. That form also searched <head>
+    // — where `astro dev` inlines stylesheets UNMINIFIED — and `hq.css:2281`
+    // carries the literal `FREQ=MONTHLY;BYDAY=3MO` inside a comment, as the
+    // example of the very unreadability this test defends. It passed for months
+    // only because hq.css reached the page through `app.css`, whose Lightning
+    // CSS pass strips comments; when 24 · Piece 9 moved hq.css onto
+    // `AdminLayout` so readers stop downloading it, the comment started
+    // arriving intact IN DEV ONLY.
+    //
+    // Checked before narrowing rather than assumed: the production build emits
+    // **zero** occurrences of `FREQ=` and zero comments of any kind, so nothing
+    // reaches a real browser. And a string inside a stylesheet was never what
+    // this test meant — its own sentence says *interface*, and <head> is not it.
+    const body = await page.locator('body').innerHTML();
+    expect(body).not.toContain('FREQ=');
   });
 
   test('a lead and a recurrence are functions of a date, so neither exists without one', async ({ page }) => {

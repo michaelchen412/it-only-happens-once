@@ -13,6 +13,15 @@
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
+// The Observatory's own 3,323 lines, loaded HERE rather than from `app.css`
+// (24 · Piece 9), so a reader on an essay stops downloading a stylesheet for
+// rooms only Michael can open. `Base` still brings `app.css` — the tokens, the
+// themes and the base layer that every one of these rules references — and this
+// is plain CSS with no Tailwind directives, so it needs nothing from that
+// pipeline beyond the custom properties, which resolve globally at runtime.
+// The full account of what was checked before moving it is in `app.css`, where
+// the `@import` used to be.
+import '../styles/hq.css';
 import CaptureDialog from '../components/admin/CaptureDialog.astro';
 import ConfirmDialog from '../components/admin/ConfirmDialog.astro';
 import NotificationsDialog from '../components/admin/NotificationsDialog.astro';

@@ -122,3 +122,35 @@ test('the rooms still render, the day still resolves, and admin stays no-store',
   // Piece 8b: the identity the chrome renders now comes from verified claims.
   await expect(page.locator('#sidebar').getByText('@')).toBeVisible();
 });
+
+/*
+  24 · Piece 3 — the branch that keeps a draft out of the public CDN.
+
+  ⚠ THIS IS THE ONLY PLACE THE BRANCH CAN BE TESTED, and that is why it lives in
+  an ADMIN spec rather than beside the other cache assertions in
+  `public-speed.anon.spec.ts`. Anonymously a draft constellation is unreachable:
+  RLS hides the row, `getConstellation` returns null, and the page redirects
+  home — so an anon test would pass whether or not the branch exists.
+
+  The failure it guards is one line of carelessness away: an unconditional
+  `s-maxage` on this route would put an unpublished constellation into a shared
+  CDN and serve it to everyone for a minute.
+*/
+import fs from 'node:fs';
+import path from 'node:path';
+
+const fixtures = JSON.parse(fs.readFileSync(path.join('tests', 'e2e', '.auth', 'fixtures.json'), 'utf8'));
+
+test('a draft constellation is never publicly cacheable, a published one always is', async ({ page }) => {
+  test.skip(!fixtures.draftConstellationSlug, 'the sky has no draft constellation to check');
+
+  const draft = await page.goto(`/${fixtures.draftConstellationSlug}`);
+  expect(draft?.status()).toBe(200); // the admin can see it — this page IS the preview
+  expect(draft?.headers()['cache-control']).toBe('private, no-store');
+
+  // ...and the same route, same session, on something published.
+  await page.goto('/');
+  const href = await page.locator('a.sky-row').first().getAttribute('href');
+  const published = await page.goto(href!);
+  expect(published?.headers()['cache-control']).toBe('public, s-maxage=60, stale-while-revalidate=86400');
+});

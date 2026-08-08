@@ -439,4 +439,30 @@
    which was never what "single source of truth for tokens" was protecting.
    ======================================================================== */
 @import './admin.css';
-@import './hq.css';
+
+/* ⚠ `hq.css` USED TO BE THE NEXT LINE, AND IT IS NOW LOADED BY `AdminLayout`
+   INSTEAD (24 · Piece 9). It is 3,323 lines — 56 KB of hand-written CSS — and
+   every one of them was render-blocking on every essay and every constellation,
+   for readers who can never see a single rule it contains.
+
+   Verified before moving, by walking the PUBLIC import closure (46 files: every
+   non-admin page plus the two layouts, dev-only labs excluded because they 302
+   in production) and intersecting the classes they use against the classes
+   hq.css defines. Four came back and all four were false alarms:
+     · `.back-to-top`  — hq's only rule is `body:has(.cap-fab) .back-to-top`,
+                          and `.cap-fab` is the capture ✚, which no public page has
+     · `.is-visible`   — hq's only rule is `.undo-bar.is-visible`, admin-only
+     · `.f`            — NOT a class. It is the loop variable in
+                          ConstellationSuite's `f.kind === 'writing'`, and the
+                          scan tokenised it out of a `class:list` expression
+     · `.back-to-top--in-sheet` — same `:has(.cap-fab)` rule as the first
+
+   ⚠ AND `admin.css` DELIBERATELY DID NOT MOVE WITH IT, which is the finding
+   worth carrying: **it is not the Observatory's stylesheet.** The same scan
+   says the public site depends on FIFTY of its classes — the whole Sky
+   (`.sky-row`, `.sky-star`, `.sky-cta*`, `.sky-return`), every constellation
+   suite (`.suite*`, `.sw-*`, `.excerpt-fade`, `.return-arrow`), the blog reader
+   (`.reader*`, `.drawer-dialog`), the feed cards (`.post-*`, `.feed-*`), the
+   stars (`.star-bloom*`, `.star-mark`) and the theme toggle. Moving it would
+   have taken the front door down. Splitting it is a re-partition rather than an
+   import move, and it wants its own piece — see the plan. */
