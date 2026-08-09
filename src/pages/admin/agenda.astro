@@ -39,6 +39,7 @@ import {
   type CalendarItem,
 } from '../../lib/hq/calendar';
 import { staleness } from '../../lib/hq/mirror';
+import { liveAndAnswered } from '../../lib/hq/today-data';
 
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = Astro.locals.today;
@@ -67,27 +68,25 @@ const weekCells = Array.from({ length: 7 }, (_, i) => shiftYmd(weekStart, i));
 const from = week ? weekCells[0] : cells[0].ymd;
 const to = week ? weekCells[6] : cells[41].ymd;
 
-const [
-  { data: eventRows, error },
-  { data: taskRows },
-  { data: peopleRows },
-  { data: answeredRows },
-  mirrored,
-  { data: syncState },
-] = await Promise.all([
+const [{ data: eventRows, error }, tasks, { data: peopleRows }, mirrored, { data: syncState }] = await Promise.all([
   supabase
     .from('events')
     .select('*, event_people(person_id, people(id, display_name))')
     .gte('starts_on', from)
     .lte('starts_on', to),
-  supabase
-    .from('tasks')
-    .select('id, title, due_on, due_time')
-    .is('archived_at', null)
-    .gte('due_on', from)
-    .lte('due_on', to),
+  // ⚠ THE LOADER, NOT A SECOND MERGE (plans/29 · §1). This page used to run its
+  // own windowed `tasks` query beside an `answered` set keyed by TASK ID, and
+  // the two disagreed with every other room in the building: `dispose` advances
+  // `due_on` before the page renders, so ticking a weekly chore struck through
+  // its NEXT occurrence — bare, with no chips — while the cell you had just
+  // used went empty, and a one-off disappeared outright with its archiving.
+  // Keying by `(task_id, for_due_on)` here would have fixed the strike and left
+  // both disappearances, because the occurrence you answered is no longer
+  // reachable from the `tasks` row at all. `liveAndAnswered` is where that
+  // merge already lived; it takes a window now so this page can stop having an
+  // opinion about it (ADR 0016).
+  liveAndAnswered(supabase, todayYmd, { from, to }),
   supabase.from('people').select('id, display_name, birth_month, birth_day, birthday_lead_days, archived_at'),
-  supabase.from('task_events').select('task_id').eq('occurred_on', todayYmd),
   // 13 · Piece 3. The fourth source finally has a producer — until now `mirror`
   // was a kind of row nothing could create.
   mirroredBetween(supabase, from, to),
@@ -102,19 +101,29 @@ const [
 // is null almost always, and says one sentence when it matters.
 const stale = staleness(syncState ?? null);
 
-const answered = new Set((answeredRows ?? []).map((r) => r.task_id));
-
 const items: CalendarItem[] = [
   // No `href`: this page IS the day panel, so an event's door is already here.
   ...(eventRows ?? []).map(eventItem),
-  ...(taskRows ?? []).map((t) => ({
-    kind: 'task' as const,
-    id: t.id,
-    on: t.due_on!,
-    title: t.title,
-    at: t.due_time ? t.due_time.slice(0, 5) : null,
-    answered: answered.has(t.id),
-  })),
+  // ⚠ `shownDueOn`, NEVER `due_on` — which occurrence this row is standing on.
+  // The filter is the type being honest rather than a guard: the loader's
+  // window already excludes an undated task from both halves, so nothing is
+  // dropped here, and a `!` would have been a claim this file cannot check.
+  ...tasks.rows
+    .filter((t): t is typeof t & { shownDueOn: Ymd } => !!t.shownDueOn)
+    .map((t) => ({
+      kind: 'task' as const,
+      id: t.id,
+      on: t.shownDueOn,
+      title: t.title,
+      at: t.due_time ? t.due_time.slice(0, 5) : null,
+      // ⚠ ANSWERED, NOT DONE — and the grid cannot yet tell them apart. The
+      // tasks room deliberately withholds the line-through from a skip ("that
+      // would read as *did it*"), and this surface strikes both, as it always
+      // has. Kept rather than fixed here because the honest fix is a `skipped`
+      // treatment for `.drow`, which is UI work rather than this plan's
+      // one-owner move; what changed is only WHICH occurrence is struck.
+      answered: !!t.answeredAs,
+    })),
   // ⚠ BIRTHDAYS ARE NOT ROWS ANYWHERE — derived from `people.birth_month/day`
   // (12-people.md §8), which is why they get no body on the grid and nothing at
   // all to press in the day panel. There is no row to open.
@@ -228,9 +237,14 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
     </PageHeader>
 
     {
-      error && (
+      /* Either read failing costs the grid a whole source, so both say so. The
+         tasks half was silently discarded until 2026-08-09 — not by a decision,
+         but because the old query destructured `data` and never `error`. */
+    }
+    {
+      (error ?? tasks.error) && (
         <p class="admin-alert mb-4" role="alert">
-          Couldn’t load the calendar: {error.message}
+          Couldn’t load the calendar: {(error ?? tasks.error)!.message}
         </p>
       )
     }

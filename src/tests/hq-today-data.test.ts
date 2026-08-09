@@ -104,3 +104,117 @@ describe('liveAndAnswered', () => {
     expect(rows[0].shownDueOn).toBeNull();
   });
 });
+
+// The windowed form — what the CALENDAR asks for (plans/29 · §1).
+//
+// ⚠ THESE EXIST BECAUSE `/admin/agenda` HAD ITS OWN ANSWER AND IT WAS WRONG.
+// The page ran a raw windowed `tasks` query beside an `answered` set keyed by
+// **task id**, so a recurring chore ticked this morning struck through its NEXT
+// occurrence — `dispose` advances `due_on` before the page ever renders — and
+// today's cell, the one you had just used, went empty. A one-off vanished
+// outright, archived by the same call. That is the "which occurrence is this
+// task standing on" drift ADR 0016 says the loader layer exists to prevent, and
+// the page was rebuilding the loader only because no loader took a window.
+//
+// ⚠ WHAT THE STUB CANNOT PROVE, said plainly: it fakes the BUILDER, so the
+// `.gte`/`.lte` narrowing the live query is not exercised here. What is
+// exercised is the half the bug was made of — which date each row is placed on,
+// and which dispositions belong to the window at all.
+describe('liveAndAnswered, windowed', () => {
+  const AUGUST = { from: '2026-08-01', to: '2026-08-31' };
+
+  it('places an answered task on the day it was answered FOR, not where the answer moved it', async () => {
+    // The bug, stated as an assertion. Ticked today; `due_on` is already the
+    // 11th. Today's cell must carry the struck row.
+    const advanced = task({ id: 'a', title: 'Bins out', due_on: '2026-08-11' });
+    const db = fakeDb({
+      tasks: { data: [advanced] },
+      task_events: { data: [{ for_due_on: TODAY, outcome: 'done', tasks: advanced }] },
+    });
+
+    const { rows } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    const answered = rows.filter((r) => r.answeredAs);
+    expect(answered).toHaveLength(1);
+    expect(answered[0].shownDueOn).toBe(TODAY);
+    expect(answered[0].answeredAs).toBe('done');
+  });
+
+  it('keeps the occurrence the answer moved the task to, because a grid draws days not tasks', async () => {
+    // ⚠ THE ONE PLACE THE WINDOWED FORM DELIBERATELY DIVERGES from the list
+    // form, and the reason the parameter changes the dedupe rule rather than
+    // only the filter. Dropping the live twin — correct for a list, which shows
+    // each task once — would empty the 11th for the rest of today, trading one
+    // half of the bug for the other.
+    const advanced = task({ id: 'a', title: 'Bins out', due_on: '2026-08-11' });
+    const db = fakeDb({
+      tasks: { data: [advanced] },
+      task_events: { data: [{ for_due_on: TODAY, outcome: 'done', tasks: advanced }] },
+    });
+
+    const { rows } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    expect(rows.map((r) => [r.shownDueOn, r.answeredAs])).toEqual(
+      expect.arrayContaining([
+        [TODAY, 'done'],
+        ['2026-08-11', null],
+      ]),
+    );
+    expect(rows).toHaveLength(2);
+  });
+
+  it('keeps a one-off answered this morning, which archiving took out of the live query', async () => {
+    const archived = task({ id: 'a', title: 'Renew passport', archived_at: '2026-08-04T09:00:00Z' });
+    const db = fakeDb({
+      tasks: { data: [] },
+      task_events: { data: [{ for_due_on: TODAY, outcome: 'done', tasks: archived }] },
+    });
+
+    const { rows } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].shownDueOn).toBe(TODAY);
+    expect(rows[0].answeredAs).toBe('done');
+  });
+
+  it('drops an answer for an occurrence outside the window', async () => {
+    // Backfilling last Friday from the tasks room, while the calendar is on
+    // September. The disposition happened TODAY, but the day it is about is not
+    // on this grid, and a row has to land on a cell.
+    const t = task({ id: 'a', due_on: '2026-09-04' });
+    const db = fakeDb({
+      tasks: { data: [] },
+      task_events: { data: [{ for_due_on: '2026-07-31', outcome: 'done', tasks: t }] },
+    });
+
+    const { rows } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    expect(rows).toEqual([]);
+  });
+
+  it('drops an answer for a task with no date, which has no cell to sit on', async () => {
+    const someday = task({ id: 'a', due_on: null });
+    const db = fakeDb({
+      tasks: { data: [] },
+      task_events: { data: [{ for_due_on: null, outcome: 'done', tasks: someday }] },
+    });
+
+    const { rows } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    expect(rows).toEqual([]);
+  });
+
+  it('still reports what everything answered today, window or not', async () => {
+    // `answeredToday` is the badge's and the zones' map, and it means TODAY —
+    // never "today, as seen through whatever month you happen to be looking at".
+    const t = task({ id: 'a', due_on: '2026-09-04' });
+    const db = fakeDb({
+      tasks: { data: [] },
+      task_events: { data: [{ for_due_on: '2026-07-31', outcome: 'skipped', tasks: t }] },
+    });
+
+    const { answeredToday } = await liveAndAnswered(db, TODAY, AUGUST);
+
+    expect(answeredToday.get('a')).toBe('skipped');
+  });
+});

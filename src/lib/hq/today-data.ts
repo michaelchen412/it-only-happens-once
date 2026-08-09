@@ -68,29 +68,62 @@ export type TaskRow = Task & {
  * turn a failed read into a 500 on a surface whose whole job is to still be
  * there on a bad morning. Today ignores it and renders empty zones, which is
  * the same answer that page gives to a quiet day.
+ *
+ * ⚠ `window` MAKES IT SERVE A GRID INSTEAD OF A LIST (plans/29 · §1), and it
+ * changes two things rather than one — see the note on the dedupe below. It was
+ * added because `/admin/agenda` had grown its own answer to this exact
+ * question and got it wrong: a raw windowed `tasks` query beside an `answered`
+ * set keyed by **task id**, which struck through the occurrence a tick had just
+ * moved the row TO and dropped the one you actually ticked. The page was
+ * rebuilding the loader only because no loader took a window.
  */
 export async function liveAndAnswered(
   sb: DB,
   today: Ymd,
+  window?: { from: Ymd; to: Ymd },
 ): Promise<{ rows: TaskRow[]; answeredToday: Map<string, Outcome>; error: PostgrestError | null }> {
+  // The window has to be applied twice, in two different places, because the
+  // two queries carry the date on different columns — `due_on` on the task,
+  // `for_due_on` on the disposition — and that difference IS the reason this
+  // function exists. Narrowing only the live query is the bug, one layer down.
+  const liveQuery = sb.from('tasks').select('*').is('archived_at', null);
   const [{ data: live, error: liveErr }, { data: events, error: eventErr }] = await Promise.all([
-    sb.from('tasks').select('*').is('archived_at', null),
+    window ? liveQuery.gte('due_on', window.from).lte('due_on', window.to) : liveQuery,
     sb.from('task_events').select('for_due_on, outcome, tasks(*)').eq('occurred_on', today),
   ]);
 
-  const answered = (events ?? []).filter((e): e is typeof e & { tasks: Task } => !!e.tasks);
+  const dispositions = (events ?? []).filter((e): e is typeof e & { tasks: Task } => !!e.tasks);
+  // An answer with no date, or one about a day off this grid, has no cell to
+  // sit on. Backfilling last Friday while the calendar is on September is the
+  // real case: the disposition happened today, the day it is ABOUT did not.
+  const answered = window
+    ? dispositions.filter((e) => !!e.for_due_on && e.for_due_on >= window.from && e.for_due_on <= window.to)
+    : dispositions;
   const answeredIds = new Set(answered.map((e) => e.tasks.id));
 
+  // ⚠ THE DEDUPE IS A LIST RULE, AND A GRID IS NOT A LIST. Unwindowed, this
+  // answers *what do I owe*, so a task appears exactly once and the live row
+  // loses to the disposition — otherwise every answered chore renders twice,
+  // once ticked and once not. A window is asked by the CALENDAR, whose question
+  // is *what is on this day*, and there the two rows are two different days:
+  // the occurrence you ticked this morning, and the one the tick moved the task
+  // to. Dropping the live twin there would empty next Friday's cell for the
+  // rest of today — trading one half of §1's bug for the other, which is why
+  // the alternative (filter the window, keep the list's dedupe) was rejected.
+  const shownLive = window ? (live ?? []) : (live ?? []).filter((t) => !answeredIds.has(t.id));
+
   const rows: TaskRow[] = [
-    ...(live ?? [])
-      .filter((t) => !answeredIds.has(t.id))
-      .map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
+    ...shownLive.map((t) => ({ ...t, answeredAs: null, shownDueOn: t.due_on })),
     ...answered.map((e) => ({ ...e.tasks, answeredAs: e.outcome, shownDueOn: e.for_due_on })),
   ];
 
   return {
     rows,
-    answeredToday: new Map(answered.map((e) => [e.tasks.id, e.outcome])),
+    // ⚠ NEVER NARROWED BY THE WINDOW. This map means "answered today", full
+    // stop — it is what the badge and Today's zones read, and a count that
+    // changed because you had stepped the calendar to September would be the
+    // same class of bug as the one this parameter fixes.
+    answeredToday: new Map(dispositions.map((e) => [e.tasks.id, e.outcome])),
     error: liveErr ?? eventErr ?? null,
   };
 }
