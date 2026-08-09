@@ -12,8 +12,8 @@
 // So they are driven properly below. The list specs DISCOVER rather than seed,
 // and skip with a reason while the table is empty; they start doing real work
 // the day there are real tasks.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 const openEditor = async (page: Page) => {
   await page.goto('/admin/agenda/tasks');

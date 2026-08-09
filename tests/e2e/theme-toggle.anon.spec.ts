@@ -9,7 +9,7 @@
 // Signed out on purpose: the public site is the half that was broken, and it is
 // also the half with the router, which is what made it stay broken. Read-only —
 // the theme lives in localStorage and nothing here touches the database.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const TOGGLE = '#theme-toggle';
 

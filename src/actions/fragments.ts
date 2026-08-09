@@ -16,12 +16,17 @@ import { type DB, fail, fragmentStatus, requireAdmin, uniqueSlug, optText, optUr
 
 type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 
-function firstWords(text: string, n = 7): string {
+// ⚠ The next two are exported for `src/tests/actions-pure.test.ts` and are
+// imported by nothing else. They are the slug and date rules a fragment is
+// saved under — pure, total, and previously unreachable from any test.
+
+/** The first `n` words of a body, whitespace collapsed — a slug's last resort. */
+export function firstWords(text: string, n = 7): string {
   return text.trim().split(/\s+/).slice(0, n).join(' ');
 }
 
 /** A bare year → Jan 1 noon UTC. Paired with date_precision 'year'. */
-function yearToISO(year: number): string {
+export function yearToISO(year: number): string {
   return new Date(`${year}-01-01T12:00:00Z`).toISOString();
 }
 

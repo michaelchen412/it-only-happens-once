@@ -14,7 +14,8 @@
 //  · nothing anywhere counts what you owe
 //  · the stack order survives a phone, which is a computed-style question
 //  · only the check-in follows the date bar
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const ZONES = [
   { attr: '[data-agenda-zone]', title: 'Today' },

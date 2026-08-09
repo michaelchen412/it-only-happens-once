@@ -6,9 +6,9 @@
 // ⚠ Chromium at 390px, not Safari on a phone — the caveat playwright.config.ts
 // already writes down about this whole project. It catches overflow; it cannot
 // catch the iOS keyboard.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 type Returns<T> = T extends (...a: never[]) => Promise<infer R>
   ? R extends { data: infer D }

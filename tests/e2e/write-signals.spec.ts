@@ -4,8 +4,7 @@
 // read off the form — so the specs stub `/_actions/**` and assert that nothing
 // was written. That keeps the harness read-only against the live project while
 // still driving the real editor, which is the entire point.
-import { test, expect } from '@playwright/test';
-import { blockWrites } from './fixtures';
+import { test, expect, blockWrites } from './fixtures';
 
 /** Open the composer on a brand-new piece and wait for the editor to mount. */
 async function openNewWriting(page: import('@playwright/test').Page) {

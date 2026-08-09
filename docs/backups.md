@@ -101,10 +101,20 @@ about it:
 ## The corpus export — `GET /admin/export.json`
 
 A **Export corpus** link on [`/admin/library`](../src/pages/admin/library.astro)
-downloads the whole corpus as one JSON file: all nine tables, every row,
+downloads the whole corpus as one JSON file: **all 28 tables**, every row,
 `select('*')` so a column added later appears without anyone remembering. Built
 2026-07-31 ([plan 05 Piece 2](plans/archive/05-export-backup.md)). 478 KB and 538 rows
 at the time of writing.
+
+⚠ **It said "nine" until 2026-08-09, and so did the endpoint.** The list had
+drifted five tables behind the schema — the three check-in children and both
+push tables — so every export taken between 2026-08-06 and then was silently
+short. The file's own comment had said "every table joins this list, in the same
+commit" the whole time; comments do not run. **`src/tests/export-tables.test.ts`
+now derives the expected list from the generated `Database` types and fails
+`npm run verify` on any table that is neither exported nor explicitly excluded
+with a reason.** That test is the reason this number can be trusted, and it is
+also why it is a number rather than a word.
 
 **Be clear about what it is for, because it is not disaster recovery.** That job
 is done above, and better: the nightly dump restores straight back into
@@ -123,12 +133,19 @@ you least want to be writing one.
 - **Tables are listed in dependency order**, so an importer can insert them top
   to bottom without tripping a foreign key. The list is typed against the
   generated `Database` types, so a renamed table is a compile error rather than
-  a runtime surprise inside a backup nobody was watching.
+  a runtime surprise inside a backup nobody was watching — and since 2026-08-09
+  a **missing** one is a failing test, which is the half that was open.
+- **Views are excluded on purpose**, and there are two: `goal_last_done` and
+  `person_last_contact`. Exporting a derived value would put a stored copy of a
+  computation into the artefact you restore from, which is the drift
+  [data-model.md §7](data-model.md) forbids. Both are recomputed by the database
+  the moment their inputs are back.
 - **Images are referenced by URL, never embedded.** The bytes are archived
   nightly (above); base64 here would duplicate them at several times the size.
-- **Verified against live**: an admin session sees every row of all nine tables
-  (checked against the service key, which bypasses RLS — a table missing an
-  admin policy would have exported as an empty array rather than an error), the
+- **Verified against live, 2026-07-31, when there were nine tables**: an admin
+  session saw every row of all of them (checked against the service key, which
+  bypasses RLS — a table missing an admin policy would have exported as an empty
+  array rather than an error), the
   file's own `counts` agree with its rows, every join row points at a row also
   in the file, and signed out the endpoint serves nothing.
 

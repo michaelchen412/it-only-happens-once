@@ -13,7 +13,8 @@
 //  · THE 44px TAP FLOOR. The mode segments are a fresh `.pseg` instance, and
 //    the circle control shipped at 36px in Piece 1 — caught by the harness on
 //    its first ever run, not by review.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 async function profiles(page: Page): Promise<string[]> {
   await page.goto('/admin/people');

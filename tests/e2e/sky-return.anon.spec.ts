@@ -24,8 +24,8 @@
 // but asserting on an animation mid-flight is how you get a flaky spec. Every
 // assertion below reads the settled DOM through `toPass`, never the
 // pseudo-elements.
-import { test, expect, type Page } from '@playwright/test';
-import { hideDevToolbar } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, hideDevToolbar } from './fixtures';
 
 // ⚠ RETRIES, AND EXACTLY WHY — because a retry with no reason attached is how a
 // real failure gets slept through.

@@ -10,8 +10,8 @@
 // so the assertions below are largely about what must NOT be on the page — a
 // bar, a percentage, an "n of m", a red cold line, a paragraph explaining why
 // none of those are there.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 const room = async (page: Page) => {
   await page.goto('/admin/agenda/goals');

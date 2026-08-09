@@ -14,8 +14,8 @@
 // backdrop — what you do every time you select a line right-to-left and
 // overshoot. Each dialog gets both halves, because "it never closes" would pass
 // the first assertion and be a different bug.
-import { expect, test, type Page } from '@playwright/test';
-import { hideDevToolbar, stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, test, hideDevToolbar, stubActions } from './fixtures';
 
 /**
  * A point on the backdrop: same height as the dialog, hard against the left

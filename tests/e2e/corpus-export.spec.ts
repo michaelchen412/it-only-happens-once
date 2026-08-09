@@ -13,7 +13,7 @@
 // contains what the database contains.
 //
 // The `anon` half lives in corpus-export.anon.spec.ts, where it belongs.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 interface Corpus {
   format: string;
@@ -24,9 +24,20 @@ interface Corpus {
 }
 
 // Kept in step with `TABLES` in src/pages/admin/export.json.ts BY HAND, on
-// purpose: the standing rule is that a piece creating an HQ table appends it
-// there, and a spec that derived its list from the same source could never
-// catch a piece that forgot.
+// purpose: a spec that derived its list from the same source could never catch
+// a piece that forgot.
+//
+// ⚠ IT HAD DRIFTED TO TEN OF TWENTY-EIGHT by 2026-08-09, which is the same
+// failure the endpoint itself had and is why "by hand" is no longer the whole
+// mechanism. `src/tests/export-tables.test.ts` derives the expected list from
+// the generated `Database` types — a genuinely independent source, since those
+// are regenerated from the live schema — and fails `npm run verify` on any
+// table the endpoint has not been told about.
+//
+// This list still earns its place, and it is a DIFFERENT assertion: the unit
+// test proves the array is right, and this proves the RESPONSE actually carries
+// every one of those keys with rows and an honest count behind it. Both, or the
+// endpoint is only checked on paper.
 const TABLES = [
   'subjects',
   'authors',
@@ -38,6 +49,24 @@ const TABLES = [
   'fragment_constellations',
   'fragment_versions',
   'settings',
+  'daily_checkins',
+  'checkin_dreams',
+  'checkin_wakings',
+  'checkin_naps',
+  'people',
+  'interactions',
+  'interaction_people',
+  'goals',
+  'tasks',
+  'task_events',
+  'events',
+  'external_events',
+  'calendar_sync',
+  'event_people',
+  'push_subscriptions',
+  'push_day_claims',
+  'person_works',
+  'person_fragments',
 ];
 
 test.describe('corpus export', () => {

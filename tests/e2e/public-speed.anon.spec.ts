@@ -1,6 +1,6 @@
 // What the public side pays to open a constellation — docs/plans/24 · Pieces 3,
 // 4 and 6. Signed out, because that is who these three are for.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('the sky and its suites are CDN-cacheable', async ({ page }) => {
   const PUBLIC = 'public, s-maxage=60, stale-while-revalidate=86400';

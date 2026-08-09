@@ -19,8 +19,7 @@
 //  · THE PAYLOAD NO LONGER CARRIES THE REMOVED KEYS. `me.headline`,
 //    `me.interests` and `site.thesis` must be absent — not empty. Zod strips
 //    unknown keys, so a leftover would fail silently rather than loudly.
-import { test, expect } from '@playwright/test';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 test.describe('the About builder after ADR-0020', () => {
   test('the three removed controls are gone', async ({ page }) => {

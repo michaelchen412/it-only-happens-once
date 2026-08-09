@@ -10,8 +10,8 @@
 // public API and is already how the Work combo gets re-scoped when the Author
 // changes. That keeps these specs off the live vocabulary — and it is the only
 // way to exercise a list longer than the corpus currently is.
-import { test, expect, type Page } from '@playwright/test';
-import { blockWrites } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, blockWrites } from './fixtures';
 
 const COMBO = '#quote-author';
 

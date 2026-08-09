@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/check-server-bundle.mjs",
+    "build": "npm run verify && astro build && node scripts/check-server-bundle.mjs",
+    "build:unchecked": "astro build && node scripts/check-server-bundle.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",

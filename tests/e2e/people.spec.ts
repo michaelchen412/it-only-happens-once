@@ -21,8 +21,8 @@
 //    network rather than returning `{ error }`.
 //  · THE PHOTO NOT UPLOADING UNTIL SAVE. Backing out of the sheet must leave no
 //    orphan object in the private bucket.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 /** Is anybody in the roster? These specs adapt rather than seed. */
 async function rosterSize(page: Page): Promise<number> {

@@ -27,8 +27,8 @@
 //  · UNLINK BEING GUARDED, and living inside the fold. A <button> inside a
 //    <summary> is activated by the same click that toggles the <details>, so
 //    an unlink control on the summary row would open or close it every time.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 /** Every profile URL on the roster. These specs adapt rather than seed. */
 async function profiles(page: Page): Promise<string[]> {

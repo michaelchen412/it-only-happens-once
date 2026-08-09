@@ -12,7 +12,8 @@
 // nothing wrong. Two of the four failures the Today lab caught were this shape
 // (10-hq.md §11), and the fix for one of them — TRAP 1, `grid-column: 2`
 // conjuring an implicit column — is a one-line "tidy-up" away at all times.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /** Where a zone's top edge is, or null when the zone has nothing to say. */
 async function topOf(page: Page, selector: string): Promise<number | null> {

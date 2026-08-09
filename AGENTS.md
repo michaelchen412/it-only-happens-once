@@ -25,6 +25,14 @@ A pre-commit hook (husky + lint-staged) formats and lints **staged files only**
 ESLint carries no style rule. ⚠ **Green checks are necessary and nowhere near
 sufficient** — see `docs/architecture.md` §9a.
 
+⚠ **`verify` also runs on the deploy, since 2026-08-09.** `npm run build` is
+`verify && astro build && …`, and Vercel's build command is `npm run build` — so
+a failing check **fails the build and the deploy never happens**, leaving the
+last good version serving. Running it before you commit is still the right
+habit: it costs 22s here and a failed production build there. `build:unchecked`
+skips the checks for local iteration and must never become Vercel's build
+command.
+
 ## Development
 
 When starting the dev server, use background mode:

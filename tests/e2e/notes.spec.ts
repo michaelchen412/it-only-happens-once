@@ -10,8 +10,8 @@
 // that the CLIENT behaves given a correct response — never that the action
 // sends one. `appendToPiece` is the one piece of new server code here and its
 // gap is the widest: nothing below proves it actually merges two bodies.
-import { test, expect, type Page } from '@playwright/test';
-import { hideDevToolbar, stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, hideDevToolbar, stubActions } from './fixtures';
 // ⚠ THE SAME FUNCTION THE ROOM USES, not a restatement of it. Triage hands the
 // sheets plain text, because a task's title is an `<input>` and a log entry's
 // body is a `<textarea>` — neither can render `**`. Asserting on the raw

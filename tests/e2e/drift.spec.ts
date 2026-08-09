@@ -14,8 +14,8 @@
 //
 // So the assertions below are as much about what must NOT be on the page — a
 // badge, a count, a red, a fourth row — as about what must.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 const panel = (page: Page) => page.locator('[data-been-a-while]');
 

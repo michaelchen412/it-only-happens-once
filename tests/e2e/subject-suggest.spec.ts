@@ -8,9 +8,9 @@
 // `/_actions/**` is stubbed, so no Anthropic call is paid for and nothing
 // touches the corpus. That leaves the server path unproven by these specs on
 // purpose — it's checked separately, once, against the live action.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 type Returns<T> = T extends (...a: never[]) => Promise<infer R>
   ? R extends { data: infer D }

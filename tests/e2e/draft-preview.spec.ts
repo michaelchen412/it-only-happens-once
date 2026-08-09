@@ -3,8 +3,7 @@
 //
 // The paired spec `draft-preview.anon.spec.ts` asserts the opposite for the
 // same URL. Neither is meaningful alone — read them together.
-import { test, expect } from '@playwright/test';
-import { fixtures } from './fixtures';
+import { test, expect, fixtures } from './fixtures';
 
 test.describe('draft preview — signed in as the admin', () => {
   test('an unpublished essay renders instead of 404ing', async ({ page }) => {

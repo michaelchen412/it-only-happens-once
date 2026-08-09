@@ -12,7 +12,7 @@
 //      context and `evaluate` dies mid-function. Where a later frame is needed,
 //      set the attribute by hand instead — that is what the script does anyway,
 //      and it isolates the CSS from the script.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('the bar and the pending row answer on the frame of the click', async ({ page }) => {
   await page.goto('/admin');

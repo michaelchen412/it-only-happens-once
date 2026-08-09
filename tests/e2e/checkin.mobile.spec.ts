@@ -10,7 +10,7 @@
 // geometry, all of which are real. It cannot measure the iOS keyboard, which is
 // the thing a phone walkthrough still owes on the one field here that summons
 // one.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * Turn a toggle ON, whatever it was.

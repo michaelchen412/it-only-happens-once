@@ -13,9 +13,9 @@
 // write-signals.spec.ts keeps, and it matters more here: this flow needs a
 // published piece that already HAS versions, and making one up is far safer
 // than finding one in Michael's corpus and rewriting it.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 /**
  * The shapes below are canned, which is the one real weakness of stubbing: a

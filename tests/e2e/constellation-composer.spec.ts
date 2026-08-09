@@ -12,8 +12,8 @@
 // are written against INVARIANTS — "the placed count went down by one", "the
 // subject badge equals the union of what remains" — rather than against numbers
 // that would need a seeded corpus to be true.
-import { expect, test, type Page } from '@playwright/test';
-import { fixtures, hideDevToolbar, stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, test, fixtures, hideDevToolbar, stubActions } from './fixtures';
 
 /** Every action the composer can fire, answered locally. Anything not named
  *  here is aborted rather than passed through — that is what keeps the live

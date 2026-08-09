@@ -15,9 +15,9 @@
 // READ-ONLY BY CONSTRUCTION, and unusually so: the entire point of every spec
 // below is that the write does NOT land. Nothing here can reach the database
 // even if a stub were removed, because the stub IS the severed connection.
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { fixtures, hideDevToolbar, stubActions } from './fixtures';
+import { expect, test, fixtures, hideDevToolbar, stubActions } from './fixtures';
 
 type SetMembership = Awaited<ReturnType<typeof actions.constellations.setMembership.orThrow>>;
 type FragmentGet = Awaited<ReturnType<typeof actions.fragments.get.orThrow>>;

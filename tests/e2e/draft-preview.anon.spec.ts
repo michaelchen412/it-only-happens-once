@@ -4,8 +4,7 @@
 // Same URLs as `draft-preview.spec.ts`, opposite expectations. The app-side
 // filter is only half the story: RLS is the real boundary (verified separately
 // against the live database), and this proves the two agree over HTTP.
-import { test, expect } from '@playwright/test';
-import { fixtures } from './fixtures';
+import { test, expect, fixtures } from './fixtures';
 
 test.describe('draft preview — signed out', () => {
   test('an unpublished essay is not there at all', async ({ page }) => {

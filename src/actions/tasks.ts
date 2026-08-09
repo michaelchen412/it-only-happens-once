@@ -63,7 +63,8 @@ interface RecurrenceColumns {
   recur_unit: 'days' | 'weeks' | 'months' | null;
 }
 
-function recurrenceOf(v: Input, dueOn: string | null): RecurrenceColumns {
+/** Exported for `src/tests/actions-pure.test.ts`; nothing else imports it. */
+export function recurrenceOf(v: Input, dueOn: string | null): RecurrenceColumns {
   const cleared = { recur_mode: null, recur_rrule: null, recur_every: null, recur_unit: null } as const;
   if (v.repeat === 'none') return { ...cleared };
 

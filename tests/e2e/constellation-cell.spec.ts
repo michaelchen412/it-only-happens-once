@@ -12,8 +12,8 @@
 // action allowed through is `fragments.get` (the workshop cannot open a piece
 // without it). Everything else is refused AND recorded, which is how claim 3 is
 // tested rather than assumed.
-import { expect, test, type Page } from '@playwright/test';
-import { fixtures, hideDevToolbar, stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, test, fixtures, hideDevToolbar, stubActions } from './fixtures';
 
 /** Let reads through, refuse every write, and remember what was refused. */
 async function readsOnly(page: Page): Promise<() => string[]> {

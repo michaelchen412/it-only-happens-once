@@ -10,9 +10,9 @@
 // publish state and on a working version landing, and inventing those is
 // strictly safer than finding a real published piece in the corpus and typing
 // into it.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 /** Tie each canned response to the action's own return type, so a stub that
  *  drifts from the handler it imitates is a compile error rather than a spec

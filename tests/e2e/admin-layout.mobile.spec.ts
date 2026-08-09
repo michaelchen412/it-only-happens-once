@@ -7,8 +7,7 @@
 // the top layer — because chromium has no such keyboard. A green run here does
 // NOT close plan 08; it just means the walkthrough can spend its attention on
 // the keyboard instead of on things a script could have caught.
-import { test, expect } from '@playwright/test';
-import { blockWrites, fixtures } from './fixtures';
+import { test, expect, blockWrites, fixtures } from './fixtures';
 
 /** Does this element's content run wider than the space it has? */
 async function overflowOf(page: import('@playwright/test').Page, selector: string) {

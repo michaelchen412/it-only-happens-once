@@ -13,8 +13,8 @@
 // sticky header — unclickable, while still reporting `toBeVisible`. Opening
 // downward would have been clipped by `.zone { overflow: hidden }` instead.
 // Anything here that clicks a picker row is that guard.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 /** The first person on the roster, or null when nobody is there yet. */
 async function firstPerson(page: Page): Promise<string | null> {

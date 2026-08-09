@@ -27,8 +27,22 @@ import type { APIRoute } from 'astro';
  * its tables are in this array. Doing it per-piece is what keeps the export
  * permanently right rather than wrong until somebody remembers — and it is
  * mechanical, because the list is already ordered for exactly this reason.
+ *
+ * ⚠ AND THE RULE DID NOT HOLD, WHICH IS WHY IT IS NO LONGER ONLY A COMMENT.
+ * Five tables were missing when the 2026-08-08 audit looked: the three check-in
+ * children (2026-08-06) and both push tables (plan 21). Every export taken
+ * between those commits and 2026-08-09 was quietly incomplete, and nothing said
+ * so — a truncated backup looks exactly like a whole one, which is the same
+ * failure `fetchAll`'s count check exists to prevent one table down.
+ *
+ * `src/tests/export-tables.test.ts` now derives the full table list from the
+ * generated `Database` types and fails `verify` on any table that is neither
+ * here nor in its `EXCLUDED` allowlist. The comment above is the intent; that
+ * test is the enforcement, and the difference between them is five tables.
+ *
+ * Exported for exactly that test. It is not read anywhere else.
  */
-const TABLES = [
+export const TABLES = [
   'subjects',
   'authors',
   'works',
@@ -41,6 +55,18 @@ const TABLES = [
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
   'daily_checkins',
+  // The night in pieces (2026-08-06). All three carry `checkin_id` into
+  // `daily_checkins` above and nothing else, so they follow it directly and an
+  // importer walking top to bottom can never trip one.
+  //
+  // ⚠ THEY ARE NOT DERIVED AND MUST BE HERE. `daily_checkins` alone is a night
+  // whose dreams, wakings and naps are gone — and unlike a view, none of this
+  // is recomputable from the parent row. The efficiency figure the whole
+  // instrument turns on is derived FROM the wakings (lib/hq/checkin.ts), so an
+  // export without them restores to nights that quietly score differently.
+  'checkin_dreams',
+  'checkin_wakings',
+  'checkin_naps',
   'people',
   // `interactions` owns nothing; `interaction_people` carries BOTH foreign keys,
   // so it must come after `people` and after `interactions` — an importer
@@ -70,6 +96,21 @@ const TABLES = [
   // The cursor and the mirror's health. One row.
   'calendar_sync',
   'event_people',
+  // Push (plan 21 · Phases 1–2). Neither owns a foreign key — a subscription is
+  // identified by the endpoint the push service minted, and a claim by a local
+  // date — so their position is free and they sit here, after the rest of HQ
+  // and before the seam below, purely so the list keeps reading in the order it
+  // was built.
+  //
+  // ⚠ THE SUBSCRIPTIONS ARE DEVICE STATE AND RESTORE AS STALE ROWS. That is the
+  // honest reading, and they are exported anyway: an endpoint is the only record
+  // that a given phone was ever reachable, the prune retires a dead one on the
+  // first 404/410, and the app re-asserts its own subscription on every open.
+  // `push_day_claims` is the one that genuinely must survive — it is what makes
+  // "was today's push already sent" answerable, and restoring without it means
+  // the first tick after a restore sends a second time.
+  'push_subscriptions',
+  'push_day_claims',
   // The one seam with the corpus. Both carry a foreign key into the PUBLIC half
   // — `works` and `fragments`, already listed far above — as well as into
   // `people`, so they land last and an importer walking top to bottom is safe.
@@ -122,8 +163,10 @@ export const GET: APIRoute = async ({ locals, url }) => {
   const tables: Record<Table, Record<string, unknown>[]> = {} as Record<Table, Record<string, unknown>[]>;
 
   try {
-    // Sequential, not parallel: nine small queries, and a partial failure part
-    // way through is easier to reason about than nine racing ones.
+    // Sequential, not parallel: small queries, and a partial failure part way
+    // through is easier to reason about than a page of racing ones. (It said
+    // "nine" until 2026-08-09, when it was twenty-eight — the same drift the
+    // test beside this list now catches, in a comment nobody was checking.)
     for (const table of TABLES) tables[table] = await fetchAll(sb, table);
   } catch (e) {
     // Never hand back a partial export dressed as a whole one.

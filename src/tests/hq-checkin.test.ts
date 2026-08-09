@@ -11,8 +11,26 @@
 //  3. THE MEDIAN OF A CLOCK, which is circular. A naive median of bed times
 //     straddling midnight lands in the afternoon and looks like a plausible
 //     suggestion.
+//
+// ⚠ POINT 2 WAS NOT ACTUALLY TESTED HERE UNTIL 2026-08-09 (27 · §4), despite
+// this header having claimed it since the file was written. The function that
+// decides it — `bedDate` — was module-private inside `src/actions/checkin.ts`,
+// so the header described an intention the file could not carry out. The
+// arithmetic moved to `lib/hq/checkin.ts` and the three describes at the foot
+// of this file are what the header was always promising.
 import { describe, expect, it } from 'vitest';
-import { derive, deriveLine, hasAnswers, hm, medianClock, t12, wordFor } from '../lib/hq/checkin';
+import {
+  bedDate,
+  derive,
+  deriveLine,
+  duringNight,
+  hasAnswers,
+  hm,
+  instants,
+  medianClock,
+  t12,
+  wordFor,
+} from '../lib/hq/checkin';
 import { utcToZonedTime, zonedTimeToUtc } from '../lib/hq/time';
 
 const LA = 'America/Los_Angeles';
@@ -379,5 +397,152 @@ describe('hasAnswers', () => {
     // `'{}'` is a tap and `null` is a hole. Reading an empty answer as "took
     // nothing" would invent the control group the column depends on.
     expect(hasAnswers({ ...(empty as object), sleep_aids: [] } as never)).toBe(true);
+  });
+});
+
+// ── which night a wall clock belongs to (27 · §4) ──────────────────────────
+//
+// The three functions the check-in writes its timestamps with. Every case below
+// is a night that actually happens, and each one is wrong in a way that reads as
+// plausible on screen: an off-by-one day here does not look like a bug, it looks
+// like a seventeen-hour lie-in or a nap at the wrong end of the day.
+
+describe('bedDate', () => {
+  it('dates an evening bedtime to the night BEFORE the morning being logged', () => {
+    // The ordinary night, and the whole reason this function exists. The row is
+    // about waking up on the 9th; 23:35 belongs to the 8th.
+    expect(bedDate('2026-08-09', '23:35', '06:25')).toBe('2026-08-08');
+  });
+
+  it('keeps an after-midnight bedtime on the log date itself', () => {
+    // Asleep at 01:30, up at 08:00 — one morning, no wrap. Shifting this back a
+    // day would put the night before the evening it started.
+    expect(bedDate('2026-08-09', '01:30', '08:00')).toBe('2026-08-09');
+  });
+
+  it('⚠ uses the WAKE time as the pivot, not a fixed hour', () => {
+    // The case a "before noon means today" shortcut gets wrong. A 14:00 bedtime
+    // with an 18:00 wake is a nap-shaped night that never crossed midnight, and
+    // it must stay on the log date; the same 14:00 against an 09:00 wake did.
+    expect(bedDate('2026-08-09', '14:00', '18:00')).toBe('2026-08-09');
+    expect(bedDate('2026-08-09', '14:00', '09:00')).toBe('2026-08-08');
+  });
+
+  it('treats equal times as the same day rather than wrapping', () => {
+    // `>` and not `>=`: a mid-edit row with the same value in both pickers must
+    // not silently jump a day underneath the person typing.
+    expect(bedDate('2026-08-09', '07:00', '07:00')).toBe('2026-08-09');
+  });
+
+  it('falls back to noon when there is no wake time yet', () => {
+    // A half-filled check-in is a check-in. With nothing to compare against,
+    // an evening bedtime is the night before and a morning one is not — dating
+    // 23:35 to the evening OF the logged day would place it in the future.
+    expect(bedDate('2026-08-09', '23:35', null)).toBe('2026-08-08');
+    expect(bedDate('2026-08-09', '01:30', undefined)).toBe('2026-08-09');
+    expect(bedDate('2026-08-09', '12:01', null)).toBe('2026-08-08');
+    expect(bedDate('2026-08-09', '12:00', null)).toBe('2026-08-09');
+  });
+
+  it('crosses a month boundary, and a year one', () => {
+    expect(bedDate('2026-09-01', '23:35', '06:25')).toBe('2026-08-31');
+    expect(bedDate('2026-01-01', '23:35', '06:25')).toBe('2025-12-31');
+    // And a leap day, which is the one a naive `-1` on the date string breaks.
+    expect(bedDate('2028-03-01', '23:35', '06:25')).toBe('2028-02-29');
+  });
+});
+
+describe('duringNight', () => {
+  it('puts a time after bedtime on bedtime’s own date', () => {
+    // 23:50, from a 23:30 bedtime on the 8th — still the 8th.
+    expect(duringNight('2026-08-08', '23:30', '23:50', LA)).toBe('2026-08-09T06:50:00.000Z');
+  });
+
+  it('puts a time past midnight on the FOLLOWING date', () => {
+    // 02:30 from that same 23:30 bedtime is the 9th, not the 8th. This is the
+    // waking these columns exist to record, and dating it to the 8th would put
+    // it 21 hours before the bedtime it happened after.
+    expect(duringNight('2026-08-08', '23:30', '02:30', LA)).toBe('2026-08-09T09:30:00.000Z');
+  });
+
+  it('does not wrap when the night began after midnight', () => {
+    // From a 00:15 bedtime, 05:00 is still the same date — the comparison is
+    // against the bedtime, never against midnight.
+    expect(duringNight('2026-08-09', '00:15', '05:00', LA)).toBe('2026-08-09T12:00:00.000Z');
+  });
+
+  it('is null without a night to sit inside', () => {
+    // A time inside a night with no beginning is not a fact about anything, and
+    // the action filters these out rather than writing an empty row.
+    expect(duringNight(null, '23:30', '02:30', LA)).toBeNull();
+    expect(duringNight('2026-08-08', null, '02:30', LA)).toBeNull();
+    expect(duringNight('2026-08-08', undefined, '02:30', LA)).toBeNull();
+  });
+
+  it('resolves in the configured zone, on the date it actually happened', () => {
+    // LA is UTC-8 in January and UTC-7 in August. A single stored offset would
+    // put every winter waking an hour out, silently, for months.
+    expect(duringNight('2026-01-15', '23:30', '02:30', LA)).toBe('2026-01-16T10:30:00.000Z');
+  });
+});
+
+describe('instants', () => {
+  it('resolves a whole ordinary night', () => {
+    const t = instants('2026-08-09', '23:35', '06:25', '06:40', null, LA);
+    // Bed on the 8th; everything else on the morning of the 9th.
+    expect(t.bed_at).toBe('2026-08-09T06:35:00.000Z');
+    expect(t.woke_at).toBe('2026-08-09T13:25:00.000Z');
+    expect(t.got_up_at).toBe('2026-08-09T13:40:00.000Z');
+    expect(t.asleep_at).toBeNull();
+  });
+
+  it('⚠ pins waking and getting up to the LOG DATE, never to bedtime’s', () => {
+    // The asymmetry worth stating: `bed_at` can move a day, `woke_at` and
+    // `got_up_at` cannot. You get out of bed on the morning you woke up on, and
+    // a pair straddling midnight is not representable in this model at all.
+    const t = instants('2026-08-09', '23:35', '00:30', '00:45', null, LA);
+    expect(t.bed_at).toBe('2026-08-09T06:35:00.000Z'); // the 8th, local
+    expect(t.woke_at).toBe('2026-08-09T07:30:00.000Z'); // the 9th, local
+    expect(t.got_up_at).toBe('2026-08-09T07:45:00.000Z');
+  });
+
+  it('anchors “asleep at” inside the night, wrapping past midnight', () => {
+    // The refinement `over_60` asks for. From a 23:35 bedtime, 00:50 is the
+    // next date — an hour and a quarter of lying awake, not a 23-hour one.
+    const t = instants('2026-08-09', '23:35', '06:25', null, '00:50', LA);
+    expect(t.asleep_at).toBe('2026-08-09T07:50:00.000Z');
+  });
+
+  it('leaves every unanswered field null, and never invents a bed date', () => {
+    // Half-filled is legal. With no bedtime there is no night to hang anything
+    // off, so `asleep_at` is null even though a time was given.
+    const t = instants('2026-08-09', null, '06:25', null, '00:50', LA);
+    expect(t.bed_at).toBeNull();
+    expect(t.asleep_at).toBeNull();
+    expect(t.got_up_at).toBeNull();
+    expect(t.woke_at).toBe('2026-08-09T13:25:00.000Z');
+
+    expect(instants('2026-08-09', null, null, null, null, LA)).toEqual({
+      bed_at: null,
+      woke_at: null,
+      got_up_at: null,
+      asleep_at: null,
+    });
+  });
+
+  it('survives the night the clocks go back', () => {
+    // 1 November 2026 in LA: 01:00–02:00 happens twice. A bedtime of 23:35 on
+    // the 31st and a wake of 06:25 must still resolve to one instant each,
+    // inside the day, rather than to something an hour outside it.
+    const t = instants('2026-11-01', '23:35', '06:25', null, null, LA);
+    expect(t.bed_at).toBe('2026-11-01T06:35:00.000Z'); // 31 Oct 23:35 PDT
+    expect(t.woke_at).toBe('2026-11-01T14:25:00.000Z'); // 1 Nov 06:25 PST
+    // ⚠ AND THE EXTRA HOUR IS REALLY IN THERE. 23:35 → 06:25 is 6h50m on the
+    // clock, but 7h50m actually elapsed, because 01:00–02:00 happened twice.
+    // Storing full instants is what makes that recoverable; two wall-clock
+    // strings could never express it, and the night would score an hour short.
+    const clockHours = 6 + 50 / 60;
+    const realHours = (Date.parse(t.woke_at!) - Date.parse(t.bed_at!)) / 3_600_000;
+    expect(realHours).toBeCloseTo(clockHours + 1, 10);
   });
 });

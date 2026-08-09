@@ -13,8 +13,8 @@
 // what the dialog says, which button it offers, what it sends, and in what
 // order — and they cannot prove that a notification arrives. That was proven
 // once by hand on the real phone (21 · Phase 1) and is Phase 5's job again.
-import { expect, test, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, test, stubActions } from './fixtures';
 
 /** Put a WebKit-shaped `window.pushManager` in front of chromium. */
 async function stubPushApi(

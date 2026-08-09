@@ -10,7 +10,7 @@
 // sidebar's numeral is off screen, AND the burger's is on it. A future change
 // that opens the drawer by default, or drops the burger badge as duplication,
 // breaks one of them and says why.
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 /** Put something in the count without writing to the live database — the same
  *  event the tick and the check-in dispatch. See `attention.spec.ts`. */

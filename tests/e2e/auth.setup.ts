@@ -16,28 +16,13 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import fs from 'node:fs';
 import path from 'node:path';
+// `loadEnv` moved to ./db.ts on 2026-08-09, when `library.spec.ts` became its
+// second reader. Same function, one copy.
+import { loadEnv } from './db';
 
 const AUTH_DIR = path.join('tests', 'e2e', '.auth');
 const STATE_FILE = path.join(AUTH_DIR, 'admin.json');
 const FIXTURES_FILE = path.join(AUTH_DIR, 'fixtures.json');
-
-/** Playwright doesn't go through Vite, so .env.local isn't loaded for us. */
-function loadEnv(): Record<string, string> {
-  const out: Record<string, string> = { ...process.env } as Record<string, string>;
-  for (const file of ['.env', '.env.local']) {
-    if (!fs.existsSync(file)) continue;
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-      const i = trimmed.indexOf('=');
-      out[trimmed.slice(0, i).trim()] = trimmed
-        .slice(i + 1)
-        .trim()
-        .replace(/^["']|["']$/g, '');
-    }
-  }
-  return out;
-}
 
 setup('mint an admin session and find fixtures', async () => {
   const env = loadEnv();

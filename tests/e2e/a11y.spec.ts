@@ -13,7 +13,8 @@
 // still owes a walkthrough on real hardware.
 //
 // Read-only by construction: every route here is a GET, and nothing is clicked.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /** Every room in the Observatory. The point is that a new room added without
  *  its own spec is still covered by this one. */

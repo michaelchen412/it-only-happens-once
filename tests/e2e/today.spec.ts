@@ -15,9 +15,11 @@
 //     and silently lost every style rule it had (10-hq.md §10h, trap 3).
 //
 // Read-only by construction, like the rest of the harness: this drives
-// navigation and reads the DOM. Nothing here can write a row.
-import { test, expect } from '@playwright/test';
-import { fixtures } from './fixtures';
+// navigation and reads the DOM. Nothing here can write a row — and since
+// 2026-08-09 that is enforced rather than merely intended (27 · §3). The one
+// deep-link test names `fragments.get` as an allowed READ; everything else,
+// including every write, is still refused.
+import { test, expect, allowActions, fixtures } from './fixtures';
 
 /** `YYYY-MM-DD` in a given IANA zone — the spec's own `localToday`. */
 function localDate(tz: string, at = new Date()): string {
@@ -118,6 +120,14 @@ test.describe('the deep links survived the move', () => {
     const href = await page.getByRole('link', { name: 'Edit' }).getAttribute('href');
     expect(href, 'the blog preview must point at the manager, not the old root').toMatch(/^\/admin\/fragments#edit=/);
     const id = href!.split('#edit=')[1];
+
+    // ⚠ THE SHEET HAS TO REACH THE SERVER FOR THIS ASSERTION TO MEAN ANYTHING.
+    // Opening `#edit=<id>` loads the piece through `fragments.get`, and the
+    // failure path in `writing-sheet.ts` opens an inert error shell with the
+    // hash CLEARED — so with the call refused, the URL below is `/admin/fragments`
+    // and the test reads as "the bounce dropped the id" when the bounce was fine.
+    // One named READ, not a lifted guard: this spec still cannot write.
+    await allowActions(page, ['fragments.get']);
 
     // …and the same link still works if it arrives at the OLD address.
     await page.goto(`/admin#edit=${id}`);

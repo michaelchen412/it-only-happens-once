@@ -79,7 +79,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
  * and `people_birthday_exists` exactly. The database still holds them — this
  * layer is a courtesy, not the guarantee, and the migration says so.
  */
-function assertBirthday(month: number | null, day: number | null, year: number | null): void {
+export function assertBirthday(month: number | null, day: number | null, year: number | null): void {
   if ((month == null) !== (day == null)) {
     throw fail('A birthday needs both a month and a day.', 'BAD_REQUEST');
   }

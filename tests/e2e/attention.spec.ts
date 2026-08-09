@@ -12,7 +12,7 @@
 // about the room, it is about TODAY and not about the date the page is looking
 // at, and at zero it says nothing at all. All three hold whatever the count is,
 // which is exactly why they are worth asserting here.
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 /** `Today — Observatory`, optionally prefixed `(2) `. Nothing else is legal. */
 const TITLE = /^(\(\d+\) )?.+ — Observatory$/;

@@ -18,7 +18,8 @@
 // ⚠ This project is CHROMIUM at 390px, not mobile Safari. It catches layout and
 // overflow. It cannot catch the iOS keyboard/viewport behaviour plan 08 is
 // about — a phone walkthrough is still owed.
-import { test, expect, type Locator } from '@playwright/test';
+import type { Locator } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * Every descendant's right edge, against the container's CONTENT edge.

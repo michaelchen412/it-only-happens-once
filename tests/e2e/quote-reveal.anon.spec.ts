@@ -10,7 +10,8 @@
 //
 // ⚠ Read-only by construction. Nothing here writes, and the reveal is a GET
 // surface, so there is no action to stub — unlike the admin specs.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const TRIGGER = '.qr__trigger';
 const POP = '.qr__pop';

@@ -15,8 +15,7 @@
 // The write path was exercised separately, by hand, against the live action on
 // 2026-08-02: the timestamps, the backfill window, skip/unskip, and the dream
 // constraint. Every probe row was deleted and the table verified empty after.
-import { test, expect } from '@playwright/test';
-import { stubActions } from './fixtures';
+import { test, expect, stubActions } from './fixtures';
 
 /** `YYYY-MM-DD` in a zone — the spec's own clock. */
 const dateIn = (tz: string, offsetDays = 0) =>

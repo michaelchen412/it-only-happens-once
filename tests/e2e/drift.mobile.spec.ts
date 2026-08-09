@@ -9,7 +9,8 @@
 // the sharpest tap-target problem in HQ: they sit side by side and mean
 // OPPOSITE things, so a mis-tap either logs contact that never happened or
 // silences somebody for a year, and nothing on screen says which occurred.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const panel = (page: Page) => page.locator('[data-been-a-while]');
 

@@ -12,9 +12,9 @@
 // sends one. `constellations.save` creating from a name alone is already true
 // in production (it is what /admin/constellations' own one-field form calls),
 // which is exactly why Piece 2 needed no server code.
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { fixtures, hideDevToolbar, stubActions } from './fixtures';
+import { expect, test, fixtures, hideDevToolbar, stubActions } from './fixtures';
 
 type Save = Awaited<ReturnType<typeof actions.constellations.save.orThrow>>;
 

@@ -16,7 +16,8 @@
 //
 // ⚠ Chromium at 390px, not mobile Safari: this catches layout and overflow, not
 // the iOS keyboard.
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /** Every descendant's right edge against the container's CONTENT edge. */
 async function overflowingChildren(container: Locator): Promise<string[]> {

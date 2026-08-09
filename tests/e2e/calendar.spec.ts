@@ -10,8 +10,8 @@
 // read-only, or he will try to drag one and be confused about why the change
 // vanished." That is a claim about computed styles, which is exactly what a
 // screenshot review passes and a spec can check.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 const calendar = (page: Page, query = '') => page.goto(`/admin/agenda${query}`);
 const visibleText = async (page: Page) => (await page.locator('body').innerText()).replace(/\s+/g, ' ');

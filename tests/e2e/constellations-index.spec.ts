@@ -10,7 +10,8 @@
 // two gestures both persist, so a spec that let one through would recolour or
 // reorder Michael's real sky. `constellations.save` and `.reorder` are answered
 // here and never reach the database.
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const row = (page: Page, n: number) => page.locator('#cl-list li[data-id]').nth(n);
 const pop = (page: Page) => page.locator('#cl-colors');

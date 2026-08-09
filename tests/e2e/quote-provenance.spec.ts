@@ -18,8 +18,8 @@
 // ⚠ These specs read the vocabulary the PAGE rendered rather than hardcoding
 // "The Bible", so they assert the RULE — every authorless work stays offerable,
 // a work with no author leads with its locator — rather than the datum.
-import { test, expect, type Page } from '@playwright/test';
-import { blockWrites, stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, blockWrites, stubActions } from './fixtures';
 
 const AUTHOR = '#quote-author';
 const WORK = '#quote-work';

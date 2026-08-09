@@ -7,7 +7,7 @@
 // This project runs `anon` as its own Playwright project with deliberately no
 // storageState, so these assertions are made by a genuinely signed-out browser
 // rather than by a session someone remembered to clear.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('personal export — signed out', () => {
   test('is not served to the public', async ({ request }) => {

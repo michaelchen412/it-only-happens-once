@@ -22,7 +22,11 @@
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
 import { fail, requireAdmin, type DB } from './_shared';
-import { BACKFILL_DAYS, OPEN_ENDED_LATENCY, TIMEABLE_WAKINGS } from '../lib/hq/checkin';
+// ⚠ `bedDate`, `duringNight` and `instants` live in `lib/hq/checkin.ts` since
+// 2026-08-09 (27 · §4). They were private to this file and therefore had no
+// tests, while being the exact cross-midnight arithmetic the check-in is most
+// likely to be quietly wrong about — see `hq-checkin.test.ts`.
+import { BACKFILL_DAYS, OPEN_ENDED_LATENCY, TIMEABLE_WAKINGS, bedDate, duringNight, instants } from '../lib/hq/checkin';
 import { homeTimezone, localToday, parseYmd, shiftYmd, zonedTimeToUtc, type Ymd } from '../lib/hq/time';
 
 /** A 1–5 mark, or explicitly cleared. */
@@ -105,66 +109,6 @@ function assertWritable(logDate: Ymd, today: Ymd): void {
   if (logDate < earliest) {
     throw fail(`Check-ins can only be filled in for the last ${BACKFILL_DAYS} days.`, 'BAD_REQUEST');
   }
-}
-
-/**
- * The two wall-clock times as real instants.
- *
- * **Which DAY was bedtime?** `log_date` is the date you WOKE UP on, so a bed
- * time later in the clock than the wake time belongs to the day before — 23:35
- * → 06:25 is last night, not a seventeen-hour lie-in. A bed time earlier than
- * the wake time is the same morning (asleep at 1:30, up at 8). That single
- * comparison is the whole cross-midnight rule, and storing full timestamps is
- * what stops every later reader having to redo it.
- */
-function bedDate(logDate: Ymd, bed: string, woke: string | null | undefined): Ymd {
-  // With a wake time, the comparison IS the rule.
-  if (woke) return bed > woke ? shiftYmd(logDate, -1) : logDate;
-  // Without one — a half-filled check-in, which is allowed — fall back to the
-  // usual case: an evening bedtime belongs to the night before. Dating a 23:35
-  // bedtime to the evening OF the day being logged would place it in the
-  // future, on a row about a morning that has already happened.
-  return bed > '12:00' ? shiftYmd(logDate, -1) : logDate;
-}
-
-/**
- * A wall-clock time that happened somewhere inside one night, as an instant.
- *
- * Everything after getting into bed belongs to bedtime's date — unless the
- * clock has come round past midnight in between, which is exactly the nights
- * these fields exist for. That is the same single comparison `bedDate` makes,
- * applied one step later: from a 23:30 bedtime, 02:30 is the following date and
- * 23:50 is the same one; from a 00:15 bedtime, 05:00 is still the same one.
- *
- * Needs a bedtime, because a time inside a night with no beginning is not a
- * fact about anything.
- */
-function duringNight(bedDay: Ymd | null, bed: string | null | undefined, at: string, tz: string): string | null {
-  if (!bedDay || !bed) return null;
-  return zonedTimeToUtc(at >= bed ? bedDay : shiftYmd(bedDay, 1), at, tz).toISOString();
-}
-
-function instants(
-  logDate: Ymd,
-  bed: string | null | undefined,
-  woke: string | null | undefined,
-  gotUp: string | null | undefined,
-  asleepAt: string | null | undefined,
-  tz: string,
-) {
-  const bedDay = bed ? bedDate(logDate, bed, woke) : null;
-  return {
-    bed_at: bed && bedDay ? zonedTimeToUtc(bedDay, bed, tz).toISOString() : null,
-    woke_at: woke ? zonedTimeToUtc(logDate, woke, tz).toISOString() : null,
-
-    // You get out of bed on the morning you woke up on. There is no comparison
-    // to make here and no wrinkle to handle: a wake-and-rise pair straddling
-    // midnight is not representable in this model at all, because `woke_at` is
-    // already pinned to `log_date` by the same reasoning.
-    got_up_at: gotUp ? zonedTimeToUtc(logDate, gotUp, tz).toISOString() : null,
-
-    asleep_at: asleepAt ? duringNight(bedDay, bed, asleepAt, tz) : null,
-  };
 }
 
 async function upsert(sb: DB, values: Record<string, unknown>) {

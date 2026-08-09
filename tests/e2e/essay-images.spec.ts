@@ -9,8 +9,8 @@
 // `**/storage/v1/**` — so no file is written to the live `site` bucket and no
 // row is written to the corpus. The upload REQUEST is still made and inspected,
 // which is the part worth checking: it carries the path convention.
-import { test, expect, type Page } from '@playwright/test';
-import { stubActions } from './fixtures';
+import type { Page } from '@playwright/test';
+import { test, expect, stubActions } from './fixtures';
 
 /** A real 1×1 PNG. Small enough that the downscale path returns it untouched. */
 const PNG = Buffer.from(

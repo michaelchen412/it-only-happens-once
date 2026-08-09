@@ -9,9 +9,8 @@
 // is a red typecheck rather than a spec quietly imitating something that no
 // longer exists. The response CONTENT is verified separately, against live, in
 // the paired-media probe.
-import { expect, test } from '@playwright/test';
 import type { actions } from 'astro:actions';
-import { fixtures, stubActions } from './fixtures';
+import { expect, test, fixtures, stubActions } from './fixtures';
 
 type FragmentGet = Awaited<ReturnType<typeof actions.fragments.get.orThrow>>;
 type SongsSearch = Awaited<ReturnType<typeof actions.songs.search.orThrow>>;

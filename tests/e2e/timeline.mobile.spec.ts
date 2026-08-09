@@ -11,7 +11,8 @@
 // ⚠ Chromium at 390px, not mobile Safari. It catches layout and reachability.
 // It cannot catch iOS keyboard/viewport behaviour — a phone walkthrough is
 // still owed.
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 async function openProfile(page: Page) {
   await page.goto('/admin/people');
