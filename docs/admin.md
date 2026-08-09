@@ -29,7 +29,7 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
 | **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one box — a TipTap editor with the writing sheet's toolbar under it — that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
 | **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil opens the room's one editor **in that card**, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
-| **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5c). Visible only when a reading filled the sheet in. |
+| **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5d). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
@@ -68,6 +68,23 @@ One behaviour for one component, on both surfaces: a flag to make the manager an
 - **The filter field renders always and hides below the threshold**, so a sky that grows past eight *mid-session* gets its filter without a reload.
 
 Adding from this side **appends** to the end of that suite — composed order stays the constellation's business (recompose in the composer).
+
+### 2c. The building says what it is waiting for
+
+*Plan 20 (local working notes), shipped 2026-08-06. Raised by Michael from real use: "if we have unfinished tasks or check-ins for the day, it's not actually apparent from the left side sidebar." Today knew; every other room was deaf, so navigating away stopped the system telling you anything at all.*
+
+**One number, four places, one source.** [`src/lib/hq/attention.ts`](../src/lib/hq/attention.ts) computes it once per request in middleware — the sidebar's Today pill, the burger pill on mobile, the tab title's `(2) ` prefix, and the **installed app's icon badge** all read that one answer. Five surfaces inventing their own would disagree, and the one that disagreed would be the one on screen at 7am.
+
+**It counts exactly two things: the unanswered check-in, and tasks due *today* that are undone.** Nothing else, and the exclusions are the section:
+
+> ⚠ **[ADR 0013](adr/0013-absence-never-accumulates.md) ends with a standing instruction — *"any feature that wants to show a count of things not done must be checked against this ADR first"* — and this is that check, run in conversation on 2026-08-04.** The outcome is not "we changed our minds". The ADR was defending against one specific mechanism and it named it: **a number that grows while you are away**, landing hardest on the morning you can least absorb it. That mechanism is already impossible here, because recurrences are rules and never materialise rows, so the count can never exceed the number of task *rules* you have — two weeks away produces the same number as two days.
+>
+> So the line moves from *never count* to: **a room may signal what is addressed to you, bounded, resolvable today, and self-resetting. It may never signal accumulation.** Past due fails the fourth test and is therefore the one input excluded on purpose; drift and the writing signal fail the first two. **The single most likely regression in this feature is a future session folding past due in "for consistency"** — one line of code, and it silently restores the guilt engine the ADR exists to prevent.
+
+- **`0` never renders.** No pill, no prefix, no badge — the reward is the absence.
+- **Two facts the plan got wrong and both would have shipped as plausible.** It specified counting `due_on`, but ticking a task advances that column immediately, so the raw value says *tomorrow* about a row still on screen — the honest occurrence is rebuilt from `task_events.for_due_on`, which is what the rooms already render. And it settled the check-in with `hasAnswers()` alone: a **skipped** row has every field null, so the badge would have gone on burning after a deliberate skip. `checkinSettled` composes the two.
+- **The icon badge is honest only while the app runs.** `navigator.setAppBadge` executes in the page, so an installed app keeps the numeral live while it is open and corrects it every time it is opened. ⚠ **It is cleared on `pagehide`, deliberately.** Leaving it standing is wrong every single night — at 00:01 the true count is 1 and the icon still shows yesterday's — and **being reliably absent beats being confidently wrong**. The cost is a blink on every admin navigation (there is no ClientRouter; each room is a real page load), taken knowingly.
+- **The badge does not follow the date bar.** It is a statement about *now*, like every zone on Today except the check-in (§16), so `?date=` does not move it.
 
 ### 2a. Nothing in the workshop navigates to stay fresh
 
@@ -294,7 +311,7 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   are not four questions — they are one question, *what kind of thing is this?*,
   asked once. The menu is a top-layer popover (trap 7) positioned against the
   card that opened it.
-  - **Add to the Agenda…** reads the sentence first (§5c) and opens whichever
+  - **Add to the Agenda…** reads the sentence first (§5d) and opens whichever
     sheet the reading calls for — a task or an event — already filled in.
     Saving creates the row and consumes the dump.
   - **Log an entry…** opens a sheet that asks **who** first — the one field a
@@ -390,6 +407,96 @@ both uploaders share one set of rules.
 
 **Not backed up.** The nightly dump captures `storage.objects` metadata, not the
 bytes — see [backups.md](backups.md).
+
+## 5d. Reading a task out of a sentence
+
+*The parser, [plan 14](plans/archive/14-capture.md) §6. Claude Haiku 4.5, structured
+output, Zod-validated — the same pattern as ✦ Suggest with AI
+([ADR 0007](adr/0007-ai-subject-tagging.md)), and the same rule: the model
+proposes, the person disposes.*
+
+**Add to the Agenda…** on a brain dump sends the sentence to the model and opens
+the sheet it belongs in, filled. *"I have an appointment with the dentist every
+Thursday at 4:00 p.m. Please warn me one day ahead. This is a very important
+task! And leave a note that I should bring a gift every single time."* becomes a
+task titled *Appointment with the dentist*, due the coming Thursday at 4:00 PM,
+repeating weekly, warning one day ahead, at high priority, with the gift as its
+notes.
+
+**Why a model rather than a date library.** `chrono` handles *"tomorrow at
+4:30pm"* and falls over on *"warn me three days in advance"* and *"every third
+Monday"* — those are not date parsing, they are this system's own concepts. And
+separating a task's **title** from its **scheduling words** is exactly what a
+language model is good at and a regex is not.
+
+### What makes it safe
+
+- **The output schema is the system's own enums.** `recurrence` is
+  `z.enum(PRESETS)`, so the model **cannot** propose a schedule the database has
+  no way to store. Asked for *"water the plants every three weeks"* it returns no
+  recurrence and says *"can't schedule that: every three weeks"* — the failure
+  where a parser invents a rule and something downstream rounds it to the
+  nearest one is closed by construction, not by review.
+- **Every filled field carries the words it was read from.** *"2026-08-06 — read
+  from 'every Thursday'"* can be judged at a glance; a date on its own cannot be
+  judged at all, and a silently misparsed date is worse than no parse.
+- **Today and the timezone are passed in**, from `localToday()` over the
+  `settings` table — never the browser, never the server's clock. *"4:30pm
+  tomorrow"* is meaningless without both.
+- **It never makes triage worse by existing.** No key, a dead model, a slow
+  network: the sheet opens anyway with the first line as the title and the rest
+  as the notes, which is exactly what shipped before the parser. No error is
+  shown, because nothing is wrong.
+- **Three contradictions are settled in code, not asked of the model**, because
+  each one is arithmetic and each was seen to fail live: a weekly rule whose
+  weekday disagrees with its date; an *event* carrying a repeat or a lead, which
+  `events` has no column for; and a repeat with no first date to anchor it.
+
+### Which row it picks, and why that is not the router §4.21 banned
+
+**[10-hq §4.21](plans/archive/10-hq.md) forbids a model deciding what a captured thought
+IS**, and the recorded reason is that a router's failure is *silent* — a thought
+filed as the wrong kind disappears into the wrong room. **That ban stands** for
+task vs log entry vs piece.
+
+Event vs task is the one pair it does not reach, for a structural reason:
+**events and tasks share every surface.** Both render on the calendar grid, both
+appear on Today. A wrong guess is the wrong *shape* somewhere you are already
+looking, never a disappearance. And most of the call is capability rather than
+taste — a repeat or a lead **cannot** be an event.
+
+So the model picks, and the **kind bar** at the top of the sheet says which and
+why, with the other shape one tap away. The switch carries the whole reading
+across rather than asking again. **The reason on that bar is derived from the
+fields, never written by the model**: asked to explain itself, it justified a
+correct answer with a repeat the sentence never mentioned and its own fields did
+not contain.
+
+**The line it does not remove:** the same appointment phrased two ways can land
+in two different rows — *"dentist appointment Thursday at 4pm"* is an event,
+*"dentist every Thursday, remind me"* is a task. Both are right, and the second
+is the only one the database could hold. The decision does not disappear; it
+moves out of your head and into the sentence, where the bar can show you what it
+did with it.
+
+## 5e. Proofread — the mark on the word
+
+*Plan 22 (local working notes), shipped 2026-08-07. Claude Haiku 4.5, structured output, Zod-validated — the third tenant of `ANTHROPIC_API_KEY` and the same rule as its two siblings ([ADR 0007](adr/0007-ai-subject-tagging.md)): the model proposes, the person disposes.*
+
+**Press *Proofread* in the writing sheet's ⋯ menu; three spans pick up a mark; click one for `thier → their` with Fix it / Ignore.** It is deliberately **an explicit press and never automatic** — it is a paid call, and the composer's whole contract is instruments that do not act on their own.
+
+**What it is allowed to say.** Typos, a missing or duplicated word, subject–verb or number disagreement, and punctuation that is plainly wrong. **Nothing stylistic** — not word choice, not sentence length, not comma preference, not fragments, not starting a sentence with *And*. That constraint is **structural rather than a plea in the prompt**: every fix must carry a `kind` from a five-value enum, so an observation about tone has nowhere to go. Returning nothing is a normal and correct answer.
+
+- **The marks are DECORATIONS, never document steps**, and the first reason alone settles it: a draft autosaves 1.2s after you stop typing, so a mark that was a document change would dirty the piece and arm that timer — three marks, three saves, for a highlight. It also keeps `getMarkdown()` clean and leaves the undo history alone, which is what makes **⌘Z the undo for Fix it**. They map through transactions, so a mark stays glued to its word while you type above it — and **edit the text under one and it drops itself**, because it is pointing at words that no longer exist.
+- **Tinted with the accent, not a red underline.** Chrome's own squiggle is already on and already under half these words.
+- **The title is proofread too and reports in the chip**, not in the document: an `<input>` holds no decoration. That is also why the action takes **two fields rather than one string** — concatenating them would throw away which field a fix belongs to at the one moment it is free to keep. Its fix opens the same popover, anchored to the field, and **stays open afterwards**: assigning `.value` does not enter the browser's undo stack, so leaving `thier → their` on screen is the only record of what changed.
+- **It is a ⋯ menu item, not a fifth button in the command row** — that row is measured territory (§5), and adding one there was the change that would have pushed it back to scrolling. ⚠ **Its presence makes ⋯ permanent**: `syncMoreMenu` hides the whole menu when nothing behind it is visible, and on a plain draft that was all four items — so the trigger would have been unreachable in exactly the state you press it in.
+- **Opt-in per editor** (a `proofread` option, the same shape as `images`). `mountRichEditor` has five callers, and the capture ✚, the interest notes and the three About-builder editors get none of this.
+- **Over 20,000 characters it says so rather than slicing.** A proofread that quietly skipped the last third is precisely the failure this feature exists to prevent.
+
+⚠ **The truncation guard is the load-bearing bit, and it is the reason this is not a copy of `suggest-subjects.ts`.** A response cut off by `max_tokens` **does not throw** — `parsed_output` comes back null, which that file absorbs with a `?? {…}`. Copy that shape here and a long piece reports *"nothing caught"*: a clean bill of health on the essay most likely to hold a typo. So `proofread.ts` checks `stop_reason` *and* a null `parsed_output` and throws `IncompleteProofread`, which the action reports in its own words — **"it came back half-finished" and "it never answered" are both zero fixes and mean opposite things.**
+
+⚠ **The two AI calls were deliberately not merged**, though they read the same essay. The saving was about ten cents across the whole corpus, and sharing would have cost the feature: `suggestSubjects` sends `getMarkdown()`, so every `before` would come back carrying `**` that does not exist as characters in the ProseMirror document, and **every position would be wrong**. This call sends plain text, so the model and the document read one alphabet — and the text sent is built by the same walk that later locates the fix, which is what keeps them agreeing. The locator renders every inline leaf as exactly one character, because `textContent` skips leaves while positions advance past them: one hard break above the typo would otherwise shift every mark after it.
 
 ## 6. Songs — what auto-fills, what doesn't
 
@@ -487,14 +594,26 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 ([`public/workshop.webmanifest`](../public/workshop.webmanifest)), so readers are
 never offered an "install" they'd have no use for.
 
-**Why it exists — and what changed.** It was built to earn a specific
+**Why it exists — and it has changed twice.** It was built to earn a specific
 guarantee: Safari deletes script-written storage after **7 days without a
 visit**, and home-screen web apps are exempt, so installing was what kept the
 writing sheet's offline outbox alive between sessions. **That outbox was removed
-the following day** ([ADR 0010](adr/0010-online-first-writing.md)) — there is no
-local storage left to protect, and the install is now simply a convenience: its
-own icon, its own window, opening straight into Today instead of the
-homepage. Kept because it costs nothing and reads better than a browser tab.
+the following day** ([ADR 0010](adr/0010-online-first-writing.md)), and for two
+months the install was simply a convenience — its own icon, its own window,
+opening straight into Today.
+
+⚠ **It stopped being a convenience on 2026-08-06, and this section said
+otherwise until 2026-08-09.** Two capabilities now *depend* on the installed
+app, and neither has any browser-tab equivalent on iOS:
+
+- **The number on the icon** (§2c). `navigator.setAppBadge` paints the Home
+  Screen icon and the macOS dock; in a tab there is no icon to paint.
+- **Web push** (§9a). iOS grants `Notification.requestPermission()` **only** to
+  a web app added to the Home Screen — in Safari proper the button cannot work,
+  which is why the notifications dialog says so rather than offering one.
+
+So the honest line is no longer "kept because it costs nothing": **the install
+is the delivery mechanism for everything HQ says when the app is closed.**
 
 **How, on iOS:** open `/admin` in **Safari** (not another browser) → Share →
 **Add to Home Screen** → leave **"Open as Web App"** switched **on**. Since
@@ -508,10 +627,13 @@ The manifest's `start_url` says `/admin` for the same reason; `scope` is `/` so
 tapping **Site ↗** stays inside the app instead of bouncing you to Safari.
 
 **What it does *not* do.** There is **no service worker**, and the installed app
-behaves exactly like the site in a tab: it needs the network to **load** and to
-**save**. Installing buys an icon and a window, not offline capability — see
+still needs the network to **load** and to **save**. Installing buys an icon, a
+window, a badge and a push channel — **not offline capability** — see
 [ADR 0010](adr/0010-online-first-writing.md) for why that trade was taken
-deliberately rather than left as a TODO.
+deliberately rather than left as a TODO. ⚠ And registering a worker would now be
+actively harmful rather than merely redundant: Safari routes a declarative push
+*through* a worker's `push` handler when one exists, so adding one would silently
+disable §9a.
 
 **Icons** are generated from the one drawn mark by
 [`scripts/build-app-icons.mjs`](../scripts/build-app-icons.mjs) (`node
@@ -524,6 +646,22 @@ is rendered at dusk and re-tinted by
 theme you actually chose. *(It followed the system colour scheme until
 2026-08-07, which was close enough only while the page did too — see
 [ADR 0021](adr/0021-dark-is-the-default-not-the-system-preference.md).)*
+
+## 9a. Push — the tripwire that speaks only on a morning you skipped
+
+*Plan 21 (local working notes), shipped 2026-08-06/07. Schema in [data-model.md](data-model.md) §6b; the decision in [ADR 0019](adr/0019-push-is-a-contract-you-sign.md), which is still **Proposed**. This is the only thing in the building that acts while nobody is looking at it.*
+
+**The control is a bell beside the theme toggle and Sign out**, not a nav item. Those three are the controls about *this device and this session* rather than about the corpus, and push is subscribed **per device** — so "on" here never means "on everywhere". It opens a dialog rather than a `/admin/settings` room, deliberately: there is no settings room in this building (`home_timezone` has never had a UI), and one switch does not justify a ninth item in a nav whose whole argument is that it is short.
+
+**The dialog has four states written as `data-state` on its root**, with every paragraph rendered at once and revealed by CSS — the states *are* the content of this surface, so a reader (and a future edit) sees all of them. ⚠ **Desktop reads *unsupported*, and that is correct rather than broken:** `window.pushManager` is WebKit's declarative-push entry point, and Chrome and Firefox expose push only through a service worker registration, which [ADR 0010](adr/0010-online-first-writing.md) and §9 rule out. An unset `PUBLIC_VAPID_PUBLIC_KEY` gets its **own** state naming the variable — folding it in with *unsupported* once made a deployment fault wear a device fault's clothes and told an already-installed iPhone to add itself to the Home Screen.
+
+**The condition is the whole feature.** The push fires only when the check-in is still unanswered at `settings.push_time` — it is a **tripwire, not a reminder**, and the distinction is the design. Michael, 2026-08-06: *"I don't need a reminder necessarily to do my sleep check-in… the notification telling me 'Hey, do your sleep check-in' is noise because I need to already have that ingrained within me."* At 07:00 the check-in is unanswered on nearly every day including every good one, so it would fire ~365 times a year and become the ping you learn to swipe away. At **10:00** it fires on the days the habit actually broke. ⚠ **If it starts speaking most days, the hour is wrong, not the feature** — count the rows in `push_day_claims` before changing anything.
+
+**No service worker is registered, and that is the design.** Declarative Web Push subscribes from the *page* via `window.pushManager` and WebKit renders the payload itself — display, tap-navigation, badge — with no JavaScript woken on the device. Proven on the real phone before a line of it was written. The cost is that nothing repairs a stale subscription in the background, so `scripts/push.ts` re-asserts on **every admin load**; that is the entire upkeep strategy (§6b of [data-model.md](data-model.md)).
+
+**Turning off deletes the row *before* retiring the endpoint**, and the order is a reliability argument rather than a style preference. The sender can only reach an endpoint it has, so deleting the row is what stops the notifications; if the browser call then fails you are left with a dead endpoint nobody pushes to. Reverse it and a failure leaves a live row for an endpoint the browser already retired — **silent, and it fails open**, which on this feature means a phone that keeps ringing.
+
+⚠ **Every failure mode of this feature is silent, and that is what to know about it.** A wrong schema, a missing secret, a stale key, a Vault entry that never reached the Edge runtime — none of them throw anywhere a person is watching. They just mean **the phone never rings on the morning it should**, which is indistinguishable from *"nothing was waiting"*. Three real ones were found and fixed on the day it shipped: a failed send *burned the day's single claim* (it now releases when it reached nobody); a `dry` run claimed the day, so a diagnostic silenced the real tick an hour later; and the missing-key case above. The sender is a Supabase Edge Function with hand-rolled RFC 8291/8292 crypto on `crypto.subtle` — no dependency, portable enough to have been driven from a laptop against the real phone before it was ever deployed — and it authorizes on its own `PUSH_CRON_SECRET` rather than `verify_jwt`, because *any* valid JWT satisfies that check, including the anon key printed in the client bundle.
 
 ## 10. Deferred (not in admin v1)
 
@@ -844,74 +982,3 @@ Beside it sit the active goals' observations (§14), which keep their own cold-s
 ### Today reads; the rooms write
 
 A row's title is plain text here, where in the tasks room it opens the sheet. An event's title is a link to the day panel. **No `TaskSheet`, no `EventSheet`, no TipTap** — this is the page opened on a phone at 7am, and the editors stay in the rooms that need them. The only writes on the page are the tick and drift's two dismissals, and both reuse their room's script verbatim.
-
-## 5c. Reading a task out of a sentence
-
-*The parser, [plan 14](plans/archive/14-capture.md) §6. Claude Haiku 4.5, structured
-output, Zod-validated — the same pattern as ✦ Suggest with AI
-([ADR 0007](adr/0007-ai-subject-tagging.md)), and the same rule: the model
-proposes, the person disposes.*
-
-**Add to the Agenda…** on a brain dump sends the sentence to the model and opens
-the sheet it belongs in, filled. *"I have an appointment with the dentist every
-Thursday at 4:00 p.m. Please warn me one day ahead. This is a very important
-task! And leave a note that I should bring a gift every single time."* becomes a
-task titled *Appointment with the dentist*, due the coming Thursday at 4:00 PM,
-repeating weekly, warning one day ahead, at high priority, with the gift as its
-notes.
-
-**Why a model rather than a date library.** `chrono` handles *"tomorrow at
-4:30pm"* and falls over on *"warn me three days in advance"* and *"every third
-Monday"* — those are not date parsing, they are this system's own concepts. And
-separating a task's **title** from its **scheduling words** is exactly what a
-language model is good at and a regex is not.
-
-### What makes it safe
-
-- **The output schema is the system's own enums.** `recurrence` is
-  `z.enum(PRESETS)`, so the model **cannot** propose a schedule the database has
-  no way to store. Asked for *"water the plants every three weeks"* it returns no
-  recurrence and says *"can't schedule that: every three weeks"* — the failure
-  where a parser invents a rule and something downstream rounds it to the
-  nearest one is closed by construction, not by review.
-- **Every filled field carries the words it was read from.** *"2026-08-06 — read
-  from 'every Thursday'"* can be judged at a glance; a date on its own cannot be
-  judged at all, and a silently misparsed date is worse than no parse.
-- **Today and the timezone are passed in**, from `localToday()` over the
-  `settings` table — never the browser, never the server's clock. *"4:30pm
-  tomorrow"* is meaningless without both.
-- **It never makes triage worse by existing.** No key, a dead model, a slow
-  network: the sheet opens anyway with the first line as the title and the rest
-  as the notes, which is exactly what shipped before the parser. No error is
-  shown, because nothing is wrong.
-- **Three contradictions are settled in code, not asked of the model**, because
-  each one is arithmetic and each was seen to fail live: a weekly rule whose
-  weekday disagrees with its date; an *event* carrying a repeat or a lead, which
-  `events` has no column for; and a repeat with no first date to anchor it.
-
-### Which row it picks, and why that is not the router §4.21 banned
-
-**[10-hq §4.21](plans/archive/10-hq.md) forbids a model deciding what a captured thought
-IS**, and the recorded reason is that a router's failure is *silent* — a thought
-filed as the wrong kind disappears into the wrong room. **That ban stands** for
-task vs log entry vs piece.
-
-Event vs task is the one pair it does not reach, for a structural reason:
-**events and tasks share every surface.** Both render on the calendar grid, both
-appear on Today. A wrong guess is the wrong *shape* somewhere you are already
-looking, never a disappearance. And most of the call is capability rather than
-taste — a repeat or a lead **cannot** be an event.
-
-So the model picks, and the **kind bar** at the top of the sheet says which and
-why, with the other shape one tap away. The switch carries the whole reading
-across rather than asking again. **The reason on that bar is derived from the
-fields, never written by the model**: asked to explain itself, it justified a
-correct answer with a repeat the sentence never mentioned and its own fields did
-not contain.
-
-**The line it does not remove:** the same appointment phrased two ways can land
-in two different rows — *"dentist appointment Thursday at 4pm"* is an event,
-*"dentist every Thursday, remind me"* is a task. Both are right, and the second
-is the only one the database could hold. The decision does not disappear; it
-moves out of your head and into the sentence, where the bar can show you what it
-did with it.
