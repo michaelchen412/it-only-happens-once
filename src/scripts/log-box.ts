@@ -16,7 +16,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
-import { anchorPopover } from './pop-anchor';
+import { wireEntryMeta } from './entry-meta';
 
 const zone = document.querySelector<HTMLElement>('[data-timeline]');
 
@@ -32,21 +32,24 @@ if (zone) {
   const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
   const cancelBtn = $<HTMLButtonElement>('[data-log-cancel]')!;
   const errorEl = $<HTMLElement>('[data-log-error]')!;
-  const kindLabel = $<HTMLElement>('[data-kind-label]')!;
-  const kindIcon = $<HTMLElement>('[data-kind-icon]')!;
-  const dateLabel = $<HTMLElement>('[data-date-label]')!;
-  const withLabel = $<HTMLElement>('[data-with-label]');
-
   /** The entry being corrected, or null when writing a new one. */
   let editingId: string | null = null;
-  /** The chosen date, as a local `YYYY-MM-DD`. */
-  let occurredOn = today;
 
-  const shiftYmd = (ymd: string, n: number) => {
-    const d = new Date(`${ymd}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + n);
-    return d.toISOString().slice(0, 10);
-  };
+  // Kind, date and who are `entry-meta.ts` now — the same wiring the notes
+  // pile's log sheet runs (docs/plans/25 · §3). The picker here is "with",
+  // because a profile already knows whose entry this is and these are the
+  // OTHERS; in the pile the same control asks "Who?" and is required. That
+  // difference is the whole of what the two hosts still configure.
+  //
+  // ⚠ It also retires a local `shiftYmd` that used to sit here — five untested
+  // lines beside the tested one in `lib/hq/time.ts`, and the drift that made
+  // this extraction earn itself.
+  const entryMeta = wireEntryMeta(zone, {
+    today,
+    peopleAttr: 'with',
+    peopleLabel: (names) =>
+      names.length === 0 ? 'with' : names.length === 1 ? `with ${names[0]}` : `with ${names[0]} +${names.length - 1}`,
+  });
 
   function showError(message: string | null) {
     errorEl.textContent = message ?? '';
@@ -71,96 +74,11 @@ if (zone) {
     syncControls();
   });
 
-  // ── the pickers ──────────────────────────────────────────────────────────
-  // Opening, closing, Escape, light-dismiss and one-at-a-time all belong to the
-  // browser (`popovertarget` + `popover="auto"`). All that is left is putting
-  // it in the right place, and that arithmetic — plus the measure-after-open
-  // trap it exists to avoid — moved to `pop-anchor.ts` on 2026-08-03, when the
-  // notes room's triage chooser needed exactly the same thing.
-  const pops = $$<HTMLElement>('[data-pop]');
-  const closePops = () => pops.forEach((p) => p.matches(':popover-open') && p.hidePopover());
-
-  for (const pop of pops) {
-    anchorPopover(pop, () => zone.querySelector<HTMLElement>(`[popovertarget="${pop.id}"]`));
-  }
-
-  // kind
-  $$<HTMLButtonElement>('[data-kind]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      $$('[data-kind]').forEach((o) => o.classList.toggle('is-on', o === btn));
-      kindLabel.textContent = btn.textContent!.trim();
-      // The glyph is copied out of the chosen row into a wrapper that STAYS —
-      // replacing the element itself would destroy the `[data-kind-icon]` hook,
-      // so the second choice you made would silently do nothing.
-      const svg = btn.querySelector('svg');
-      if (svg) kindIcon.replaceChildren(svg.cloneNode(true));
-      closePops();
-    }),
-  );
-
-  // date
-  const setDate = (ymd: string, label: string) => {
-    occurredOn = ymd;
-    dateLabel.textContent = label;
-  };
-  $$<HTMLButtonElement>('[data-day]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      $$('[data-day]').forEach((o) => o.classList.toggle('is-on', o === btn));
-      setDate(shiftYmd(today, -Number(btn.dataset.day)), btn.textContent!.trim());
-      closePops();
-    }),
-  );
-  $<HTMLInputElement>('[data-date-input]')?.addEventListener('change', (e) => {
-    const el = e.target as HTMLInputElement;
-    const value = el.value;
-    if (!value) return;
-    // ⚠ A DATE INPUT FIRES `change` PER SEGMENT, not when you are finished with
-    // it. Once month and day are filled, the FIRST digit of the year completes
-    // a "valid" date — 2 arrives as the year 0002 — so this handler used to
-    // commit that and close the picker before `2026` could be typed. Waiting
-    // for the year to land inside the input's own `min`/`max` is the fix: 0002,
-    // 0020 and 0202 are all range errors, and we simply sit through them.
-    if (el.validity.rangeUnderflow) return;
-    $$('[data-day]').forEach((o) => o.classList.remove('is-on'));
-    const d = new Date(`${value}T00:00:00Z`);
-    setDate(value, `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);
-    closePops();
-  });
-
-  // with — multi-select. The label COUNTS rather than listing, so three names
-  // cannot push the meta row past the box at 390px.
-  const chosen = new Set<string>();
-  function syncWith() {
-    if (!withLabel) return;
-    const names = [...chosen].map((id) => $<HTMLElement>(`[data-with="${id}"]`)?.dataset.name ?? '');
-    withLabel.textContent =
-      names.length === 0 ? 'with' : names.length === 1 ? `with ${names[0]}` : `with ${names[0]} +${names.length - 1}`;
-    $('[data-with-open]')?.classList.toggle('lchip--on', names.length > 0);
-  }
-  $$<HTMLButtonElement>('[data-with]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.with!;
-      if (chosen.has(id)) chosen.delete(id);
-      else chosen.add(id);
-      btn.classList.toggle('is-on', chosen.has(id));
-      syncWith();
-    }),
-  );
-
   // ── writing, and correcting ──────────────────────────────────────────────
   function reset() {
     editingId = null;
     input.value = '';
-    occurredOn = today;
-    chosen.clear();
-    $$('[data-with]').forEach((o) => o.classList.remove('is-on'));
-    $$('[data-kind]').forEach((o, i) => o.classList.toggle('is-on', i === 0));
-    $$('[data-day]').forEach((o, i) => o.classList.toggle('is-on', i === 0));
-    kindLabel.textContent = 'Hangout';
-    dateLabel.textContent = 'Today';
-    const first = $<HTMLElement>('[data-kind="hangout"] svg');
-    if (first) kindIcon.replaceChildren(first.cloneNode(true));
-    syncWith();
+    entryMeta.reset();
     showError(null);
     grow();
     syncControls();
@@ -177,22 +95,11 @@ if (zone) {
       reset();
       editingId = row.dataset.entry!;
       input.value = row.dataset.body ?? '';
-
-      const on = row.dataset.entryOn!;
-      const label = on === today ? 'Today' : on === shiftYmd(today, -1) ? 'Yesterday' : null;
-      const d = new Date(`${on}T00:00:00Z`);
-      setDate(on, label ?? `${d.getUTCMonth() + 1}/${d.getUTCDate()}`);
-      $$('[data-day]').forEach((o) => o.classList.remove('is-on'));
-
-      const kindBtn = $<HTMLButtonElement>(`[data-kind="${row.dataset.entryKind}"]`);
-      kindBtn?.click(); // reuses the same label + glyph swap
-      closePops();
-
-      for (const id of (row.dataset.entryWith ?? '').split(',').filter(Boolean)) {
-        chosen.add(id);
-        $(`[data-with="${id}"]`)?.classList.add('is-on');
-      }
-      syncWith();
+      entryMeta.set(
+        row.dataset.entryOn!,
+        row.dataset.entryKind!,
+        (row.dataset.entryWith ?? '').split(',').filter(Boolean),
+      );
 
       zone.querySelectorAll('.tl').forEach((r) => r.classList.toggle('is-editing', r === row));
       grow();
@@ -214,9 +121,9 @@ if (zone) {
         actions.interactions.save({
           id: editingId ?? undefined,
           personId,
-          withIds: [...chosen],
-          occurredOn,
-          kind: ($('[data-kind].is-on') as HTMLElement | null)?.dataset.kind as never,
+          withIds: entryMeta.people(),
+          occurredOn: entryMeta.occurredOn(),
+          kind: entryMeta.kind() as never,
           body,
         }),
       { button: saveBtn, busy: 'Saving…', onError: showError },

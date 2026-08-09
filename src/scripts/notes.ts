@@ -38,6 +38,7 @@ import { wireAltDialog } from './alt-dialog';
 import { anchorPopover } from './pop-anchor';
 import { mountRichEditor } from './rich-editor';
 import { uploadImage } from './upload';
+import { onBackdropDismiss } from './backdrop-close';
 
 const pile = document.getElementById('notes-pile');
 const undoBar = document.getElementById('notes-undo');
@@ -492,9 +493,11 @@ if (undoBar) {
 
   fileQuery?.addEventListener('input', () => filterPieces(fileQuery.value));
   fileDialog?.querySelector('[data-close]')?.addEventListener('click', () => fileDialog.close());
-  fileDialog?.addEventListener('click', (e) => {
-    if (e.target === fileDialog) fileDialog.close();
-  });
+  // Guarded like every other backdrop in the tree — the least costly of the
+  // four to get wrong (this dialog holds a search box and a list, and closing
+  // it loses nothing), but a dismiss rule that behaves differently in one
+  // dialog is the kind of inconsistency you feel without being able to name.
+  if (fileDialog) onBackdropDismiss(fileDialog, () => fileDialog.close());
 
   fileList?.addEventListener('click', async (e) => {
     const btn = (e.target as Element).closest<HTMLElement>('[data-piece]');

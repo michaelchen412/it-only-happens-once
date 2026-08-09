@@ -20,6 +20,7 @@
 // changes underneath this dialog while it is open.
 import { nowTime } from './action-error';
 import { wireSubjectSuggest } from './subject-suggest';
+import { onBackdropDismiss } from './backdrop-close';
 
 export interface PublishDialogDeps {
   /** The form the subjects field is associated with. */
@@ -159,9 +160,10 @@ export function wirePublishDialog(deps: PublishDialogDeps): void {
   document.getElementById('ws-open-publish')?.addEventListener('click', () => openDialog('publish'));
   document.getElementById('ws-open-details')?.addEventListener('click', () => openDialog('details'));
   document.getElementById('dialog-cancel')?.addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) dialog.close(); // backdrop click
-  });
+  // Backdrop click, guarded — the dialog holds an excerpt field and a subjects
+  // input you routinely select across before publishing (`backdrop-close.ts`,
+  // docs/plans/25 · §3).
+  onBackdropDismiss(dialog, () => dialog.close());
 
   dialogConfirm.addEventListener('click', async () => {
     dialogError.hidden = true;

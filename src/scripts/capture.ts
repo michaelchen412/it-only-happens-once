@@ -40,6 +40,7 @@
 // pressed in anger. `pointerdown`/`focusin` are belt and braces for the tap
 // that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
+import { onBackdropDismiss } from './backdrop-close';
 
 const fab = document.getElementById('cap-open') as HTMLButtonElement | null;
 const dialog = document.getElementById('cap-dialog') as HTMLDialogElement | null;
@@ -270,10 +271,16 @@ async function boot(dialog: HTMLDialogElement) {
     e.preventDefault();
     void close();
   });
-  // Click outside the shell — the backdrop is the <dialog> itself.
-  dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) void close();
-  });
+  // Click outside the shell — the backdrop is the <dialog> itself, and the
+  // press has to both START and END there.
+  //
+  // ⚠ THIS BOX IS THE WORST PLACE IN THE TREE TO GET THAT WRONG, which is why
+  // it is the first of the four that were missing it (docs/plans/25 · §3).
+  // Closing here FLUSHES — so a right-to-left selection across a sentence that
+  // overshoots the edge used to end the thought and file it, mid-word. The box
+  // exists so a thought at 11pm costs fifteen seconds; losing one to a drag is
+  // the opposite of that.
+  onBackdropDismiss(dialog, () => void close());
 
   // Anything still pending when the tab goes away (phone locking, app switch).
   document.addEventListener('visibilitychange', () => {

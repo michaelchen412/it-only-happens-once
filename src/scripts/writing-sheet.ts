@@ -39,6 +39,7 @@ import { wireMusicPanel, type PairedSong } from './music-panel';
 import { wireAddMenu } from './fragment-panel';
 import { wireProofread } from './writing-proofread';
 import { wirePublishDialog } from './writing-publish-dialog';
+import { onBackdropDismiss } from './backdrop-close';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -807,12 +808,9 @@ sheet.addEventListener('cancel', (e) => {
   requestClose();
 });
 // Backdrop dismiss only when the press STARTED and ENDED on the backdrop
-// (a text selection released outside must not close the sheet).
-let pressedOnBackdrop = false;
-sheet.addEventListener('pointerdown', (e) => (pressedOnBackdrop = e.target === sheet));
-sheet.addEventListener('click', (e) => {
-  if (e.target === sheet && pressedOnBackdrop) requestClose();
-});
+// (a text selection released outside must not close the sheet) — see
+// `backdrop-close.ts`, which is where that guard lives now.
+onBackdropDismiss(sheet, requestClose);
 
 // ---- publish / details dialog ----
 // A surface of its own (src/scripts/writing-publish-dialog.ts): the preflight,

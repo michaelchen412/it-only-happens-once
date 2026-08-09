@@ -6,6 +6,7 @@
 import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
 import { callAction, isNetworkError, submitAction } from './action-error';
+import { onBackdropDismiss } from './backdrop-close';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
@@ -391,13 +392,10 @@ sheet.addEventListener('cancel', (e) => {
   requestClose();
 });
 // Backdrop dismiss, but ONLY when the press both STARTED and ENDED on the
-// backdrop. A right-to-left text selection that begins inside the sheet and
-// releases on the backdrop must not close it (that was losing work mid-edit).
-let pressedOnBackdrop = false;
-sheet.addEventListener('pointerdown', (e) => (pressedOnBackdrop = e.target === sheet));
-sheet.addEventListener('click', (e) => {
-  if (e.target === sheet && pressedOnBackdrop) requestClose();
-});
+// backdrop — a text selection released outside must not close the sheet. The
+// guard was copy-pasted into three files and missing from four; it is
+// `backdrop-close.ts` now (docs/plans/25 · §3).
+onBackdropDismiss(sheet, requestClose);
 
 function setField(form: HTMLFormElement, name: string, value: string) {
   const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;

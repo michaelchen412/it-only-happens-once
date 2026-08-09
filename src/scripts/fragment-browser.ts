@@ -6,6 +6,7 @@ import { starMarkHtml } from '../lib/star-mark';
 import { openEditorFor } from './open-editor';
 import { onSkyChange } from './sky-changed';
 import { notifyFragmentsChanged, onFragmentsChanged } from './fragments-changed';
+import { onBackdropDismiss } from './backdrop-close';
 
 const browser = document.getElementById('fbrowser') as HTMLDialogElement;
 const cid = browser.dataset.constellation!;
@@ -222,11 +223,8 @@ browser.addEventListener('cancel', (e) => {
   e.preventDefault(); // Escape → still refresh the suite if we placed things
   closeBrowser();
 });
-let pressedOnBackdrop = false;
-browser.addEventListener('pointerdown', (e) => (pressedOnBackdrop = e.target === browser));
-browser.addEventListener('click', (e) => {
-  if (e.target === browser && pressedOnBackdrop) closeBrowser();
-});
+// The press must both start and end on the backdrop — `backdrop-close.ts`.
+onBackdropDismiss(browser, closeBrowser);
 
 wireAddMenu(document.getElementById('fb-add-btn')!, document.getElementById('fb-add-menu')!);
 
