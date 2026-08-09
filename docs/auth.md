@@ -73,7 +73,7 @@ The RLS **policies are unchanged** — they already call `public.is_admin()`. On
 | `PUBLIC_SUPABASE_URL` | public | everything | Supabase project URL |
 | `PUBLIC_SUPABASE_ANON_KEY` | public | everything | anon key — safe in the browser; RLS restricts it; also what Supabase Auth uses client-side |
 | `PUBLIC_TURNSTILE_SITE_KEY` | public | [`ContactForm.astro`](../src/components/ContactForm.astro) | the Cloudflare Turnstile widget on /about. Unset ⇒ the widget simply doesn't render |
-| `PUBLIC_VAPID_PUBLIC_KEY` | public | [`scripts/push.ts`](../src/scripts/push.ts) | the `applicationServerKey` the installed app subscribes with. Public **by construction** — it travels in every subscription request. Unset ⇒ the notifications dialog says *unconfigured* and names this variable, which it did not always do (§9 of [admin.md](admin.md)) |
+| `PUBLIC_VAPID_PUBLIC_KEY` | public | [`scripts/push.ts`](../src/scripts/push.ts) | the `applicationServerKey` the installed app subscribes with. Public **by construction** — it travels in every subscription request. Unset ⇒ the notifications dialog says *unconfigured* and names this variable, which it did not always do (§9a of [admin.md](admin.md)) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only** | scripts, the e2e session mint | seeds + one-off admin tasks (e.g. setting `app_metadata.role`). **Never in request-handling code and never in client code** — RLS is the boundary ([architecture.md](architecture.md) §6) |
 | `ANTHROPIC_API_KEY` | **server only** | [`actions/fragments.ts`](../src/actions/fragments.ts), [`actions/tasks.ts`](../src/actions/tasks.ts) | **three tenants**: ✦ Suggest with AI ([ADR 0007](adr/0007-ai-subject-tagging.md)), the capture parser ([admin.md](admin.md) §5d) and Proofread ([admin.md](admin.md) §5e) |
 | `SPOTIFY_CLIENT_ID` | **server only** | [`lib/media.ts`](../src/lib/media.ts) | Spotify Web API, client-credentials — song title/artist/album/year |
@@ -83,7 +83,7 @@ The RLS **policies are unchanged** — they already call `public.is_admin()`. On
 
 **How they are read is itself a security property.** The `PUBLIC_*` four are `import.meta.env` and are **inlined into the client bundle at build time** — that is what "public" means here, and it is why nothing else may ever take that prefix. The six server-only ones go through `getSecret()` from `astro:env/server`, which reads the runtime environment, so an unset key is a sentence in the UI rather than a build failure or a 500.
 
-**Three more secrets exist and are deliberately *not* in this app's env** — they belong to Supabase, because that is where the code holding them runs ([admin.md](admin.md) §9):
+**Three more secrets exist and are deliberately *not* in this app's env** — they belong to Supabase, because that is where the code holding them runs ([admin.md](admin.md) §9a):
 
 | Variable | Where it lives | Purpose |
 |---|---|---|
