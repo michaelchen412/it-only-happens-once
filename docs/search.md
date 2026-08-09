@@ -1,15 +1,24 @@
 # Search & highlighting
 
-*How fragment search and match-highlighting work, and the decisions/lessons behind them. The engine lives in [`../src/lib/search-highlight.ts`](../src/lib/search-highlight.ts); the admin Fragment Manager is its first consumer ([`admin.md`](admin.md) §2). **This document exists so the public blog can replicate the same behaviour without re-learning the pitfalls.***
+*How fragment search and match-highlighting work, and the decisions/lessons behind them. The engine lives in [`../src/lib/search-highlight.ts`](../src/lib/search-highlight.ts) and has **two live consumers** — the admin Fragment Manager ([`admin.md`](admin.md) §2) and the public blog. This document is why they behave identically instead of by coincidence.*
 
 ---
 
-## 1. What search does today
+## 1. What search does today, on both surfaces
 
-The admin list search is a **literal, case-insensitive substring match** — the same match the DB `ilike '%term%'` performs — surfaced two ways:
+Search is a **literal, case-insensitive substring match** — the same match the DB `ilike '%term%'` performs — surfaced two ways:
 
-1. **Filter** — the server narrows the fragment list to rows whose title/attribution/body contain the term.
+1. **Filter** — the server narrows the list to rows containing the term.
 2. **Highlight** — matches are wrapped in `<mark class="hl">` in the title and attribution, and for `writing` fragments the body is shown as **windowed excerpts** around each match (option #2: *all* matches shown, each in its own context window).
+
+**Two consumers, one engine.** They differ only in which columns they may search, and that difference is the RLS boundary rather than a design choice:
+
+| | Where | Columns searched |
+|---|---|---|
+| **The Fragment Manager** | [`fragment-query.ts`](../src/lib/fragment-query.ts) (server) + [`fragment-panel.ts`](../src/scripts/fragment-panel.ts) (client) | `title`, `body`, `attribution` **and `excerpt`** — the admin sees every field it stores |
+| **The public blog** | [`blog.ts`](../src/lib/blog.ts) (server) + [`blog-feed.ts`](../src/scripts/blog-feed.ts) (client) | writing: `title` + `body`; quotes: `body` + `attribution`. No `excerpt`: a card blurb is a *rendering*, and a hit in one the reader never sees reads as a false positive |
+
+⚠ **The public half shipped on 2026-08-05 and this file described it as future work until 2026-08-09** — §6 below still opened *"when building public search"* after it had been built. The two live consumers are the reason the checklist there is now a contract rather than a plan.
 
 There is **no ranking, stemming, or fuzzy matching** yet. This is deliberate — see §5.
 
@@ -31,10 +40,12 @@ Key exports (`search-highlight.ts`):
 
 ## 3. Minimum search length (`MIN_SEARCH = 2`)
 
-A one-character term matches nearly everything and is never a useful query. Below `MIN_SEARCH` the term is **ignored entirely** — no filter, no highlight, the full list shows. Enforced in three places, all reading the one constant:
+A one-character term matches nearly everything and is never a useful query. Below `MIN_SEARCH` the term is **ignored entirely** — no filter, no highlight, the full list shows. Enforced at every layer of **both** consumers, all reading the one constant:
 
-- **Server** ([`admin/index.astro`](../src/pages/admin/index.astro)): `const searching = q.length >= MIN_SEARCH` gates both the `ilike` filter and whether `searchTerm` is passed to rows.
-- **Client** ([`admin-list.ts`](../src/scripts/admin-list.ts)): the debounce compares an *effective* query (`raw.length >= MIN_SEARCH ? raw : ''`) against `lastSearch` and skips the fetch when unchanged — so typing/clearing a single letter fires **no** request.
+- **Server, admin** — [`fragment-query.ts:68`](../src/lib/fragment-query.ts): `searching: q.length >= MIN_SEARCH` gates both the `ilike` filter and whether `searchTerm` is passed to rows. *(It lived in `admin/index.astro` until 2026-08-02, when that route became Today; the query moved to a module because the composer's browser sheet needed the same one.)*
+- **Server, public** — [`blog/index.astro:42`](../src/pages/blog/index.astro): the same line, with the same comment pointing back here.
+- **Client, admin** — [`fragment-panel.ts:173`](../src/scripts/fragment-panel.ts): the debounce compares an *effective* query (`raw.length >= MIN_SEARCH ? raw : ''`) against `lastSearch` and skips the fetch when unchanged — so typing/clearing a single letter fires **no** request. *(Was `admin-list.ts`, which is now only the page-specific half: bulk bar, trash, the Add ▾ menu.)*
+- **Client, public** — [`blog-feed.ts`](../src/scripts/blog-feed.ts): the same comparison against `lastEffective`, plus the token guard that stops a stale response clobbering a newer one.
 - **URL hygiene**: `params.delete('q')` when below min, so a stray short `q` never lands in the address bar or history.
 
 > Lesson: gate the term in one place conceptually (a shared constant) but enforce at *every* layer. If only the server gates, the client still round-trips on every keystroke; if only the client gates, a hand-typed URL bypasses it.
@@ -61,14 +72,16 @@ Verified with a unit test: a body containing 100 matches renders exactly 8 highl
 - **No stemming / fuzzy / synonyms** — literal substring only. Predictable and escaping-free.
 - **No Postgres FTS / `tsvector`** — `ilike` is sufficient at this scale and keeps the same match semantics on client and server. Revisit if the public corpus (500+ posts) makes `ilike` scans slow.
 
-## 6. Porting to the public frontend — checklist
+## 6. The contract a third consumer inherits
 
-The engine (`search-highlight.ts`) and `Highlighted.astro` are **presentation-agnostic and reusable as-is**. When building public search:
+The engine (`search-highlight.ts`) and `Highlighted.astro` are **presentation-agnostic**, and the public blog took them as-is rather than forking — which is the only reason a term typed into the workshop and the same term typed into `/blog` mean the same thing. Every line below is a rule the second consumer already keeps, so it reads as a checklist and is really a description:
 
-- [ ] Reuse `search-highlight.ts` unchanged — do not fork the matching logic.
-- [ ] Keep the **segments-as-data** rendering boundary (§2). Never build `<mark>` via string replace.
-- [ ] Respect `MIN_SEARCH` on both server and any client debounce (§3).
-- [ ] Always call `excerpts()` (bounded) for long bodies — never `highlight()` on a full essay body (§4).
-- [ ] Run `toPlain()` before excerpting Markdown bodies so `#`, `*`, links etc. don't leak into snippets.
-- [ ] If the public corpus is large, reconsider `ilike` vs Postgres FTS (§5) — but keep highlighting literal so client and server agree on what "matched".
-- [ ] Add/keep the density unit test (100 matches → 8 shown) as a regression guard.
+- [x] **Reuse `search-highlight.ts` unchanged** — the matching logic is not forked, and there is no second `ranges()` anywhere.
+- [x] **Keep the segments-as-data boundary** (§2). Neither surface builds `<mark>` by string replace; both render `Seg[]` through the component.
+- [x] **Respect `MIN_SEARCH` on server *and* client debounce** (§3) — four enforcement sites, one constant.
+- [x] **Always `excerpts()` (bounded) for long bodies**, never `highlight()` on a full essay.
+- [x] **Run `toPlain()` before excerpting Markdown** so `#`, `*` and link syntax don't leak into snippets.
+- [x] **Keep the density unit test** (100 matches → 8 shown) as the regression guard — the failure mode is invisible until the data is dense.
+- [ ] **Postgres FTS** stays deferred (§5). If the corpus grows enough to make `ilike` scans slow, keep highlighting literal anyway, or client and server stop agreeing about what "matched".
+
+⚠ **The one thing a new consumer must decide for itself is which columns it may search**, because that is a privacy question and not a search question — see the table in §1. The public feed searches fewer columns than the manager, and it is not an oversight.
