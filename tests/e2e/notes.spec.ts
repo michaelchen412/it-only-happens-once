@@ -738,6 +738,15 @@ test.describe('the parser (14 · Piece 3)', () => {
     // sentence, which would cost another call and could answer differently.
     await expect(page.locator('#event-sheet input[name="title"]')).toHaveValue('Appointment with the dentist');
     await expect(page.locator('#event-sheet [data-kindbar]')).toContainText('Make it a task instead');
+
+    // ⚠ ONE SHEET, NOT TWO (docs/plans/25 · §1). `showModal()` on a second
+    // <dialog> STACKS rather than replacing, and this spec used to stop one
+    // line above — so the task sheet sat underneath, still populated, and was
+    // revealed again the moment you closed the event sheet. The switch is a
+    // correction, and a correction that leaves the wrong answer on screen
+    // behind the right one has not corrected anything.
+    await expect(page.locator('#task-sheet')).not.toHaveAttribute('open', '');
+    await expect(page.locator('#task-sheet')).toBeHidden();
   });
 
   test('⚠ a dead model leaves the motion exactly as it was without the parser', async ({ page }) => {

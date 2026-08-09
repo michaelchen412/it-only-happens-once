@@ -11,7 +11,7 @@
 // adding a song is the Fragment Manager's job, and duplicating that flow here
 // would be a second way to write a song fragment.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { callAction, formatActionError } from './action-error';
 
 export interface PairedSong {
   id: string;
@@ -138,7 +138,10 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     }
     queryEl.disabled = false;
     const seq = ++searchSeq;
-    const { data, error } = await actions.songs.search({ q: queryEl.value.trim() });
+    // `callAction` rather than a bare await: a dead network throws here, and an
+    // unhandled rejection would leave the last results on screen with no
+    // indication that the box had stopped answering.
+    const { data, error } = await callAction(actions.songs.search({ q: queryEl.value.trim() }));
     if (seq !== searchSeq) return; // a newer search already answered
     if (error) return showError(formatActionError(error));
     clearError();
@@ -153,10 +156,18 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     // reads better than a spinner on every row.
     current = song;
     renderCurrent();
-    const { error } = await actions.songs.pair({
-      fragment_id: fragmentId,
-      song_id: song?.id ?? undefined,
-    });
+    // ⚠ THE ROLLBACK HAS TO COVER THE **THROWN** FAILURE TOO, and it did not.
+    // This branch tested the RETURNED error only, so on a dead network the
+    // rejection sailed past it and the song stayed painted as paired while the
+    // server had never heard of it — an optimistic control that cannot roll
+    // back is just a lie with a transition on it. `callAction` is what makes
+    // the two failures arrive at the same line.
+    const { error } = await callAction(
+      actions.songs.pair({
+        fragment_id: fragmentId,
+        song_id: song?.id ?? undefined,
+      }),
+    );
     if (error) {
       current = previous;
       renderCurrent();

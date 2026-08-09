@@ -14,7 +14,7 @@
 // finish, and a debounce would mean a half-typed sentence became a row every
 // time the phone locked.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { anchorPopover } from './pop-anchor';
 
@@ -205,31 +205,28 @@ if (zone) {
     const body = input.value.trim();
     if (!body) return;
     showError(null);
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving…';
-    try {
-      const { error } = await actions.interactions.save({
-        id: editingId ?? undefined,
-        personId,
-        withIds: [...chosen],
-        occurredOn,
-        kind: ($('[data-kind].is-on') as HTMLElement | null)?.dataset.kind as never,
-        body,
-      });
-      if (error) throw new Error(error.message);
-      // Reload rather than patching: the count, the ordering, the last-contact
-      // fact in the header and the card on the roster are all functions of the
-      // row that just changed, and re-deriving four of them by hand is four
-      // chances to disagree with the database.
-      location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — the trap that once left a button stuck on "Thinking…"
-      // for the life of the page.
-      showError(formatActionError(err));
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save';
-    }
+    // The disable/label/format/restore lifecycle is `submitAction` now
+    // (docs/plans/25 · §2) — including the trap it was built around: a dead
+    // network THROWS rather than returning `{ error }`, which is what once left
+    // a button stuck on "Thinking…" for the life of the page.
+    const res = await submitAction(
+      () =>
+        actions.interactions.save({
+          id: editingId ?? undefined,
+          personId,
+          withIds: [...chosen],
+          occurredOn,
+          kind: ($('[data-kind].is-on') as HTMLElement | null)?.dataset.kind as never,
+          body,
+        }),
+      { button: saveBtn, busy: 'Saving…', onError: showError },
+    );
+    if (!res.ok) return;
+    // Reload rather than patching: the count, the ordering, the last-contact
+    // fact in the header and the card on the roster are all functions of the
+    // row that just changed, and re-deriving four of them by hand is four
+    // chances to disagree with the database.
+    location.reload();
   });
 
   $$<HTMLButtonElement>('[data-delete]').forEach((btn) =>
@@ -243,11 +240,14 @@ if (zone) {
       });
       if (!ok) return;
 
-      const { error } = await actions.interactions.remove({ id: row.dataset.entry! });
-      if (error) {
-        showError(error.message);
-        return;
-      }
+      // Was a bare await with `error.message` straight onto the screen — so a
+      // dead network both skipped this branch entirely (it throws) and, when it
+      // did return, printed `Failed to fetch` at a human.
+      const res = await submitAction(() => actions.interactions.remove({ id: row.dataset.entry! }), {
+        button: btn,
+        onError: showError,
+      });
+      if (!res.ok) return;
       location.reload();
     }),
   );

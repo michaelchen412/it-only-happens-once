@@ -10,7 +10,7 @@
 // Greying out `Active` would say "no" without saying why, on a control whose
 // whole point is that letting go is a visible, dignified move.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { callAction, formatActionError, submitAction } from './action-error';
 
 const sheet = document.querySelector<HTMLDialogElement>('#goal-sheet');
 const form = document.querySelector<HTMLFormElement>('#goal-form');
@@ -26,7 +26,6 @@ const showPageError = (msg: string | null) => {
 if (sheet && form) {
   const errorEl = document.querySelector<HTMLElement>('#goal-sheet-error');
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-  const submitLabel = submitBtn.textContent ?? 'Save';
   const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]')!;
   const whyInput = form.querySelector<HTMLTextAreaElement>('textarea[name="why"]')!;
 
@@ -54,36 +53,41 @@ if (sheet && form) {
   );
   form.querySelectorAll<HTMLElement>('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
 
+  // The lifecycle — disable, label, format ANY failure, restore — is
+  // `submitAction` now (scripts/action-error.ts, docs/plans/25 · §2). Eight
+  // sheets hand-rolled the identical block, nine other files missed it
+  // entirely, and a convention that fails at 15% of its sites is not a
+  // convention. ⚠ Note what the hand-rolled version got wrong beyond the
+  // duplication: it did `throw new Error(error.message)` and then formatted the
+  // rethrow, so a validation failure lost its field-level sentences one line
+  // before `formatActionError` was called to join them.
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     showError(null);
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving…';
-
-    try {
-      const { data, error } = await actions.goals.save({
-        id: form.dataset.id || undefined,
-        name: nameInput.value.trim(),
-        why: whyInput.value.trim(),
-        horizon: picked('horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
-        status: picked('goalStatus', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
-      });
-      if (error) throw new Error(error.message);
-      // A new goal goes to its own page; an edit reloads the one you are on.
-      // Both re-derive the observation line rather than patching it, since it
-      // is a function of rows this form did not touch.
-      if (!form.dataset.id && data) location.href = `/admin/agenda/goals/${data.slug}`;
-      else location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — without this the button sticks on "Saving…".
-      showError(formatActionError(err));
-      submitBtn.disabled = false;
-      submitBtn.textContent = submitLabel;
-    }
+    const res = await submitAction(
+      () =>
+        actions.goals.save({
+          id: form.dataset.id || undefined,
+          name: nameInput.value.trim(),
+          why: whyInput.value.trim(),
+          horizon: picked('horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
+          status: picked('goalStatus', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
+        }),
+      { button: submitBtn, busy: 'Saving…', onError: showError },
+    );
+    if (!res.ok) return;
+    // A new goal goes to its own page; an edit reloads the one you are on.
+    // Both re-derive the observation line rather than patching it, since it
+    // is a function of rows this form did not touch.
+    //
+    // The button stays on "Saving…" through the navigation on purpose — see
+    // `SubmitOptions.reusable` for why not restoring is the default.
+    if (!form.dataset.id && res.data) location.href = `/admin/agenda/goals/${res.data.slug}`;
+    else location.reload();
   });
 
-  form.querySelector<HTMLButtonElement>('[data-delete-goal]')?.addEventListener('click', async () => {
+  const deleteBtn = form.querySelector<HTMLButtonElement>('[data-delete-goal]');
+  deleteBtn?.addEventListener('click', async () => {
     const id = form.dataset.id;
     if (!id) return;
     const { confirmDialog } = await import('./confirm-dialog');
@@ -96,13 +100,17 @@ if (sheet && form) {
       danger: true,
     });
     if (!ok) return;
-    try {
-      const { error } = await actions.goals.remove({ id });
-      if (error) throw new Error(error.message);
-      location.href = '/admin/agenda/goals';
-    } catch (err) {
-      showError(formatActionError(err));
-    }
+    // No `busy` label: this button is a trash glyph and one word, and swapping
+    // it for "Deleting…" reflows the row for the length of a request that ends
+    // in a navigation anyway. The disabled state is the whole signal — and it
+    // is one this button did not have before, so a double-tap on a slow
+    // connection can no longer send the delete twice.
+    const res = await submitAction(() => actions.goals.remove({ id }), {
+      button: deleteBtn,
+      onError: showError,
+    });
+    if (!res.ok) return;
+    location.href = '/admin/agenda/goals';
   });
 }
 
@@ -127,14 +135,17 @@ if (header) {
       // instantly. It goes back if the server refuses.
       buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
 
-      try {
-        const { error } = await actions.goals.setStatus({ id: goalId, status });
-        if (error) throw new Error(error.message);
-      } catch (err) {
+      // ⚠ NOT `submitAction`: the control here is a GROUP of four buttons that
+      // go down and come back together, and the state being restored is
+      // `aria-pressed` rather than a label. `callAction` is the half that
+      // transfers — it puts a thrown dead network and a returned refusal on the
+      // same line, so the cap's sentence and "you're offline" arrive the same
+      // way.
+      const { error } = await callAction(actions.goals.setStatus({ id: goalId, status }));
+      buttons.forEach((b) => (b.disabled = false));
+      if (error) {
         buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === previous)));
-        showPageError(formatActionError(err));
-      } finally {
-        buttons.forEach((b) => (b.disabled = false));
+        showPageError(formatActionError(error));
       }
     }),
   );

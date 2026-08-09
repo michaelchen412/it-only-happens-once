@@ -9,11 +9,12 @@
 //   flush(newId)                       — call right after a first save
 //   preselect(id)                      — tick somebody without user input
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { callAction, formatActionError } from './action-error';
 
 export interface SharedByHandle {
   setFragment: (id: string | null, personIds: string[]) => void;
-  flush: (newId: string) => Promise<void>;
+  /** Resolves `false` if the queued write failed — see PickerHandle.flush. */
+  flush: (newId: string) => Promise<boolean>;
   preselect: (personId: string) => void;
 }
 
@@ -25,6 +26,8 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
 
   let fragmentId: string | null = null;
   let inFlight: Promise<unknown> = Promise.resolve();
+  /** Did the most recent trip through the chain fail? Read by `flush`. */
+  let failed = false;
 
   const selected = () =>
     boxes()
@@ -55,16 +58,34 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
     who.textContent = names.length === 0 ? 'nobody' : names.join(', ');
   }
 
-  /** Persist the current tick-state. Serialized so rapid toggles cannot race. */
+  /**
+   * Persist the current tick-state. Serialized so rapid toggles cannot race.
+   *
+   * ⚠ THE CHAIN MUST ALWAYS SETTLE **RESOLVED** — the identical rule the
+   * constellation picker carries, written out there at length because it is the
+   * same defect in the same shape: one rejected persist poisons `inFlight` and
+   * every later tick is silently dropped for the rest of the sheet's session.
+   * `astro:actions` throws on a dead network, so that was one lost connection
+   * away until 2026-08-08.
+   */
   function persist() {
     if (!fragmentId) return; // queued until the first save (see flush)
     const ids = selected();
     const id = fragmentId;
-    inFlight = inFlight.then(async () => {
-      const { error } = await actions.links.setPeople({ fragmentId: id, personIds: ids });
-      if (error) return say(formatActionError(error), true);
-      say('Saved');
-    });
+    inFlight = inFlight
+      .then(async () => {
+        const { error } = await callAction(actions.links.setPeople({ fragmentId: id, personIds: ids }));
+        if (error) {
+          failed = true;
+          return say(formatActionError(error), true);
+        }
+        failed = false;
+        say('Saved');
+      })
+      .catch((e) => {
+        failed = true;
+        say(formatActionError(e), true);
+      });
   }
 
   root.addEventListener('change', (e) => {
@@ -99,9 +120,11 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
       fragmentId = newId;
       // Nothing ticked means nothing to write. Calling anyway would be a
       // pointless round trip on every new quote in a roster-less corpus.
-      if (selected().length === 0) return;
+      if (selected().length === 0) return true;
+      failed = false;
       persist();
       await inFlight;
+      return !failed;
     },
 
     preselect(personId) {

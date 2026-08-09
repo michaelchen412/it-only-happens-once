@@ -5,7 +5,7 @@
 // .astro file so the markup stays legible.
 import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
-import { formatActionError } from './action-error';
+import { callAction, isNetworkError, submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
@@ -544,14 +544,30 @@ function fillIfEmpty(name: string, value: string | null | undefined): string {
   if (!el.value.trim() && value) setField(songForm, name, value);
   return el.value;
 }
+/** Lookups are async and this one fires on BOTH `paste` and `change`, so a
+ *  paste-then-correct sends two and they can land out of order. The token is
+ *  the same guard `music-panel.ts` carries for its search, for the same reason:
+ *  a stale answer must never overwrite a newer one. Damage was bounded by
+ *  `fillIfEmpty` — the visible fields survive — but `thumbnail_url` and the
+ *  three hidden Spotify ids are written unconditionally, and those are exactly
+ *  the ones nobody would notice were wrong. */
+let lookupSeq = 0;
 async function runLookup() {
   const url = urlField.value.trim();
   if (!url) return;
+  const seq = ++lookupSeq;
   lookupNote.textContent = 'Looking up…';
-  const { data, error } = await actions.songs.lookup({ url });
+  const { data, error } = await callAction(actions.songs.lookup({ url }));
+  if (seq !== lookupSeq) return; // a newer paste already answered
   if (error || !data) {
-    lookupNote.textContent =
-      'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
+    // A DEAD NETWORK IS NOT A BAD LINK, and before this the note said only the
+    // second thing — sending you off to re-check a URL that was fine while the
+    // real answer was that nothing could be reached. Worse, without the
+    // `callAction` above the throw skipped this line entirely and left
+    // "Looking up…" on screen for the life of the sheet.
+    lookupNote.textContent = isNetworkError(error)
+      ? 'Couldn’t reach the lookup — the fields are yours to fill in.'
+      : 'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
     return;
   }
   fillIfEmpty('title', data.title);
@@ -619,25 +635,61 @@ for (const [form, action] of [
       }
     }
     const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
-    submitBtn.disabled = true;
-    const { data, error } = await action(fd);
-    submitBtn.disabled = false;
-    if (!error) {
-      // A brand-new fragment's queued memberships (including the composer's
-      // pre-ticked constellation, and a profile's pre-ticked person) can only
-      // be written once it has an id.
-      if (data?.id) {
-        await picker.flush(data.id);
-        await sharedByHandles.get(form === quoteForm ? 'quote' : 'song')?.flush(data.id);
+    // ⚠ THIS WAS THE WORST BUG IN THE TREE, found by the 2026-08-08 audit. The
+    // save had no try and no `callAction`, and `astro:actions` THROWS on a dead
+    // network rather than returning `{ error }` — so offline, the rejection
+    // skipped `submitBtn.disabled = false` and every line under it: Save stuck
+    // disabled for the life of the sheet, NOTHING said on screen, and an
+    // unhandled rejection in the console nobody was reading. The line below
+    // formatted *returned* errors only, which is the exact half-pattern
+    // `action-error.ts` was written to warn about.
+    //
+    // `reusable` because this sheet is CLOSED AND REOPENED, never replaced —
+    // and the song form's Save has no validity rule to switch it back on the
+    // way in, unlike the quote form's `refreshQuoteValid`.
+    const res = await submitAction(() => action(fd), {
+      button: submitBtn,
+      onError: showError,
+      reusable: true,
+    });
+    if (!res.ok) return;
+
+    // A brand-new fragment's queued memberships (including the composer's
+    // pre-ticked constellation, and a profile's pre-ticked person) can only be
+    // written once it has an id.
+    //
+    // ⚠ SAVED IS NOT DONE. These are two MORE action calls, on the same network
+    // that may have just come back — and their rejection used to be unhandled
+    // too, which meant a dead network here closed nothing, said nothing and
+    // left the sheet sitting open with the save half written. Both flushes now
+    // report whether what was queued actually landed.
+    if (res.data?.id) {
+      const wrote = await picker.flush(res.data.id);
+      const linked = (await sharedByHandles.get(form === quoteForm ? 'quote' : 'song')?.flush(res.data.id)) ?? true;
+      // The id goes back into the form whatever happens, so pressing Save again
+      // UPDATES this fragment rather than minting a second one. Without it the
+      // retry after a half-written save is a duplicate quote, which is a worse
+      // outcome than the failure being retried.
+      setField(form, 'id', res.data.id);
+      if (!wrote || !linked) {
+        // ⚠ CLEARED HERE TOO, and it is not an oversight to resist. The FIELDS
+        // are saved — only the relations failed, and a relation never armed
+        // this flag in the first place (`markDirty` ignores the constellations
+        // panel deliberately). Leaving it true would meet a close with "this
+        // fragment has unsaved edits", about edits that are in the database.
+        dirty = false;
+        // Held open on purpose. The ticks are still on screen and the picker
+        // now knows the fragment's id, so re-ticking one writes it immediately
+        // — there is nothing to re-type and nothing lost.
+        showError('Saved — but its constellations or people didn’t take. Re-tick them once you’re back online.');
+        return;
       }
-      dirty = false; // saved — don't prompt the unsaved-work guard on the way out
-      // The reload used to be what closed this sheet after a save. It isn't any
-      // more, so the close is explicit and load-bearing rather than tidying.
-      sheet.close();
-      notifyFragmentsChanged(sheet);
-      return;
     }
-    showError(formatActionError(error));
+    dirty = false; // saved — don't prompt the unsaved-work guard on the way out
+    // The reload used to be what closed this sheet after a save. It isn't any
+    // more, so the close is explicit and load-bearing rather than tidying.
+    sheet.close();
+    notifyFragmentsChanged(sheet);
   });
 }
 
@@ -654,14 +706,19 @@ document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
       danger: true,
     });
     if (!ok) return;
-    btn.disabled = true;
     const fd = new FormData();
     fd.set('id', id);
-    const { error } = await actions.fragments.trash(fd);
-    if (error) {
-      btn.disabled = false;
-      return showError(error.message);
-    }
+    // `reusable` for the same reason the submit above needs it, and it fixes a
+    // latent one: the sheet is refreshed in place rather than reloaded, so a
+    // successful trash used to leave Delete permanently disabled for the next
+    // fragment you opened. `error.message` is gone too — it printed
+    // `Failed to fetch` at a human on the one failure it was written for.
+    const res = await submitAction(() => actions.fragments.trash(fd), {
+      button: btn,
+      onError: showError,
+      reusable: true,
+    });
+    if (!res.ok) return;
     dirty = false; // trashed — nothing left here worth guarding
     sheet.close();
     notifyFragmentsChanged(sheet);

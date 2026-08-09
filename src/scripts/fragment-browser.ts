@@ -1,6 +1,6 @@
 import { actions } from 'astro:actions';
 import { wireFragmentPanel, wireAddMenu, type PanelHandle } from './fragment-panel';
-import { formatActionError } from './action-error';
+import { callAction, formatActionError } from './action-error';
 import './subject-filter'; // the fetched partial's <subject-filter> needs the definition
 import { starMarkHtml } from '../lib/star-mark';
 import { openEditorFor } from './open-editor';
@@ -49,7 +49,14 @@ async function place(id: string): Promise<boolean> {
   const fd = new FormData();
   fd.set('constellation_id', cid);
   fd.set('fragment_id', id);
-  const { error } = await actions.constellations.place(fd);
+  // ⚠ `callAction`, NOT a bare await — this function's `false` return is what
+  // both callers use to stop, and a dead network THROWS rather than returning
+  // `{ error }`. That rejection propagated straight out of the `for` loop below
+  // and skipped `placeSelectedBtn.disabled = false`, so **Place all N** stuck
+  // disabled for the life of the drawer with nothing said. Found alongside the
+  // nine sites in docs/plans/25; the audit's own grep missed this one because
+  // the await is one function away from the button it wedges.
+  const { error } = await callAction(actions.constellations.place(fd));
   if (error) {
     showError(formatActionError(error));
     return false;

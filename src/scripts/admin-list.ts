@@ -4,6 +4,7 @@
 // bar, trash actions, the Add ▾ menu, and routing row-opens to the editor
 // sheets (quote/song → FragmentSheet, writing → WritingSheet).
 import { actions } from 'astro:actions';
+import { callAction, formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { onFragmentsChanged } from './fragments-changed';
 import { wireFragmentPanel, wireAddMenu } from './fragment-panel';
@@ -73,10 +74,18 @@ bulkBtns.forEach((btn) =>
     const fd = new FormData();
     fd.set('ids', ids.join(','));
     fd.set('op', op);
-    const { error } = await actions.fragments.bulk(fd);
+    // ⚠ NOT `submitAction`, because the control here is the WHOLE BAR rather
+    // than one button — six buttons go down together and have to come back
+    // together. `callAction` is the half that matters: `astro:actions` throws
+    // on a dead network, and that rejection used to skip the re-enable, so an
+    // offline bulk op left every action on this bar dead for the rest of the
+    // session with nothing on screen to say why.
+    const { error } = await callAction(actions.fragments.bulk(fd));
     if (error) {
       bulkBtns.forEach((b) => (b.disabled = false));
-      showBulkError(error.message);
+      // `error.message` printed `Failed to fetch` at a human on exactly the
+      // failure the friendly sentence was written for.
+      showBulkError(formatActionError(error));
       return;
     }
     // Every op on this bar can move rows OUT of the current view — a trashed
@@ -145,8 +154,8 @@ async function trashAction(op: 'restore' | 'purge', id: string) {
     return;
   const fd = new FormData();
   fd.set('id', id);
-  const { error } = await (op === 'restore' ? actions.fragments.restore(fd) : actions.fragments.purge(fd));
-  if (error) return showBulkError(error.message);
+  const { error } = await callAction(op === 'restore' ? actions.fragments.restore(fd) : actions.fragments.purge(fd));
+  if (error) return showBulkError(formatActionError(error));
   await panel.refresh();
 }
 
@@ -161,8 +170,8 @@ document.getElementById('empty-trash')?.addEventListener('click', async () => {
     }))
   )
     return;
-  const { error } = await actions.fragments.emptyTrash(new FormData());
-  if (error) return showBulkError(error.message);
+  const { error } = await callAction(actions.fragments.emptyTrash(new FormData()));
+  if (error) return showBulkError(formatActionError(error));
   await panel.refresh();
 });
 
@@ -215,7 +224,7 @@ cnMenu?.addEventListener('click', async (e) => {
   fd.set('constellation_id', (add ? el.dataset.cnAdd : el.dataset.cnRemove)!);
   fd.set('fragment_ids', ids.join(','));
   fd.set('op', add ? 'add' : 'remove');
-  const { error } = await actions.constellations.bulkMembership(fd);
-  if (error) return showBulkError(error.message);
+  const { error } = await callAction(actions.constellations.bulkMembership(fd));
+  if (error) return showBulkError(formatActionError(error));
   await panel.refresh(); // the membership column is now stale
 });

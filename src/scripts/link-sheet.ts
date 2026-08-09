@@ -6,7 +6,7 @@
 // resolution of a work's fragments, and re-deriving any of that in the browser
 // is how the saved shape and the shown shape start to disagree.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 
 type Mode = 'work' | 'fragment';
@@ -125,26 +125,24 @@ if (sheet && personId) {
   saveBtn.addEventListener('click', async () => {
     if (!picked) return;
     clearError();
-    const label = saveBtn.textContent;
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Linking…';
-    try {
-      const note = noteInput.value.trim() || null;
-      const { error } =
+    const note = noteInput.value.trim() || null;
+    const target = picked;
+    // The lifecycle is `submitAction` now (docs/plans/25 · §2). The reason it
+    // is not optional here is unchanged: `astro:actions` THROWS on a dead
+    // network, and a swallowed failure leaves this button stuck saying
+    // "Linking…" forever — the exact bug the check-in shipped with.
+    // `<unknown>`: the two branches return differently-shaped `data`, so there
+    // is no single `T` to infer — and nothing here reads it. Naming the type
+    // parameter is the whole fix; widening either action would be worse.
+    const res = await submitAction<unknown>(
+      () =>
         mode === 'work'
-          ? await actions.links.work({ personId, workId: picked.id, note })
-          : await actions.links.fragment({ personId, fragmentId: picked.id, note });
-      if (error) throw new Error(error.message);
-      location.reload();
-    } catch (err) {
-      // `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }`, so the catch is not optional — a swallowed failure here
-      // leaves the button stuck saying "Linking…" forever, which is the exact
-      // bug the check-in shipped with and its own spec caught.
-      show(sheetError, formatActionError(err));
-      saveBtn.disabled = false;
-      saveBtn.textContent = label;
-    }
+          ? actions.links.work({ personId, workId: target.id, note })
+          : actions.links.fragment({ personId, fragmentId: target.id, note }),
+      { button: saveBtn, busy: 'Linking…', onError: (m) => show(sheetError, m) },
+    );
+    if (!res.ok) return;
+    location.reload();
   });
 }
 
@@ -165,17 +163,17 @@ zone?.querySelectorAll<HTMLButtonElement>('[data-unlink]').forEach((btn) =>
     });
     if (!ok) return;
 
-    btn.disabled = true;
-    try {
-      const { error } =
+    const res = await submitAction<unknown>(
+      () =>
         kind === 'work'
-          ? await actions.links.unlinkWork({ personId, workId: btn.dataset.id! })
-          : await actions.links.unlinkFragment({ personId, fragmentId: btn.dataset.id! });
-      if (error) throw new Error(error.message);
-      location.reload();
-    } catch (err) {
-      show(zoneError, formatActionError(err));
-      btn.disabled = false;
-    }
+          ? actions.links.unlinkWork({ personId, workId: btn.dataset.id! })
+          : actions.links.unlinkFragment({ personId, fragmentId: btn.dataset.id! }),
+      // The ZONE's error box, not the sheet's — the sheet is closed when you
+      // unlink, so a sentence written inside it would be invisible. See the
+      // note on the two targets at the top of this file.
+      { button: btn, onError: (m) => show(zoneError, m) },
+    );
+    if (!res.ok) return;
+    location.reload();
   }),
 );

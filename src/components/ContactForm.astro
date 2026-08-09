@@ -47,7 +47,7 @@ const labelCls = 'font-sans text-xs tracking-wide text-base-content/55';
 
 <script>
   import { actions } from 'astro:actions';
-  import { formatActionError } from '../scripts/action-error';
+  import { callAction, formatActionError } from '../scripts/action-error';
 
   interface TurnstileApi {
     render(el: HTMLElement, opts: Record<string, unknown>): string;
@@ -102,13 +102,23 @@ const labelCls = 'font-sans text-xs tracking-wide text-base-content/55';
       submitBtn.disabled = true;
       setStatus('Sending…', 'muted');
 
-      const { error } = await actions.contact.send({
-        name: String(data.get('name') || ''),
-        email: String(data.get('email') || ''),
-        message: String(data.get('message') || ''),
-        company: String(data.get('company') || ''), // honeypot
-        token: widgetId !== undefined ? ts()?.getResponse(widgetId) : undefined,
-      });
+      // ⚠ THE ONE CONTROL A VISITOR EVER PRESSES, and it had the same defect as
+      // the workshop's nine (docs/plans/25): `astro:actions` THROWS on a dead
+      // network rather than returning `{ error }`, so the rejection skipped the
+      // re-enable AND the Turnstile reset below and left **Sending…** on a dead
+      // button forever — on a form somebody had just typed a message into, with
+      // no draft anywhere and nothing on screen saying to try again. Every
+      // other site in this class is a room only Michael stands in; this one is
+      // the front door.
+      const { error } = await callAction(
+        actions.contact.send({
+          name: String(data.get('name') || ''),
+          email: String(data.get('email') || ''),
+          message: String(data.get('message') || ''),
+          company: String(data.get('company') || ''), // honeypot
+          token: widgetId !== undefined ? ts()?.getResponse(widgetId) : undefined,
+        }),
+      );
 
       submitBtn.disabled = false;
       if (widgetId !== undefined) ts()?.reset(widgetId);

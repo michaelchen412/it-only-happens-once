@@ -9,7 +9,7 @@
 // distinction and cannot get it wrong — the same trick the tasks room plays
 // with RRULEs, where the client only ever handles a preset.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 
 const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
 const form = document.querySelector<HTMLFormElement>('#tag-form');
@@ -56,25 +56,27 @@ if (sheet && form) {
     e.preventDefault();
     if (!subject) return;
     showError(null);
-    submitBtn.disabled = true;
-
-    try {
-      const { error } = await actions.events.tag({
-        externalId: subject,
-        personIds: checks()
-          .filter((c) => c.checked)
-          .map((c) => c.value),
-      });
-      if (error) throw new Error(error.message);
-      // Reload rather than patching: tagging somebody changes the day panel,
-      // the People zone's brief, and the drift guard — three surfaces, one of
-      // which is on another page.
-      location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — without this the button sticks disabled.
-      showError(formatActionError(err));
-      submitBtn.disabled = false;
-    }
+    const externalId = subject; // captured: `subject` is a `let`, so the guard
+    // above does not narrow it inside the callback below.
+    // The disable/await/format/restore lifecycle is `submitAction` now
+    // (docs/plans/25 · §2). NO `busy` LABEL HERE, deliberately: this is the one
+    // Save in the set that holds an `<Icon>` beside its word, and `busy` writes
+    // `textContent`, which would delete the glyph and never bring it back. The
+    // disabled state carries the whole message instead.
+    const res = await submitAction(
+      () =>
+        actions.events.tag({
+          externalId,
+          personIds: checks()
+            .filter((c) => c.checked)
+            .map((c) => c.value),
+        }),
+      { button: submitBtn, onError: showError },
+    );
+    if (!res.ok) return;
+    // Reload rather than patching: tagging somebody changes the day panel,
+    // the People zone's brief, and the drift guard — three surfaces, one of
+    // which is on another page.
+    location.reload();
   });
 }

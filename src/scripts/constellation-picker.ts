@@ -6,14 +6,16 @@
 //   flush(newId)                       — call right after a first save
 //   changed()                          — did membership change while open?
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { callAction, formatActionError, submitAction } from './action-error';
 import { announceSkyChange, onSkyChange, type SkyConstellation } from './sky-changed';
 
 export interface PickerHandle {
   /** Point the picker at a fragment (null = a new one, toggles get queued). */
   setFragment: (id: string | null, memberIds: string[]) => void;
-  /** A new fragment just got its id — persist whatever was queued. */
-  flush: (newId: string) => Promise<void>;
+  /** A new fragment just got its id — persist whatever was queued. Resolves
+   *  `false` if that write failed, so the host can hold its sheet open rather
+   *  than reporting a save that only half landed. */
+  flush: (newId: string) => Promise<boolean>;
   /** True if membership changed since the last setFragment (host may refresh). */
   changed: () => boolean;
   /** Tick a constellation without user input (e.g. the composing context). */
@@ -30,6 +32,8 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
   let fragmentId: string | null = null;
   let dirty = false;
   let inFlight: Promise<unknown> = Promise.resolve();
+  /** Did the most recent trip through the chain fail? Read by `flush`. */
+  let failed = false;
 
   const selected = () =>
     boxes()
@@ -43,19 +47,45 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
     if (!isError && msg) window.setTimeout(() => (status.textContent === msg ? (status.textContent = '') : null), 2000);
   }
 
-  /** Persist the current tick-state. Serialized so rapid toggles can't race. */
+  /**
+   * Persist the current tick-state. Serialized so rapid toggles can't race.
+   *
+   * ⚠ THE CHAIN MUST ALWAYS SETTLE **RESOLVED**, and that is the whole reason
+   * this block looks over-defended. `inFlight` is the serializer for every
+   * toggle in the sheet: one rejection poisons it, and then every subsequent
+   * tick is silently dropped for the rest of the session — the swallowed save,
+   * this codebase's named worst failure, arrived at from a direction no amount
+   * of care inside the callback would have caught. `astro:actions` THROWS on a
+   * dead network rather than returning `{ error }`, so before 2026-08-08 that
+   * took exactly one lost connection.
+   *
+   * Two defences, deliberately, because they guard different things:
+   * `callAction` makes the *failure legible* — a thrown `TypeError` and a
+   * returned error reach `say` as the same sentence — while the trailing
+   * `.catch` makes settling-resolved a property of the CHAIN rather than
+   * something that stays true only while nothing else in here ever throws.
+   */
   function persist() {
     if (!fragmentId) return; // queued until the first save (see flush)
     const ids = selected();
     const id = fragmentId;
-    inFlight = inFlight.then(async () => {
-      const fd = new FormData();
-      fd.set('fragment_id', id);
-      fd.set('constellation_ids', ids.join(','));
-      const { error } = await actions.constellations.setMembership(fd);
-      if (error) return say(formatActionError(error), true);
-      say(ids.length ? 'Saved' : 'Removed from all');
-    });
+    inFlight = inFlight
+      .then(async () => {
+        const fd = new FormData();
+        fd.set('fragment_id', id);
+        fd.set('constellation_ids', ids.join(','));
+        const { error } = await callAction(actions.constellations.setMembership(fd));
+        if (error) {
+          failed = true;
+          return say(formatActionError(error), true);
+        }
+        failed = false;
+        say(ids.length ? 'Saved' : 'Removed from all');
+      })
+      .catch((e) => {
+        failed = true;
+        say(formatActionError(e), true);
+      });
   }
 
   root.addEventListener('change', (e) => {
@@ -172,14 +202,20 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
       return;
     }
 
-    newSave.disabled = true;
     const fd = new FormData();
     fd.set('name', name); // status defaults to draft; colour is auto-picked
-    const { data, error } = await actions.constellations.save(fd);
-    newSave.disabled = false;
-    if (error || !data) return say(formatActionError(error), true);
+    // The button used to be disabled before an unguarded await, so a dead
+    // network took the footer's Create away for the life of the sheet and said
+    // nothing about why. `submitAction` owns both halves of that lifecycle.
+    const res = await submitAction(() => actions.constellations.save(fd), {
+      button: newSave,
+      onError: (m) => say(m, true),
+      reusable: true, // the footer stays on screen; it is not replaced by a save
+    });
+    if (!res.ok) return;
+    if (!res.data) return say('Something went wrong.', true);
 
-    const made = { id: data.id, name, slug: data.slug };
+    const made = { id: res.data.id, name, slug: res.data.slug };
     tick(addRow(made));
     foldForm(false);
     // `tick` fired `change`, which ran the persist/queue path above — so this
@@ -223,9 +259,11 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
     },
     async flush(newId) {
       fragmentId = newId;
-      if (!selected().length) return; // nothing queued
+      if (!selected().length) return true; // nothing queued
+      failed = false;
       persist();
       await inFlight;
+      return !failed;
     },
     changed: () => dirty,
     preselect(id) {

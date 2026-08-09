@@ -31,6 +31,7 @@
 // and the one that would drift is the one on screen at 7am. The module is
 // type-only in its imports, so it costs the bundle nothing but the functions.
 import { actions } from 'astro:actions';
+import { callAction, formatActionError } from './action-error';
 import { signalAttention } from './attention';
 import {
   OPEN_ENDED_LATENCY,
@@ -474,9 +475,15 @@ if (zone) {
     });
 
     const setSkipped = async (skipped: boolean) => {
-      const { error } = await actions.checkin.setSkipped({ logDate, skipped });
+      // ⚠ SKIP HAD NO CATCH while the autosave above has carried one since the
+      // day its own spec found the bug. Same surface, same header promising
+      // that *failure is loud*, and offline a Skip/Unskip tap did nothing at
+      // all — no reload, no sentence, an unhandled rejection. The one place a
+      // silent no-op is worst is the control whose whole meaning is "I answered
+      // this, stop asking."
+      const { error } = await callAction(actions.checkin.setSkipped({ logDate, skipped }));
       if (error) {
-        note(error.message || 'Not saved', true);
+        note(formatActionError(error), true);
         return;
       }
       location.reload();

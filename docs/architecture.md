@@ -109,6 +109,8 @@ Every mutation is an [Astro Action](https://docs.astro.build/en/guides/actions/)
 
 Client scripts (`src/scripts/`) are plain TypeScript modules imported by a page's `<script>` — no UI framework, no hydration. The DOM is the state: a selected segment lives in `aria-pressed`, a date lives in the date input, and there is no JavaScript copy of a form beside the form.
 
+⚠ **On the client, an action THROWS on a dead network — it does not return `{ error }`.** The fetch underneath rejects, so a bare `await actions.x.y(…)` skips everything after it: the re-enable, the close, the sentence. `src/scripts/action-error.ts` is the single owner of that invariant and offers three things — `submitAction` (the whole disable → label → await → format → restore lifecycle, and the first choice), `callAction` (turns a throw into `{ error }` where the control is not one button), and `formatActionError` (one human sentence from either kind of failure; **never hand-roll `err instanceof Error ? err.message : …`**, because `TypeError` extends `Error` and that idiom prints `Failed to fetch` in exactly the case its friendly fallback was written for). `src/tests/action-guard.test.ts` holds the line: it fails on any new bare `await actions.` and carries an allowlist of the files whose throw is caught elsewhere.
+
 ## 7. The public surfaces, as built
 
 - **The Sky** (`/`) — the constellation overview; `/{slug}` is one constellation as a typeset suite. Canonical and shareable: the zoom is navigation, and home *is* the overview (`design.md` §13).

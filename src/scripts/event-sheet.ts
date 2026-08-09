@@ -9,7 +9,7 @@
 // The DOM is the state: the checked boxes ARE the guest list, and the date input
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
@@ -110,9 +110,14 @@ if (sheet && form) {
   let filingNote: string | null = null;
 
   /** Says which row this is, and offers the other one. See KindBar.astro. */
-  const setKindBar = mountKindBar(form, (detail, to) =>
-    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
-  );
+  // ⚠ CLOSE FIRST, THEN ANNOUNCE — see `mountKindBar`'s note. The pile answers
+  // the switch by opening the task sheet, and a second `showModal()` stacks
+  // instead of replacing: without this line "make it a task instead" left this
+  // sheet sitting underneath, still holding the same sentence.
+  const setKindBar = mountKindBar(form, (detail, to) => {
+    sheet.close();
+    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } }));
+  });
 
   const open = (row?: EventRow, on?: string) => {
     showError(null);
@@ -192,49 +197,45 @@ if (sheet && form) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     showError(null);
-    submitBtn.disabled = true;
-    const label = submitBtn.textContent;
-    submitBtn.textContent = 'Saving…';
+    // The disable/label/format/restore lifecycle is `submitAction` now
+    // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
+    // CLOSES this sheet rather than replacing the page — and it is reopened for
+    // the next dump, with the same button.
+    const res = await submitAction(
+      () =>
+        actions.events.save({
+          id: editing ?? undefined,
+          title: titleInput.value.trim(),
+          startsOn: dateInput.value,
+          startsAt: startInput.value,
+          endsAt: endInput.value,
+          location: locationInput.value.trim(),
+          notes: notesInput.value.trim(),
+          personIds: checks()
+            .filter((c) => c.checked)
+            .map((c) => c.value),
+        }),
+      { button: submitBtn, busy: 'Saving…', onError: showError, reusable: true },
+    );
+    if (!res.ok) return;
 
-    try {
-      const { data, error } = await actions.events.save({
-        id: editing ?? undefined,
-        title: titleInput.value.trim(),
-        startsOn: dateInput.value,
-        startsAt: startInput.value,
-        endsAt: endInput.value,
-        location: locationInput.value.trim(),
-        notes: notesInput.value.trim(),
-        personIds: checks()
-          .filter((c) => c.checked)
-          .map((c) => c.value),
-      });
-      if (error) throw new Error(error.message);
-
-      // ⚠ TWO ENDINGS, as the task sheet has. In the Agenda room: reload, since
-      // which CELL a row lands in, the legend and the day panel are all
-      // functions of the row that changed. In the notes room: don't — a reload
-      // would throw away the pile's undo strip at the moment it has something
-      // to offer, and nothing on that page is derived from this event.
-      if (filingNote) {
-        const noteId = filingNote;
-        filingNote = null;
-        sheet.close();
-        document.dispatchEvent(
-          new CustomEvent('hq:note-filed', {
-            detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: data?.id } },
-          }),
-        );
-        return;
-      }
-      location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — without this the button sticks on "Saving…".
-      showError(formatActionError(err));
-      submitBtn.disabled = false;
-      submitBtn.textContent = label;
+    // ⚠ TWO ENDINGS, as the task sheet has. In the Agenda room: reload, since
+    // which CELL a row lands in, the legend and the day panel are all
+    // functions of the row that changed. In the notes room: don't — a reload
+    // would throw away the pile's undo strip at the moment it has something
+    // to offer, and nothing on that page is derived from this event.
+    if (filingNote) {
+      const noteId = filingNote;
+      filingNote = null;
+      sheet.close();
+      document.dispatchEvent(
+        new CustomEvent('hq:note-filed', {
+          detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: res.data?.id } },
+        }),
+      );
+      return;
     }
+    location.reload();
   });
 
   deleteBtn.addEventListener('click', async () => {
@@ -247,20 +248,22 @@ if (sheet && form) {
       danger: true,
     });
     if (!ok) return;
-    deleteBtn.disabled = true;
-    try {
-      const { error } = await actions.events.remove({ id: editing });
-      if (error) throw new Error(error.message);
-      location.reload();
-    } catch (err) {
+    const id = editing; // captured: `editing` is a `let`, so the guard above
+    // does not narrow it inside the callback below.
+    const res = await submitAction(() => actions.events.remove({ id }), {
+      button: deleteBtn,
       // The sheet is about to close on success, so a failure has to be visible
-      // where the eye already is.
-      showError(formatActionError(err));
-      if (pageError) {
-        pageError.textContent = 'Couldn’t delete that event.';
-        pageError.hidden = false;
-      }
-      deleteBtn.disabled = false;
-    }
+      // where the eye already is — and echoed on the page behind it, in case
+      // the sheet goes anyway.
+      onError: (m) => {
+        showError(m);
+        if (pageError) {
+          pageError.textContent = 'Couldn’t delete that event.';
+          pageError.hidden = false;
+        }
+      },
+    });
+    if (!res.ok) return;
+    location.reload();
   });
 }

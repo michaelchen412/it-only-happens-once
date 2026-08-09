@@ -42,6 +42,16 @@ export interface ParsedFields {
  * the sentence would cost another call and could return a different answer —
  * so pressing "make it an event instead" moves the same fields into the other
  * form, which is what a one-tap correction has to mean.
+ *
+ * ⚠ `onSwitch` MUST CLOSE ITS OWN SHEET, and the contract lives here because it
+ * is invisible from either end. This module deliberately knows nothing about
+ * what a switch opens — it announces, and the pile decides — but the pile
+ * answers by calling `showModal()` on the other `<dialog>`, and a second
+ * `showModal()` STACKS rather than replaces. So a bar that only announced left
+ * two modals on screen, the stale populated one revealed again the moment you
+ * closed the new one. Closing here rather than in the pile keeps the rule
+ * "whoever opened it closes it" intact, and it is the reason this note is
+ * attached to the callback instead of to either caller.
  */
 export function mountKindBar(
   root: ParentNode,

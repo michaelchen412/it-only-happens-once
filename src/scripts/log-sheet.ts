@@ -11,7 +11,7 @@
 // every motion — so there is exactly one implementation of "a dump left the
 // pile" rather than one per destination.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { anchorPopover } from './pop-anchor';
 import { shiftYmd } from '../lib/hq/time';
 
@@ -150,40 +150,36 @@ if (root && sheet) {
   saveBtn.addEventListener('click', async () => {
     const [personId, ...withIds] = [...chosen];
     if (!personId || !body.value.trim() || !noteId) return;
-
-    saveBtn.disabled = true;
-    const label = saveBtn.textContent;
-    saveBtn.textContent = 'Saving…';
+    const filing = noteId;
     showError(null);
 
-    try {
-      // `personId` is "whose profile this was logged from" — from the pile
-      // there is no profile, so the first person picked stands in. The action
-      // makes every id a participant either way, so which one leads changes
-      // nothing about the row.
-      const { data, error } = await actions.interactions.save({
-        personId,
-        withIds,
-        occurredOn,
-        kind: ($('[data-kind].is-on')?.dataset.kind ?? 'hangout') as 'hangout',
-        body: body.value.trim(),
-      });
-      if (error || !data) throw new Error(error?.message ?? 'Couldn’t save that.');
-
-      sheet!.close();
-      document.dispatchEvent(
-        new CustomEvent('hq:note-filed', {
-          detail: { noteId, what: 'a log entry', href: null, undo: { kind: 'interaction', id: data.id } },
+    // The disable/label/format/restore lifecycle is `submitAction` now
+    // (docs/plans/25 · §2). `reusable`, because this sheet is closed and
+    // reopened for the next dump rather than replaced by a navigation.
+    const res = await submitAction(
+      () =>
+        // `personId` is "whose profile this was logged from" — from the pile
+        // there is no profile, so the first person picked stands in. The action
+        // makes every id a participant either way, so which one leads changes
+        // nothing about the row.
+        actions.interactions.save({
+          personId,
+          withIds,
+          occurredOn,
+          kind: ($('[data-kind].is-on')?.dataset.kind ?? 'hangout') as 'hangout',
+          body: body.value.trim(),
         }),
-      );
-      noteId = null;
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — without this catch the button sticks on "Saving…" and the
-      // sheet silently swallows the entry.
-      showError(formatActionError(err));
-      saveBtn.disabled = false;
-      saveBtn.textContent = label;
-    }
+      { button: saveBtn, busy: 'Saving…', onError: showError, reusable: true },
+    );
+    if (!res.ok) return;
+    if (!res.data) return showError('Couldn’t save that.');
+
+    sheet!.close();
+    document.dispatchEvent(
+      new CustomEvent('hq:note-filed', {
+        detail: { noteId: filing, what: 'a log entry', href: null, undo: { kind: 'interaction', id: res.data.id } },
+      }),
+    );
+    noteId = null;
   });
 }

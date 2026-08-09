@@ -314,6 +314,12 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
           >
             {person.archived_at ? 'Put back in the roster' : 'Archive — keeps everything, removes them from the roster'}
           </button>
+          {/* ⚠ ITS OWN ERROR LINE. A failure here used to be written into the
+              bio box up in the rail — off screen from a control deliberately
+              placed at the foot of a long page, which makes a refused archive
+              indistinguishable from one that silently did nothing. Same
+              reasoning as LinkSheet's two error targets. */}
+          <p data-archive-error hidden role="alert" class="admin-alert mt-2" />
         </div>
       </div>
     )
@@ -335,6 +341,7 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
 
   <script>
     import { actions } from 'astro:actions';
+    import { submitAction } from '../../../scripts/action-error';
     import { confirmDialog } from '../../../scripts/confirm-dialog';
 
     const personId = document.querySelector<HTMLElement>('[data-person-id]')?.dataset.personId;
@@ -359,30 +366,35 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
       showForm(false);
     });
 
+    const showBioError = (msg: string) => {
+      if (!errorEl) return;
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    };
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const save = form.querySelector<HTMLButtonElement>('[data-bio-save]')!;
       const bio = form.querySelector<HTMLTextAreaElement>('textarea')!.value;
-      save.disabled = true;
-      save.textContent = 'Saving…';
-      try {
-        if (!personId) throw new Error('Missing person id.');
-        const { error } = await actions.people.saveBio({ id: personId, bio });
-        if (error) throw new Error(error.message);
-        // Reload so the prose comes back through the same Markdown renderer the
-        // server uses — rendering it a second way in the browser is how the
-        // saved text and the shown text start to disagree.
-        location.reload();
-      } catch (err) {
-        // `astro:actions` THROWS on a dead network rather than returning
-        // `{ error }`, so a catch is not optional here.
-        if (errorEl) {
-          errorEl.textContent = err instanceof Error ? err.message : 'Could not save — check your connection.';
-          errorEl.hidden = false;
-        }
-        save.disabled = false;
-        save.textContent = 'Save';
-      }
+      if (!personId) return showBioError('Missing person id.');
+      // ⚠ THIS HANDLER HAD THE CATCH AND STILL COULD NOT SAY THE SENTENCE IT
+      // CARRIED. It formatted with `err instanceof Error ? err.message : '…'`,
+      // which is the precise idiom `action-error.ts` was written to warn about:
+      // **`TypeError` extends `Error`**, so a dead network takes the FIRST
+      // branch and prints `Failed to fetch`, while "Could not save — check your
+      // connection" was unreachable in exactly the case it was written for.
+      // `submitAction` owns the whole lifecycle, so there is nothing left here
+      // to get wrong.
+      const res = await submitAction(() => actions.people.saveBio({ id: personId, bio }), {
+        button: save,
+        busy: 'Saving…',
+        onError: showBioError,
+      });
+      if (!res.ok) return;
+      // Reload so the prose comes back through the same Markdown renderer the
+      // server uses — rendering it a second way in the browser is how the
+      // saved text and the shown text start to disagree.
+      location.reload();
     });
 
     // ── archive / restore ───────────────────────────────────────────────────
@@ -405,14 +417,20 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
       );
       if (!ok || !personId) return;
 
-      const { error } = await actions.people.setArchived({ id: personId, archived: archiving });
-      if (error) {
-        if (errorEl) {
-          errorEl.textContent = error.message;
-          errorEl.hidden = false;
-        }
-        return;
-      }
+      // Was a bare await with no catch at all, so offline this control did
+      // nothing whatsoever — no navigation, no sentence, an unhandled
+      // rejection. The bio save above at least had a `try`; this one, six lines
+      // further down the same file, never got the paste.
+      const archiveError = document.querySelector<HTMLElement>('[data-archive-error]');
+      const res = await submitAction(() => actions.people.setArchived({ id: personId, archived: archiving }), {
+        button: archiveBtn,
+        onError: (msg) => {
+          if (!archiveError) return;
+          archiveError.textContent = msg;
+          archiveError.hidden = false;
+        },
+      });
+      if (!res.ok) return;
       location.href = archiving ? '/admin/people' : location.pathname;
     });
   </script>

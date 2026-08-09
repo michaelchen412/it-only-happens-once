@@ -16,7 +16,7 @@
 // `aria-pressed`, the date lives in the date input. There is no JavaScript copy
 // of the form beside the form.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
 import { ordinal } from '../lib/hq/dates';
@@ -77,9 +77,14 @@ if (sheet && form) {
    * The switch goes back to the pile rather than to the event sheet directly:
    * this file has no business knowing that an event sheet exists.
    */
-  const setKindBar = mountKindBar(form, (detail, to) =>
-    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
-  );
+  // ⚠ CLOSE FIRST, THEN ANNOUNCE — see `mountKindBar`'s note. The pile answers
+  // the switch by opening the event sheet, and a second `showModal()` stacks
+  // instead of replacing: without this line "make it an event instead" left
+  // this sheet sitting underneath, still holding the same sentence.
+  const setKindBar = mountKindBar(form, (detail, to) => {
+    sheet!.close();
+    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } }));
+  });
 
   const showError = (message: string | null) => {
     if (!errorEl) return;
@@ -348,59 +353,54 @@ if (sheet && form) {
     showError(null);
 
     const repeat = picked('rep', 'none') as 'none' | 'after' | 'fixed';
-    submitBtn.disabled = true;
-    const label = submitBtn.textContent;
-    submitBtn.textContent = 'Saving…';
+    // The disable/label/format/restore lifecycle is `submitAction` now
+    // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
+    // CLOSES this sheet rather than replacing the page — and it is reopened for
+    // the next dump, with the same button.
+    const res = await submitAction(
+      () =>
+        actions.tasks.save({
+          id: editing ?? undefined,
+          title: titleInput.value.trim(),
+          notes: notesInput.value.trim(),
+          dueOn: dueInput.value,
+          dueTime: timeInput.value,
+          priority: picked('prio', 'normal') as Priority,
+          effort: picked('effort', 'sitting') as Effort,
+          leadDays: overrideOn.checked ? overrideN.value : '',
+          repeat,
+          every: repeat === 'after' ? everyInput.value : '',
+          unit: repeat === 'after' ? (picked('unit', 'weeks') as 'days' | 'weeks' | 'months') : undefined,
+          preset: repeat === 'fixed' ? (presetSel.value as (typeof PRESETS)[number]) : undefined,
+          goalId: goalSel?.value ?? '',
+        }),
+      { button: submitBtn, busy: 'Saving…', onError: showError, reusable: true },
+    );
+    if (!res.ok) return;
 
-    try {
-      const { data, error } = await actions.tasks.save({
-        id: editing ?? undefined,
-        title: titleInput.value.trim(),
-        notes: notesInput.value.trim(),
-        dueOn: dueInput.value,
-        dueTime: timeInput.value,
-        priority: picked('prio', 'normal') as Priority,
-        effort: picked('effort', 'sitting') as Effort,
-        leadDays: overrideOn.checked ? overrideN.value : '',
-        repeat,
-        every: repeat === 'after' ? everyInput.value : '',
-        unit: repeat === 'after' ? (picked('unit', 'weeks') as 'days' | 'weeks' | 'months') : undefined,
-        preset: repeat === 'fixed' ? (presetSel.value as (typeof PRESETS)[number]) : undefined,
-        goalId: goalSel?.value ?? '',
-      });
-      if (error) throw new Error(error.message);
-
-      // ⚠ TWO ENDINGS, because the two rooms need opposite things.
-      //
-      // In the agenda room: reload. Which GROUP a task belongs to, how late it
-      // is, and the counts beside every heading are all functions of the row
-      // that just changed, and re-deriving four of them by hand is four chances
-      // to disagree with the database.
-      //
-      // In the notes room: DON'T. A reload there would throw away the pile's
-      // undo strip at the exact moment it has something to offer — and nothing
-      // on that page is derived from the task at all. So the sheet announces
-      // what happened and lets the pile do the tidying (scripts/notes.ts).
-      if (filingNote) {
-        const noteId = filingNote;
-        filingNote = null;
-        sheet!.close();
-        document.dispatchEvent(
-          new CustomEvent('hq:note-filed', {
-            detail: { noteId, what: 'a task', href: '/admin/agenda/tasks', undo: { kind: 'task', id: data?.id } },
-          }),
-        );
-        return;
-      }
-      location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }` — without this catch the button sticks on "Saving…" and the
-      // sheet silently swallows the task.
-      showError(formatActionError(err));
-      submitBtn.disabled = false;
-      submitBtn.textContent = label;
+    // ⚠ TWO ENDINGS, because the two rooms need opposite things.
+    //
+    // In the agenda room: reload. Which GROUP a task belongs to, how late it
+    // is, and the counts beside every heading are all functions of the row
+    // that just changed, and re-deriving four of them by hand is four chances
+    // to disagree with the database.
+    //
+    // In the notes room: DON'T. A reload there would throw away the pile's
+    // undo strip at the exact moment it has something to offer — and nothing
+    // on that page is derived from the task at all. So the sheet announces
+    // what happened and lets the pile do the tidying (scripts/notes.ts).
+    if (filingNote) {
+      const noteId = filingNote;
+      filingNote = null;
+      sheet!.close();
+      document.dispatchEvent(
+        new CustomEvent('hq:note-filed', {
+          detail: { noteId, what: 'a task', href: '/admin/agenda/tasks', undo: { kind: 'task', id: res.data?.id } },
+        }),
+      );
+      return;
     }
+    location.reload();
   });
 
   // ── deleting ──────────────────────────────────────────────────────────────
@@ -417,14 +417,13 @@ if (sheet && form) {
     });
     if (!ok) return;
 
-    deleteBtn.disabled = true;
-    try {
-      const { error } = await actions.tasks.remove({ id: editing });
-      if (error) throw new Error(error.message);
-      location.reload();
-    } catch (err) {
-      showError(formatActionError(err));
-      deleteBtn.disabled = false;
-    }
+    const id = editing; // captured: `editing` is a `let`, so the guard above
+    // does not narrow it inside the callback below.
+    const res = await submitAction(() => actions.tasks.remove({ id }), {
+      button: deleteBtn,
+      onError: showError,
+    });
+    if (!res.ok) return;
+    location.reload();
   });
 }

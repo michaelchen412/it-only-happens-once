@@ -11,7 +11,7 @@
 // each one can fail on its own, which is why a failed upload leaves you with a
 // created person and a sentence rather than a lost form.
 import { actions } from 'astro:actions';
-import { formatActionError } from './action-error';
+import { submitAction } from './action-error';
 import { uploadPrivateImage } from './upload';
 import { photoPath } from '../lib/hq/people';
 
@@ -21,7 +21,6 @@ const form = document.querySelector<HTMLFormElement>('#person-form');
 if (sheet && form) {
   const errorEl = document.querySelector<HTMLElement>('#person-error');
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-  const submitLabel = submitBtn.textContent ?? 'Save';
   const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]')!;
   const photoPreview = form.querySelector<HTMLImageElement>('[data-photo-preview]')!;
   const photoEmpty = form.querySelector<HTMLElement>('[data-photo-empty]')!;
@@ -102,54 +101,54 @@ if (sheet && form) {
     const data = new FormData(form);
     const str = (k: string) => String(data.get(k) ?? '');
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving…';
-
-    try {
-      const { data: saved, error } = await actions.people.save({
-        id: form.dataset.id || undefined,
-        displayName: str('displayName'),
-        circle: str('circle') as 'family' | 'friends' | 'professional',
-        epithet: str('epithet'),
-        location: str('location'),
-        birthMonth: str('birthMonth'),
-        birthDay: str('birthDay'),
-        birthYear: str('birthYear'),
-        knownSinceYear: str('knownSinceYear'),
-        cadenceMonths: str('cadenceMonths') || 12,
-        birthdayLeadDays: str('birthdayLeadDays') || 30,
-      });
-      if (error) throw new Error(error.message);
-
-      const file = photoInput.files?.[0];
-      if (file && saved) {
-        submitBtn.textContent = 'Uploading…';
-        // The PRIVATE bucket, which is why nothing here gets a public URL back.
-        // The list mirrors the bucket's own `allowed_mime_types`, so an
-        // unsupported file is a sentence here rather than a 400 from storage.
-        const path = await uploadPrivateImage(file, {
-          pathFor: (hash, ext) => photoPath(saved.id, hash, ext),
-          accept: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
+    // ⚠ THE THREE-STEP SAVE IS ONE LIFECYCLE, and it is why `submitAction`
+    // hands `work` a `busy` setter rather than taking a fixed label: this is
+    // the only consumer whose middle step needs to say something different.
+    // `formatActionError` covers both kinds of failure that can arrive here —
+    // an action's, and an `UploadError` carrying a sentence written for exactly
+    // this box. It overrides the message only when the failure is
+    // connectivity, which is the one case where "Upload failed: …" would be
+    // naming a symptom rather than the cause.
+    const res = await submitAction(
+      async (busy) => {
+        const { data: saved, error } = await actions.people.save({
+          id: form.dataset.id || undefined,
+          displayName: str('displayName'),
+          circle: str('circle') as 'family' | 'friends' | 'professional',
+          epithet: str('epithet'),
+          location: str('location'),
+          birthMonth: str('birthMonth'),
+          birthDay: str('birthDay'),
+          birthYear: str('birthYear'),
+          knownSinceYear: str('knownSinceYear'),
+          cadenceMonths: str('cadenceMonths') || 12,
+          birthdayLeadDays: str('birthdayLeadDays') || 30,
         });
-        const { error: photoError } = await actions.people.setPhoto({ id: saved.id, path });
-        if (photoError) throw new Error(photoError.message);
-      }
+        if (error || !saved) return { error };
 
-      // Reload rather than patching the DOM: the card, the section it belongs
-      // to and the coming-up rail are all functions of the row that just
-      // changed, and re-deriving three of them by hand is three chances to
-      // disagree with the database.
-      location.reload();
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }`, and an upload can throw an `UploadError` carrying a
-      // sentence written for exactly this box. `formatActionError` passes both
-      // through — it only overrides the message when the failure is
-      // connectivity, which is the one case where `UploadError`'s own wording
-      // ("Upload failed: …") would be describing a symptom rather than a cause.
-      showError(formatActionError(err));
-      submitBtn.disabled = false;
-      submitBtn.textContent = submitLabel;
-    }
+        const file = photoInput.files?.[0];
+        if (file) {
+          busy('Uploading…');
+          // The PRIVATE bucket, which is why nothing here gets a public URL
+          // back. The list mirrors the bucket's own `allowed_mime_types`, so an
+          // unsupported file is a sentence here rather than a 400 from storage.
+          const path = await uploadPrivateImage(file, {
+            pathFor: (hash, ext) => photoPath(saved.id, hash, ext),
+            accept: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
+          });
+          const { error: photoError } = await actions.people.setPhoto({ id: saved.id, path });
+          if (photoError) return { error: photoError };
+        }
+        return { data: saved };
+      },
+      { button: submitBtn, busy: 'Saving…', onError: showError },
+    );
+    if (!res.ok) return;
+
+    // Reload rather than patching the DOM: the card, the section it belongs
+    // to and the coming-up rail are all functions of the row that just
+    // changed, and re-deriving three of them by hand is three chances to
+    // disagree with the database.
+    location.reload();
   });
 }

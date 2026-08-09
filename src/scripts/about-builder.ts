@@ -29,7 +29,7 @@
 // against a deliberate break in that position before being trusted.
 import { actions } from 'astro:actions';
 import { mountRichEditor } from './rich-editor';
-import { formatActionError, nowTime } from './action-error';
+import { formatActionError, nowTime, submitAction } from './action-error';
 import { uploadImage } from './upload';
 
 const init = JSON.parse(document.getElementById('about-init')!.textContent || '{}');
@@ -135,7 +135,6 @@ function showError(msg: string) {
 
 saveBtn.addEventListener('click', async () => {
   errorBox.hidden = true;
-  saveBtn.disabled = true;
   spinner.hidden = false;
   statusText.textContent = 'Saving…';
   statusText.classList.remove('text-warning', 'text-error');
@@ -158,14 +157,24 @@ saveBtn.addEventListener('click', async () => {
     },
   };
 
-  const { error } = await actions.pages.save({ slug: 'about', content });
+  // ⚠ THE CATCH IS THE POINT, and it is a little galling that this file's own
+  // fifteen-line header is about silent-save hazards. `astro:actions` THROWS on
+  // a dead network rather than returning `{ error }`, so before 2026-08-08 an
+  // offline save left **"Saving…" with a live spinner on screen forever** —
+  // and About is the one room with no autosave, so nothing else was ever going
+  // to come along and correct it.
+  //
+  // NOT `reusable`: on success Save SHOULD stay disabled, because there is
+  // nothing left to save. `markDirty` is what brings it back, and the next edit
+  // is exactly when it should return. On failure `submitAction` restores it, so
+  // a retry no longer requires typing a character first.
+  const res = await submitAction(() => actions.pages.save({ slug: 'about', content }), {
+    button: saveBtn,
+    onError: showError,
+  });
   spinner.hidden = true;
-  if (error) {
-    showError(formatActionError(error));
-    return;
-  }
+  if (!res.ok) return;
   dirty = false;
-  saveBtn.disabled = true;
   statusText.textContent = 'Saved ' + nowTime();
   statusText.classList.remove('text-warning', 'text-error');
 });
