@@ -1,9 +1,36 @@
 ---
+/*
+  /reading — the long-form typography bench: Newsreader judged at real essay
+  length, in the measure and rhythm the published page uses. Working scaffolding
+  for building the site, not a room a reader is meant to find.
+
+  ⚠ DEV-GATED 2026-08-09, and this one was worse than the four gated before it.
+  /styleguide, /sky-lab, /reveal-lab and /afford-lab were bench pages showing
+  primitives; THIS page ships a FABRICATED ESSAY — an invented "Forgiveness"
+  with invented constellations and an invented date — public, un-gated and
+  indexable, one route away from the real essay of that name at
+  /blog/forgiveness. A search engine had no way to tell which was the writing.
+
+  It predates the 2026-08-07 sweep, whose comment in styleguide.astro shows it
+  only knew about four bench pages. Five now answer "is this public?" the same
+  way instead of four answering it one way and one drifting.
+
+  ⚠ THE ALTERNATIVE THAT LOST WAS DELETING IT, and the case was real:
+  `blog/[slug]` + PostArticle render every element this prototypes — `.reading`,
+  `.reading-lead`, `prose-measure`, the blockquote, the h2s — against fifty real
+  essays, so the layout's true consumer has absorbed it. What kept the file is
+  that a real essay is CONTENT and this is a CONTROL: judging a type change here
+  costs one page load and touches nothing that is published. Reverting the gate
+  is one line if that ever stops being worth 103 lines of sample prose.
+*/
 import Base from '../layouts/Base.astro';
 import Timestamp from '../components/Timestamp.astro';
 import Label from '../components/Label.astro';
 
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
 // Sample content — a plausible essay, so we can judge Newsreader at real length.
+// ⚠ Fabricated, every word of it. See the header: this is why the page is gated.
 const constellations = ['conditions, not character', 'the invisible graveyard'];
 ---
 
