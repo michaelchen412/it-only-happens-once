@@ -9,7 +9,7 @@ import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
 import { COLOR_SLOTS, leastUsedSlot } from '../lib/constellation-colors';
 import type { Database } from '../lib/database.types';
-import { constellationStatus, fail, idList, optText, optUuid } from './_shared';
+import { constellationStatus, fail, idList, optText, optUuid, requireAdmin, uniqueSlug } from './_shared';
 
 export const constellations = {
   save: defineAction({
@@ -30,18 +30,21 @@ export const constellations = {
       status: constellationStatus,
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
-      // unique slug among constellations (small table; linear probe like fragments)
-      const base = slugify(input.slug || input.name) || 'constellation';
-      let slug = base;
-      for (let i = 1; i < 60; i++) {
-        let q = sb.from('constellations').select('id').eq('slug', slug).limit(1);
-        if (input.id) q = q.neq('id', input.id);
-        const { data, error } = await q;
-        if (error) throw fail(error.message);
-        if (!data || data.length === 0) break;
-        slug = `${base}-${i + 1}`;
-      }
+      // A slug nobody else in `constellations` is using. This was a loop
+      // inlined here — the fourth copy of the same probe in the actions tree —
+      // until `uniqueSlug` learned to take its table. Worth noting what the
+      // copy got wrong: it fell out of the loop after 59 attempts and used the
+      // last candidate WITHOUT checking it, so a crowded name would have
+      // written a duplicate and failed at the unique index. The shared one
+      // refuses in a sentence instead.
+      const slug = await uniqueSlug(
+        sb,
+        'constellations',
+        slugify(input.slug || input.name) || 'constellation',
+        input.id,
+      );
       const scoreUrl = input.score_url?.trim();
       if (scoreUrl) {
         try {
@@ -87,6 +90,7 @@ export const constellations = {
     accept: 'form',
     input: z.object({ id: z.uuid() }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       // Placements cascade away; fragments are never touched.
       const { error } = await ctx.locals.supabase.from('constellations').delete().eq('id', input.id);
       if (error) throw fail(error.message);
@@ -98,6 +102,7 @@ export const constellations = {
     accept: 'form',
     input: z.object({ ids: z.string().min(1) }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.ids.split(',').filter(Boolean);
       for (let i = 0; i < ids.length; i++) {
@@ -115,6 +120,7 @@ export const constellations = {
     accept: 'form',
     input: z.object({ constellation_id: z.uuid(), fragment_id: z.uuid() }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const { data: last } = await sb
         .from('fragment_constellations')
@@ -139,6 +145,7 @@ export const constellations = {
     accept: 'form',
     input: z.object({ constellation_id: z.uuid(), fragment_id: z.uuid() }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase
         .from('fragment_constellations')
         .delete()
@@ -162,6 +169,7 @@ export const constellations = {
       constellation_ids: idList,
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const want = new Set(
         input.constellation_ids
@@ -217,6 +225,7 @@ export const constellations = {
       op: z.enum(['add', 'remove']),
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.fragment_ids
         .split(',')
@@ -259,6 +268,7 @@ export const constellations = {
     accept: 'form',
     input: z.object({ constellation_id: z.uuid(), fragment_ids: z.string().min(1) }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.fragment_ids.split(',').filter(Boolean);
       for (let i = 0; i < ids.length; i++) {

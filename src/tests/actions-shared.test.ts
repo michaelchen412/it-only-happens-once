@@ -182,12 +182,16 @@ describe('requireAdmin', () => {
 // uniqueSlug — the one function here that talks to the database.
 //
 // The fake below is a SHAPE HARNESS, not a Postgres emulator: it answers the
-// one query uniqueSlug makes (`select id from fragments where slug = ? [and id
-// != ?] limit 1`) out of a set of taken slugs. Matching the real filter
-// semantics any more closely would only be testing the fake.
+// one query uniqueSlug makes (`select id from <table> where slug = ? [and id
+// != ?] limit 1`) out of a set of taken slugs, and records which table was
+// asked. Matching the real filter semantics any more closely would only be
+// testing the fake.
 function fakeDb(taken: string[], opts: { failOn?: string } = {}) {
-  return {
-    from: () => {
+  const asked: string[] = [];
+  const db = {
+    asked,
+    from: (table: string) => {
+      asked.push(table);
       let slug = '';
       let exclude: string | undefined;
       const q = {
@@ -205,36 +209,59 @@ function fakeDb(taken: string[], opts: { failOn?: string } = {}) {
       };
       return q;
     },
-  } as unknown as Parameters<typeof uniqueSlug>[0];
+  };
+  return db as unknown as Parameters<typeof uniqueSlug>[0] & { asked: string[] };
 }
 
 describe('uniqueSlug', () => {
+  it('ASKS THE TABLE IT WAS GIVEN — the bug this argument exists for', async () => {
+    // Until 2026-08-08 this function was hard-wired to `fragments`, and
+    // subjects/authors/works called it anyway: their uniqueness was "checked"
+    // against a table they do not share a namespace with, so a real collision
+    // reached the database as a raw unique-violation string. Two other modules
+    // (people, goals) had written their own probe to avoid the trap and said so
+    // in a comment; a fourth copy was inlined in constellations.save. All four
+    // are gone, which is only safe if the table argument is actually used.
+    const db = fakeDb([]);
+    await uniqueSlug(db, 'subjects', 'forgiveness');
+    expect(db.asked).toEqual(['subjects']);
+  });
+
   it('returns the slug untouched when nothing has it', async () => {
-    expect(await uniqueSlug(fakeDb([]), 'forgiveness')).toBe('forgiveness');
+    expect(await uniqueSlug(fakeDb([]), 'fragments', 'forgiveness')).toBe('forgiveness');
   });
 
   it('counts up from 2, so the second one reads as the second', async () => {
-    expect(await uniqueSlug(fakeDb(['forgiveness']), 'forgiveness')).toBe('forgiveness-2');
-    expect(await uniqueSlug(fakeDb(['forgiveness', 'forgiveness-2']), 'forgiveness')).toBe('forgiveness-3');
+    expect(await uniqueSlug(fakeDb(['forgiveness']), 'fragments', 'forgiveness')).toBe('forgiveness-2');
+    expect(await uniqueSlug(fakeDb(['forgiveness', 'forgiveness-2']), 'fragments', 'forgiveness')).toBe(
+      'forgiveness-3',
+    );
   });
 
   it('a row does not collide with ITSELF when it is re-saved', async () => {
     // Without the exclusion, saving a piece twice would walk its slug to -2,
     // -3, -4 and break every link to it.
-    expect(await uniqueSlug(fakeDb(['forgiveness']), 'forgiveness', 'owner-of-forgiveness')).toBe('forgiveness');
+    expect(await uniqueSlug(fakeDb(['forgiveness']), 'fragments', 'forgiveness', 'owner-of-forgiveness')).toBe(
+      'forgiveness',
+    );
   });
 
   it('an empty base becomes "untitled" rather than an empty URL', async () => {
-    expect(await uniqueSlug(fakeDb([]), '')).toBe('untitled');
-    expect(await uniqueSlug(fakeDb(['untitled']), '')).toBe('untitled-2');
+    expect(await uniqueSlug(fakeDb([]), 'fragments', '')).toBe('untitled');
+    expect(await uniqueSlug(fakeDb(['untitled']), 'fragments', '')).toBe('untitled-2');
   });
 
   it('surfaces a database error instead of inventing a slug', async () => {
-    await expect(uniqueSlug(fakeDb([], { failOn: 'forgiveness' }), 'forgiveness')).rejects.toThrow(/db exploded/);
+    // The vocabulary callers used to wrap this in `.catch(() => slugify(name))`,
+    // which turned "the database is down" into a slug that might already be
+    // taken. The catch is gone; the throw has to survive.
+    await expect(uniqueSlug(fakeDb([], { failOn: 'forgiveness' }), 'subjects', 'forgiveness')).rejects.toThrow(
+      /db exploded/,
+    );
   });
 
   it('gives up rather than looping forever', async () => {
     const crowded = ['untitled', ...Array.from({ length: 60 }, (_, i) => `untitled-${i + 2}`)];
-    await expect(uniqueSlug(fakeDb(crowded), 'untitled')).rejects.toThrow(/Could not generate a unique slug/);
+    await expect(uniqueSlug(fakeDb(crowded), 'fragments', 'untitled')).rejects.toThrow(/Could not find a free URL/);
   });
 });

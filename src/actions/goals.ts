@@ -18,7 +18,7 @@
 // ============================================================================
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { blankToUndef, fail, optUuid, requireAdmin, type DB } from './_shared';
+import { blankToUndef, fail, optUuid, requireAdmin, uniqueSlug, type DB } from './_shared';
 import { ACTIVE_CAP, goalSlug } from '../lib/hq/goals';
 
 const input = z.object({
@@ -30,24 +30,6 @@ const input = z.object({
   horizon: z.enum(['this_season', 'this_year', 'next_few_years']).default('this_year'),
   status: z.enum(['active', 'paused', 'achieved', 'let_go']).default('active'),
 });
-
-/**
- * A slug nobody else is using.
- *
- * Its own function rather than `_shared`'s `uniqueSlug`, which is bound to
- * `fragments`: goals and fragments do not share a namespace, and nothing is
- * gained by pretending they do. Inactive goals still count — they keep their
- * address, so a link to something you let go still resolves.
- */
-async function uniqueGoalSlug(sb: DB, base: string): Promise<string> {
-  for (let i = 0; i < 60; i++) {
-    const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const { data, error } = await sb.from('goals').select('id').eq('slug', candidate).limit(1);
-    if (error) throw fail(error.message);
-    if (!data || data.length === 0) return candidate;
-  }
-  throw fail('Could not find a free URL for that name.');
-}
 
 /**
  * Refuse a sixth active goal, in a sentence rather than a constraint violation.
@@ -85,8 +67,9 @@ export const goals = {
 
       if (v.status === 'active') await assertRoomToActivate(sb);
       // The slug is minted once, from the name, and never re-minted: renaming a
-      // goal is ordinary and must not move its page.
-      const slug = await uniqueGoalSlug(sb, goalSlug(v.name));
+      // goal is ordinary and must not move its page. Inactive goals still count
+      // — they keep their address, so a link to something you let go resolves.
+      const slug = await uniqueSlug(sb, 'goals', goalSlug(v.name));
       const { data, error } = await sb
         .from('goals')
         .insert({ ...values, slug })

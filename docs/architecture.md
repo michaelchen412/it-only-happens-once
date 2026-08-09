@@ -105,7 +105,11 @@ Three conventions fall out of it and are worth stating separately:
 
 ### The write path
 
-Every mutation is an [Astro Action](https://docs.astro.build/en/guides/actions/) in `src/actions/`, composed by `index.ts` — *add a namespace by adding a file, never by growing the index*. Handlers run on `ctx.locals.supabase`, the caller's cookie-session client, so **RLS is the trust boundary and an action is a validation layer, not a security one**. `requireAdmin` is used where an action does not touch an RLS-protected table (the AI parser, the Spotify lookup), and as a readable refusal elsewhere.
+Every mutation is an [Astro Action](https://docs.astro.build/en/guides/actions/) in `src/actions/`, composed by `index.ts` — *add a namespace by adding a file, never by growing the index*. Handlers run on `ctx.locals.supabase`, the caller's cookie-session client, so **RLS is the trust boundary and an action is a validation layer, not a security one**.
+
+**Every action's first line is `requireAdmin(ctx)`**, with exactly one exception — `contact.send`, the public form on /about. The older rule was narrower (guard only what touches no RLS-protected table: the AI parser, the Spotify lookup) and it did not survive a growing tree — by 2026-08-08 guarding followed module ancestry rather than policy, leaving 27 mutating handlers open. They were never *exploitable*, because RLS held; the problem is that **RLS refuses silently** — a non-admin's update matches zero rows, which is not an error, so the action answers `{ ok: true }` and the screen reports a save that never happened. `src/tests/actions-admin-guard.test.ts` holds the line, with a one-entry allowlist.
+
+⚠ **One write is not in this layer at all.** Merging two subjects, authors or works is a plpgsql function called over `rpc` (`supabase/migrations/20260809013157_*.sql`), because a merge remaps several tables and then deletes a row — and a merge that fails halfway is worse than one that fails, since the FKs it leaves behind are `set null` and `cascade`. One function is one transaction; the actions in `vocabulary.ts` are only the door.
 
 Client scripts (`src/scripts/`) are plain TypeScript modules imported by a page's `<script>` — no UI framework, no hydration. The DOM is the state: a selected segment lives in `aria-pressed`, a date lives in the date input, and there is no JavaScript copy of a form beside the form.
 

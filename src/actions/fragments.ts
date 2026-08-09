@@ -174,6 +174,7 @@ export const fragments = {
       base_updated_at: optText, // opaque concurrency token; mismatch → CONFLICT
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const publishing = input.status === 'published';
       const title = input.title?.trim() ?? '';
@@ -182,7 +183,7 @@ export const fragments = {
       if (publishing && !body.trim()) throw fail('Write something before publishing', 'BAD_REQUEST');
 
       const base = input.slug || title || firstWords(body) || 'untitled';
-      const slug = await uniqueSlug(sb, slugify(base), input.id);
+      const slug = await uniqueSlug(sb, 'fragments', slugify(base), input.id);
       const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
         type: 'writing',
         title: title || null,
@@ -233,6 +234,7 @@ export const fragments = {
       slug: optText,
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       // ⚠ `details` IS DOWN TO ONE KEY, and that is the whole story of plan 17.
       // It is a drawer, not a schema: a key here is write-only until something
@@ -286,7 +288,7 @@ export const fragments = {
       // which both renderers already handle by drawing no line at all.
       const attribution = input.attribution?.trim() || derived || null;
       const base = input.slug || `${attribution ?? ''} ${firstWords(input.body)}`;
-      const slug = await uniqueSlug(sb, slugify(base), input.id);
+      const slug = await uniqueSlug(sb, 'fragments', slugify(base), input.id);
       const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
         type: 'quote',
         title: null,
@@ -336,12 +338,18 @@ export const fragments = {
       slug: optText,
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       // The URL is the single source of truth for what's being cited — the id
       // and the kind both come from it, so a stale hidden field can't disagree.
       const ref = parseSongRef(input.spotify_url);
       if (!ref) throw fail('That doesn’t look like a Spotify track, album, or YouTube link', 'BAD_REQUEST');
-      const slug = await uniqueSlug(sb, slugify(input.slug || `${input.title} ${input.attribution}`), input.id);
+      const slug = await uniqueSlug(
+        sb,
+        'fragments',
+        slugify(input.slug || `${input.title} ${input.attribution}`),
+        input.id,
+      );
       // `spotify_id` stays the key for Spotify refs so existing rows keep their
       // meaning; a YouTube citation records its own id under its own name.
       const details: Record<string, Json> =
@@ -522,6 +530,7 @@ export const fragments = {
     accept: 'form',
     input: z.object({ id: z.string().min(1) }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase
         .from('fragments')
         .update({ deleted_at: new Date().toISOString() })
@@ -536,6 +545,7 @@ export const fragments = {
     accept: 'form',
     input: z.object({ id: z.string().min(1) }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase.from('fragments').update({ deleted_at: null }).eq('id', input.id);
       if (error) throw fail(error.message);
       return { ok: true };
@@ -547,6 +557,7 @@ export const fragments = {
     accept: 'form',
     input: z.object({ id: z.string().min(1) }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase
         .from('fragments')
         .delete()
@@ -562,6 +573,7 @@ export const fragments = {
     accept: 'form',
     input: z.object({}),
     handler: async (_input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase.from('fragments').delete().not('deleted_at', 'is', null);
       if (error) throw fail(error.message);
       return { ok: true };
@@ -657,6 +669,7 @@ export const fragments = {
       op: z.enum(['publish', 'draft', 'note', 'trash', 'restore', 'purge']),
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.ids
         .split(',')
@@ -761,6 +774,7 @@ export const songs = {
   pair: defineAction({
     input: z.object({ fragment_id: z.uuid(), song_id: optUuid }),
     handler: async ({ fragment_id, song_id }, ctx) => {
+      requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       if (song_id) {
         if (song_id === fragment_id) throw fail('A piece can’t be paired with itself.', 'BAD_REQUEST');

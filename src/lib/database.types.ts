@@ -1106,6 +1106,9 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      merge_authors: { Args: { from_id: string; into_id: string }; Returns: undefined }
+      merge_subjects: { Args: { from_id: string; into_id: string }; Returns: undefined }
+      merge_works: { Args: { from_id: string; into_id: string }; Returns: undefined }
     }
     Enums: {
       awakenings: "none" | "few" | "many"

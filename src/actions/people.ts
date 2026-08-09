@@ -18,7 +18,7 @@
 // the real work. This layer validates and converts; it is not the boundary.
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
-import { fail, optUuid, requireAdmin, type DB } from './_shared';
+import { fail, optUuid, requireAdmin, uniqueSlug, type DB } from './_shared';
 import { monthsToDays, personSlug, PHOTO_BUCKET } from '../lib/hq/people';
 
 /**
@@ -91,24 +91,6 @@ function assertBirthday(month: number | null, day: number | null, year: number |
   }
 }
 
-/**
- * A slug nobody else is using.
- *
- * Its own function rather than `_shared`'s `uniqueSlug`, which is bound to the
- * `fragments` table — people and fragments do not share a namespace, and
- * nothing is gained by pretending they do. Archived rows still count: they keep
- * their address so an old link resolves.
- */
-async function uniquePersonSlug(sb: DB, base: string): Promise<string> {
-  for (let i = 0; i < 60; i++) {
-    const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const { data, error } = await sb.from('people').select('id').eq('slug', candidate).limit(1);
-    if (error) throw fail(error.message);
-    if (!data || data.length === 0) return candidate;
-  }
-  throw fail('Could not find a free URL for that name.');
-}
-
 export const people = {
   /**
    * Create or update the fixed facts.
@@ -152,7 +134,9 @@ export const people = {
         return data;
       }
 
-      const slug = await uniquePersonSlug(sb, personSlug(v.displayName));
+      // Archived people still count: they keep their address, so an old link
+      // to somebody you stopped seeing still resolves.
+      const slug = await uniqueSlug(sb, 'people', personSlug(v.displayName));
       const { data, error } = await sb
         .from('people')
         .insert({ ...values, slug })

@@ -21,3 +21,22 @@
  * that keeps passing while it drifts away from what production throws.
  */
 export { ActionError, isActionError, isInputError } from '../../../node_modules/astro/dist/actions/runtime/client.js';
+
+/**
+ * The real `defineAction`, for the same reason and by the same deep path.
+ *
+ * ⚠ THIS IS WHAT MAKES A HANDLER TESTABLE AT ALL, and it was worth checking
+ * before assuming otherwise: `runtime/server.js` imports nothing virtual (only
+ * devalue, zod and Astro's own core modules), unlike the entrypoint above it.
+ * So a unit test can drive the action a browser drives — input coercion, Zod,
+ * the guard and the handler — instead of a hand-extracted copy of the handler's
+ * body, which is the version that stays green while the real one rots.
+ *
+ * ⚠ HOW TO CALL ONE, because it is not obvious: the value `defineAction`
+ * returns refuses to run unless `this` is an action context. Use
+ * `action.orThrow.call(ctx, input)` — `orThrow` skips only the result
+ * WRAPPING, so a refusal arrives as a thrown `ActionError` (which is what you
+ * want to assert on) and everything before it still runs. `src/tests/
+ * actions-vocabulary.test.ts` is the worked example.
+ */
+export { defineAction } from '../../../node_modules/astro/dist/actions/runtime/server.js';

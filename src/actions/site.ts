@@ -7,7 +7,7 @@ import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { Resend } from 'resend';
 import type { Json } from '../lib/database.types';
-import { fail } from './_shared';
+import { fail, requireAdmin } from './_shared';
 
 /** Verify a Cloudflare Turnstile token server-side. Returns false on any failure. */
 async function verifyTurnstile(secret: string, token: string, ip?: string): Promise<boolean> {
@@ -66,6 +66,7 @@ export const pages = {
       }),
     }),
     handler: async (input, ctx) => {
+      requireAdmin(ctx);
       const { error } = await ctx.locals.supabase
         .from('pages')
         .upsert({ slug: input.slug, content: input.content as unknown as Json }, { onConflict: 'slug' });
@@ -97,6 +98,14 @@ export const contact = {
       token: z.string().optional(),
     }),
     handler: async (input, ctx) => {
+      // ⚠ NO `requireAdmin` HERE, AND THAT IS NOT AN OVERSIGHT. Every other
+      // mutating handler in this tree guards (see `requireAdmin`'s note in
+      // _shared.ts); this one is the single deliberate exception, because a
+      // contact form a stranger cannot use is not a contact form. What stands
+      // in for the guard is the honeypot below, the Turnstile check, and the
+      // fact that this writes to no table at all — it hands a message to
+      // Resend and returns.
+      //
       // Bots that trip the honeypot get a silent "success" — never a signal.
       if (input.company && input.company.trim()) return { ok: true };
 
