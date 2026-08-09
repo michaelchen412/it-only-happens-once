@@ -25,20 +25,22 @@ All three are the same Astro app, sharing the design system and components. The 
 | Layer | Choice | Notes |
 |---|---|---|
 | Framework | **Astro 7** | `output: 'server'` (on-demand rendering) |
-| Styling | **Tailwind 4 + daisyUI 5** | CSS-first; tokens and themes in `src/styles/app.css`, which imports `admin.css` and `hq.css` |
+| Styling | **Tailwind 4 + daisyUI 5** | CSS-first; tokens and themes in `src/styles/app.css`. It imports `admin.css`; **`hq.css` is loaded by `AdminLayout` instead** (see §9) |
 | Fonts | **Astro Fonts API** | self-hosted Newsreader + Atkinson Hyperlegible |
 | Icons | **astro-icon + Phosphor** | only used icons bundled |
 | Database | **Supabase (Postgres)** | single source of truth for all content |
-| Auth | **Supabase Auth** | single admin; Google OAuth + passkeys (beta); native RLS ([`auth.md`](auth.md)) |
+| Auth | **Supabase Auth** | single admin; **Google OAuth only**; native RLS ([`auth.md`](auth.md)) |
 | Hosting | **Vercel** | adapter provides SSR + on-demand revalidation (ISR) |
 
 ## 3. Rendering strategy
 
-The app runs on demand (**`output: 'server'` + an adapter**) so DB-backed pages render fresh and the admin can be auth-gated server-side. We then choose per surface:
+The app runs on demand (**`output: 'server'` + the Vercel adapter**) so DB-backed pages render fresh and the admin can be auth-gated server-side. **Every route is server-rendered; the difference between surfaces is the cache header, not the render mode.**
 
-- **Public pages → server-rendered from Supabase, cached at the edge.** Read published content via the Supabase anon key (RLS-protected), and cache responses (`Cache-Control` / Vercel on-demand revalidation). On a cache hit these are as fast as static; on publish they revalidate. Content appears without a manual rebuild.
-- **Truly static pages** (e.g. About) → `export const prerender = true`, baked at build time.
-- **Admin (`/admin`) → `export const prerender = false`, auth-gated.** Middleware redirects unauthenticated requests to sign-in; server code reads the Supabase user from the cookie session (`@supabase/ssr`).
+- **Public pages → server-rendered from Supabase, cached at the edge.** Read published content via the Supabase anon key (RLS-protected), and set `Cache-Control: public, s-maxage=60, stale-while-revalidate=86400` — the Sky, `/blog`, `/blog/[slug]`, `/{slug}` and `/about` each set it themselves. On a cache hit these are as fast as static; a publish is visible within the minute. Content appears without a manual rebuild.
+- **⚠ A page an admin is previewing flips to `private, no-store`** instead. A draft renders for Michael and 404s for everyone else, so caching that response at the edge would hand a draft to the next stranger. `[slug].astro` and `blog/[slug].astro` both branch on it, and `PreviewBar` says so in its own header.
+- **The Observatory → uncached, auth-gated.** Middleware sets `Cache-Control: no-store` on the whole of `/admin` and redirects unauthenticated requests to sign-in; server code reads the session from the cookie (`@supabase/ssr`). The cost is bfcache for the admin, taken deliberately — a restored workshop is a lying workshop ([`admin.md`](admin.md) §2a).
+
+⚠ **There is no prerendered tier, and there never was one in this tree.** This section described "truly static pages (e.g. About) → `export const prerender = true`" until 2026-08-09; `grep -rn prerender src/` returns **nothing**, and `about.astro` is SSR with an edge cache like its neighbours. Astro's `output: 'server'` makes on-demand the default, so a page becomes static only by opting in — and nothing here ever did. The claim was plausible enough to survive a year of reading, which is exactly what makes it worth a line rather than a silent delete.
 
 Rationale and alternatives (pure SSG + rebuild-on-publish, etc.) in [ADR 0001](adr/0001-rendering-and-hosting.md).
 
@@ -49,7 +51,7 @@ Public read:
   Browser ──▶ Astro (SSR, edge-cached) ──▶ Supabase (anon key, RLS: published only) ──▶ HTML
 
 Admin write:
-  Browser ──▶ Supabase Auth (Google / passkey) ──▶ Astro /admin (SSR, cookie session)
+  Browser ──▶ Supabase Auth (Google OAuth) ──▶ Astro /admin (SSR, cookie session)
                                                    │
                                      Supabase server client (@supabase/ssr, user session)
                                                    ▼
@@ -64,7 +66,7 @@ Admin write:
 
 | | Public | Admin (`/admin`) |
 |---|---|---|
-| Rendering | SSR + edge cache (some prerendered) | SSR, uncached |
+| Rendering | SSR + edge cache (`s-maxage=60`) | SSR, `no-store` |
 | Access | anyone | authenticated admin only |
 | DB access | anon key, RLS = published only | user session, RLS = admin write |
 | Build cadence | independent of content changes (SSR reads live data) | — |
@@ -119,7 +121,7 @@ Client scripts (`src/scripts/`) are plain TypeScript modules imported by a page'
 
 - **The Sky** (`/`) — the constellation overview; `/{slug}` is one constellation as a typeset suite. Canonical and shareable: the zoom is navigation, and home *is* the overview (`design.md` §13).
 - **The blog** (`/blog`) — writing by date, with quote and music indexes in their own view shapes, plus search and subject filters ([`search.md`](search.md)).
-- **A single piece** (`/blog/[slug]`) — the `/reading` layout, rendering one `writing` fragment. An unpublished one is visible to the admin behind a preview bar and 404s for everyone else.
+- **A single piece** (`/blog/[slug]`) — one `writing` fragment in the `.reading` type treatment (`app.css`). An unpublished one is visible to the admin behind a preview bar and 404s for everyone else.
 - **About** (`/about`) — built from the About builder, with a contact form (Resend + Cloudflare Turnstile).
 
 ## 8. Migration
@@ -139,15 +141,19 @@ As it stands. *(This section describes the tree today; history lives in the ADRs
 ```
 src/
   styles/
-    app.css                ← the law: theme, type, base — and it imports the other two, LAST
-    admin.css              ← the workshop's component classes (.admin-*, the sheets, the rows)
-    hq.css                 ← the Observatory's primitives (.zone, .row, .chip, .stamp, …)
+    app.css                ← the law: theme, type, base — and it imports admin.css, LAST
+    admin.css              ← component classes; NOT admin-only — 50 of them are public (the
+                             Sky, the suites, the Reader, the feed cards), which is why it
+                             is still in app.css while hq.css is not
+    hq.css                 ← the Observatory's primitives (.zone, .row, .chip, .stamp, …).
+                             56 KB, loaded by AdminLayout so it never reaches a reader
   layouts/                 ← Base · SiteLayout (public) · AdminLayout (the Observatory)
   components/              ← public primitives: PostCard, Reader, Timestamp, StarMark, …
     admin/                 ← private ones: Zone, PageHeader, the *Sheet dialogs, the *Zone cards
       checkin/             ← the Morning card's two heavy panels (DonePanel, FillPanel)
   lib/
-    supabase.ts            ← client factories (browser / server session via @supabase/ssr)
+    supabase.ts            ← the SERVER client factory only (@supabase/ssr, request-bound).
+                             createBrowserClient is imported at its three call sites — auth.md §4
     database.types.ts      ← GENERATED from the live schema; never hand-edit
     blog.ts, media.ts, markdown.ts, fragment-query.ts, …   ← the corpus half
     hq/                    ← the private half: rules, then loaders (ADR 0016)
@@ -156,7 +162,9 @@ src/
   pages/
     index.astro            ← the Sky (constellation overview)
     [slug].astro           ← one constellation
-    blog/, about, reading, constellations, styleguide
+    blog/, about, constellations
+                           reading, styleguide, sky-lab, reveal-lab, afford-lab
+                             ← benches: all five 302 to / in production
     admin/                 ← Today (index), people/, agenda/, notes, fragments, library, …
     auth/callback.ts       ← OAuth code exchange → session cookies
   tests/                   ← vitest: pure functions only (*.test.ts)
@@ -170,17 +178,40 @@ scripts/                   ← one-off Node tooling (imports, backfills, build c
 ## 9a. Working on it
 
 ```
-npm run dev        astro dev
-npm run verify     format:check + lint + astro check + test   ← before pushing
-npm run test       vitest (pure functions)
-npm run test:e2e   Playwright — needs a dev server and a real admin session
-npm run format     prettier across the tree
+npm run dev              astro dev
+npm run verify           format:check + lint + astro check + test   ← ~22s
+npm run build            verify, THEN astro build — what Vercel runs
+npm run build:unchecked  the build alone; local iteration only
+npm run test             vitest (pure functions)
+npm run test:e2e         Playwright — needs a dev server and a real admin session
+npm run format           prettier across the tree
 ```
 
-**`npm run verify` is the gate.** A pre-commit hook (husky + lint-staged) formats
-and lints *staged files only* — deliberately not the test suite, because a slow
-hook is a bypassed hook. Formatting is Prettier's alone; ESLint carries no style
-rule.
+**`npm run verify` is the gate, and since 2026-08-09 it is one literally.** It is
+the first thing `npm run build` runs, and Vercel's build command is
+`npm run build` — so **a failing check fails the build and the deploy never
+happens.** The last good deployment keeps serving. This is the difference between
+a tripwire and a gate, and on a repo where *pushing `main` is a production
+deploy* only the gate actually stops anything: a GitHub Action would report the
+breakage while the broken version was already live.
+
+- **Roughly 22s per deploy** — format:check 5.6s, lint 3.1s, astro check 12.4s,
+  test 1.0s. The e2e suite is deliberately **not** in it: it needs a live session
+  key and a running server, and a slow gate is a bypassed gate — the same
+  reasoning that keeps the pre-commit hook to staged files only.
+- **`build:unchecked` exists for local iteration** on `astro.config.mjs`'s
+  `noExternal` and on `check-server-bundle.mjs`, where the checks are 22s of
+  noise per attempt. ⚠ **Never point Vercel's Build Command at it.** That setting
+  is currently unset, which is what makes `package.json` the one place the gate
+  is described; overriding it would remove the gate silently, from a web form,
+  with no diff.
+- **The precedent is `scripts/check-server-bundle.mjs`**, chained into the same
+  script since 2026-07-31 because a production 500 got past every local check.
+  The gate is not new machinery here — it is that idea applied to `verify`.
+
+A pre-commit hook (husky + lint-staged) formats and lints *staged files only* —
+deliberately not the test suite, for the reason above. Formatting is Prettier's
+alone; ESLint carries no style rule.
 
 ⚠ **Green checks are necessary and nowhere near sufficient.** Twice, work has
 shipped with a clean typecheck, a clean build and green unit tests and been
@@ -193,4 +224,4 @@ Turn it on once per clone: `git config blame.ignoreRevsFile .git-blame-ignore-re
 
 ## 10. Environment & secrets
 
-See [`auth.md`](auth.md) §Secrets for the full table. In short: `PUBLIC_*` keys are browser-safe (Supabase URL + anon key); `SUPABASE_SERVICE_ROLE_KEY` is server-only and never imported into client code. Google OAuth credentials live in the Supabase dashboard, not in env.
+[`auth.md`](auth.md) §6 holds the full table — **ten variables in this app's env, plus three that belong to Supabase** because that is where the code holding them runs. In short: four `PUBLIC_*` keys are browser-safe and are inlined into the bundle at build time (Supabase URL + anon key, the Turnstile site key, the VAPID public key); six server-only ones are read at runtime through `getSecret()` so an unset key is a sentence rather than a 500; `SUPABASE_SERVICE_ROLE_KEY` is never imported into client code *or* into request-handling code. Google OAuth credentials live in the Supabase dashboard, not in env.

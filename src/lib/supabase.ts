@@ -12,9 +12,10 @@ const SUPABASE_ANON_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
  * the incoming request cookies and writes any refreshed session cookies back
  * onto the response. Typed against our generated Database types.
  *
- * The browser side (sign-in, sign-out, passkeys) uses `createBrowserClient`
+ * The browser side (sign-in, sign-out, storage uploads) uses `createBrowserClient`
  * from `@supabase/ssr` directly inside a client <script>, so no server code is
- * pulled into the browser bundle.
+ * pulled into the browser bundle. It is deliberately NOT re-exported from here
+ * — see docs/auth.md §4 for the three sites and why each imports it itself.
  */
 export function createSupabaseServerClient(context: { request: Request; cookies: AstroCookies }) {
   return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
