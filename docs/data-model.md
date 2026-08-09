@@ -46,7 +46,15 @@ erDiagram
     text name
     text slug UK
     text description
+    text status
+    text color
+    text score_url
     int sort
+  }
+  pages {
+    text slug PK
+    jsonb content
+    timestamptz updated_at
   }
   fragment_constellations {
     uuid fragment_id FK
@@ -131,8 +139,42 @@ create table constellations (
   slug        text not null unique,
   description text,
   sort        int  not null default 0, -- manual ordering hint (weight is otherwise derived)
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- The three below arrived in July 2026 and are all load-bearing in the
+  -- composing room (admin.md §2). They were missing from this block until
+  -- 2026-08-09, which made the DDL here describe a sky with no drafts and no
+  -- colour — i.e. one you could not have built the composer against.
+  status    text not null default 'draft'
+              check (status in ('draft','published')),
+              -- A "pile" is just a draft. Drafts never reach the public sky:
+              -- `constellations_select_public` is `status = 'published'`, which
+              -- is what makes /{slug} a free draft preview for the admin.
+  color     text not null default 'amber'
+              check (color in ('violet','ice','azure','gold','amber','sand','ember','rose')),
+              -- A SLOT, never a raw value — app.css owns what the slot means in
+              -- each theme, so design.md's one-palette law survives. A new
+              -- constellation auto-takes the least-used slot.
+  score_url text  -- the suite's playlist (ADR-0009). A playlist is deliberately
+                  -- not a song fragment; it belongs to the constellation.
 );
+-- ⚠ `status` here is a plain `text` + CHECK, NOT the `fragment_status` enum, and
+-- the difference reaches the app: `_shared.ts` splits the Zod schema into
+-- `fragmentStatus` and `constellationStatus` so "a constellation that is a note"
+-- is refused at the boundary rather than at the database (admin.md §5b).
+
+-- An editable singleton page (About, and later `now` / `colophon`). NOT a
+-- fragment: it never appears in a feed, and has no provenance, constellation or
+-- subject semantics — which is the whole reason it is its own table rather than
+-- a fourth `fragment_type`. Written by the About builder (`actions/site.ts`);
+-- `content`'s per-page shape is validated by that action's Zod schema, not by
+-- the database. See ADR 0020 for what the About page is now allowed to say.
+create table pages (
+  slug       text primary key,                  -- 'about', later 'now', 'colophon', …
+  content    jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now() -- moddatetime trigger
+);
+-- Security posture mirrors fragments' public metadata: anyone READS a page
+-- (there is one, and it is meant to be public); only the admin writes.
 
 -- Placement + composed order. `position` is the authored adjacency (the "suite").
 create table fragment_constellations (
@@ -366,6 +408,21 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 - **Google's auto-generated birthdays are dropped at ingest** — HQ derives birthdays from `people` and draws them as a mark rather than a row, so importing Google's would put two differently-drawn entries on one day. On the live calendar that filter removes **31 of 48 events**.
 - **`calendar_sync` is one row**: the incremental cursor, when Google was last reached, and the last error. It is a *separate* table from `settings` on purpose — `settings` is configuration a person chooses, this is machine state a sync writes, and a background write should not touch the row everything else derives "today" from.
 
+**`push_subscriptions` + `push_day_claims`** — the tripwire's two tables ([ADR 0019](adr/0019-push-is-a-contract-you-sign.md), [admin.md](admin.md) §9a, plan 21). **The first schema in the building that exists to reach Michael when no page is open**, which is why [ADR 0013](adr/0013-absence-never-accumulates.md) is at its maximum strength here — a push is the loudest possible version of the surface that ADR is about.
+
+| Table | Key | Why it exists |
+|---|---|---|
+| `push_subscriptions` | **`endpoint`**, the primary key | One row per installed **device**, and that is the point: the phone and the desktop each subscribe separately and a send is a loop over all of them. The endpoint is minted by the push service, is what the sender POSTs to, and is what a 404/410 condemns — so a synthetic `uuid` beside it would be a second name for one thing that every upsert and every prune would have to disambiguate. `p256dh` / `auth` are the subscription's own encryption parameters, stored exactly as `PushSubscription.toJSON()` delivers them; `user_agent` exists only so a human pruning by hand can tell which row is which phone, and **nothing branches on it**. `last_seen_at` is bumped on every admin load — see below. |
+| `push_day_claims` | **`ymd`**, a local date | **The INSERT *is* the claim.** `insert … on conflict (ymd) do nothing returning ymd` — no row back means somebody already sent today. The scheduler fires **hourly** (it must: `pg_cron` runs on UTC and HQ's day boundary is `settings.home_timezone`, so resolving the zone in code is the only thing that survives DST), so the guard against a second push cannot be the schedule and has to be the database. It closes three real cases: the tick firing twice, a manual run racing the schedule, and **the November night 01:00–02:00 happens twice**. `delivered` records how many devices were actually reached, so *"did it go out?"* and *"did it go anywhere?"* stay different questions. |
+
+> ⚠ **There is no `push_enabled` flag, and its absence is the off switch.** `push.forget` deletes the device's row, and the sender cannot reach an endpoint it does not have — so turning off **cannot fail open**. A global boolean would create "subscribed but muted": indistinguishable from off, two places to look when nothing arrives, and a new way for the feature to be silently broken.
+
+> ⚠ **`settings.push_time` is a `time`, not a `timestamptz`** — the same argument `tasks.due_time` makes. *"Ten in the morning"* is a fact about Michael's morning; a stored instant would move the hour he chose the moment he travelled. The zone is applied at read time, in the sender. The default is **10:00 rather than 07:00** because this is a tripwire and not a reminder: at 7am the check-in is unanswered on nearly every day *including every good one*, so the push would fire ~365 times a year and become the ping you learn to swipe away. **If it starts speaking most days, the hour is wrong rather than the feature** — and `push_day_claims` is the evidence, one row per day it spoke and nothing at all on a day it stayed quiet.
+
+**A subscription rots, and this is where it is repaired.** With no service worker there is no `pushsubscriptionchange` firing in the background, so the only moment we can learn a subscription is alive is a moment the app is **open**: `scripts/push.ts` re-asserts on every admin load, which is what `last_seen_at` records and why `push.touch` exists as its own action. A row that has not been re-asserted in months belongs to a device nobody uses, and the 404/410 prune retires it anyway.
+
+⚠ **The sender does not come through RLS at all.** Both tables carry the standard HQ posture — `is_admin()` for all four verbs, no `anon` policy of any kind — and those policies govern *the browser*: the permission button writing its own row, and nothing else. The Edge Function reads with the service role, which bypasses RLS by design, because that is what lets a scheduled job run with nobody signed in.
+
 ## 7. Derived data (not stored)
 
 - **Constellation weight** — `count` of *published* members (for size/brightness in the Sky). A view or query, not a column, so it can't drift out of sync.
@@ -407,6 +464,9 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 | Who was there | `event_people` — additive over HQ events AND the Google mirror (§6b) |
 | "Did it" / "Skipping it" | a `task_events` row; the only thing that moves a schedule (§6b) |
 | The configured home timezone | `settings.home_timezone` (§6b) |
+| A singleton page (About) | `pages`, keyed by slug — **not** a fragment (§4) |
+| A device HQ may interrupt | `push_subscriptions` — one row per device, keyed by endpoint (§6b) |
+| "It already spoke today" | `push_day_claims` — the insert *is* the claim (§6b) |
 | The blog / index | queries over `fragments` by `type` + `occurred_at` |
 
 ## 9. Deferred (not in v1)
