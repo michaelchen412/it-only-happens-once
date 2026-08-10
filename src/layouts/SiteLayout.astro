@@ -37,8 +37,13 @@ interface Props {
   /** Constellation pages bring their own floating control (the sky-return ✦)
    *  and pass false — one quiet corner control at a time. */
   backToTop?: boolean;
+  /** Passed straight through to Base → Social. A room that says nothing here
+   *  still gets a correct card; these only make it a better one. */
+  image?: string;
+  ogType?: 'website' | 'article';
+  canonical?: string;
 }
-const { title, description, active, backToTop = true } = Astro.props;
+const { title, description, active, backToTop = true, image, ogType, canonical } = Astro.props;
 const pageTitle = title ? `${title} — It Only Happens Once` : 'It Only Happens Once';
 
 // "Home" is explicit (not only the wordmark): the homepage is the site's
@@ -51,7 +56,7 @@ const nav = [
 ] as const;
 ---
 
-<Base title={pageTitle} description={description} transitions>
+<Base title={pageTitle} description={description} image={image} ogType={ogType} canonical={canonical} transitions>
   <div class="flex min-h-screen flex-col">
     {/* Top bar — the site's primary navigation. */}
     <header

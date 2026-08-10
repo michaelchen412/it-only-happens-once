@@ -76,7 +76,7 @@ const hasSite = !!(siteBodyHtml || blurbHtml || embedSrc);
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 ---
 
-<SiteLayout title="About" active="about">
+<SiteLayout title="About" active="about" description="Who Michael Chen is, and how to say hello.">
   <article class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
     <h1 class="sr-only">About</h1>
     {

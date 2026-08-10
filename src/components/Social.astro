@@ -1,0 +1,72 @@
+---
+/*
+  Social — how a page introduces itself when it is not the one doing the
+  showing: a link preview in iMessage, a card in Slack, a search result.
+
+  ⚠ RENDERED BY Base FOR EVERY PAGE, NOT OPTED INTO PER PAGE. The site had no
+  `og:*`, no `twitter:*` and no canonical at all until 2026-08-10, and the fix
+  could have been six lines pasted into three permalink pages. That version is
+  correct for about a month: the fourth page forgets, the fifth copies the
+  fourth, and nothing ever reports it because a missing meta tag has no symptom
+  on the page it is missing from. One component, always on, deriving from props
+  Base already has, cannot drift — a page opts into a BETTER card by passing
+  `image`, never into having one at all.
+
+  ⚠ THE CANONICAL ORIGIN IS THE REQUEST'S OWN, and that is deliberate rather
+  than lazy. `astro.config.mjs` sets no `site`, and the obvious value —
+  `https://itonlyhappensonce.blog` — currently resolves to the OLD Squarespace
+  blog (docs/plans/README, cold start). Hardcoding it would point every canonical
+  and every `og:url` on this site at somebody else's page. Deriving from
+  `Astro.url` is always right for the host actually serving, costs a preview
+  deploy its own canonical (harmless, and arguably correct), and starts
+  producing the real domain by itself the day DNS moves. **Set `site` then, and
+  delete this paragraph.**
+
+  ⚠ NO `og:image:alt` WITHOUT AN IMAGE, and no empty `og:image` either: an
+  absent tag makes a client fall back to its own sensible default, while an
+  empty one makes it render a broken box. Every tag here is conditional on
+  having something true to say.
+*/
+interface Props {
+  /** The full document title — the same string that reaches <title>. */
+  title: string;
+  description?: string;
+  /** Absolute or root-relative; made absolute here. Omit for no card image. */
+  image?: string;
+  /** What a client should say this IS. `article` for one piece of writing. */
+  type?: 'website' | 'article';
+  /** Overrides the derived canonical — for a page reachable at several URLs. */
+  canonical?: string;
+}
+const { title, description, image, type = 'website', canonical } = Astro.props;
+
+// Path only: query strings are the reader's filter state (`?subject=`, `?q=`,
+// `?page=`), not different documents, and every one of them would otherwise be
+// indexed as a near-duplicate of the same feed.
+const origin = Astro.url.origin;
+const href = canonical ?? new URL(Astro.url.pathname, origin).href;
+const imageHref = image ? new URL(image, origin).href : null;
+---
+
+<link rel="canonical" href={href} />
+
+<meta property="og:site_name" content="It Only Happens Once" />
+<meta property="og:type" content={type} />
+<meta property="og:title" content={title} />
+<meta property="og:url" content={href} />
+{description && <meta property="og:description" content={description} />}
+{
+  imageHref && (
+    <>
+      <meta property="og:image" content={imageHref} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+    </>
+  )
+}
+
+{
+  /* `summary_large_image` needs an image to be large about; without one the
+    small-summary card is the honest request. */
+}
+<meta name="twitter:card" content={imageHref ? 'summary_large_image' : 'summary'} />

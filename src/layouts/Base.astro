@@ -42,6 +42,7 @@
 */
 import { Font } from 'astro:assets';
 import { ClientRouter, fade } from 'astro:transitions';
+import Social from '../components/Social.astro';
 import '../styles/app.css';
 
 interface Props {
@@ -50,9 +51,17 @@ interface Props {
   description?: string;
   /** Opt into animated view transitions (the public reader pages do). */
   transitions?: boolean;
+  /** The link-preview card. Root-relative is fine — Social makes it absolute. */
+  image?: string;
+  /** `article` for one piece of writing or one quote; `website` otherwise. */
+  ogType?: 'website' | 'article';
+  /** Overrides the derived canonical. The Reader is why this exists: one essay
+   *  is legitimately readable at `/blog/x`, `/blog#read=x` AND
+   *  `/{constellation}#read=x`, and only one of the three is the address. */
+  canonical?: string;
 }
 
-const { title = 'It Only Happens Once', description, transitions = false } = Astro.props;
+const { title = 'It Only Happens Once', description, transitions = false, image, ogType, canonical } = Astro.props;
 ---
 
 <!doctype html>
@@ -86,6 +95,11 @@ const { title = 'It Only Happens Once', description, transitions = false } = Ast
     <meta name="generator" content={Astro.generator} />
     {description && <meta name="description" content={description} />}
     <title>{title}</title>
+    {
+      /* Unconditional, so a new page cannot ship without a card by forgetting to
+        ask for one. See the component for why it is not opt-in. */
+    }
+    <Social title={title} description={description} image={image} type={ogType} canonical={canonical} />
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />
     {transitions && <ClientRouter />}

@@ -116,7 +116,11 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 Astro.response.headers.set('Vary', 'X-Requested-With');
 ---
 
-<SiteLayout title="Blog" active="blog">
+<SiteLayout
+  title="Blog"
+  active="blog"
+  description="Essays and collected lines — the writing, and the words of other people worth keeping."
+>
   <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
     {
       /* The page heading, for the document outline + screen readers. The visible

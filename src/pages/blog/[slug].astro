@@ -47,7 +47,7 @@ if (!item) {
 const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
 ---
 
-<SiteLayout title={item ? item.title : 'Not found'} active="blog" description={description}>
+<SiteLayout title={item ? item.title : 'Not found'} active="blog" description={description} ogType="article">
   {preview && <PreviewBar status={preview.status} editHref={preview.editHref} />}
   {
     !item ? (
