@@ -23,12 +23,21 @@
 // the words it read to fill it (`from`), so a wrong parse is visible in the
 // sheet instead of surfacing three days late as a task that never appeared.
 // §6.2: a silently misparsed date is worse than no parse at all.
-import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'astro/zod';
+import { anthropic } from '../anthropic';
 import { EFFORTS, PRIORITIES } from './tasks';
 import { PRESETS, dayNameOf } from './recurrence';
 import type { Ymd } from './time';
+
+/**
+ * One jotted sentence in, a handful of fields out — a short answer, so a short
+ * budget. It matters more here than for the other two: this call sits between
+ * pressing ✚ and the sheet opening, which is the fastest interaction in HQ and
+ * the one where a stall is most obviously a stall. Worst case is twice this;
+ * see `anthropic.ts` on why.
+ */
+const TIMEOUT_MS = 15_000;
 
 const EFFORT_KEYS = EFFORTS.map((e) => e.key) as [string, ...string[]];
 const PRIORITY_KEYS = PRIORITIES.map((p) => p.key) as [string, ...string[]];
@@ -214,7 +223,7 @@ export async function parseTask(
   at: number,
 ): Promise<ParseResult> {
   const weekday = dayNameOf(today);
-  const client = new Anthropic({ apiKey });
+  const client = anthropic(apiKey, TIMEOUT_MS);
   const message = await client.messages.parse({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 700,

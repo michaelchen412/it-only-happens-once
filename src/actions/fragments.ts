@@ -9,7 +9,7 @@ import { defineAction } from 'astro:actions';
 import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
-import { lookupSong, parseSongRef, songRefUrl } from '../lib/media';
+import { MediaUnreachable, lookupSong, parseSongRef, songRefUrl } from '../lib/media';
 import { provenanceLine } from '../lib/provenance';
 import type { Database, Json } from '../lib/database.types';
 import {
@@ -786,7 +786,20 @@ export const songs = {
     input: z.object({ url: z.string().min(1).max(500) }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
-      const found = await lookupSong(input.url);
+      // ⚠ TWO FAILURES, TWO SENTENCES (plans/30 · §5). "That is not a link a
+      // song may cite" is something you fix by pasting a different link;
+      // "nobody answered" is something you fix by waiting. `lookupSong` used to
+      // let the second escape as a bare 500 from an unwrapped oEmbed call, and
+      // the obvious tidy-up — catch it and return null — would have been worse
+      // than the 500: it would have told you your working Spotify link was the
+      // wrong kind of link.
+      let found;
+      try {
+        found = await lookupSong(input.url);
+      } catch (e) {
+        if (e instanceof MediaUnreachable) throw fail(e.message, 'GATEWAY_TIMEOUT');
+        throw e;
+      }
       if (!found) throw fail('Couldn’t read that link — Spotify track/album or YouTube video, please', 'BAD_REQUEST');
       return found;
     },

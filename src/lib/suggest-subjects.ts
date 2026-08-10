@@ -5,9 +5,16 @@
 // pins existing picks to the real taxonomy. Human stays in the loop — the caller
 // pre-fills the tag input and requires an explicit accept for a proposal. Never
 // imported client-side (it holds the API key path).
-import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'astro/zod';
+import { anthropic } from './anthropic';
+
+/**
+ * At most three tag names out of a fixed taxonomy — the smallest answer any of
+ * the three AI features asks for, so the shortest budget. Worst case is twice
+ * this; see `anthropic.ts` on why.
+ */
+const TIMEOUT_MS = 15_000;
 
 export interface TaxonomyEntry {
   name: string;
@@ -46,7 +53,7 @@ export async function suggestSubjects(
       .describe('A proposed NEW subject, or null when an existing one already fits.'),
   });
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropic(apiKey, TIMEOUT_MS);
   const list = taxonomy.map((t) => `- ${t.name}: ${t.definition ?? '(no definition yet)'}`).join('\n');
   const message = await client.messages.parse({
     model: 'claude-haiku-4-5-20251001',

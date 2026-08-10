@@ -328,6 +328,50 @@ describe('lookupSong', () => {
     const { lookupSong: fresh } = await import('../lib/media');
     expect(await fresh('https://open.spotify.com/playlist/2wQlYWCZpxDvO7UAWEUSY5')).toBeNull();
   });
+
+  it('⚠ a dead network is NOT “wrong kind of link” — it throws instead of returning null', async () => {
+    // plans/30 §5. Only the API path sat in a `try`, so a throw from the LAST
+    // tier escaped the action as a bare 500. The obvious tidy-up — catch it and
+    // return null — is the trap this asserts against: null already means "not
+    // something a song may cite", and the sheet renders that as *"Spotify
+    // track/album or YouTube video, please"*. Answering a timeout with that
+    // sends you off to re-check a link that was fine the whole time.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed');
+      }),
+    );
+    const { lookupSong: fresh, MediaUnreachable } = await import('../lib/media');
+
+    await expect(fresh('https://www.youtube.com/watch?v=IXQN1mv6CtI')).rejects.toBeInstanceOf(MediaUnreachable);
+  });
+
+  it('⚠ every outbound call carries a deadline', async () => {
+    // A fetch with no timeout is not a fetch, it is a hang — `gcal.ts` had the
+    // only one in the tree. Asserted on the REQUEST rather than by waiting,
+    // because the alternative is a test that sleeps for eight seconds to prove
+    // something the argument list already says.
+    process.env.SPOTIFY_CLIENT_ID = 'id';
+    process.env.SPOTIFY_CLIENT_SECRET = 'secret';
+    const inits: (RequestInit | undefined)[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        inits.push(init);
+        return new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    const { lookupSong: fresh } = await import('../lib/media');
+    await fresh('https://open.spotify.com/track/697MdxMbVWn1Ajbw8iaPv5');
+
+    // The token POST and the API GET, both bounded.
+    expect(inits.length).toBeGreaterThan(0);
+    expect(inits.every((i) => i?.signal instanceof AbortSignal)).toBe(true);
+  });
 });
 
 // `lookupSong` is imported at the top so a rename breaks the file loudly rather

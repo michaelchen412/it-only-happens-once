@@ -14,9 +14,18 @@
 // the ProseMirror document, and every position would be wrong. This call sends
 // plain text so the model's output and the document's contents are the same
 // alphabet. See docs/plans/22 §1.
-import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'astro/zod';
+import { anthropic } from './anthropic';
+
+/**
+ * The longest of the three budgets, because this is the only call that reads a
+ * whole essay — up to 20,000 characters — before it may answer. A run is
+ * normally a couple of seconds; 25 leaves room for a slow one without leaving
+ * the composer sitting on a spinner. Worst case is twice this; see
+ * `anthropic.ts` on why.
+ */
+const TIMEOUT_MS = 25_000;
 
 /**
  * Which field a fix was found in. The body gets an in-editor mark; the title
@@ -120,7 +129,7 @@ export function keepLocatable(fixes: Fix[], title: string, body: string): Fix[] 
 }
 
 export async function proofread(title: string, body: string, apiKey: string): Promise<{ fixes: Fix[] }> {
-  const client = new Anthropic({ apiKey });
+  const client = anthropic(apiKey, TIMEOUT_MS);
   const message = await client.messages.parse({
     model: MODEL,
     max_tokens: MAX_TOKENS,

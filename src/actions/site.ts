@@ -9,6 +9,20 @@ import { Resend } from 'resend';
 import type { Json } from '../lib/database.types';
 import { fail, requireAdmin } from './_shared';
 
+/**
+ * How long either outside service gets before the contact form gives up.
+ *
+ * ⚠ THE PERSON WAITING HERE IS A STRANGER (plans/30 · §5). Both calls below sit
+ * between a visitor pressing Send and anything at all appearing, and neither
+ * had a bound — so one hung upstream held the action, the form and the button
+ * for whatever the platform allows, on the one surface in this application
+ * whose entire job is to be used by somebody who has no reason to be patient.
+ * Five seconds is generous for a token check that normally takes a hundred
+ * milliseconds; ten is generous for handing an email to an API.
+ */
+const TURNSTILE_TIMEOUT_MS = 5_000;
+const RESEND_TIMEOUT_MS = 10_000;
+
 /** Verify a Cloudflare Turnstile token server-side. Returns false on any failure. */
 async function verifyTurnstile(secret: string, token: string, ip?: string): Promise<boolean> {
   try {
@@ -16,6 +30,9 @@ async function verifyTurnstile(secret: string, token: string, ip?: string): Prom
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret, response: token, remoteip: ip }),
+      // A timeout lands in the `catch` below, so it fails CLOSED — the visitor
+      // is asked to try again rather than waved through unverified.
+      signal: AbortSignal.timeout(TURNSTILE_TIMEOUT_MS),
     });
     const outcome = (await res.json()) as { success?: boolean };
     return outcome.success === true;
@@ -146,14 +163,36 @@ export const contact = {
       const from = getSecret('CONTACT_FROM_EMAIL') || 'It Only Happens Once <onboarding@resend.dev>';
 
       const resend = new Resend(resendKey);
-      const { error } = await resend.emails.send({
+      const send = resend.emails.send({
         from,
         to,
         replyTo: input.email,
         subject: `New message from ${input.name}`,
         text: `From: ${input.name} <${input.email}>${ip ? `\nIP: ${ip}` : ''}\n\n${input.message}`,
       });
-      if (error) throw fail('Sorry — the message didn’t send. Please try again.', 'INTERNAL_SERVER_ERROR');
+
+      // ⚠ A RACE, NOT A SIGNAL, AND THAT IS THE SDK'S LIMIT RATHER THAN A
+      // PREFERENCE. `ResendOptions` is `{ baseUrl, userAgent }` and the send
+      // options are `{ query, headers }` — there is nowhere to hand it an
+      // `AbortSignal` and no custom-fetch hook to wrap, so this bounds the
+      // WAIT rather than the request.
+      //
+      // ⚠ WHICH MAKES THE TIMEOUT OUTCOME GENUINELY AMBIGUOUS, and it is worth
+      // being plain about: the request is still in flight when we stop waiting,
+      // so a message can be delivered after the visitor has been told it wasn't.
+      // That was weighed and accepted — a stranger who sends twice has cost
+      // Michael a duplicate email, where a stranger left on a dead button has
+      // been shown that the form does not work. Cost falls on the right side.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('resend-timeout')), RESEND_TIMEOUT_MS).unref?.(),
+      );
+      let sent;
+      try {
+        sent = await Promise.race([send, timeout]);
+      } catch {
+        throw fail('Sorry — the message didn’t send. Please try again.', 'GATEWAY_TIMEOUT');
+      }
+      if (sent.error) throw fail('Sorry — the message didn’t send. Please try again.', 'INTERNAL_SERVER_ERROR');
       return { ok: true };
     },
   }),

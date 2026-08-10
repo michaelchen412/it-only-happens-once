@@ -31,6 +31,22 @@ const OEMBED_YOUTUBE = 'https://www.youtube.com/oembed';
 const ACCOUNTS = 'https://accounts.spotify.com/api/token';
 const API = 'https://api.spotify.com/v1';
 
+/**
+ * ⚠ A FETCH WITH NO TIMEOUT IS NOT A FETCH, IT IS A HANG. `gcal.ts` says it
+ * first and it is exactly as true here: every call below runs inside a request,
+ * so a connection Spotify or YouTube never answers holds the action — and the
+ * sheet, and the person watching it — until the platform kills the invocation.
+ * Three of these fetches had no bound at all (plans/30 · §5).
+ *
+ * Shorter than `gcal.ts`'s ten seconds ON PURPOSE, and the difference is who is
+ * waiting. That one is a background sync nobody is timing; this one is behind a
+ * button somebody just pressed with a pasted link, and eight seconds of a dead
+ * Paste field is already longer than anyone will sit through. There is no retry
+ * to go with it, also on purpose: `lookupSong` already has a second tier to try
+ * (oEmbed), which is a better answer than the same tier twice.
+ */
+const TIMEOUT_MS = 8_000;
+
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
@@ -209,6 +225,7 @@ async function accessToken(): Promise<string | null> {
     try {
       const res = await fetch(ACCOUNTS, {
         method: 'POST',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
@@ -313,7 +330,10 @@ async function lookupViaOembed(ref: SongRef): Promise<SongLookup | null> {
       ? `${OEMBED_YOUTUBE}?format=json&url=${encodeURIComponent(url)}`
       : `${OEMBED_SPOTIFY}?url=${encodeURIComponent(url)}`;
 
-  const res = await fetch(endpoint, { headers: { accept: 'application/json' } });
+  const res = await fetch(endpoint, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
   if (!res.ok) return null;
   const data = (await res.json()) as { title?: string; thumbnail_url?: string; author_name?: string };
 
@@ -342,6 +362,7 @@ async function lookupViaApi(ref: SongRef): Promise<SongLookup | null> {
 
   const res = await fetch(`${API}/${ref.kind}s/${ref.id}`, {
     headers: { authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   // A 401 means our cached token went stale early; drop it so the next call
   // refetches rather than looping on a dead credential.
@@ -370,13 +391,30 @@ async function lookupViaApi(ref: SongRef): Promise<SongLookup | null> {
 }
 
 /**
+ * Neither tier answered, and the reason was the NETWORK rather than the link.
+ *
+ * ⚠ ITS OWN CLASS BECAUSE `null` ALREADY MEANS SOMETHING ELSE — "that is not a
+ * thing a song may cite", which the sheet reports as *"Spotify track/album or
+ * YouTube video, please"*. Collapsing a timeout into that would answer a
+ * network fault by telling somebody their perfectly good Spotify link is the
+ * wrong kind of link, which is the same confident-wrong-sentence fault
+ * `links.assertExists` was carrying (plans/30 · §2).
+ */
+export class MediaUnreachable extends Error {
+  constructor() {
+    super('Couldn’t reach Spotify or YouTube just now — paste it again in a moment.');
+    this.name = 'MediaUnreachable';
+  }
+}
+
+/**
  * Resolve a pasted track / album / video link to everything we can learn about
  * it. Tries the Web API first and falls back to oEmbed, so the caller never has
  * to know which tier is available — only `source` says, and only so the sheet
  * can explain why the artist field is still empty.
  *
- * Returns null when the URL isn't something a song may cite, or when neither
- * tier answers.
+ * Returns null when the URL isn't something a song may cite; throws
+ * `MediaUnreachable` when it is and nobody answered.
  */
 export async function lookupSong(url: string): Promise<SongLookup | null> {
   const ref = parseSongRef(url);
@@ -387,5 +425,13 @@ export async function lookupSong(url: string): Promise<SongLookup | null> {
   } catch {
     // Network trouble on the API path is not fatal — oEmbed may still answer.
   }
-  return lookupViaOembed(ref);
+  // ⚠ AND THE FALLBACK IS WRAPPED TOO, which it was not: only the API path sat
+  // in a `try`, so a dead network on the LAST tier threw straight out of the
+  // action and surfaced as a bare 500 (plans/30 · §5). The two tiers now fail
+  // the same way — the difference between them is a cost, not a contract.
+  try {
+    return await lookupViaOembed(ref);
+  } catch {
+    throw new MediaUnreachable();
+  }
 }
