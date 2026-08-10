@@ -31,7 +31,7 @@ let starEls: { el: SVGElement; y: number; shown: number }[] = [];
 
 // The drawn line: per-segment arcs that stop short of each mark and bow
 // gently side to side — phrase marks in a score, not a wire. (The single
-// continuous-spline "thread" variant lives in /sky-lab if we ever swap.)
+// continuous-spline "thread" variant lives in the sky-lab bench if we ever swap.)
 //
 // It also yields the STARS — one per mark, at the figure's JOINTS, which is
 // where a constellation's stars actually are. Each arc stops GAP short of

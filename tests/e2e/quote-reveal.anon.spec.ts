@@ -1,5 +1,5 @@
 // The citation reveal — "where did this come from?" (plan 17a; chosen from
-// /reveal-lab, 2026-08-05).
+// the reveal-lab bench, 2026-08-05).
 //
 // Signed out ON PURPOSE. This is the one piece of plan 17 a reader ever touches,
 // and `anon` runs with no storageState, so these assertions are made by a
@@ -85,7 +85,7 @@ test.describe('opening and closing', () => {
 });
 
 // ⚠ A correction, not a default. Preferring "above when there's room" is the
-// usual tooltip habit, and /reveal-lab showed why it is wrong here: the
+// usual tooltip habit, and the reveal-lab bench showed why it is wrong here: the
 // attribution sits directly beneath the quote, so above covers the words being
 // read. This is the assertion that keeps it that way.
 test('opens BELOW the line, so it never covers the quote', async ({ page }) => {

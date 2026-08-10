@@ -163,8 +163,13 @@ src/
     index.astro            ← the Sky (constellation overview)
     [slug].astro           ← one constellation
     blog/, about, constellations
-                           reading, styleguide, sky-lab, reveal-lab, afford-lab
-                             ← benches: all five 302 to / in production
+                           reading, styleguide
+                             ← benches: both 302 to / in production. They are
+                               REFERENCES (a type specimen, the design system),
+                               which is why they outlived the three `*-lab`
+                               A/B benches — each of those answered one question
+                               and was deleted 2026-08-10 once it had. What
+                               afford-lab argued is now ADR 0022.
     admin/                 ← Today (index), people/, agenda/, notes, fragments, library, …
     auth/callback.ts       ← OAuth code exchange → session cookies
   tests/                   ← vitest: pure functions only (*.test.ts)

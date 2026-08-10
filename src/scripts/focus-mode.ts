@@ -1,5 +1,5 @@
 // focus-mode — which element is the reader ATTENDING TO, on whichever kind of
-// device they brought (design.md §13; prototyped in /afford-lab, 2026-08-07).
+// device they brought (design.md §13; ADR-0022, decided 2026-08-07).
 //
 // THE PROBLEM IT SOLVES. Every affordance in the Sky used to be a `:hover`
 // rule, so on a phone the overview was a list of names with nothing to say it

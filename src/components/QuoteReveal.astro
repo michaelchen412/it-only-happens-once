@@ -2,7 +2,7 @@
 /*
   QuoteReveal — "where did this come from?", on demand.
 
-  Chosen from /reveal-lab, 2026-08-05 (candidate B of four). THE ATTRIBUTION
+  Chosen from the reveal-lab bench, 2026-08-05 (candidate B of four). THE ATTRIBUTION
   ITSELF IS THE CONTROL: no glyph, no icon, nothing added to the line at all.
   A dotted underline appears on hover and focus, and the citation opens in the
   native top layer.
@@ -158,7 +158,7 @@ const { reveal } = Astro.props;
       const r = trigger.getBoundingClientRect();
       const p = pop.getBoundingClientRect();
       // ⚠ BELOW FIRST — a correction, not a default. The usual tooltip habit is
-      // to prefer above when there is room, and /reveal-lab showed why that is
+      // to prefer above when there is room, and the reveal-lab bench showed why that is
       // wrong here: the attribution sits directly beneath the quote, so "above"
       // covers the words being read. Below opens into the gap before the next
       // one. Above is the fallback, near the viewport floor.

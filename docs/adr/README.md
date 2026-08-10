@@ -42,6 +42,7 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0019](0019-push-is-a-contract-you-sign.md) | Push: HQ may reach you when nothing is open — two contracts (ambient signal vs. an escalation you sign), no service worker, scheduler in Supabase | **Proposed** |
 | [0020](0020-the-about-page-does-not-summarise.md) | The About page does not summarise the sky — interests, headline and thesis are removed; no surface restates what a constellation delivers | Accepted |
 | [0021](0021-dark-is-the-default-not-the-system-preference.md) | Dark is the default, not the system preference: `dusk` is unconditional, `paper` is a sticky opt-in, `prefers-color-scheme` is not consulted, and the standalone status bar follows the choice | **Proposed** |
+| [0022](0022-the-sky-affords-differently-on-a-thumb.md) | The Sky affords differently on a thumb: every affordance used to be a `:hover` rule, so touch gets three signals arriving as one — and touch and pointer are two models, each consulting exactly one ambient input, never one model with a fallback | **Proposed** |
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —

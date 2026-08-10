@@ -124,9 +124,9 @@ onto: the attribution line itself is a button, a dotted underline appears on
 hover and focus, and the citation opens beneath it in the native top layer
 ([`QuoteReveal.astro`](../../src/components/QuoteReveal.astro)). **Nothing is
 added to the line** — no glyph, no icon, no footnote mark. Four candidates were
-built and compared on real quotes in
-[`/reveal-lab`](../../src/pages/reveal-lab.astro); every other one made the
-quietest line on the site louder.
+built and compared on real quotes on the **reveal-lab** bench; every other one
+made the quietest line on the site louder. *(The bench was removed 2026-08-10 —
+`git log -- src/pages/reveal-lab.astro` has the four.)*
 
 ## Consequences
 

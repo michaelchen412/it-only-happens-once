@@ -4,15 +4,23 @@
   the primitives. Working scaffolding for building the site, not a room a reader
   is meant to find.
 
-  ⚠ DEV-GATED 2026-08-07, to match /sky-lab, /reveal-lab and /afford-lab. It had
-  been the only one of the four reachable in production — not by decision, just
-  by never having been asked the question. It is linked from nowhere, so nothing
-  regressed; what changed is that the four bench pages now answer "is this
-  public?" the same way, instead of three answering it one way and one drifting.
+  ⚠ DEV-GATED 2026-08-07, alongside the three `*-lab` benches. It had been the
+  only one of the four reachable in production — not by decision, just by never
+  having been asked the question. It is linked from nowhere, so nothing
+  regressed; what changed is that the bench pages now answer "is this public?"
+  the same way, instead of three answering it one way and one drifting.
 
-  Reverting is one line, and the case for reverting is real: a styleguide is the
-  most defensible of the four to publish. Make that call deliberately if you
-  make it.
+  ⚠ AND IT IS ONE OF THE TWO THAT SURVIVED. sky-lab, reveal-lab and afford-lab
+  were deleted 2026-08-10 (plan 31 §7) once their questions were settled and
+  the arguments had somewhere else to live — afford-lab's is now ADR-0022. This
+  page and /reading were kept for the opposite reason: they are not A/B benches
+  that answered one question, they are REFERENCES that stay useful. A styleguide
+  has no question to stop being live, which is what made the others deletable.
+  Michael, 2026-08-10, on the deletion: "styleguide I thought was meant to be
+  kept? As a reference for you/any other developers when building."
+
+  Reverting the gate is one line, and the case is real: a styleguide is the most
+  defensible bench to publish. Make that call deliberately if you make it.
 */
 import Base from '../layouts/Base.astro';
 import StarMark from '../components/StarMark.astro';
