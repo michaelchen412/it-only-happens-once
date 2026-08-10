@@ -73,6 +73,26 @@ describe('renderMarkdown — the notes pile’s line breaks', () => {
   });
 });
 
+// ⚠ A GOAL'S NOTES LEAN ON THIS, so it stops being incidental and becomes a
+// promise. `goals.notes` is where a routine gets written down, and a routine
+// written down is one keystroke from `- [ ]` — which would put a checklist on
+// the one surface built to refuse progress (ADR-0013). GFM emits a disabled
+// `<input>` for that syntax and the allowlist has never carried `input`, so it
+// arrives as a plain bullet. That is the rule enforced by the pipeline instead
+// of by discipline, and this test is what keeps it that way if the allowlist is
+// ever widened for some unrelated tag.
+describe('renderMarkdown — a task list is not a task', () => {
+  it('renders GFM checkboxes as plain bullets, with nothing to tick', () => {
+    const html = renderMarkdown('- [ ] brush teeth\n- [x] read the day\n- move', { breaks: true });
+    expect(html).not.toMatch(/<input/i);
+    expect(html).not.toMatch(/checkbox/i);
+    // The words survive; only the control is gone.
+    expect(html).toMatch(/brush teeth/);
+    expect(html).toMatch(/read the day/);
+    expect(html.match(/<li>/g)).toHaveLength(3);
+  });
+});
+
 describe('stripMarkdown — the words, for a field that cannot render them', () => {
   it('unwraps inline marks', () => {
     expect(stripMarkdown('**call** the *dentist* about ~~the~~ `thing`')).toBe('call the dentist about the thing');

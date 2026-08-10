@@ -27,6 +27,13 @@ const input = z.object({
   name: z.string().trim().min(1, 'A goal needs a name.').max(200),
   /** Markdown: what this is actually for. */
   why: z.preprocess(blankToUndef, z.string().max(10_000).optional()),
+  /**
+   * Markdown: how the intention is actually kept — what is in the routine, what
+   * to remember. **Prose, never a checklist**: it cannot be ticked, counted or
+   * scheduled, and a line that wants any of those wants to be a task. See the
+   * `goal_notes` migration.
+   */
+  notes: z.preprocess(blankToUndef, z.string().max(10_000).optional()),
   horizon: z.enum(['this_season', 'this_year', 'next_few_years']).default('this_year'),
   status: z.enum(['active', 'paused', 'achieved', 'let_go']).default('active'),
 });
@@ -56,7 +63,13 @@ export const goals = {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase as DB;
 
-      const values = { name: v.name, why: v.why ?? null, horizon: v.horizon, status: v.status };
+      const values = {
+        name: v.name,
+        why: v.why ?? null,
+        notes: v.notes ?? null,
+        horizon: v.horizon,
+        status: v.status,
+      };
 
       if (v.id) {
         if (v.status === 'active') await assertRoomToActivate(sb, v.id);

@@ -97,8 +97,20 @@ test.describe('the goal sheet', () => {
   test('asks for a name and nothing else — a goal that needs a form is a project', async ({ page }) => {
     await openSheet(page);
     await expect(page.locator('#goal-form input[name="name"]')).toHaveAttribute('required', '');
-    // Four controls in total: name, horizon, why, and (when editing) status.
-    await expect(page.locator('#goal-form input[type="text"], #goal-form textarea')).toHaveCount(2);
+    // Five controls in total: name, horizon, why, notes, and (when editing)
+    // status. Notes joined on 2026-08-10 — "the why is only half of it" — and
+    // the count is asserted rather than left open precisely so a sixth has to
+    // argue for itself here first.
+    await expect(page.locator('#goal-form input[type="text"], #goal-form textarea')).toHaveCount(3);
+  });
+
+  test('⚠ notes are a textarea, and nothing in the sheet can hold a tick or a date', async ({ page }) => {
+    // The field that most looks like a way around the table's founding rule.
+    // Prose cannot be counted, and these two assertions are what stops the
+    // routine you describe in it from quietly becoming a subtask list.
+    await openSheet(page);
+    await expect(page.locator('#goal-form textarea[name="notes"]')).toBeVisible();
+    await expect(page.locator('#goal-form input[type="checkbox"], #goal-form input[type="date"]')).toHaveCount(0);
   });
 
   test('⚠ TRAP 6: the horizon you just picked stays picked under the cursor', async ({ page }) => {

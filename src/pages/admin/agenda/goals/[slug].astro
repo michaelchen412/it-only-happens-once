@@ -3,7 +3,9 @@
   /admin/goals/[slug] — ONE INTENTION (docs/plans/13-agenda.md §4a).
 
   Header, then three sections: **Scheduled**, **Not scheduled yet**, and **Done
-  toward this**.
+  toward this** — plus **Notes**, which appears only on the goals that have any
+  (2026-08-10, and the reason it earns a section is at the block that renders
+  it).
 
   ⚠ THE THIRD ONE IS A LIST OF WHAT HAPPENED, NEVER A COUNT WITH A BAR BESIDE
   IT. That is the difference between a goal and a project, made visible: you
@@ -84,6 +86,12 @@ const lastDoneOn = done[0]?.occurred_on ?? null;
 const observation = observationFor((recent ?? []).length, lastDoneOn, todayYmd);
 
 const why = renderMarkdown(goal.why);
+// ⚠ `breaks: true`, unlike the why directly above it — the same split the notes
+// pile made (lib/markdown.ts). A why is prose, where a wrapped line is not a
+// break. Notes are typed as *lines*: `Teeth` / `Read the day` / `Move`, usually
+// without a bullet in sight, and prose rules would run all three into one
+// sentence that reads as nonsense. Their line breaks are their structure.
+const notes = renderMarkdown(goal.notes, { breaks: true });
 
 const presetFor = (t: Task) => (t.recur_rrule && t.due_on ? presetOf(t.recur_rrule, t.due_on) : null);
 const repeatWords = (t: Task) => {
@@ -158,7 +166,7 @@ const payload = (t: Task) =>
 
     <div class="hq-grid mt-6" data-task-list>
       <div class="col-main">
-        <section class="zone cn-amber o-1">
+        <section class="zone cn-amber o-2">
           <div class="zone__head">
             <span class="zone__chip"><Icon name="ph:calendar-blank" /></span>
             <h2 class="zone__title">Scheduled</h2>
@@ -213,7 +221,7 @@ const payload = (t: Task) =>
           }
         </section>
 
-        <section class="zone cn-sand o-2">
+        <section class="zone cn-sand o-3">
           <div class="zone__head">
             <span class="zone__chip"><Icon name="ph:dots-three" /></span>
             <h2 class="zone__title">Not scheduled yet</h2>
@@ -265,7 +273,47 @@ const payload = (t: Task) =>
       </div>
 
       <div class="col-rail">
-        <section class="zone cn-ice o-3">
+        {
+          /* ── Notes: how this one is actually kept ──────────────────────────
+            ⚠ ORDERED FIRST, ahead of both task lists — the only rail section on
+            any HQ page that outranks the main column. It is not a ranking of
+            importance in general; it is what the narrow layout does to the goal
+            that asked for this field. *Wake up and get moving* is a routine, and
+            a routine has no scheduled tasks and nothing waiting — so leaving
+            Notes at o-3 would put the one thing you opened the page to read
+            below two boxes saying "Nothing with a date on it" and "Nothing
+            waiting". First also puts it directly under the why on mobile, which
+            is where it belongs: the two halves of what this goal says.
+
+            AND NOTHING AT ALL WHEN THERE ARE NO NOTES — not an empty zone. A
+            goal that hasn't got a routine to describe isn't missing one, and
+            most won't ever have one (10-hq.md §10i: a domain that does not
+            exist renders nothing, not a "no data" box).
+
+            NO TICKS IN HERE, and that is the section's whole discipline: it is
+            read, never worked. The moment a line in it earns a tick it wants to
+            be a task, and the ✚ two boxes down is how it becomes one. */
+        }
+        {
+          notes && (
+            <section class="zone cn-violet o-1">
+              <div class="zone__head">
+                <span class="zone__chip">
+                  <Icon name="ph:note" />
+                </span>
+                <h2 class="zone__title">Notes</h2>
+                <button type="button" class="zone__act ml-auto" data-edit-goal aria-label="Edit these notes">
+                  <Icon name="ph:pencil-simple" />
+                </button>
+              </div>
+              <div class="zone__body">
+                <div class="reading text-base-content/80 font-serif text-sm leading-relaxed" set:html={notes} />
+              </div>
+            </section>
+          )
+        }
+
+        <section class="zone cn-ice o-4">
           <div class="zone__head">
             <span class="zone__chip"><Icon name="ph:check-circle" /></span>
             <h2 class="zone__title">Done toward this</h2>

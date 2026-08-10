@@ -2,9 +2,23 @@
 /*
   GoalSheet — name an intention, or change what it says (13-agenda.md §4a).
 
-  Four fields and no more, and the shortness is the design: a goal that needs a
+  Five fields and no more, and the shortness is the design: a goal that needs a
   form is a project. **Name is the only required one** — you can write down
   *"be a better friend to the people I've drifted from"* and close the sheet.
+
+  ⚠ IT WAS FOUR UNTIL 2026-08-10, and Notes is the one that joined. Michael, on
+  the goal that asked for it — *wake up and get moving*, against the weight of
+  an anxiety dream: **"the why is only half of it."** The other half is what is
+  actually in the routine, and it had nowhere to go: it is not a reason, and it
+  is emphatically not a task, so filing it as five subtasks would have taught
+  the goal to be a project on the one surface built to refuse that.
+
+  ⚠ SO NOTES IS PROSE AND STAYS PROSE. It cannot be ticked, counted, dated or
+  scored — a `text` column is the same defence that keeps `progress` and
+  `due_on` off this table, and `- [ ]` typed in here comes back a plain bullet
+  because the sanitizer drops the checkbox. Its length is why it is a textarea
+  and not a fifth control: a control would be a form growing, a page of notes is
+  the goal talking.
 
   ⚠ THE HORIZON IS A SEGMENTED CONTROL, NOT A TEXT FIELD, and that is the rule
   made structural (settled 2026-08-03). §4a: *the horizon is deliberately vague
@@ -72,6 +86,21 @@ const editing = !!goal;
           rows="4"
           placeholder="Not a number on a scale. Being able to do the Tahoe hike in September without hating it."
           >{goal?.why}</textarea
+        >
+      </label>
+
+      {
+        /* The practice, not the reason. Roomier than Why on purpose: this is the
+        field that holds a list, and a two-row box would ask you to keep it
+        short on the one surface where the detail IS the point. */
+      }
+      <label class="f mt-4">
+        <span class="f__k">Notes</span>
+        <textarea
+          name="notes"
+          rows="5"
+          placeholder="What’s actually in it. Out of bed before the phone. Teeth, water, read the day. Twenty minutes moving — a walk counts."
+          >{goal?.notes}</textarea
         >
       </label>
 

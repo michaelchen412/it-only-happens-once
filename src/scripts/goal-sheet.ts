@@ -28,6 +28,7 @@ if (sheet && form) {
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]')!;
   const whyInput = form.querySelector<HTMLTextAreaElement>('textarea[name="why"]')!;
+  const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
 
   const showError = (message: string | null) => {
     if (!errorEl) return;
@@ -70,6 +71,7 @@ if (sheet && form) {
           id: form.dataset.id || undefined,
           name: nameInput.value.trim(),
           why: whyInput.value.trim(),
+          notes: notesInput.value.trim(),
           horizon: picked('horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
           status: picked('goalStatus', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
         }),

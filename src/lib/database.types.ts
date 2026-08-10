@@ -595,6 +595,7 @@ export type Database = {
           horizon: Database["public"]["Enums"]["goal_horizon"]
           id: string
           name: string
+          notes: string | null
           slug: string
           status: Database["public"]["Enums"]["goal_status"]
           updated_at: string
@@ -605,6 +606,7 @@ export type Database = {
           horizon?: Database["public"]["Enums"]["goal_horizon"]
           id?: string
           name: string
+          notes?: string | null
           slug: string
           status?: Database["public"]["Enums"]["goal_status"]
           updated_at?: string
@@ -615,6 +617,7 @@ export type Database = {
           horizon?: Database["public"]["Enums"]["goal_horizon"]
           id?: string
           name?: string
+          notes?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["goal_status"]
           updated_at?: string
