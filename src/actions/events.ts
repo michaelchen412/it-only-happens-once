@@ -38,6 +38,20 @@ const input = z.object({
  * list is a handful of rows, a diff is more code than it saves, and this way
  * somebody removed in the editor is genuinely gone rather than depending on the
  * diff being right.
+ *
+ * ⚠ THE FAILURE POSTURE IS `interactions.setParticipants`'S — read the note
+ * there, it argues the trade in full (plans/30 · §4). Between the two
+ * statements the event carries no tags, so a failed insert leaves an event that
+ * is on the calendar and on nobody's profile. A resave restores it; the sheet
+ * stays open with the error, which is what makes that possible.
+ *
+ * ⚠ ONE THING IS *LESS* BAD HERE THAN NEXT DOOR AND ONE IS WORSE. Less: an
+ * event survives losing its tags — it still renders on the grid with its title
+ * and time, where an untagged interaction is invisible everywhere. Worse: this
+ * is also `events.tag`'s write, and that one is called against a MIRRORED
+ * Google row, where the tags are the only thing HQ owns about it (ADR-0014 —
+ * we may never write to Google's copy). Losing those loses the whole of our
+ * side of that event.
  */
 async function setParticipants(sb: DB, eventId: string, personIds: string[]): Promise<void> {
   const { error: delErr } = await sb.from('event_people').delete().eq('event_id', eventId);

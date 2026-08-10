@@ -101,34 +101,77 @@ async function resolveWork(sb: DB, title?: string, authorId?: string | null): Pr
   return data.id;
 }
 
-/** Replace a fragment's subject links, creating any new subjects on the fly. */
-async function syncSubjects(sb: DB, fragmentId: string, raw?: string): Promise<void> {
-  const names = (raw ?? '')
+/**
+ * Reconcile a fragment's subject links, creating any new subjects on the fly.
+ *
+ * ⚠ A DIFF, NOT A WIPE, AND IT USED TO BE A WIPE WITH THE WIDEST WINDOW IN THE
+ * LAYER (plans/30 · §4). The old shape deleted every link FIRST and then did
+ * three more things — upsert the new subjects, read their ids, insert the links
+ * — so a failure at any of the three left the piece with no subjects at all,
+ * having reported nothing. That is not a rare corner: this runs on every save
+ * of every fragment, including each autosave of a draft, and the tags are how
+ * a piece is found again.
+ *
+ * The shape is `links.setPeople`'s, which had already worked it out next door
+ * (plans/26): remove exactly what was unticked, add exactly what was ticked,
+ * leave what was already right alone. Two properties fall out, and the second
+ * is the one that matters:
+ *
+ *   1. The common save — a body edit with the tags untouched — now writes
+ *      NOTHING, where before it rewrote every link.
+ *   2. A failure can only ever cost the tags you were actually changing. There
+ *      is no longer any moment at which the fragment has fewer subjects than
+ *      both the before and the after state.
+ *
+ * The target set is resolved BEFORE anything is removed, which is the half a
+ * naive diff gets wrong: reading `subjects` after the delete would put the same
+ * three fallible steps back inside the window.
+ */
+export async function syncSubjects(sb: DB, fragmentId: string, raw?: string): Promise<void> {
+  const rows = (raw ?? '')
     .split(',')
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((name) => ({ name, slug: slugify(name) }))
+    .filter((r) => r.slug);
 
-  const { error: delErr } = await sb.from('fragment_subjects').delete().eq('fragment_id', fragmentId);
-  if (delErr) throw fail(delErr.message);
-  if (!names.length) return;
+  let wanted: string[] = [];
+  if (rows.length) {
+    const { error: upErr } = await sb.from('subjects').upsert(rows, { onConflict: 'slug', ignoreDuplicates: true });
+    if (upErr) throw fail(upErr.message);
 
-  const rows = names.map((name) => ({ name, slug: slugify(name) })).filter((r) => r.slug);
-  const { error: upErr } = await sb.from('subjects').upsert(rows, { onConflict: 'slug', ignoreDuplicates: true });
-  if (upErr) throw fail(upErr.message);
+    const { data: subs, error: selErr } = await sb
+      .from('subjects')
+      .select('id')
+      .in(
+        'slug',
+        rows.map((r) => r.slug),
+      );
+    if (selErr) throw fail(selErr.message);
+    // Deduped: two spellings of one subject ("Grief, grief") slug to the same
+    // row, and inserting that pair twice is a unique-violation, not a tag.
+    wanted = [...new Set((subs ?? []).map((s) => s.id))];
+  }
 
-  const { data: subs, error: selErr } = await sb
-    .from('subjects')
-    .select('id, slug')
-    .in(
-      'slug',
-      rows.map((r) => r.slug),
-    );
-  if (selErr) throw fail(selErr.message);
+  const { data: current, error: readErr } = await sb
+    .from('fragment_subjects')
+    .select('subject_id')
+    .eq('fragment_id', fragmentId);
+  if (readErr) throw fail(readErr.message);
 
-  const links = (subs ?? []).map((s) => ({ fragment_id: fragmentId, subject_id: s.id }));
-  if (links.length) {
-    const { error: linkErr } = await sb.from('fragment_subjects').insert(links);
-    if (linkErr) throw fail(linkErr.message);
+  const have = new Set((current ?? []).map((r) => r.subject_id));
+  const gone = [...have].filter((id) => !wanted.includes(id));
+  const added = wanted.filter((id) => !have.has(id));
+
+  if (gone.length) {
+    const { error } = await sb.from('fragment_subjects').delete().eq('fragment_id', fragmentId).in('subject_id', gone);
+    if (error) throw fail(error.message);
+  }
+  if (added.length) {
+    const { error } = await sb
+      .from('fragment_subjects')
+      .insert(added.map((subject_id) => ({ fragment_id: fragmentId, subject_id })));
+    if (error) throw fail(error.message);
   }
 }
 

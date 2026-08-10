@@ -55,6 +55,24 @@ function assertNotFuture(on: Ymd, today: Ymd): void {
  * Delete-then-insert rather than a diff: the list is at most a handful of rows,
  * a diff is more code than it saves, and this way a participant removed in the
  * editor is genuinely gone rather than depending on the diff being right.
+ *
+ * ⚠ AND HERE IS WHAT THAT COSTS WHEN IT FAILS, which is the half this used to
+ * leave unsaid (plans/30 · §4). Between the two statements the entry has NO
+ * participants, and a participant list is the only thing that connects an entry
+ * to a person — `interactions` has no owner column. So a failed insert leaves
+ * an entry that exists, holds your words, and appears on nobody's timeline.
+ *
+ * It is kept anyway, and the reason is that the window is closed by the caller
+ * rather than by the query: the action throws, `submitAction` holds the sheet
+ * open with your text still in it and the reason on screen, and pressing Save
+ * again re-runs this whole function — the delete is then a no-op and the insert
+ * retries. The subject is always in `personIds` (see the header), so a resave
+ * restores the list in full rather than partially.
+ *
+ * The one state that does NOT recover is walking away from that error, and
+ * `fragments.syncSubjects` is the counter-example that shows when the trade
+ * stops being worth it: there the wipe ran BEFORE three more fallible steps, on
+ * every autosave, so it got the diff instead.
  */
 async function setParticipants(sb: DB, interactionId: string, personIds: string[]): Promise<void> {
   const { error: delErr } = await sb.from('interaction_people').delete().eq('interaction_id', interactionId);
