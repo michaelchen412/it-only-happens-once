@@ -163,6 +163,22 @@ async function constellationsOf(supabase: DB, id: string): Promise<QuoteConstell
  * threshold you can explain beats a score you cannot, until the corpus says
  * otherwise.
  */
+export function rankByOverlap(siblingRows: { fragment_id: string }[], selfId: string, subjectCount: number): string[] {
+  const overlap = new Map<string, number>();
+  for (const row of siblingRows) {
+    if (row.fragment_id === selfId) continue;
+    overlap.set(row.fragment_id, (overlap.get(row.fragment_id) ?? 0) + 1);
+  }
+  // A quote with one subject can only ever reach an overlap of 1, so demanding
+  // two would give it no list at all rather than a weak one. 70 of 77 published
+  // quotes carry two or more, so this branch is the exception it looks like.
+  const need = subjectCount >= MIN_OVERLAP ? MIN_OVERLAP : 1;
+  return [...overlap.entries()]
+    .filter(([, n]) => n >= need)
+    .sort((a, b) => b[1] - a[1])
+    .map(([fid]) => fid);
+}
+
 async function relatedTo(
   supabase: DB,
   id: string,
@@ -175,17 +191,7 @@ async function relatedTo(
     .select('fragment_id')
     .in('subject_id', subjectIds);
 
-  const overlap = new Map<string, number>();
-  for (const row of siblings ?? []) {
-    if (row.fragment_id === id) continue;
-    overlap.set(row.fragment_id, (overlap.get(row.fragment_id) ?? 0) + 1);
-  }
-
-  const need = subjectIds.length >= MIN_OVERLAP ? MIN_OVERLAP : 1;
-  const ranked = [...overlap.entries()]
-    .filter(([, n]) => n >= need)
-    .sort((a, b) => b[1] - a[1])
-    .map(([fid]) => fid);
+  const ranked = rankByOverlap(siblings ?? [], id, subjectIds.length);
   if (ranked.length === 0) return { shown: [], total: 0 };
 
   // ⚠ THE STATUS FILTER IS WHAT MAKES THE COUNT PUBLISHABLE, and it cannot be

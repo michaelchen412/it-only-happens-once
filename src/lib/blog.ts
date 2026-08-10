@@ -301,10 +301,39 @@ export async function listWriting(
  *  subjects and/or a search term. */
 export async function listQuotes(
   supabase: DB,
-  opts: { page?: number; subjects?: string[] | null; q?: string | null; subjectRank?: Map<string, number> } = {},
+  opts: {
+    page?: number;
+    subjects?: string[] | null;
+    q?: string | null;
+    /**
+     * An `authors.slug` — everything by one person (plan 32 · §5). The quote
+     * page's attribution opens onto this: *"a way to view all the quotes by
+     * that attribution"*.
+     *
+     * ⚠ IT RESOLVES TO `author_id` AND FILTERS ON THAT, never on the
+     * `attribution` string. That column is a DERIVED LINE (lib/provenance.ts) —
+     * three published quotes carry one with no author row behind it, and a
+     * `.ilike` on it would be a text search wearing a facet's clothes: it would
+     * match a quote whose body mentions the name, and miss one filed correctly
+     * under an override. The facet is the fact; the line is the rendering.
+     */
+    author?: string | null;
+    subjectRank?: Map<string, number>;
+  } = {},
 ): Promise<Page<QuoteItem>> {
   const page = Math.max(1, opts.page ?? 1);
   const searchTerm = opts.q ? sanitizeQuery(opts.q) : '';
+
+  let authorId: string | null = null;
+  if (opts.author) {
+    const { data: a } = await supabase.from('authors').select('id').eq('slug', opts.author).maybeSingle();
+    // ⚠ An unknown slug matches NOTHING rather than being silently ignored —
+    // the same rule `fragment-query.ts` uses for an unknown constellation. A
+    // dropped filter would show the whole corpus under a heading naming one
+    // person, which reads as an answer rather than as a typo.
+    if (!a) return { items: [], total: 0, page, pageCount: 0 };
+    authorId = a.id;
+  }
 
   let ids: string[] | null = null;
   if (opts.subjects && opts.subjects.length > 0) {
@@ -334,6 +363,7 @@ export async function listQuotes(
     .range(from, from + QUOTES_PAGE_SIZE - 1);
 
   if (ids) query = query.in('id', ids);
+  if (authorId) query = query.eq('author_id', authorId);
   if (searchTerm) query = query.or(`body.ilike.%${searchTerm}%,attribution.ilike.%${searchTerm}%`);
 
   const { data, count } = await query;

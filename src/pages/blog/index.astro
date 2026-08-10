@@ -38,6 +38,9 @@ const selectedSubjects = Array.from(
       .filter(Boolean),
   ),
 );
+// One author, not a list: "everything by this person" is a single question, and
+// stacking two authors would be an OR where every other filter here is an AND.
+const authorSlug = (params.get('author') ?? '').trim() || null;
 const rawQ = (params.get('q') ?? '').trim();
 const searching = rawQ.length >= MIN_SEARCH; // a 1-char term matches ~everything (docs/search.md §3)
 const q = searching ? rawQ : '';
@@ -67,7 +70,7 @@ const writing =
     : null;
 const quotes =
   view === 'quotes'
-    ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, subjectRank })
+    ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, author: authorSlug, subjectRank })
     : null;
 const feed = writing ?? quotes!;
 
@@ -77,11 +80,18 @@ const nounPlural = view === 'quotes' ? 'quotes' : 'essays';
 const searchNoun = view === 'quotes' ? 'quotes' : 'writing';
 
 /** Build a /blog URL from the current view + the given subjects / query / page. */
-function buildHref(over: { subjects?: string[]; q?: string | null; page?: number | null } = {}): string {
+function buildHref(
+  over: { subjects?: string[]; q?: string | null; page?: number | null; author?: string | null } = {},
+): string {
   const p = new URLSearchParams();
   if (view === 'quotes') p.set('view', 'quotes');
   const subs = over.subjects ?? selectedSubjects;
   if (subs.length) p.set('subject', subs.join(','));
+  // Carried by default: the author is a filter like any other, so toggling a
+  // subject or typing a search must NARROW within that person rather than
+  // silently drop back to the whole corpus.
+  const who = over.author !== undefined ? over.author : authorSlug;
+  if (who) p.set('author', who);
   const query = over.q !== undefined ? over.q : q || null;
   if (query) p.set('q', query);
   if (over.page) p.set('page', String(over.page));
@@ -98,8 +108,21 @@ function toggleHref(slug: string): string {
   return buildHref({ subjects: next, page: null });
 }
 
-/** Clears every filter (subjects + search) while staying on the current view. */
-const clearHref = buildHref({ subjects: [], q: null, page: null });
+/** Clears every filter (subjects + search + author) while staying on the view. */
+const clearHref = buildHref({ subjects: [], q: null, page: null, author: null });
+// ⚠ NO PER-FILTER ✕ FOR THE AUTHOR, deliberately. One was written and removed:
+// the rail's "Clear" already drops every filter including this one, and a second
+// dismissal control would be the only ✕ on a page whose subjects, search and
+// view all clear the same way. The summary line names the filter; the rail
+// removes it. One vocabulary.
+
+// The name to SHOW. Resolved from the corpus rather than from the slug, because
+// "marcus-aurelius" un-slugified is a guess and this is a person's name. An
+// unknown slug returns no quotes at all (listQuotes' rule), and the chip then
+// names the slug so the URL is at least legible while it is being corrected.
+const authorName = authorSlug
+  ? ((await supabase.from('authors').select('name').eq('slug', authorSlug).maybeSingle()).data?.name ?? authorSlug)
+  : null;
 
 const tabs = [
   { key: 'writing', label: 'Writing', href: '/blog', active: view === 'writing' },
@@ -174,6 +197,11 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
               (comma-joined). With JS, the client reads the live URL instead. */
           }
           {selectedSubjects.length > 0 && <input type="hidden" name="subject" value={selectedSubjects.join(',')} />}
+          {
+            /* Same reason as `subject` above: without this, searching inside one
+              author's lines silently widens to the whole corpus with no JS. */
+          }
+          {authorSlug && <input type="hidden" name="author" value={authorSlug} />}
           {view === 'quotes' && <input type="hidden" name="view" value="quotes" />}
         </form>
 
@@ -182,7 +210,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
             <div class="mt-7" data-subjects>
               <div class="flex items-baseline justify-between gap-2">
                 <Label variant="chrome">Subjects</Label>
-                {(selectedSubjects.length > 0 || q) && (
+                {(selectedSubjects.length > 0 || q || authorName) && (
                   <a
                     href={clearHref}
                     data-subject-clear
@@ -251,9 +279,19 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       <section class="min-w-0">
         <div id="blog-feed">
           {
-            (selectedSubjects.length > 0 || q) && (
+            (selectedSubjects.length > 0 || q || authorName) && (
               <p class="text-base-content/55 mb-8 font-serif italic">
                 {feed.total} {feed.total === 1 ? noun : nounPlural}
+                {/* ⚠ "by <Name>" LEADS, before the subjects. Arriving here from a
+                    quote's attribution, the author is the question you asked and
+                    everything else is a narrowing of it — reading "12 quotes on
+                    grief by Seneca" puts the answer second. */}
+                {authorName && (
+                  <>
+                    {' '}
+                    by <span class="text-base-content/80 not-italic">{authorName}</span>
+                  </>
+                )}
                 {selectedSubjects.length > 0 && (
                   <>
                     {' '}
@@ -278,7 +316,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
               <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
                 <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
                 <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
-                  {selectedSubjects.length > 0 || q
+                  {selectedSubjects.length > 0 || q || authorSlug
                     ? `No ${nounPlural} match this filter.`
                     : `The ${nounPlural} will collect here.`}
                 </p>
