@@ -10,6 +10,7 @@ import { ActionError } from 'astro:actions';
 import { z } from 'astro/zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../lib/database.types';
+import { slugify } from '../lib/slug';
 
 export type DB = SupabaseClient<Database>;
 
@@ -178,4 +179,43 @@ export async function uniqueSlug(sb: DB, table: SluggedTable, base: string, excl
     if (!data || data.length === 0) return candidate;
   }
   throw fail('Could not find a free URL for that name.');
+}
+
+/**
+ * The slug a fragment save should write.
+ *
+ * ⚠ **A FRAGMENT THAT HAS EVER BEEN PUBLISHED KEEPS THE SLUG IT HAS.** Both
+ * save paths used to re-derive on every write — writing from its title, a quote
+ * from its attribution plus the first words of its body — and neither sheet
+ * sent a slug, so the derivation ran unopposed every time. Retitling a
+ * published essay therefore *changed its URL*, and the old one hard 404s
+ * (`blog/[slug].astro` sets the status explicitly). For a quote it was worse:
+ * the slug comes from the BODY, so fixing a typo moved the address. Nothing
+ * warned, and every link already handed out died silently.
+ *
+ * `published_at` is the right question rather than `status === 'published'`,
+ * and the difference is a real case: a piece that was published and later
+ * pulled back to draft has still been out in the world, so its URL is still
+ * owed to whoever holds it. The column is set once, on first publish, and never
+ * cleared — which is exactly the fact "has this ever had a public address?"
+ * needs. No new column, and no migration.
+ *
+ * An explicit `override` still wins, because the escape hatch is the point: the
+ * freeze makes a URL durable, and the field in the sheet makes changing one a
+ * decision rather than a side effect of editing prose. The override is still
+ * slugified and still uniquified — a hand-typed value cannot smuggle in
+ * punctuation or collide with someone else's row.
+ *
+ * ⚠ `id` being present does NOT mean the row exists: ids are minted
+ * client-side, so a first save is an insert-with-id. A miss here is a create,
+ * and falls through to the derivation.
+ */
+export async function fragmentSlug(sb: DB, args: { id?: string; override?: string; base: string }): Promise<string> {
+  const explicit = args.override?.trim();
+  if (args.id && !explicit) {
+    const { data, error } = await sb.from('fragments').select('slug, published_at').eq('id', args.id).maybeSingle();
+    if (error) throw fail(error.message);
+    if (data?.published_at && data.slug) return data.slug;
+  }
+  return uniqueSlug(sb, 'fragments', slugify(explicit || args.base), args.id);
 }

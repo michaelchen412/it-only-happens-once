@@ -14,6 +14,7 @@ import {
   blankToUndef,
   constellationStatus,
   fail,
+  fragmentSlug,
   fragmentStatus,
   idList,
   optDatetimeLocal,
@@ -291,5 +292,75 @@ describe('uniqueSlug', () => {
   it('gives up rather than looping forever', async () => {
     const crowded = ['untitled', ...Array.from({ length: 60 }, (_, i) => `untitled-${i + 2}`)];
     await expect(uniqueSlug(fakeDb(crowded), 'fragments', 'untitled')).rejects.toThrow(/Could not find a free URL/);
+  });
+});
+
+// ── fragmentSlug ────────────────────────────────────────────────────────────
+//
+// A second fake, because this asks a question `fakeDb` was never shaped for: it
+// reads the ROW (`select('slug, published_at').eq('id').maybeSingle()`) before
+// it probes for uniqueness. Distinguished by whether `maybeSingle` is called.
+function fakeFragmentsDb(row: { slug: string; published_at: string | null } | null, taken: string[] = []) {
+  const db = {
+    from: () => {
+      let col = '';
+      let val = '';
+      const q = {
+        select: () => q,
+        eq: (c: string, v: string) => ((col = c), (val = v), q),
+        neq: () => q,
+        limit: () => q,
+        maybeSingle: async () => ({ data: row, error: null }),
+        then: (resolve: (v: { data: unknown[] | null; error: null }) => unknown) => {
+          const hit = col === 'slug' && taken.includes(val);
+          return resolve({ data: hit ? [{ id: 'someone-else' }] : [], error: null });
+        },
+      };
+      return q;
+    },
+  };
+  return db as unknown as Parameters<typeof fragmentSlug>[0];
+}
+
+describe('fragmentSlug', () => {
+  it('KEEPS A PUBLISHED FRAGMENT’S SLUG — the bug this exists for', async () => {
+    // Until 2026-08-10 both save paths re-derived on every write and neither
+    // sheet sent a slug, so retitling a published essay CHANGED ITS URL and the
+    // old one hard 404s. A quote was worse: its slug comes from the body, so
+    // fixing a typo moved the address. Nothing warned.
+    const db = fakeFragmentsDb({ slug: 'forgiveness', published_at: '2026-01-01T00:00:00Z' });
+    expect(await fragmentSlug(db, { id: UUID, base: 'a completely different title' })).toBe('forgiveness');
+  });
+
+  it('still moves a DRAFT’s slug, because a draft has never had an address', async () => {
+    const db = fakeFragmentsDb({ slug: 'old-working-title', published_at: null });
+    expect(await fragmentSlug(db, { id: UUID, base: 'the real title' })).toBe('the-real-title');
+  });
+
+  it('asks `published_at`, not `status` — an unpublished piece still owes its old URL', async () => {
+    // A piece pulled back to draft has still been out in the world. `published_at`
+    // is set once and never cleared, which is exactly that fact.
+    const db = fakeFragmentsDb({ slug: 'was-live-once', published_at: '2026-01-01T00:00:00Z' });
+    expect(await fragmentSlug(db, { id: UUID, base: 'renamed while unpublished' })).toBe('was-live-once');
+  });
+
+  it('lets an explicit override win, and still slugifies and uniquifies it', async () => {
+    const db = fakeFragmentsDb({ slug: 'forgiveness', published_at: '2026-01-01T00:00:00Z' }, ['a-better-name']);
+    // Hand-typed, with punctuation and a collision — neither may reach the URL.
+    expect(await fragmentSlug(db, { id: UUID, override: '  A Better Name!  ', base: 'ignored' })).toBe(
+      'a-better-name-2',
+    );
+  });
+
+  it('treats a missing row as a create — ids are minted client-side', async () => {
+    // `id` being present does not mean the row exists: the first save is an
+    // insert-with-id. A miss must fall through to the derivation, not throw.
+    expect(await fragmentSlug(fakeFragmentsDb(null), { id: UUID, base: 'brand new' })).toBe('brand-new');
+  });
+
+  it('derives normally when there is no id at all', async () => {
+    expect(await fragmentSlug(fakeFragmentsDb(null), { base: 'Never Complain, Never Explain' })).toBe(
+      'never-complain-never-explain',
+    );
   });
 });

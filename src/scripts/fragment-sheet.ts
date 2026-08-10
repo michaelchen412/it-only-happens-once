@@ -5,6 +5,7 @@
 // .astro file so the markup stays legible.
 import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
+import { slugify } from '../lib/slug';
 import { callAction, isNetworkError, submitAction } from './action-error';
 import { onBackdropDismiss } from './backdrop-close';
 import { confirmDialog } from './confirm-dialog';
@@ -54,6 +55,9 @@ function refreshQuoteValid() {
   quoteSave.disabled = quoteEditor.isEmpty;
 }
 quoteEditor.on('update', refreshQuoteValid);
+// The slug preview is derived from the attribution AND the opening words, so an
+// edit to the body moves it exactly as an edit to the author does.
+quoteEditor.on('update', () => refreshPreview());
 
 // --- provenance facets: structured Author → Work combos (integrity by construction) ---
 type Combo = HTMLElement & {
@@ -67,6 +71,8 @@ type Combo = HTMLElement & {
 const authorCombo = document.getElementById('quote-author') as Combo;
 const workCombo = document.getElementById('quote-work') as Combo;
 const quoteWhere = document.getElementById('quote-where') as HTMLInputElement;
+const quoteSlug = document.getElementById('quote-slug') as HTMLInputElement;
+const quoteSlugNote = document.getElementById('quote-slug-note') as HTMLElement;
 const previewLine = document.getElementById('quote-preview-line')!;
 const previewReveal = document.getElementById('quote-preview-reveal')!;
 const overrideWrap = document.getElementById('quote-attr-override') as HTMLElement;
@@ -171,10 +177,41 @@ function say(el: HTMLElement, text: string, whenEmpty: string) {
   el.classList.toggle('opacity-55', !text);
 }
 
+// ── The address ────────────────────────────────────────────────────────────
+// Mirrors `saveQuote`'s own derivation — `slugify(attribution + first 7 words)`
+// — so what the field shows is what the server will store, not an approximation
+// of it. The two are allowed to drift only in the direction that does not
+// matter: if they ever disagree, the SERVER decides, because this preview is
+// submitted as `slug` and `fragmentSlug` slugifies and uniquifies it again.
+//
+// Stops the moment you type in it (the writing sheet's `slugTouched` rule, same
+// behaviour in the second room) and never fires for a saved quote, whose slug is
+// frozen and is loaded in as-is.
+let slugTouched = false;
+quoteSlug.addEventListener('input', () => (slugTouched = true));
+
+const firstWords = (text: string, n = 7) => text.trim().split(/\s+/).slice(0, n).join(' ');
+
+function refreshSlug(line: string) {
+  if (slugTouched) return;
+  quoteSlug.value = slugify(`${line} ${firstWords(quoteEditor.getText())}`);
+}
+
+/** The field's two states. A saved quote's address is FROZEN, so the note stops
+ *  describing a future and starts describing a promise already made. */
+function setSlugState(saved: string | null) {
+  slugTouched = !!saved;
+  quoteSlug.value = saved ?? '';
+  quoteSlugNote.textContent = saved
+    ? 'Already live at this address. Changing it breaks every link that has been shared.'
+    : 'Set when you first save. Change it only if this one reads badly — any link already shared stops working.';
+}
+
 function refreshPreview() {
   const { line, reveal } = deriveProvenance(quoteFacts());
   const override = quoteAttr.value.trim();
   const shown = overrideWrap.hidden ? line : override || line;
+  refreshSlug(shown);
   // Two silences, two sentences. They render identically on the page and mean
   // opposite things, so the one place they must NOT look alike is the place you
   // choose between them.
@@ -425,6 +462,7 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
       workCombo.clear();
       recomputeWorkScope();
       setOverrideOpen(false); // a fresh quote is never an exception to its own rule
+      setSlugState(null); // ⚠ BEFORE refreshPreview — it clears `slugTouched`, which is what re-arms the auto-fill
       refreshPreview();
       resetQuoteDate();
       refreshQuoteValid();
@@ -500,6 +538,7 @@ document.addEventListener('fragment:edit', (e) => {
       const overridden = !!stored && stored !== deriveProvenance(quoteFacts()).line;
       quoteAttr.value = overridden ? stored : '';
       setOverrideOpen(overridden);
+      setSlugState(d.slug ?? null); // ⚠ BEFORE refreshPreview, or the auto-fill overwrites the stored slug
       refreshPreview();
       resetQuoteDate(d.occurredIso, d.datePrecision);
       refreshQuoteValid();

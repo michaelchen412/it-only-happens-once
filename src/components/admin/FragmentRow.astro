@@ -90,6 +90,11 @@ const editorData =
     : JSON.stringify({
         id: r.id,
         type: r.type,
+        // The sheet shows it and can override it. It is carried because a saved
+        // quote's slug is FROZEN (actions/_shared.ts `fragmentSlug`) — so the
+        // field has to open on the real address rather than re-deriving a
+        // preview of one that will be ignored.
+        slug: r.slug,
         title: r.title ?? '',
         body: r.body ?? '',
         attribution: r.attribution ?? '',

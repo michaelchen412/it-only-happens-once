@@ -16,8 +16,8 @@ import {
   type DB,
   fail,
   fragmentStatus,
+  fragmentSlug,
   requireAdmin,
-  uniqueSlug,
   optDatetimeLocal,
   optText,
   optUrl,
@@ -277,8 +277,11 @@ export const fragments = {
       if (publishing && !title) throw fail('Add a title before publishing', 'BAD_REQUEST');
       if (publishing && !body.trim()) throw fail('Write something before publishing', 'BAD_REQUEST');
 
-      const base = input.slug || title || firstWords(body) || 'untitled';
-      const slug = await uniqueSlug(sb, 'fragments', slugify(base), input.id);
+      const slug = await fragmentSlug(sb, {
+        id: input.id,
+        override: input.slug,
+        base: title || firstWords(body) || 'untitled',
+      });
       const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
         type: 'writing',
         title: title || null,
@@ -398,8 +401,11 @@ export const fragments = {
       // An explicit override wins; otherwise the derivation; otherwise silence,
       // which both renderers already handle by drawing no line at all.
       const attribution = input.attribution?.trim() || derived || null;
-      const base = input.slug || `${attribution ?? ''} ${firstWords(input.body)}`;
-      const slug = await uniqueSlug(sb, 'fragments', slugify(base), input.id);
+      const slug = await fragmentSlug(sb, {
+        id: input.id,
+        override: input.slug,
+        base: `${attribution ?? ''} ${firstWords(input.body)}`,
+      });
       const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
         type: 'quote',
         title: null,
@@ -455,12 +461,15 @@ export const fragments = {
       // and the kind both come from it, so a stale hidden field can't disagree.
       const ref = parseSongRef(input.spotify_url);
       if (!ref) throw fail('That doesn’t look like a Spotify track, album, or YouTube link', 'BAD_REQUEST');
-      const slug = await uniqueSlug(
-        sb,
-        'fragments',
-        slugify(input.slug || `${input.title} ${input.attribution}`),
-        input.id,
-      );
+      // Songs freeze too, though they have no public URL of their own today
+      // (docs/admin.md). The rule is "a published FRAGMENT keeps its slug", and
+      // two of three types obeying it is the version a later session has to
+      // stop and work out the reason for. There isn't one.
+      const slug = await fragmentSlug(sb, {
+        id: input.id,
+        override: input.slug,
+        base: `${input.title} ${input.attribution}`,
+      });
       // `spotify_id` stays the key for Spotify refs so existing rows keep their
       // meaning; a YouTube citation records its own id under its own name.
       const details: Record<string, Json> =

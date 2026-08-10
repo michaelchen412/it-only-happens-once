@@ -332,6 +332,42 @@ const thisYear = new Date().getUTCFullYear();
           />
         </div>
 
+        {
+          /* — the address —
+            Last, with the date, because both are last-mile metadata: everything
+            above says what the quote IS, these two say how it is filed.
+
+            ⚠ IT MATTERS MORE HERE THAN IN THE WRITING SHEET, and the reason is
+            that a quote has no draft lifecycle — it publishes on save. So the
+            first press of Save quote is also the moment its URL freezes
+            (actions/_shared.ts `fragmentSlug`), where an essay gets a whole
+            drafting period to change its mind. This field is the one chance to
+            look at the address before it becomes a promise.
+
+            Auto-filled from the attribution and the opening words, exactly as
+            the server derives it, and it stops auto-filling the moment you type
+            in it — the writing sheet's `slugTouched` rule, same behaviour in
+            the second room. Editing is an override, not the normal path. */
+        }
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-base-content/70">Address <span class="text-base-content/40">— the URL</span></span>
+          <span class="input input-sm input-bordered flex items-center gap-0 pr-2 pl-3">
+            <span class="text-base-content/35 shrink-0 select-none">/blog/</span>
+            <input
+              name="slug"
+              id="quote-slug"
+              class="min-w-0 flex-1 bg-transparent outline-none"
+              placeholder="auto"
+              spellcheck="false"
+              autocapitalize="off"
+              autocorrect="off"
+            />
+          </span>
+          <span id="quote-slug-note" class="text-base-content/45 text-xs"
+            >Set when you first save. Change it only if this one reads badly — any link already shared stops working.</span
+          >
+        </label>
+
         {/* Quotes publish on save — no draft lifecycle (docs/admin.md). Unpublish via the list. */}
         <input type="hidden" name="status" value="published" />
 
