@@ -96,7 +96,13 @@ const quoteTitle = quote
 const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70 ? '' : '…'}` : 'Not found';
 ---
 
-<SiteLayout title={title} active="blog" description={description} ogType="article">
+<SiteLayout
+  title={title}
+  active="blog"
+  description={description}
+  ogType="article"
+  image={found ? `/og/${slug}.png` : undefined}
+>
   {preview && <PreviewBar status={preview.status} editHref={preview.editHref} />}
   {
     !found ? (
