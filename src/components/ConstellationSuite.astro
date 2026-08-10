@@ -18,10 +18,18 @@
   ever distinguished them, does not exist — the one dynamic thing on screen was
   teaching "everything here glows". A reader could not tell which stanzas open.
 
-  The fix was not to take the light away. It was to give only the OPENABLE
-  stanzas a word for it to warm (`suite-cta`, writing only): the light then
-  stops being the signal and becomes the carrier of one, and a quote still
-  glows but has nothing to say. `.is-focus` — scripts/focus-mode.ts — is what
+  The fix was not to take the light away. It was to give one KIND of stanza a
+  word for it to warm (`suite-cta`, writing only): the light then stops being
+  the signal and becomes the carrier of one, and a quote still glows but has
+  nothing to say.
+
+  ⚠ AND THE TEST IS NOT "DOES IT OPEN?" — quotes open too, as of plan 32. It is
+  **is the stanza incomplete without the click?** An essay here is a title and a
+  fading excerpt; the piece is elsewhere, and a reader who does not click has
+  not read it. A quote is set whole, and clicking only adds provenance and a
+  share mark to something already finished. A word there would promise text that
+  is not missing. (Written down because the looser reading was built first, and
+  is the one a later session would arrive at again.) `.is-focus` — scripts/focus-mode.ts — is what
   warms it, which is the lamplight on touch and the cursor on a desktop, never
   both at once.
 
@@ -126,15 +134,7 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
     {
       constellation.items.map((f, i) => (
         <article
-          class:list={[
-            'suite-item flex gap-4 sm:gap-6',
-            // ⚠ `suite-writing` IS THE CLASS `.is-focus` WARMS A CTA THROUGH, and
-            // a quote stanza now carries one. The name outlived its meaning the
-            // moment quotes became openable; it means "this stanza opens", and
-            // renaming it across the stylesheet is a larger edit than this
-            // change earns. Read it as `suite-openable`.
-            (f.kind === 'writing' || f.kind === 'quote') && 'suite-writing',
-          ]}
+          class:list={['suite-item flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
           style={`--indent:${INDENTS[i % INDENTS.length]}`}
         >
           {/* The margin column. It carries NO type glyph any more (2026-08-07):
@@ -167,28 +167,40 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
 
                 aria-hidden + tabindex="-1": this duplicates the stanza's own
                 link, which already has the accessible name and the tab stop. */
-              /* ⚠ A QUOTE HAS A WORD NOW TOO, and the rule above is why rather
-                than an exception to it. "Only the openable stanzas get a word"
-                was never about quotes — it was about which stanzas OPEN, and a
-                quote did not. It does now (plan 32: the sheet carries its
-                citation, its author's other lines, its subjects and its share
-                mark), so it earns the same treatment by the same argument.
+              /* ⚠ STILL WRITING ONLY, and a quote opening does NOT change that
+                — which is the correction, because for one commit it did. A
+                quote briefly carried an `About →` here on the reasoning that
+                the rule was "openable stanzas get a word". That was the wrong
+                reading of the rule. Michael, 2026-08-10:
 
-                ⚠ THE WORD IS NOT "Read". You have already read it — it is set
-                whole, right there, and a quote is the one stanza that hides
-                nothing. What opens is where it CAME from and what it touches,
-                so the word is `About`. Getting this wrong the easy way — one
-                word for both — would have promised an essay's worth of unread
-                text behind three lines you just finished. */
-              (f.kind === 'writing' || f.kind === 'quote') && (
+                  "quotes dont need the about button. they should just be
+                   clickable … it's not ultimately necessary to click the
+                   quotes. It's only really meant for sharing or viewing
+                   related content. However, we do need the read a button for
+                   my writing because you obviously need to click it to read
+                   the whole thing."
+
+                So the rule is sharper than "openable": **a word belongs to a
+                stanza whose content is INCOMPLETE WITHOUT THE CLICK.** An essay
+                here is a title and a fading excerpt — the piece is elsewhere,
+                and a reader who does not click has not read it. A quote is set
+                whole; clicking adds provenance and a share mark to something
+                already finished. A word on that promises the reader they are
+                missing text, and they are not.
+
+                It costs discoverability, knowingly — the same price and the
+                same argument QuoteReveal's header records for the citation
+                control: an answer to a question most readers never ask, reached
+                by the ones who do ask because they reach for the line anyway. */
+              f.kind === 'writing' && (
                 <a
-                  href={`/blog/${f.kind === 'writing' ? f.item.slug : f.quote.slug}`}
-                  data-read={f.kind === 'writing' ? f.item.slug : f.quote.slug}
+                  href={`/blog/${f.item.slug}`}
+                  data-read={f.item.slug}
                   class="suite-cta"
                   tabindex="-1"
                   aria-hidden="true"
                 >
-                  <span class="suite-cta__word">{f.kind === 'writing' ? 'Read' : 'About'}</span>
+                  <span class="suite-cta__word">Read</span>
                   <span class="suite-cta__arrow">→</span>
                 </a>
               )

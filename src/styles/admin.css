@@ -707,10 +707,36 @@ html.reader-open .sky-return {
 
    Only writing gets any of this, and that asymmetry is the whole design: the
    lamplight touches every stanza, so it could never distinguish them by itself.
-   Give the openable ones a word for it to warm and the light becomes the
-   carrier of a signal rather than a signal that lies.
+   Give ONE KIND a word for it to warm and the light becomes the carrier of a
+   signal rather than a signal that lies.
+
+   ⚠ NOT "the openable ones" — a quote opens too, as of plan 32, and gets none
+   of this deliberately. The line is whether the stanza is INCOMPLETE without
+   the click: an essay's text is elsewhere, a quote's is right there. See
+   ConstellationSuite for the whole argument.
 
    Kept AFTER the `.is-lit` rules so `.is-focus` wins at equal specificity. */
+/* ⚠ THE FOCUS RING, IN THE SITE'S OWN REGISTER. Both openable stanzas are bare
+   anchors, so they took the user agent's default: a hard rectangle drawn tight
+   around a 1.6rem blockquote, which in this setting reads as an error state.
+   Caught in a screenshot after Escape closed the sheet — the dialog correctly
+   returns focus to its trigger, and Escape is a keyboard interaction, so
+   `:focus-visible` fires exactly as it should. The ring is not the bug; its
+   shape was.
+
+   A dotted hairline at 6px offset is what QuoteCard's `.quote-line` already
+   uses for the same job on the same content — one convention, two rooms. The
+   ring stays for the same reason it exists at all: it is the only thing telling
+   a keyboard reader where they are, and the quote stanza has no other
+   affordance to fall back on. */
+.suite-item figure > a:focus-visible,
+.suite-writing > a:focus-visible,
+.suite-writing a.block:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: 6px;
+  border-radius: 2px;
+}
+
 .suite-writing .sw-title {
   color: color-mix(in oklab, var(--lamp) 34%, var(--color-base-content));
 }
