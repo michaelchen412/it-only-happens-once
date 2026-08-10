@@ -214,6 +214,39 @@ breakage while the broken version was already live.
   script since 2026-07-31 because a production 500 got past every local check.
   The gate is not new machinery here — it is that idea applied to `verify`.
 
+### The Action is the belt; Vercel is the braces
+
+⚠ **Since 2026-08-10 there is also a GitHub Action
+([`.github/workflows/verify.yml`](../.github/workflows/verify.yml)), and it does
+not contradict the paragraph above.** The argument there is that an Action must
+not *be* the gate, and it stays true — the gate is `package.json`'s `build`, run
+by Vercel, where a red check stops a deploy rather than reporting one. The
+Action is additive, and it exists for the two things the gate leaves open:
+
+- **A ✓ or ✗ on the commit.** The gate stops a bad deploy but leaves no mark in
+  the history. Anyone reading this repository — including its author, six months
+  from now — otherwise has no signal either way.
+- **A scheduled `npm audit --omit=dev`**, Mondays. This is the half that earns
+  its keep independently: on 2026-08-10 the tree carried seven advisories, five
+  of them `astro-icon`'s transitive tail, which is not maintained on this repo's
+  schedule and will regrow. A schedule is how that surfaces without remembering
+  to look. ⚠ A red audit is a prompt to redo the **reachability** work, not
+  proof of exposure — five of those seven never entered the deployed function,
+  and two shipped *bundled*, absent from the function's `node_modules` entirely.
+  Grep the server chunk, not the folder.
+
+**The `verify` job runs `npm run verify`, not `npm run build`** — deliberately.
+The build additionally runs `check-server-bundle.mjs`, which is only meaningful
+against the artifact **Vercel** produces; running it on a different machine's
+bundle would read as coverage it is not. Vercel owns that half, and this is the
+same boundary `check-server-bundle.mjs`'s own `stopAt` exists to enforce.
+
+⚠ **The e2e suite is not in CI and that is a decision.** It needs
+`SUPABASE_SERVICE_ROLE_KEY` to mint an admin session, and adding that key to
+GitHub Actions secrets widens where the service-role key lives, to buy something
+a local run already gives. The same trade as the one that keeps the e2e suite
+pointed at the live project rather than a database branch.
+
 A pre-commit hook (husky + lint-staged) formats and lints *staged files only* —
 deliberately not the test suite, for the reason above. Formatting is Prettier's
 alone; ESLint carries no style rule.

@@ -1,0 +1,78 @@
+# The belt. Vercel is the braces.
+#
+# ⚠ READ docs/architecture.md §9a BEFORE CHANGING THIS FILE. That section argues
+# — correctly, and this workflow does not weaken it — that a GitHub Action must
+# NOT be the gate: an Action reports a breakage while the broken version is
+# already live, whereas `npm run build` runs `verify` first and Vercel's build
+# command is `npm run build`, so a red check fails the BUILD and the last good
+# deployment keeps serving. That is the difference between a tripwire and a
+# gate, and the gate stays in package.json where it is.
+#
+# What this adds is the two things that fall through anyway:
+#
+#   1. A ✓ or ✗ on the commit. The gate stops a bad deploy but leaves no mark
+#      on the history; a reviewer looking at this repo sees nothing either way.
+#   2. A scheduled `npm audit`. Plan 31 §1 found seven advisories, none of them
+#      reachable, and five were `astro-icon`'s transitive tail — which is not
+#      maintained on this repo's schedule and will regrow. A schedule is how you
+#      find that out without remembering to look.
+#
+# ⚠ THE E2E SUITE IS DELIBERATELY NOT HERE. It needs SUPABASE_SERVICE_ROLE_KEY
+# to mint an admin session, and putting that key in GitHub Actions secrets would
+# widen where the service-role key lives — for a single-user personal site, to
+# buy something a local run already provides. Same trade as plan 31 §4's refusal
+# of database branching, in a different costume. If that ever changes, it is a
+# decision to write down, not a convenience to reach for.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Mondays, 07:00 UTC. The audit job only.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # Skipped on the schedule: re-running the same commit's checks weekly proves
+    # nothing. The audit below is the job that wants a calendar.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Matches `engines.node` in package.json.
+          node-version: '22.12.0'
+          cache: npm
+      - run: npm ci
+      # format:check + lint + astro check + test — ~22s locally.
+      #
+      # ⚠ NOT `npm run build`. The build additionally runs `astro build` and
+      # `check-server-bundle.mjs`, and the bundle check is only meaningful
+      # against the artifact VERCEL produces — running it here would either
+      # duplicate the deploy or, worse, pass against a differently-built bundle
+      # and read as coverage it isn't. Vercel owns that half.
+      - run: npm run verify
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+      - run: npm ci
+      # ⚠ `--omit=dev`, because that is the command a reviewer runs, and the
+      # number it prints is the one that shapes their first impression. It is
+      # not the number that measures risk: plan 31 §1 established that
+      # reachability has to be checked against the deployed artifact
+      # (.vercel/output/functions/_render.func), and that a bundled dependency
+      # can ship while being absent from that folder's node_modules. A red run
+      # here is a prompt to redo that reachability work, not proof of exposure.
+      - run: npm audit --omit=dev
