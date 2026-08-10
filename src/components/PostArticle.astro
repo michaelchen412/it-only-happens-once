@@ -13,6 +13,7 @@
   measure (`.prose-measure`) and padding.
 */
 import Timestamp from './Timestamp.astro';
+import ShareMark from './ShareMark.astro';
 import { renderMarkdown } from '../lib/markdown';
 import { embedForUrl } from '../lib/media';
 import type { WritingItem } from '../lib/blog';
@@ -21,8 +22,16 @@ interface Props {
   item: WritingItem;
   /** Link the title to its permalink (feed/reader) vs. plain h1 (the page itself). */
   linkTitle?: boolean;
+  /**
+   * Off in the composer's Read view (plan 32 · §9). Everywhere else this renders
+   * — the feed's template, the Reader, the permalink — a reader is looking at a
+   * published piece and can hand it on. In the composer Michael is looking at
+   * his own draft, and a share control there offers to publish a URL that may
+   * not resolve yet.
+   */
+  share?: boolean;
 }
-const { item, linkTitle = false } = Astro.props;
+const { item, linkTitle = false, share = true } = Astro.props;
 const bodyHtml = renderMarkdown(item.bodyMarkdown);
 
 // The paired song (ADR-0009): *this song goes with this piece*. It sits at the
@@ -39,11 +48,16 @@ const bodyHtml = renderMarkdown(item.bodyMarkdown);
 // Spotify playlist, which no song fragment may cite but which still has to
 // play. "What may a song cite" and "what can we embed" are different questions.
 const pairedEmbed = item.paired ? embedForUrl(item.paired.url) : null;
-// The legacy `details.media` path carries no title or artist, so there is
-// nothing to caption with — the embed names itself. Only a promoted song
-// fragment gets the line above it.
-const pairedCaption = item.paired?.title ? item.paired : null;
-const pairedTitle = pairedCaption ? `${pairedCaption.title} — paired with ${item.title}` : `Paired with ${item.title}`;
+// NO VISIBLE CAPTION. The player already prints the track, the artist, and the
+// artwork in type larger than ours — a "♪ Title — Artist" line above it said
+// the same thing twice, and the second saying was the smaller one. What we knew
+// that the embed doesn't (that this song goes with THIS piece) is the only fact
+// worth carrying, and it goes where it reads better: the iframe's accessible
+// name, for anyone arriving by screen reader. Sighted readers get the embed and
+// its position — under the title, above the prose — which is the whole sentence.
+const pairedTitle = item.paired?.title
+  ? `${item.paired.title} — paired with ${item.title}`
+  : `Paired with ${item.title}`;
 ---
 
 <article class="post-article">
@@ -59,10 +73,29 @@ const pairedTitle = pairedCaption ? `${pairedCaption.title} — paired with ${it
     }
   </h1>
 
+  {
+    /*
+    ⚠ THE SHARE MARK IS PINNED RIGHT, NOT APPENDED. Same principle as the quote
+    page's — a control the reader has to hunt for is one they find again from
+    scratch every time — but a DIFFERENT expression of it, because an essay has
+    no rule beneath its title to set a mark into. What it has is this metadata
+    line, whose left side is short and fixed (a date and a read time), so
+    `ml-auto` against the measure's right edge is already the stable address that
+    the quote page had to build a rule break to get.
+
+    ⚠ AND IT IS AT THE HEAD RATHER THAN THE FOOT, which is the opposite of the
+    quote page and is right for the opposite reason. A quote is read in one
+    glance, so its apparatus belongs after it. An essay is a sitting: a reader
+    who decides to pass it on usually decides that partway through, and a control
+    at the end is only reachable by finishing something they already stopped
+    reading to share.
+  */
+  }
   <div class="text-base-content/40 mt-5 flex flex-wrap items-center gap-3 text-sm">
     <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
     <span class="font-sans">·</span>
     <span class="font-sans">{item.readMinutes} min read</span>
+    {share && <ShareMark url={`/blog/${item.slug}`} label="Share this piece" class="ml-auto" />}
   </div>
 
   {
@@ -83,12 +116,6 @@ const pairedTitle = pairedCaption ? `${pairedCaption.title} — paired with ${it
   {
     pairedEmbed && (
       <figure class="post-paired prose-measure mt-8">
-        {pairedCaption && (
-          <figcaption class="text-base-content/45 mb-2 font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all-small-caps]">
-            <span aria-hidden="true">♪</span> {pairedCaption.title}
-            {pairedCaption.artist && <span class="text-base-content/35"> — {pairedCaption.artist}</span>}
-          </figcaption>
-        )}
         {pairedEmbed.height === null ? (
           <div class="aspect-video overflow-hidden" style="border-radius: var(--radius-box)">
             <iframe

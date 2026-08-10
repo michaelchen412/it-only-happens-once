@@ -41,10 +41,57 @@ const shownSubjects = item.subjects.slice(0, 3);
 const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
+<style>
+  /* A warm, not an underline — see the note on the anchor. The trace at rest is
+     what tells a reader who never moves the pointer that these go somewhere,
+     the same two-intensity trick `.sky-name` uses on the overview. */
+  .quote-line blockquote {
+    color: color-mix(in oklab, var(--color-base-content) 96%, var(--color-primary));
+    transition: color 0.3s ease;
+  }
+  @media (hover: hover) {
+    .quote-line:hover blockquote {
+      color: color-mix(in oklab, var(--color-base-content) 78%, var(--color-primary));
+    }
+  }
+  .quote-line:focus-visible {
+    outline: 1px dotted currentColor;
+    outline-offset: 6px;
+    border-radius: 2px;
+  }
+</style>
+
 <figure class="py-9 first:pt-0">
-  <blockquote class="text-base-content font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
-    {searching ? <Highlighted text={item.body} term={term} /> : item.body}
-  </blockquote>
+  {
+    /*
+    ⚠ THE LINE IS THE LINK, and it is the only chrome-free way to reach a quote's
+    own page (plan 32 · §3, added with §9). Until that page existed, a quote card
+    was the one item in this feed that led nowhere and correctly had no
+    affordance saying otherwise. Now it leads somewhere, and something has to say
+    so.
+
+    Every alternative was louder. A permalink glyph on the caption is the thing
+    QuoteReveal was chosen specifically to avoid — "every candidate that added
+    one made the quietest line on the site louder". Turning the "Added" date into
+    the link would have cost the date's own popover, and nested a link inside a
+    button. Making the whole <figure> clickable would have swallowed the
+    attribution, which is already a control.
+
+    So it follows the card next door: PostCard's TITLE is the link to its essay,
+    and a quote's equivalent of a title is the line itself. The hover is a warm
+    rather than an underline — at 1.35rem across a page of twenty-five, an
+    underline is a page of underlines.
+
+    ⚠ THIS IS THE FEED ONLY. A quote stanza in a constellation suite stays inert
+    by deliberation (ConstellationSuite's header): there, the suite is the thing
+    being read and a quote is a movement in it, not a card that leads away.
+  */
+  }
+  <a href={`/blog/${item.slug}`} class="quote-line block">
+    <blockquote class="font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
+      {searching ? <Highlighted text={item.body} term={term} /> : item.body}
+    </blockquote>
+  </a>
   <figcaption class="text-base-content/45 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm">
     {
       item.attribution && (

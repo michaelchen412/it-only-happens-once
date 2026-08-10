@@ -554,7 +554,9 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
   {
     readerWritings.map((w) => (
       <template data-reader-content={w.slug}>
-        <PostArticle item={w} linkTitle />
+        {/* `share={false}` — the composer is looking at your own draft, and a
+            share control there offers a URL that may not resolve yet. */}
+        <PostArticle item={w} linkTitle share={false} />
       </template>
     ))
   }
