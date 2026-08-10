@@ -97,7 +97,27 @@ export const constellations = {
       return { ok: true };
     },
   }),
-  /** Authored order of the sky itself: sort = index in the given id list. */
+  /**
+   * Authored order of the sky itself: sort = index in the given id list.
+   *
+   * ⚠ PARALLEL, NOT SEQUENTIAL, AND NOT A SINGLE UPSERT — the middle option is
+   * the one that looks right and isn't (plans/30 · §3). One `upsert` of
+   * `(id, sort)` rows would be atomic and would be one statement, and it cannot
+   * be written here: PostgREST's upsert is `INSERT … ON CONFLICT DO UPDATE`,
+   * Postgres checks NOT NULL while it BUILDS the tuple — before it ever gets to
+   * the conflict — and `name`, `slug`, `color` and `status` are all NOT NULL on
+   * this table. Supplying them means reading them and writing them back, which
+   * silently clobbers a rename made in another tab. That is not ugly, it is
+   * wrong, so the honest floor applies instead.
+   *
+   * What the change buys is latency: N round trips become one wall-clock round
+   * trip. What it does NOT buy is atomicity, and here is the posture, the same
+   * one `checkin.ts` states for its own version of this — a mid-flight failure
+   * leaves the sky half-reordered. Accepted, because the whole of what is lost
+   * is an ORDER: nothing is deleted, no constellation moves anywhere it wasn't
+   * dragged, the next drag rewrites every position from scratch, and the action
+   * throws so the page reloads and shows you the state as it actually is.
+   */
   reorder: defineAction({
     accept: 'form',
     input: z.object({ ids: z.string().min(1) }),
@@ -105,13 +125,15 @@ export const constellations = {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.ids.split(',').filter(Boolean);
-      for (let i = 0; i < ids.length; i++) {
-        const { error } = await sb
-          .from('constellations')
-          .update({ sort: i + 1 })
-          .eq('id', ids[i]);
-        if (error) throw fail(error.message);
-      }
+      const results = await Promise.all(
+        ids.map((id, i) =>
+          sb
+            .from('constellations')
+            .update({ sort: i + 1 })
+            .eq('id', id),
+        ),
+      );
+      for (const { error } of results) if (error) throw fail(error.message);
       return { ok: true };
     },
   }),
@@ -193,19 +215,38 @@ export const constellations = {
           .in('constellation_id', remove);
         if (error) throw fail(error.message);
       }
-      for (const id of [...want].filter((c) => !have.has(c))) {
-        const { data: last } = await sb
+      // ⚠ ONE READ AND ONE WRITE, WHATEVER THE COUNT (plans/30 · §3). This was
+      // two sequential queries per constellation added — a tail position, then
+      // an upsert — so placing a piece in four suites was eight round trips in
+      // a row, and a failure at the fifth left it in two of them with nothing
+      // said. Here the upsert genuinely IS available, because
+      // `fragment_constellations` is `(constellation_id, fragment_id, position)`
+      // and nothing else: every NOT NULL column is one we are supplying, so a
+      // single statement can carry every new row and either all of them land or
+      // none do.
+      const add = [...want].filter((c) => !have.has(c));
+      if (add.length) {
+        // Every target's tail in one question. Ordered ascending so the LAST
+        // row seen per constellation is its highest — the same answer the old
+        // per-constellation `order desc limit 1` gave, asked once.
+        const { data: tails, error: tailErr } = await sb
           .from('fragment_constellations')
-          .select('position')
-          .eq('constellation_id', id)
-          .order('position', { ascending: false })
-          .limit(1);
-        const { error } = await sb
-          .from('fragment_constellations')
-          .upsert(
-            { constellation_id: id, fragment_id: input.fragment_id, position: (last?.[0]?.position ?? 0) + 1 },
-            { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
-          );
+          .select('constellation_id, position')
+          .in('constellation_id', add)
+          .order('position', { ascending: true });
+        if (tailErr) throw fail(tailErr.message);
+
+        const highest = new Map<string, number>();
+        for (const row of tails ?? []) highest.set(row.constellation_id, row.position);
+
+        const { error } = await sb.from('fragment_constellations').upsert(
+          add.map((id) => ({
+            constellation_id: id,
+            fragment_id: input.fragment_id,
+            position: (highest.get(id) ?? 0) + 1,
+          })),
+          { onConflict: 'fragment_id,constellation_id', ignoreDuplicates: true },
+        );
         if (error) throw fail(error.message);
       }
       return { ok: true };
@@ -263,7 +304,26 @@ export const constellations = {
     },
   }),
 
-  /** The composed order: positions rewritten 1..n from the given list. */
+  /**
+   * The composed order: positions rewritten 1..n from the given list.
+   *
+   * ⚠ ONE STATEMENT, SO THE SUITE IS NEVER HALF-REORDERED (plans/30 · §3).
+   * This was one query per fragment, sequentially, which meant a twenty-piece
+   * constellation was twenty round trips and a failure at the eleventh left the
+   * composition in an order nobody authored — the first ten as dragged, the
+   * rest as they were, and no note anywhere. An upsert works here (unlike
+   * `reorder` above) because this table's every NOT NULL column is one we are
+   * supplying, so the rewrite is atomic.
+   *
+   * ⚠ AND IT IS GUARDED, WHICH IS THE PART A BARE UPSERT GETS WRONG. `upsert`
+   * is `INSERT … ON CONFLICT`, so an id that is NOT currently placed here would
+   * be INSERTED — a *reorder* silently becoming a *place*. That is not
+   * hypothetical: unplace a piece in one tab, drag in another, and the stale
+   * tab's list would put it back. The old `.eq()` update no-opped on such a row
+   * and that behaviour is worth keeping, so the current placements are read
+   * first and the rewrite is the intersection. One extra read to keep the
+   * action doing only what its name says.
+   */
   reorderPlacements: defineAction({
     accept: 'form',
     input: z.object({ constellation_id: z.uuid(), fragment_ids: z.string().min(1) }),
@@ -271,14 +331,30 @@ export const constellations = {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
       const ids = input.fragment_ids.split(',').filter(Boolean);
-      for (let i = 0; i < ids.length; i++) {
-        const { error } = await sb
-          .from('fragment_constellations')
-          .update({ position: i + 1 })
-          .eq('constellation_id', input.constellation_id)
-          .eq('fragment_id', ids[i]);
-        if (error) throw fail(error.message);
-      }
+
+      const { data: placed, error: readErr } = await sb
+        .from('fragment_constellations')
+        .select('fragment_id')
+        .eq('constellation_id', input.constellation_id);
+      if (readErr) throw fail(readErr.message);
+      const here = new Set((placed ?? []).map((r) => r.fragment_id));
+
+      // Positions stay 1..n over what is ACTUALLY placed: numbering from the
+      // client's index would leave a gap wherever a stale id was dropped, and
+      // "authored order, rewritten 1..n" is this module's opening promise.
+      const rows = ids
+        .filter((fragment_id) => here.has(fragment_id))
+        .map((fragment_id, i) => ({
+          constellation_id: input.constellation_id,
+          fragment_id,
+          position: i + 1,
+        }));
+      if (!rows.length) return { ok: true };
+
+      const { error } = await sb
+        .from('fragment_constellations')
+        .upsert(rows, { onConflict: 'fragment_id,constellation_id' });
+      if (error) throw fail(error.message);
       return { ok: true };
     },
   }),
