@@ -3,12 +3,15 @@
 // composer's browser sheet fetches. One implementation, one truth.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
+// One vocabulary, one owner (plans/29 · §3) — this file used to carry its own
+// `TYPES` array, and `FragmentListPanel.astro`, which renders what it returns,
+// carried a second one.
+import { FRAGMENT_TYPES, type FragmentType } from './fragments-display';
 import { MIN_SEARCH } from './search-highlight';
 
 type DB = SupabaseClient<Database>;
 export type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
 
-const TYPES = ['writing', 'quote', 'song'] as const;
 const SORT_COL: Record<string, string> = { title: 'title', posted: 'occurred_at', edited: 'updated_at' };
 
 export interface FragmentListParams {
@@ -27,7 +30,7 @@ export interface FragmentListParams {
    * either end.
    */
   view: 'list' | 'trash';
-  type: (typeof TYPES)[number] | null;
+  type: FragmentType | null;
   subjectSlugs: string[];
   q: string;
   searching: boolean;
@@ -49,7 +52,7 @@ export interface FragmentListParams {
 export function parseListParams(sp: URLSearchParams): FragmentListParams {
   const viewParam = sp.get('view');
   const view = viewParam === 'trash' ? 'trash' : 'list';
-  const typeParam = TYPES.find((t) => t === sp.get('type')) ?? null;
+  const typeParam = FRAGMENT_TYPES.find((t) => t === sp.get('type')) ?? null;
   const subjectSlugs = (sp.get('subject') || '')
     .split(',')
     .map((s) => s.trim())

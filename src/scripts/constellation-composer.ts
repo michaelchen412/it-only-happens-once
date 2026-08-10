@@ -2,7 +2,11 @@ import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
 import { callAction, formatActionError } from './action-error';
 import { suiteHints } from '../lib/suite-shape';
-import { typeCountLabel, type FragmentType } from '../lib/fragments-display';
+// ⚠ THE LIST, NOT A SIXTH COPY OF IT (plans/29 · §3, which counted four and
+// missed this one and the composer page's). Iterating `FRAGMENT_TYPES` also
+// retires the `as FragmentType` this loop used to need — the cast existed only
+// because the local array was typed `string`.
+import { FRAGMENT_TYPES, typeCountLabel } from '../lib/fragments-display';
 import { announceSkyChange } from './sky-changed';
 import { onFragmentsChanged } from './fragments-changed';
 import { wireListReorder } from './list-reorder';
@@ -112,7 +116,6 @@ const statsBar = document.getElementById('suite-stats')!;
 const spreadStat = document.getElementById('suite-spread')!;
 const placedStat = document.getElementById('suite-placed')!;
 const hintLine = document.getElementById('suite-hints')!;
-const TYPES = ['writing', 'quote', 'song'] as const;
 
 const suiteRows = () => [...rows.querySelectorAll<HTMLElement>('li[data-fid]')];
 
@@ -166,11 +169,11 @@ function refreshSuiteStats() {
     for (const s of (li.dataset.subjects ?? '').split('|').filter(Boolean)) subjects.add(s);
   }
 
-  for (const t of TYPES) {
+  for (const t of FRAGMENT_TYPES) {
     const badge = statsBar.querySelector<HTMLElement>(`[data-type-count="${t}"]`);
     if (!badge) continue;
     badge.querySelector('.admin-stat__n')!.textContent = String(mix[t]);
-    badge.querySelector('.admin-stat__label')!.textContent = typeCountLabel(t as FragmentType, mix[t]);
+    badge.querySelector('.admin-stat__label')!.textContent = typeCountLabel(t, mix[t]);
     badge.classList.toggle('opacity-50', mix[t] === 0);
   }
 

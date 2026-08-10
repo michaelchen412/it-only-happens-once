@@ -30,7 +30,7 @@ import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
 import Reader from '../../../components/Reader.astro';
 import PostArticle from '../../../components/PostArticle.astro';
 import SuiteStanza from '../../../components/SuiteStanza.astro';
-import { TYPE_META, type FragmentType } from '../../../lib/fragments-display';
+import { FRAGMENT_TYPES, TYPE_META, type FragmentType } from '../../../lib/fragments-display';
 import { excerpt, readingMinutes } from '../../../lib/markdown';
 import type { SuiteItem } from '../../../lib/constellations';
 import { revealOf } from '../../../lib/provenance';
@@ -216,7 +216,6 @@ for (const s of suite) mix[s.type]++;
 const { size: sizeHint, spread: spreadHint } = suiteHints(placedCount, subjectSpread);
 
 const subjectNames = (subjectRows ?? []).map((s) => s.name);
-const TYPES = ['writing', 'quote', 'song'] as const;
 ---
 
 <AdminLayout title={c.name} active="constellations">
@@ -371,7 +370,7 @@ const TYPES = ['writing', 'quote', 'song'] as const;
       </div>
 
       <div id="suite-stats" class="mt-3 flex flex-wrap items-center gap-2">
-        {TYPES.map((t) => <TypeCount type={t} count={mix[t]} />)}
+        {FRAGMENT_TYPES.map((t) => <TypeCount type={t} count={mix[t]} />)}
         <span id="suite-spread" class="admin-stat" title={spreadHint || undefined}>
           <b class="admin-stat__n">{subjectSpread}</b>
           <span class="admin-stat__label">{subjectSpread === 1 ? 'subject' : 'subjects'}</span>

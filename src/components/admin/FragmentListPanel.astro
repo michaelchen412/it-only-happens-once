@@ -10,6 +10,10 @@ import { Icon } from 'astro-icon/components';
 import FragmentRow from './FragmentRow.astro';
 import SubjectFilter from './SubjectFilter.astro';
 import type { FragmentListData, FragmentListParams } from '../../lib/fragment-query';
+// The vocabulary, not a fourth copy of it (plans/29 · §3). The type filter this
+// renders and the parser that reads the resulting `?type=` were two separate
+// lists of the same three words, one file apart.
+import { FRAGMENT_TYPES } from '../../lib/fragments-display';
 
 interface Props {
   data: FragmentListData;
@@ -20,8 +24,6 @@ const { data, params: p, mode = 'manage' } = Astro.props;
 // Neither trash nor notes reaches the picker: you compose a constellation out
 // of finished work, not out of scratch.
 const view = mode === 'manage' ? p.view : 'list';
-const TYPES = ['writing', 'quote', 'song'] as const;
-
 const COLUMNS = [
   { field: 'title', label: 'Fragment', align: 'left', cls: 'w-full', sortable: true },
   { field: 'status', label: 'Status', align: 'left', cls: 'hidden sm:table-cell', sortable: false },
@@ -53,7 +55,7 @@ const COLUMNS = [
         All <span class="type-badge__n">{data.totalCount}</span>
       </button>
       {
-        TYPES.map((t) => (
+        FRAGMENT_TYPES.map((t) => (
           <button
             type="button"
             role="radio"

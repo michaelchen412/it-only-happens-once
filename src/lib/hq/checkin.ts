@@ -249,11 +249,12 @@ export function hm(minutes: number): string {
   return h ? `${h}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`;
 }
 
-/** `7:30 PM` — 12-hour, always, per HQ's date register. */
-export function t12(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-}
+// ⚠ `t12` LIVED HERE AND WAS `clockTime` SPELLED AGAIN — character-identical to
+// `dates.ts`'s, which owns HQ's date register (plans/29 · §3). Two functions
+// holding one rule means "7:30 PM, never 19:30" could be changed in one and not
+// the other, on the two surfaces most likely to be read side by side. The
+// panel imports `clockTime` now; `dates.ts` depends only on `time.ts`, so
+// nothing here gained a cycle for it.
 
 /** `HH:MM` as minutes since midnight, or null if it is not a clock time. */
 function clockMinutes(hhmm: string): number | null {

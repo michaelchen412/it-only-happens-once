@@ -3,6 +3,12 @@
 // and (later) the constellation views. All reads go through the anon SSR client
 // and rely on the public RLS policies (published, non-deleted fragments only).
 import type { createSupabaseServerClient } from './supabase';
+// ⚠ THE TYPE, NOT A PRIVATE COPY OF IT. This file used to re-declare
+// `'writing' | 'quote' | 'song'` near the bottom, which made the public feed a
+// fourth owner of the corpus's own vocabulary (plans/29 · §3). `TYPE_META` is
+// pure presentation constants with no imports of its own, so this costs the
+// public bundle nothing.
+import type { FragmentType } from './fragments-display';
 import { excerpt, readingMinutes } from './markdown';
 import { revealOf } from './provenance';
 
@@ -407,8 +413,6 @@ export async function getWritingBySlug(
     paired: pairedMediaOf(r),
   };
 }
-
-type FragmentType = 'writing' | 'quote' | 'song';
 
 /**
  * The subject taxonomy that actually has published fragments of `type`, each

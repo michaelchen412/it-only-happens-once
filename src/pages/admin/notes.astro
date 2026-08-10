@@ -39,7 +39,6 @@ import LogSheet from '../../components/admin/LogSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TaskSheet from '../../components/admin/TaskSheet.astro';
 import { elapsedSince } from '../../lib/hq/dates';
-import { homeTimezone, localToday } from '../../lib/hq/time';
 import { renderMarkdown } from '../../lib/markdown';
 
 const supabase = Astro.locals.supabase;
@@ -120,8 +119,12 @@ const pieces = (pieceRows ?? []).map((p) => ({
   Active goals only, for the same reason the tasks room gives: filing a task
   under something you paused is how a goal quietly becomes a folder again.
 */
-const tz = await homeTimezone(supabase);
-const todayYmd = localToday(tz);
+// ⚠ THE MIDDLEWARE ALREADY RESOLVED THIS, ONCE, FOR THE WHOLE REQUEST. This
+// page re-derived it — `homeTimezone` then `localToday` — which is a second
+// owner of the one fact `time.ts` opens by promising has exactly one, and a
+// second round trip in front of the render besides. `middleware.ts` says the
+// consolidation happened; this was the call site it missed (plans/29 · §2).
+const { ymd: todayYmd } = Astro.locals.today;
 
 const [{ data: goalData }, { data: rosterData }] = await Promise.all([
   supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),

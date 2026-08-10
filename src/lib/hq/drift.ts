@@ -28,7 +28,7 @@
 //     under "Been a while" accusing you of it while you are on your way out.
 import { type Person } from './people';
 import type { LastContact } from './interactions';
-import { daysBetween, type Ymd } from './time';
+import { daysBetween, shiftYmd, type Ymd } from './time';
 
 /** Today, capped at three, most-drifted first — the roster holds the full list. */
 export const TODAY_DRIFT_CAP = 3;
@@ -111,9 +111,12 @@ export function driftList(
  * in the past, which would expire the moment you clicked it.
  */
 export function mutedUntil(person: Pick<Person, 'cadence_days'>, today: Ymd): Ymd {
-  const d = new Date(`${today}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + person.cadence_days);
-  return d.toISOString().slice(0, 10) as Ymd;
+  // ⚠ `shiftYmd`, not raw `Date` math — from the module this file already
+  // imports from. The hand-rolled version here agreed with it, which is exactly
+  // when a second owner is cheap to retire (plans/29 · §2): `time.ts` opens by
+  // saying that two surfaces deriving a day slightly differently is how the
+  // check-in, "due today" and "overdue" start disagreeing at midnight.
+  return shiftYmd(today, person.cadence_days);
 }
 
 /**

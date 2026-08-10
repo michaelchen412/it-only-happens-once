@@ -28,7 +28,6 @@ import {
   hm,
   instants,
   medianClock,
-  t12,
   wordFor,
 } from '../lib/hq/checkin';
 import { utcToZonedTime, zonedTimeToUtc } from '../lib/hq/time';
@@ -315,14 +314,9 @@ describe('medianClock', () => {
   });
 });
 
-describe('t12', () => {
-  it('is 12-hour, always — never 19:30', () => {
-    expect(t12('19:30')).toBe('7:30 PM');
-    expect(t12('06:20')).toBe('6:20 AM');
-    expect(t12('00:05')).toBe('12:05 AM');
-    expect(t12('12:00')).toBe('12:00 PM');
-  });
-});
+// `t12` was deleted on 2026-08-09 (plans/29 · §3) — it was `clockTime` written
+// a second time. These four assertions moved to `hq-dates.test.ts`, onto the
+// owner that kept the rule and, until then, had no test of its own.
 
 describe('wordFor', () => {
   it('names the value, because a bare position means nothing half-awake', () => {

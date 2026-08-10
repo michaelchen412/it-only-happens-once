@@ -25,7 +25,7 @@
 // it. It is clamped by CSS so the full text stays in the DOM.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types';
-import { rowTitle, type FragmentType } from '../fragments-display';
+import { plainish, rowTitle, type FragmentType } from '../fragments-display';
 import { one } from './relations';
 import type { Person } from './people';
 import type { Ymd } from './time';
@@ -166,14 +166,11 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
     }>(row.fragments);
     // A fragment in the trash is not on the shelf — the same rule `sharedFor`
     // keeps, so the brief and the profile can never disagree about what is there.
-    if (f && !f.deleted_at)
-      shelf.set(
-        row.person_id,
-        rowTitle(f)
-          .replace(/[*_`>#]/g, '')
-          .replace(/\s+/g, ' ')
-          .trim(),
-      );
+    // `plainish`, not the same three `.replace`s written out again — this was
+    // the picker's rule re-inlined verbatim, and a shelf line that kept its
+    // asterisks while the picker dropped them would have been the first sign
+    // (plans/29 · §3).
+    if (f && !f.deleted_at) shelf.set(row.person_id, plainish(rowTitle(f)));
   }
 
   return briefs.map((b) => ({

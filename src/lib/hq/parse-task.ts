@@ -27,7 +27,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'astro/zod';
 import { EFFORTS, PRIORITIES } from './tasks';
-import { PRESETS } from './recurrence';
+import { PRESETS, dayNameOf } from './recurrence';
 import type { Ymd } from './time';
 
 const EFFORT_KEYS = EFFORTS.map((e) => e.key) as [string, ...string[]];
@@ -167,7 +167,6 @@ const SYSTEM = (today: Ymd, tz: string, weekday: string) =>
   `For every field you do fill, quote the exact words you read it from. Those words are shown to the person so they can ` +
   `see how you read them, so quote the input verbatim rather than paraphrasing.`;
 
-const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const NAMES_A_WEEKDAY = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/i;
 
 /**
@@ -194,7 +193,7 @@ export function weekdayDisagreement(
   if (recurrence.value !== 'weekly' && recurrence.value !== 'biweekly') return null;
   const named = NAMES_A_WEEKDAY.exec(recurrence.from)?.[1]?.toLowerCase();
   if (!named) return null;
-  const actual = WEEKDAY[new Date(`${dueOn.value}T00:00:00Z`).getUTCDay()];
+  const actual = dayNameOf(dueOn.value);
   if (named === actual.toLowerCase()) return null;
   return `“${recurrence.from}”, but ${dueOn.value} is a ${actual} — it will repeat on ${actual}s`;
 }
@@ -214,7 +213,7 @@ export async function parseTask(
   apiKey: string,
   at: number,
 ): Promise<ParseResult> {
-  const weekday = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()];
+  const weekday = dayNameOf(today);
   const client = new Anthropic({ apiKey });
   const message = await client.messages.parse({
     model: 'claude-haiku-4-5-20251001',

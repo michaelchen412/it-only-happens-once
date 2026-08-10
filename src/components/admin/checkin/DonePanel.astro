@@ -24,12 +24,14 @@ import {
   STARS,
   TRACKS,
   hm,
-  t12,
   wordFor,
   type Checkin,
   type Derived,
   type DreamEntry,
 } from '../../../lib/hq/checkin';
+// `clockTime` from the date register, not a second 12-hour formatter in
+// `checkin.ts` — see the note where that one used to be (plans/29 · §3).
+import { clockTime } from '../../../lib/hq/dates';
 import { clockIn } from '../../../lib/hq/time';
 import { renderMarkdown } from '../../../lib/markdown';
 
@@ -75,13 +77,13 @@ const aidsTaken = AIDS.filter((a) => aids?.includes(a.key));
               <Fragment>
                 <p class="font-display text-3xl leading-none font-light">{hm(summary.inBed)}</p>
                 <p class="admin-hint mt-1.5 text-xs">
-                  {times.bed && times.woke ? `${t12(times.bed)} → ${t12(times.woke)}` : ''}
+                  {times.bed && times.woke ? `${clockTime(times.bed)} → ${clockTime(times.woke)}` : ''}
                   {/* The third time only appears when it says something the first
                       two do not. It is the span the big number now includes and
                       the estimate deliberately does not — so on a morning that
                       ended with an hour of lying there, the gap between them is
                       the visible answer rather than a silent adjustment. */}
-                  {summary.awakeInBed > 0 && times.gotUp && ` · up ${t12(times.gotUp)}`}
+                  {summary.awakeInBed > 0 && times.gotUp && ` · up ${clockTime(times.gotUp)}`}
                 </p>
               </Fragment>
             )}

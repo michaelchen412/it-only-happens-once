@@ -17,7 +17,7 @@
 // than that: public queries never touch these tables at all, so there is no
 // join for a policy to have to get right.
 import type { Database } from '../database.types';
-import { rowTitle, type FragmentType } from '../fragments-display';
+import { plainish, rowTitle, type FragmentType } from '../fragments-display';
 import { one } from './relations';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -87,14 +87,6 @@ export interface FragmentOption {
 const PICKER_CHARS = 120;
 
 const clamp = (s: string, n = PICKER_CHARS): string => (s.length <= n ? s : `${s.slice(0, n).trimEnd()}…`);
-
-/** Strip the Markdown that would otherwise render as literal punctuation in a one-line label. */
-function plainish(s: string): string {
-  return s
-    .replace(/[*_`>#]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 type FragmentBits = {
   id: string;

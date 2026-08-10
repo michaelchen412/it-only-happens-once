@@ -12,6 +12,23 @@ export const TYPE_META = {
 
 export type FragmentType = keyof typeof TYPE_META;
 
+/**
+ * The three kinds, in the order every surface offers them.
+ *
+ * ⚠ DERIVED FROM `TYPE_META`, NOT WRITTEN OUT AGAIN — which is the whole point,
+ * because until 2026-08-09 it WAS written out again three times: privately in
+ * `blog.ts`, as `TYPES` in `fragment-query.ts`, and as a second `TYPES` inside
+ * `FragmentListPanel.astro` (plans/29 · §3). Four declarations of one
+ * vocabulary, in a corpus whose types are the one thing that would be genuinely
+ * expensive to add to. Deriving means a fourth kind is added HERE, with its
+ * glyph and its label, and every list picks it up rather than three of them
+ * quietly disagreeing about what exists.
+ *
+ * `Object.keys` preserves insertion order for string keys, so `TYPE_META` is
+ * also where the order is chosen.
+ */
+export const FRAGMENT_TYPES = Object.keys(TYPE_META) as FragmentType[];
+
 /** The noun beside a type count. "writing" is a MASS noun — five pieces of
  *  writing is still "writing", and "5 writings" reads like a database. The
  *  other two count normally.
@@ -45,4 +62,25 @@ export function shortDate(iso: string | null): string {
 export function rowTitle(r: { type: string; title: string | null; body: string | null }): string {
   if (r.type === 'quote') return r.body || '(empty quote)';
   return r.title || '(untitled)';
+}
+
+/**
+ * Strip the Markdown that would otherwise render as literal punctuation in a
+ * one-line label, and flatten the whitespace with it.
+ *
+ * ⚠ BESIDE `rowTitle` RATHER THAN IN EITHER CALLER (plans/29 · §3). It existed
+ * twice — named in `hq/links.ts`, re-inlined verbatim in `hq/brief.ts` — and
+ * both copies were applied to nothing but a `rowTitle`. Exporting it from
+ * `links.ts`, which is what the plan suggested, would have made the brief
+ * depend on the picker module for a string rule neither one owns; here it sits
+ * next to its only ever argument, in the file both already import.
+ *
+ * It is deliberately not a Markdown parser. A label is a glance, so the answer
+ * to `**bold**` is `bold` and the answer to a link is not worth the dependency.
+ */
+export function plainish(s: string): string {
+  return s
+    .replace(/[*_`>#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

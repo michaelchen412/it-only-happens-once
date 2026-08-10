@@ -51,6 +51,20 @@ const weekdayOf = (ymd: Ymd) => ymdToUtc(ymd).getUTCDay();
 const dayOfMonth = (ymd: Ymd) => ymdToUtc(ymd).getUTCDate();
 
 /**
+ * What weekday a local date falls on, in words — `Tuesday`.
+ *
+ * ⚠ EXPORTED SO `parse-task.ts` STOPS CARRYING ITS OWN (plans/29 · §2, §3). It
+ * had a second `WEEKDAY` array, character-identical to `DAY_NAMES` above, in a
+ * file that already imports from here — and indexed it with
+ * `new Date(\`${ymd}T00:00:00Z\`).getUTCDay()`, which is the raw form
+ * `ymdToUtc` exists to replace. Both facts are one fact, so it is one function
+ * rather than an exported array and a convention about how to index it.
+ */
+export function dayNameOf(ymd: Ymd): string {
+  return DAY_NAMES[weekdayOf(ymd)];
+}
+
+/**
  * Which week of the month a date falls in, as RRULE's `BYDAY` prefix.
  *
  * The 29th, 30th and 31st are the interesting case: "the 5th Monday" happens in

@@ -14,6 +14,7 @@
 // PostgREST (done by hand 2026-07-30; see docs/plans/09 Piece 2).
 import { describe, it, expect } from 'vitest';
 import { parseListParams } from '../lib/fragment-query';
+import { FRAGMENT_TYPES } from '../lib/fragments-display';
 
 const view = (qs: string) => parseListParams(new URLSearchParams(qs)).view;
 
@@ -55,5 +56,21 @@ describe('parseListParams — filters', () => {
     expect(parseListParams(new URLSearchParams('')).filtered).toBe(false);
     expect(parseListParams(new URLSearchParams('view=trash')).filtered).toBe(false);
     expect(parseListParams(new URLSearchParams('type=song')).filtered).toBe(true);
+  });
+
+  it('accepts each of the three kinds, and nothing else', () => {
+    for (const t of FRAGMENT_TYPES) expect(parseListParams(new URLSearchParams(`type=${t}`)).type).toBe(t);
+    expect(parseListParams(new URLSearchParams('type=note')).type).toBeNull();
+  });
+});
+
+describe('FRAGMENT_TYPES', () => {
+  // ⚠ THE ORDER IS LOAD-BEARING AND IT IS NOW `Object.keys`'s (plans/29 · §3).
+  // Four hand-written copies of this list became one derived from `TYPE_META`,
+  // which is the right trade — but it moves the toolbar's filter order into a
+  // property of that object literal, where nothing else would notice it
+  // changing. This is what notices.
+  it('is the three kinds, in the order the manager offers them', () => {
+    expect(FRAGMENT_TYPES).toEqual(['writing', 'quote', 'song']);
   });
 });

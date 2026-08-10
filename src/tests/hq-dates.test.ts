@@ -14,6 +14,7 @@
 // in a different zone from the developer's laptop.
 import { describe, expect, it } from 'vitest';
 import {
+  clockTime,
   dmd,
   elapsedSince,
   headerDate,
@@ -50,6 +51,30 @@ describe('headerDate', () => {
     // wrong day for anyone west of Greenwich.
     expect(headerDate('2026-01-01')).toBe('Thursday, January 1st, 2026');
     expect(headerDate('2026-12-31')).toBe('Thursday, December 31st, 2026');
+  });
+});
+
+describe('clockTime', () => {
+  // ⚠ THESE ARRIVED FROM `hq-checkin.test.ts` ON 2026-08-09 (plans/29 · §3),
+  // where they were asserting against `t12` — a character-identical second
+  // copy of this function, on the surface most likely to be read beside the
+  // ones that use this one. The copy is gone; the coverage stayed, and this
+  // function had none of its own before it.
+  it('is 12-hour, always — never 19:30', () => {
+    expect(clockTime('19:30')).toBe('7:30 PM');
+    expect(clockTime('06:20')).toBe('6:20 AM');
+  });
+
+  it('gets both ends of the 12-hour wrap right', () => {
+    // The two the naive `h % 12` gets wrong: midnight becomes 0 and noon
+    // becomes 12 AM.
+    expect(clockTime('00:05')).toBe('12:05 AM');
+    expect(clockTime('12:00')).toBe('12:00 PM');
+  });
+
+  it('reads a stored `HH:MM:SS` as well as a wall clock', () => {
+    // `tasks.due_time` comes back from Postgres with seconds on it.
+    expect(clockTime('16:30:00')).toBe('4:30 PM');
   });
 });
 
