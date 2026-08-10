@@ -17,7 +17,7 @@
 import { test, expect } from './fixtures';
 import { fixtures } from './fixtures';
 
-const { quoteSlug, richQuoteSlug } = fixtures();
+const { quoteSlug, richQuoteSlug, quoteConstellationSlug } = fixtures();
 
 test.describe('the route serves a quote', () => {
   test.skip(!quoteSlug, 'no published quote in the database');
@@ -113,5 +113,96 @@ test.describe('the strip', () => {
     await trigger.click();
     const pop = page.locator('.rv__pop:popover-open');
     await expect(pop.locator('a[href*="author="]')).toBeVisible();
+  });
+});
+
+// ── The same apparatus, in a constellation ──────────────────────────────────
+//
+// Michael, 2026-08-10: *"within the constellation view, the quotes should be
+// clickable … they should show up in a sheet and, obviously, not in their own
+// dedicated page, but basically the same feature set."*
+//
+// ⚠ THESE GUARD TWO FAILURES THAT DREW NOTHING AND THREW NOTHING, which is why
+// they are worth their length. Both were found by driving the page, not by any
+// check:
+//   1. `Reveal` pairs its popovers at parse time, and template content lives in
+//      a DocumentFragment `document.querySelectorAll` cannot see — so a cloned
+//      citation control rendered, refused to open, and never showed its
+//      underline.
+//   2. astro-icon dedupes to a page-level <symbol>, which gets emitted inside
+//      whichever inert <template> comes first — leaving every other instance's
+//      <use> pointing at a node not in the document. The share mark had a
+//      bounding box, reported `visible`, and drew NOTHING.
+test.describe('a quote inside a constellation', () => {
+  test.skip(!quoteConstellationSlug, 'no published constellation holds a published quote');
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/${quoteConstellationSlug}`);
+    await expect(page.locator('#suite')).toBeVisible();
+  });
+
+  test('opens into the Reader rather than navigating away', async ({ page }) => {
+    const trigger = page.locator('figure a[data-read]').first();
+    const before = new URL(page.url()).pathname;
+    await trigger.click();
+    await expect(page.locator('#site-reader')).toBeVisible();
+    // Same page, same scroll position — a sheet, not a destination.
+    expect(new URL(page.url()).pathname).toBe(before);
+    expect(new URL(page.url()).hash).toMatch(/^#read=/);
+  });
+
+  test('⚠ its citation control WORKS after being cloned', async ({ page }) => {
+    // ⚠ WALKS THE SUITE FOR A QUOTE THAT HAS A CONTROL rather than taking the
+    // first and skipping. Not every quote has one — an unattributed line with a
+    // one-quote author has nothing behind its name, and renders none by design
+    // — and a guard that skips on the common case guards nothing. This was
+    // written as `.first()` and skipped silently on the very constellation it
+    // was meant to cover.
+    const triggers = page.locator('figure a[data-read]');
+    const n = await triggers.count();
+    let found = false;
+    for (let i = 0; i < n; i++) {
+      await triggers.nth(i).click();
+      await expect(page.locator('#site-reader')).toBeVisible();
+      if ((await page.locator('#site-reader .rv__trigger').count()) > 0) {
+        found = true;
+        break;
+      }
+      await page.keyboard.press('Escape');
+    }
+    expect(found, 'no quote in this suite has a citation or a sibling — pick another fixture').toBe(true);
+
+    // The gate the script sets. Without it the underline never appears, so the
+    // control is not merely broken — it is invisible AS a control.
+    await expect(page.locator('#site-reader [data-rv-live]').first()).toBeVisible();
+    await page.locator('#site-reader .rv__trigger').first().click();
+    await expect(page.locator('.rv__pop:popover-open')).toBeVisible();
+  });
+
+  test('⚠ its share mark actually DRAWS — a dangling <use> has a bounding box', async ({ page }) => {
+    const trigger = page.locator('figure a[data-read]').first();
+    await trigger.click();
+    const mark = page.locator('#site-reader [data-share]').first();
+    await expect(mark).toBeVisible();
+    const drew = await mark.evaluate((el) => {
+      const use = el.querySelector('use');
+      // A sprite reference is only real if its symbol is in THIS document.
+      if (use) return Boolean(document.getElementById((use.getAttribute('href') ?? '').slice(1)));
+      return Boolean(el.querySelector('svg path'));
+    });
+    expect(drew, 'the glyph is laid out but paints nothing').toBe(true);
+  });
+
+  test('does not offer a door back into the constellation you are standing in', async ({ page }) => {
+    const trigger = page.locator('figure a[data-read]').first();
+    const here = new URL(page.url()).pathname;
+    await trigger.click();
+    const control = page.locator('#site-reader .qp-ctl', { hasText: /constellation/ });
+    if ((await control.count()) === 0) return; // only in this one → correctly absent
+    await control.click();
+    const hrefs = await page
+      .locator('.rv__pop:popover-open a')
+      .evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute('href')));
+    expect(hrefs).not.toContain(here);
   });
 });

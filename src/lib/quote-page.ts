@@ -238,3 +238,133 @@ async function siblingCount(supabase: DB, id: string, authorId: string | null): 
     .neq('id', id);
   return count ?? 0;
 }
+
+// ── The batched form, for a suite ────────────────────────────────────────────
+
+/** What a caller already holds about each quote, from its own query. */
+export interface QuoteSeed {
+  id: string;
+  quote: QuoteItem;
+  authorId: string | null;
+  authorName: string | null;
+  authorSlug: string | null;
+  /** Subject ids — the suite's own select carries names, not ids, so it asks. */
+  subjectIds: string[];
+}
+
+/**
+ * The same neighbourhood as `getQuotePage`, for MANY quotes at once.
+ *
+ * ⚠ **FOUR QUERIES FOR THE WHOLE SUITE, NOT FOUR PER QUOTE, AND THAT IS THE
+ * WHOLE REASON THIS EXISTS.** A published constellation carries up to EIGHT
+ * quotes (measured 2026-08-10). Calling `getQuotePage` per stanza would be
+ * thirty-two extra round trips on `/[slug]` — the one route plan 24 · Piece 4
+ * spent its effort collapsing from two queries to ONE, taking it 110ms → 65ms.
+ * Undoing that to give a drawer its contents would be a bad trade made
+ * invisibly, which is the kind this codebase keeps finding after the fact.
+ *
+ * Set-wise instead: every question is asked once with an `IN`, and the answers
+ * are dealt back out in memory. The four run together, so it is one round trip
+ * of latency rather than four.
+ */
+export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): Promise<Map<string, QuotePage>> {
+  const out = new Map<string, QuotePage>();
+  if (seeds.length === 0) return out;
+
+  const ids = seeds.map((s) => s.id);
+  const authorIds = [...new Set(seeds.map((s) => s.authorId).filter((a): a is string => Boolean(a)))];
+  const allSubjectIds = [...new Set(seeds.flatMap((s) => s.subjectIds))];
+
+  const [placements, authorRows, siblingRows] = await Promise.all([
+    supabase
+      .from('fragment_constellations')
+      .select('fragment_id, position, constellations(name, slug, description, color, status)')
+      .in('fragment_id', ids)
+      .order('position'),
+    // Every published quote by any of these authors. Counting client-side beats
+    // a `count` per author, and the corpus is small enough that the rows are
+    // cheaper than the round trips.
+    authorIds.length
+      ? supabase
+          .from('fragments')
+          .select('id, author_id')
+          .eq('type', 'quote')
+          .eq('status', 'published')
+          .is('deleted_at', null)
+          .in('author_id', authorIds)
+      : Promise.resolve({ data: [] as { id: string; author_id: string | null }[] }),
+    allSubjectIds.length
+      ? supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', allSubjectIds)
+      : Promise.resolve({ data: [] as { fragment_id: string; subject_id: string }[] }),
+  ]);
+
+  const byConstellation = new Map<string, QuoteConstellation[]>();
+  for (const row of placements.data ?? []) {
+    const c = row.constellations;
+    // A draft constellation is not a place to send anyone — the same rule
+    // `constellationsOf` states, and it has to be restated here because this is
+    // a second path to the same fact.
+    if (!c || c.status !== 'published') continue;
+    const list = byConstellation.get(row.fragment_id) ?? [];
+    list.push({ name: c.name, slug: c.slug, description: c.description, color: c.color ?? 'amber' });
+    byConstellation.set(row.fragment_id, list);
+  }
+
+  const perAuthor = new Map<string, number>();
+  for (const r of authorRows.data ?? []) {
+    if (r.author_id) perAuthor.set(r.author_id, (perAuthor.get(r.author_id) ?? 0) + 1);
+  }
+
+  // One index of subject → fragments, sliced per quote below.
+  const bySubject = new Map<string, string[]>();
+  for (const r of siblingRows.data ?? []) {
+    const list = bySubject.get(r.subject_id) ?? [];
+    list.push(r.fragment_id);
+    bySubject.set(r.subject_id, list);
+  }
+
+  const rankedPerQuote = new Map<string, string[]>();
+  const wanted = new Set<string>();
+  for (const seed of seeds) {
+    const rows = seed.subjectIds.flatMap((sid) => (bySubject.get(sid) ?? []).map((fid) => ({ fragment_id: fid })));
+    const ranked = rankByOverlap(rows, seed.id, seed.subjectIds.length);
+    rankedPerQuote.set(seed.id, ranked);
+    for (const fid of ranked) wanted.add(fid);
+  }
+
+  // The fifth query, and it cannot join the parallel batch above: it asks about
+  // the ids the overlap pass just produced. Skipped entirely when nothing
+  // cleared the ≥2 bar, which is the common case for a lightly-tagged suite.
+  const neighbours = new Map<string, QuoteNeighbour>();
+  if (wanted.size > 0) {
+    const { data } = await supabase
+      .from('fragments')
+      .select('id, slug, type, title, body, attribution')
+      .in('id', [...wanted])
+      .eq('status', 'published')
+      .is('deleted_at', null);
+    for (const f of data ?? []) {
+      neighbours.set(f.id, {
+        slug: f.slug,
+        type: f.type,
+        title: f.title,
+        body: f.body ?? '',
+        attribution: f.attribution,
+      });
+    }
+  }
+
+  for (const seed of seeds) {
+    const ranked = (rankedPerQuote.get(seed.id) ?? []).filter((fid) => neighbours.has(fid));
+    const others = seed.authorId ? Math.max(0, (perAuthor.get(seed.authorId) ?? 0) - 1) : 0;
+    out.set(seed.id, {
+      quote: seed.quote,
+      status: 'published', // a suite only ever carries published fragments
+      constellations: byConstellation.get(seed.id) ?? [],
+      related: ranked.slice(0, RELATED_SHOWN).map((fid) => neighbours.get(fid)!),
+      relatedTotal: ranked.length,
+      author: seed.authorSlug && seed.authorName ? { name: seed.authorName, slug: seed.authorSlug, others } : null,
+    });
+  }
+  return out;
+}

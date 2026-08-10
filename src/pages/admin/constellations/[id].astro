@@ -149,7 +149,26 @@ const suite = (placements ?? []).map((p) => {
   const lede = authored || excerpt(f.body, 400);
   const read: SuiteItem =
     f.type === 'quote'
-      ? { kind: 'quote', body: f.body ?? '', attribution: f.attribution, reveal: revealOf(f) }
+      ? {
+          kind: 'quote',
+          quote: {
+            id: f.id,
+            slug: f.slug,
+            body: f.body ?? '',
+            attribution: f.attribution,
+            reveal: revealOf(f),
+            sourceUrl: f.source_url,
+            occurredAt: f.occurred_at,
+            precision: f.date_precision,
+            // ⚠ NOT the `subjects` const above — that one is comma-joined for
+            // the sheet's TagInput, and this wants the {name, slug} pairs the
+            // public renderer links with.
+            subjects: (f.fragment_subjects ?? [])
+              .map((fs) => fs.subjects)
+              .filter((x): x is { name: string; slug: string } => !!x)
+              .sort((a, b) => a.name.localeCompare(b.name)),
+          },
+        }
       : f.type === 'song'
         ? {
             kind: 'song',

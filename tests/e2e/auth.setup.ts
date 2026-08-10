@@ -160,7 +160,7 @@ setup('mint an admin session and find fixtures', async () => {
     .eq('type', 'quote')
     .eq('status', 'published')
     .is('deleted_at', null);
-  const { data: placed } = await service.from('fragment_constellations').select('fragment_id');
+  const { data: placed } = await service.from('fragment_constellations').select('fragment_id, constellation_id');
   const placedIds = new Set((placed ?? []).map((p) => p.fragment_id));
   const authorTally = new Map<string, number>();
   for (const q of quotes ?? []) {
@@ -169,11 +169,22 @@ setup('mint an admin session and find fixtures', async () => {
   const richQuote =
     (quotes ?? []).find((q) => placedIds.has(q.id) && q.author_id && (authorTally.get(q.author_id) ?? 0) >= 2) ?? null;
 
+  // A PUBLISHED constellation that actually holds a published quote — the specs
+  // about the quote sheet need one, and the sky's first row is not it (two of
+  // the eleven published constellations carry no quotes at all, and one of them
+  // sorts first). Discovered, never seeded, like everything else here.
+  const quoteIds = new Set((quotes ?? []).map((q) => q.id));
+  const withQuote = (placed ?? []).find((row) => quoteIds.has(row.fragment_id))?.constellation_id ?? null;
+  const { data: quoteConstellation } = withQuote
+    ? await service.from('constellations').select('slug').eq('id', withQuote).eq('status', 'published').maybeSingle()
+    : { data: null };
+
   fs.writeFileSync(
     FIXTURES_FILE,
     JSON.stringify(
       {
         quoteSlug: (quotes ?? [])[0]?.slug ?? null,
+        quoteConstellationSlug: quoteConstellation?.slug ?? null,
         richQuoteSlug: richQuote?.slug ?? null,
         draftSlug: draft?.slug ?? null,
         draftStatus: draft?.status ?? null,

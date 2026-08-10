@@ -5,8 +5,9 @@
 // in fragment_constellations — there is no flag.
 import type { createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
-import type { WritingItem, SubjectRef } from './blog';
+import type { WritingItem, QuoteItem, SubjectRef } from './blog';
 import { PAIRED_SELECT, pairedMediaOf } from './blog';
+import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
@@ -31,7 +32,12 @@ export type SuiteItem =
   /** `reveal` is what the citation control opens onto, or `''` for no control
    *  at all — derived once in lib/provenance.ts so the suite and the blog feed
    *  can never disagree about where a quote came from. */
-  | { kind: 'quote'; body: string; attribution: string | null; reveal: string }
+  /** ⚠ The whole `QuoteItem`, not three loose fields. A quote stanza now OPENS
+   *  (into the Reader, showing `QuoteArticle`), so the stanza and the sheet have
+   *  to agree about which quote it is — and `body`/`attribution`/`reveal` alone
+   *  could not say. Carrying the shape the blog already uses is what keeps the
+   *  two renderings from drifting. */
+  | { kind: 'quote'; quote: QuoteItem }
   | { kind: 'writing'; item: WritingItem }
   /** `body` is the annotation — Michael's words on why this song (ADR-0009).
    *  Empty is normal: a song may say nothing and simply play. */
@@ -50,6 +56,8 @@ export interface Constellation {
   /** Optional Spotify playlist — the constellation's score (design.md §14). */
   scoreUrl: string | null;
   items: SuiteItem[];
+  /** Quote id → everything its sheet shows. Empty for a suite with no quotes. */
+  neighbourhoods: Map<string, QuotePage>;
 }
 
 /** Every constellation, in authored order, weighted by published placements. */
@@ -112,7 +120,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       // quote reveal (2026-08-05, plan 17a). They cost one join on a query that
       // already embeds three, and they are what stops the suite and the blog
       // feed from being two places that decide what a quote came from.
-      `id, name, slug, description, sort, status, score_url, color, fragment_constellations(position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, occurred_at, updated_at, date_precision, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}))`,
+      `id, name, slug, description, sort, status, score_url, color, fragment_constellations(position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, author_id, occurred_at, updated_at, date_precision, authors(name, slug), works(title), fragment_subjects(subject_id, subjects(name, slug)), ${PAIRED_SELECT}))`,
     )
     .eq('slug', slug)
     .eq('fragment_constellations.fragments.status', 'published')
@@ -124,6 +132,8 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   const rows = c.fragment_constellations;
 
   const items: SuiteItem[] = [];
+  /** What the batched neighbourhood loader needs, gathered as we walk. */
+  const seeds: QuoteSeed[] = [];
   for (const r of rows ?? []) {
     const f = r.fragments as unknown as {
       id: string;
@@ -137,7 +147,8 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       occurred_at: string;
       updated_at: string | null;
       date_precision: 'day' | 'year';
-      fragment_subjects: { subjects: SubjectRef | null }[] | null;
+      author_id?: string | null;
+      fragment_subjects: { subject_id: string; subjects: SubjectRef | null }[] | null;
       paired_song_id?: string | null;
       paired_song?: {
         id: string;
@@ -148,11 +159,34 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       } | null;
       details?: unknown;
       is_self?: boolean | null;
-      authors?: { name: string } | null;
+      authors?: { name: string; slug: string } | null;
       works?: { title: string } | null;
     };
     if (f.type === 'quote') {
-      items.push({ kind: 'quote', body: f.body ?? '', attribution: f.attribution, reveal: revealOf(f) });
+      const subjects = (f.fragment_subjects ?? [])
+        .map((fs) => fs.subjects)
+        .filter((x): x is SubjectRef => !!x)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const quote: QuoteItem = {
+        id: f.id,
+        slug: f.slug,
+        body: f.body ?? '',
+        attribution: f.attribution,
+        reveal: revealOf(f),
+        sourceUrl: f.source_url,
+        occurredAt: f.occurred_at,
+        precision: f.date_precision,
+        subjects,
+      };
+      seeds.push({
+        id: f.id,
+        quote,
+        authorId: f.author_id ?? null,
+        authorName: f.authors?.name ?? null,
+        authorSlug: f.authors?.slug ?? null,
+        subjectIds: (f.fragment_subjects ?? []).map((fs) => fs.subject_id),
+      });
+      items.push({ kind: 'quote', quote });
     } else if (f.type === 'writing') {
       const authored = (f.excerpt ?? '').trim();
       const lede = authored || excerpt(f.body, 400);
@@ -193,6 +227,15 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     }
   }
 
+  /*
+    ⚠ ONE EXTRA BATCH FOR EVERY QUOTE IN THE SUITE, not one per quote — see
+    `getQuoteNeighbourhoods`. A published constellation carries up to eight, and
+    asking per stanza would put thirty-two round trips on the route plan 24 ·
+    Piece 4 collapsed to one. Skipped outright when a suite holds no quotes,
+    which two of the eleven published constellations do.
+  */
+  const neighbourhoods = await getQuoteNeighbourhoods(supabase, seeds);
+
   return {
     name: c.name,
     slug: c.slug,
@@ -202,5 +245,6 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     color: c.color,
     scoreUrl: c.score_url ?? null,
     items,
+    neighbourhoods,
   };
 }

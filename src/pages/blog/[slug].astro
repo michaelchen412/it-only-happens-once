@@ -24,7 +24,7 @@ import { Icon } from 'astro-icon/components';
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import PostArticle from '../../components/PostArticle.astro';
 import PreviewBar from '../../components/PreviewBar.astro';
-import QuotePage from '../../components/QuotePage.astro';
+import QuoteArticle from '../../components/QuoteArticle.astro';
 import { getWritingBySlug } from '../../lib/blog';
 import { getQuotePage } from '../../lib/quote-page';
 import { toPlainText } from '../../lib/markdown';
@@ -116,7 +116,14 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
         </a>
       </div>
     ) : quote ? (
-      <QuotePage page={quote} />
+      /* The permalink's own frame: a full screen with the line floated in the
+         middle of it. The Reader supplies a different one for the same content
+         — see QuoteArticle, which carries neither. */
+      <main class="px-6 pb-24">
+        <section class="mx-auto flex min-h-[76vh] max-w-3xl flex-col justify-center">
+          <QuoteArticle page={quote} />
+        </section>
+      </main>
     ) : item ? (
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
         <a

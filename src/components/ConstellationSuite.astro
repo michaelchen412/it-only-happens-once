@@ -41,6 +41,7 @@
 */
 import Reader from './Reader.astro';
 import PostArticle from './PostArticle.astro';
+import QuoteArticle from './QuoteArticle.astro';
 import SuiteStanza from './SuiteStanza.astro';
 import Label from './Label.astro';
 import type { Constellation, SuiteItem } from '../lib/constellations';
@@ -125,7 +126,15 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
     {
       constellation.items.map((f, i) => (
         <article
-          class:list={['suite-item flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
+          class:list={[
+            'suite-item flex gap-4 sm:gap-6',
+            // ⚠ `suite-writing` IS THE CLASS `.is-focus` WARMS A CTA THROUGH, and
+            // a quote stanza now carries one. The name outlived its meaning the
+            // moment quotes became openable; it means "this stanza opens", and
+            // renaming it across the stylesheet is a larger edit than this
+            // change earns. Read it as `suite-openable`.
+            (f.kind === 'writing' || f.kind === 'quote') && 'suite-writing',
+          ]}
           style={`--indent:${INDENTS[i % INDENTS.length]}`}
         >
           {/* The margin column. It carries NO type glyph any more (2026-08-07):
@@ -158,15 +167,28 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
 
                 aria-hidden + tabindex="-1": this duplicates the stanza's own
                 link, which already has the accessible name and the tab stop. */
-              f.kind === 'writing' && (
+              /* ⚠ A QUOTE HAS A WORD NOW TOO, and the rule above is why rather
+                than an exception to it. "Only the openable stanzas get a word"
+                was never about quotes — it was about which stanzas OPEN, and a
+                quote did not. It does now (plan 32: the sheet carries its
+                citation, its author's other lines, its subjects and its share
+                mark), so it earns the same treatment by the same argument.
+
+                ⚠ THE WORD IS NOT "Read". You have already read it — it is set
+                whole, right there, and a quote is the one stanza that hides
+                nothing. What opens is where it CAME from and what it touches,
+                so the word is `About`. Getting this wrong the easy way — one
+                word for both — would have promised an essay's worth of unread
+                text behind three lines you just finished. */
+              (f.kind === 'writing' || f.kind === 'quote') && (
                 <a
-                  href={`/blog/${f.item.slug}`}
-                  data-read={f.item.slug}
+                  href={`/blog/${f.kind === 'writing' ? f.item.slug : f.quote.slug}`}
+                  data-read={f.kind === 'writing' ? f.item.slug : f.quote.slug}
                   class="suite-cta"
                   tabindex="-1"
                   aria-hidden="true"
                 >
-                  <span class="suite-cta__word">Read</span>
+                  <span class="suite-cta__word">{f.kind === 'writing' ? 'Read' : 'About'}</span>
                   <span class="suite-cta__arrow">→</span>
                 </a>
               )
@@ -209,7 +231,7 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
   </div>
 </section>
 
-{/* The blog's Reader, verbatim — essays read identically everywhere. */}
+{/* The blog's Reader, verbatim — a fragment reads identically everywhere. */}
 <Reader />
 {
   writings.map((w) => (
@@ -217,6 +239,22 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
       <PostArticle item={w} linkTitle />
     </template>
   ))
+}
+{
+  /* And the quotes (plan 32). `inConstellation` drops THIS constellation from
+    the sheet's "Appears in" — a door back into the room you are standing in is
+    not a door, and counting it would make the control promise one more place
+    than it can take you. */
+  constellation.items
+    .filter((f) => f.kind === 'quote')
+    .map((f) => {
+      const page = constellation.neighbourhoods.get(f.quote.id);
+      return page ? (
+        <template data-reader-content={f.quote.slug}>
+          <QuoteArticle page={page} inConstellation={constellation.slug} />
+        </template>
+      ) : null;
+    })
 }
 
 <a href="/" class="group sky-return" data-sky-return aria-label="All constellations" title="All constellations"

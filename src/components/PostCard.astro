@@ -5,9 +5,25 @@
   Adopts the constellation's reading surface (sky-lab round 2): the title + a
   faded, clamped excerpt form ONE reader trigger — click opens the in-context
   Reader (permalink is the no-JS fallback), and the pair warms toward lamplight
-  on hover/focus. There's no "Read more" button: the fade + ellipsis is the
-  invitation. Unlike the constellation, the blog KEEPS its metadata — date, read
-  time, and subjects (left-aligned) sit quietly as chrome (§7).
+  on hover/focus. Unlike the constellation, the blog KEEPS its metadata — date,
+  read time, and subjects (left-aligned) sit quietly as chrome (§7).
+
+  ⚠ IT SAYS `Read →` NOW, AND IT USED NOT TO. This file argued the opposite for
+  most of its life — *"there's no 'Read more' button: the fade + ellipsis is the
+  invitation"* — and that was right about the FADE and wrong about who could see
+  it. It is the same hole ADR-0022 found in the Sky: a gradient and a hover warm
+  are both invisible to a thumb, so on a phone the feed was a list of titles with
+  nothing saying which of them opened, and the excerpt's fade could as easily
+  read as a styling choice. Michael, 2026-08-10: *"we're missing the Read button
+  on the main blog portion."*
+
+  ⚠ AND IT IS THE SUITE'S OWN WORD, DELIBERATELY — `.suite-cta`, the same
+  `Read →` in the same serif small-caps that a constellation gives its openable
+  stanzas. Inventing a second phrasing here would make one gesture look like two
+  features. What differs is only the trigger for the warm: the suite has
+  `.is-focus` (proximity on touch, cursor on desktop) and the feed has its own
+  `.post-read` hover/focus-within, which is the pre-existing split between a room
+  you scroll THROUGH and a list you point AT.
 
   When a search term is active it switches to the occurrence view: the title
   highlights its matches (and still opens the Reader), and the body becomes
@@ -93,6 +109,16 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
         </a>
       )
     }
+
+    {
+      /* aria-hidden + tabindex="-1": this duplicates the title's own link, which
+        already carries the accessible name and the tab stop. Exactly the suite's
+        reasoning, because it is exactly the suite's control. */
+    }
+    <a href={`/blog/${item.slug}`} data-read={item.slug} class="suite-cta post-cta" tabindex="-1" aria-hidden="true">
+      <span class="suite-cta__word">Read</span>
+      <span class="suite-cta__arrow">→</span>
+    </a>
   </div>
 
   {/* Subjects — left-aligned filter links, the quiet chrome at the foot (§7). */}

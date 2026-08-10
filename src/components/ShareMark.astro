@@ -67,7 +67,18 @@ const { url, label, onRule = false, class: className = '' } = Astro.props;
   aria-label={label}
   title={label}
 >
-  <Icon name="ph:arrow-square-out" class="h-4 w-4" />
+  {
+    /* ⚠ `is:inline` — the path rendered SELF-CONTAINED, no <symbol>/<use>.
+      astro-icon dedupes to a page-level sprite by default, and this control now
+      renders inside inert `<template>`s (the feed's reader templates, and a
+      constellation's quote sheets). The single <symbol> gets emitted inside
+      whichever template comes first, so every other instance's <use> points at
+      a node that is not in the document — the glyph is in the layout, has a
+      bounding box, and draws NOTHING. Caught in the constellation sheet, which
+      is where Timestamp hit the identical wall in plan 18; its comment is the
+      other half of this one. */
+  }
+  <Icon name="ph:arrow-square-out" is:inline class="h-4 w-4" />
 </button>
 
 <style is:global>

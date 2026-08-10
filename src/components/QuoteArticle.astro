@@ -1,6 +1,18 @@
 ---
 /*
-  QuotePage — one quote, on its own page (plan 32 · §3).
+  QuoteArticle — the ONE canonical rendering of a quote and its apparatus.
+
+  Named for `PostArticle` and shared the same way, by three surfaces that must
+  stay identical:
+    • the quote's permalink, `/blog/[slug]`,
+    • the in-context Reader, cloned from a `<template>`,
+    • a constellation suite's quote stanza, which fills that template.
+
+  It was `QuotePage.astro` for one commit, when a quote's own page was the only
+  place this existed. Michael, 2026-08-10: *"within the constellation view, the
+  quotes should be clickable … they should show up in a sheet and, obviously,
+  not in their own dedicated page, but basically the same feature set."* The
+  rename is the point — this is a rendering, not a route.
 
   THE WHOLE PAGE IS: the line, the attribution, a rule, and one strip. That is a
   ruling, not a starting point. The bench opened with "Appears in" and "Along the
@@ -47,9 +59,22 @@ import type { QuotePage as QuotePageData } from '../lib/quote-page';
 
 interface Props {
   page: QuotePageData;
+  /**
+   * The constellation the reader is STANDING IN, when this opens inside a suite.
+   *
+   * ⚠ It is dropped from "Appears in", and that is not tidying. A door back to
+   * the room you are already in is not a door; listing it would make the control
+   * count one higher than the number of places it can actually take you, which
+   * is the same lie the "45 related lines" count told before §6. When it is the
+   * only one, the control does not render at all.
+   */
+  inConstellation?: string;
 }
-const { page } = Astro.props as Props;
-const { quote, constellations, related, relatedTotal, author } = page;
+const { page, inConstellation } = Astro.props as Props;
+const { quote, related, relatedTotal, author } = page;
+const constellations = inConstellation
+  ? page.constellations.filter((c) => c.slug !== inConstellation)
+  : page.constellations;
 
 // The type ramps DOWN as the line grows. A six-word aphorism at essay size looks
 // lost; a stanza at display size overruns the screen. Three steps, chosen
@@ -94,43 +119,48 @@ const allSubjectsHref =
   quote.subjects.length > 0 ? `/blog?view=quotes&subject=${quote.subjects.map((s) => s.slug).join(',')}` : null;
 ---
 
-<main class="px-6 pb-24">
-  <section class="mx-auto flex min-h-[76vh] max-w-3xl flex-col justify-center">
-    <figure>
-      <blockquote class:list={['text-base-content font-serif leading-[1.42] font-light whitespace-pre-line', size]}>
-        {quote.body}
-      </blockquote>
-
-      {
-        quote.attribution && (
-          <figcaption class="text-base-content/50 mt-6 font-serif text-[1.15rem] tracking-[0.06em] [font-variant:all-small-caps]">
-            {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
-                name, and underlining it on hover reads as a typo. (QuoteCard
-                makes the same point in the same words.) */}
-            {'— '}
-            {quote.reveal || hasDoor ? (
-              <Reveal label={`About ${quote.attribution}`}>
-                {quote.attribution}
-                <Fragment slot="content">
-                  {quote.reveal && <span class="qp-cite">{quote.reveal}</span>}
-                  {hasDoor && authorHref && (
-                    <a href={authorHref} class:list={['qp-door', quote.reveal && 'qp-door--ruled']}>
-                      {plural(author!.others, 'more line', 'more lines')} from {author!.name}
-                      <span class="qp-door__arrow">→</span>
-                    </a>
-                  )}
-                </Fragment>
-              </Reveal>
-            ) : (
-              quote.attribution
-            )}
-          </figcaption>
-        )
-      }
-    </figure>
+{
+  /* ⚠ NO FRAME OF ITS OWN — no <main>, no measure, no vertical centring. The
+    permalink wants a full screen with the line floated in the middle of it; the
+    Reader wants the top of a 44rem drawer. Both are the CALLER's business, and
+    baking either one in here is what would make the third surface need a copy. */
+}
+<div class="quote-article">
+  <figure>
+    <blockquote class:list={['text-base-content font-serif leading-[1.42] font-light whitespace-pre-line', size]}>
+      {quote.body}
+    </blockquote>
 
     {
-      /*
+      quote.attribution && (
+        <figcaption class="text-base-content/50 mt-6 font-serif text-[1.15rem] tracking-[0.06em] [font-variant:all-small-caps]">
+          {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
+                name, and underlining it on hover reads as a typo. (QuoteCard
+                makes the same point in the same words.) */}
+          {'— '}
+          {quote.reveal || hasDoor ? (
+            <Reveal label={`About ${quote.attribution}`}>
+              {quote.attribution}
+              <Fragment slot="content">
+                {quote.reveal && <span class="qp-cite">{quote.reveal}</span>}
+                {hasDoor && authorHref && (
+                  <a href={authorHref} class:list={['qp-door', quote.reveal && 'qp-door--ruled']}>
+                    {plural(author!.others, 'more line', 'more lines')} from {author!.name}
+                    <span class="qp-door__arrow">→</span>
+                  </a>
+                )}
+              </Fragment>
+            </Reveal>
+          ) : (
+            quote.attribution
+          )}
+        </figcaption>
+      )
+    }
+  </figure>
+
+  {
+    /*
       ⚠ THE SHARE MARK IS NOT IN THIS FLOW, and that is the point of `relative`
       here. Everything else in the strip is a FACT ABOUT THE QUOTE — its
       subjects, its constellations, its kin, when it arrived. Share is the only
@@ -153,43 +183,43 @@ const allSubjectsHref =
       whose areas re-flow, and it is why the two tiers can be pure flex-wrap
       with no ordering tricks.
     */
+  }
+  <div
+    class="border-base-content/10 text-base-content/40 relative mt-12 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-5 pr-12 font-sans text-sm sm:pr-14"
+  >
+    <ShareMark url={`/blog/${quote.slug}`} label="Share this quote" onRule />
+
+    {
+      quote.subjects.length > 0 && (
+        <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {quote.subjects.map((s) => (
+            <li>
+              <a href={`/blog?view=quotes&subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
+                {s.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
     }
-    <div
-      class="border-base-content/10 text-base-content/40 relative mt-12 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-5 pr-12 font-sans text-sm sm:pr-14"
-    >
-      <ShareMark url={`/blog/${quote.slug}`} label="Share this quote" onRule />
 
+    {/* mobile tier 1, right end */}
+    <span class="ml-auto text-xs sm:hidden">
+      <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
+    </span>
+
+    {/* the actions — their own row below `sm`, right-aligned at `sm` */}
+    <div class="flex w-full items-center gap-x-4 gap-y-2 sm:ml-auto sm:w-auto">
       {
-        quote.subjects.length > 0 && (
-          <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            {quote.subjects.map((s) => (
-              <li>
-                <a href={`/blog?view=quotes&subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
-                  {s.name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-
-      {/* mobile tier 1, right end */}
-      <span class="ml-auto text-xs sm:hidden">
-        <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
-      </span>
-
-      {/* the actions — their own row below `sm`, right-aligned at `sm` */}
-      <div class="flex w-full items-center gap-x-4 gap-y-2 sm:ml-auto sm:w-auto">
-        {
-          constellations.length > 0 && (
-            <Reveal wide label={`Appears in ${plural(constellations.length, 'constellation', 'constellations')}`}>
-              <span class="qp-ctl">{plural(constellations.length, 'constellation', 'constellations')}</span>
-              <Fragment slot="content">
-                <p class="qp-label">Appears in</p>
-                <ul class="qp-list">
-                  {constellations.map((c) => (
-                    <li>
-                      {/* The Sky's own vocabulary at popover scale — `cn-<slot>`
+        constellations.length > 0 && (
+          <Reveal wide label={`Appears in ${plural(constellations.length, 'constellation', 'constellations')}`}>
+            <span class="qp-ctl">{plural(constellations.length, 'constellation', 'constellations')}</span>
+            <Fragment slot="content">
+              <p class="qp-label">Appears in</p>
+              <ul class="qp-list">
+                {constellations.map((c) => (
+                  <li>
+                    {/* The Sky's own vocabulary at popover scale — `cn-<slot>`
                           hands the row its colour, `.sky-star` breathes and
                           glows, `.sky-name` carries a TRACE of that colour at
                           rest and comes to full on attention, and StarBloom
@@ -206,59 +236,58 @@ const allSubjectsHref =
                           open — the affordance was established by the act of
                           opening it, so a proximity tracker in here would be
                           motion with nothing left to say. */}
-                      <a href={`/${c.slug}`} class:list={['qp-row group', `cn-${c.color}`]}>
-                        <span class="qp-row__head">
-                          <span class="sky-star text-sm" style={`--glow: .72; --phase: ${phaseOf(c.slug)}`}>
-                            <StarBloom />
-                          </span>
-                          <span class="sky-name qp-row__name">{c.name}</span>
+                    <a href={`/${c.slug}`} class:list={['qp-row group', `cn-${c.color}`]}>
+                      <span class="qp-row__head">
+                        <span class="sky-star text-sm" style={`--glow: .72; --phase: ${phaseOf(c.slug)}`}>
+                          <StarBloom />
                         </span>
-                        {c.description && <span class="qp-row__sub qp-row__sub--indent">{c.description}</span>}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </Fragment>
-            </Reveal>
-          )
-        }
+                        <span class="sky-name qp-row__name">{c.name}</span>
+                      </span>
+                      {c.description && <span class="qp-row__sub qp-row__sub--indent">{c.description}</span>}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Fragment>
+          </Reveal>
+        )
+      }
 
-        {
-          related.length > 0 && (
-            <Reveal wide label={`${plural(relatedTotal, 'related line', 'related lines')}`}>
-              <span class="qp-ctl">{plural(relatedTotal, 'related line', 'related lines')}</span>
-              <Fragment slot="content">
-                <p class="qp-label">Along the same lines</p>
-                <ul class="qp-list">
-                  {related.map((r) => (
-                    <li>
-                      <a href={`/blog/${r.slug}`} class="qp-row">
-                        <span class="qp-row__title">{r.type === 'writing' ? r.title : preview(r.body)}</span>
-                        <span class="qp-row__sub">
-                          {r.type === 'writing' ? 'an essay' : (r.attribution ?? 'unattributed')}
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-                {allSubjectsHref && (
-                  <a href={allSubjectsHref} class="qp-door qp-door--ruled">
-                    More on {quote.subjects.map((s) => s.name).join(' · ')}
-                    <span class="qp-door__arrow">→</span>
-                  </a>
-                )}
-              </Fragment>
-            </Reveal>
-          )
-        }
+      {
+        related.length > 0 && (
+          <Reveal wide label={`${plural(relatedTotal, 'related line', 'related lines')}`}>
+            <span class="qp-ctl">{plural(relatedTotal, 'related line', 'related lines')}</span>
+            <Fragment slot="content">
+              <p class="qp-label">Along the same lines</p>
+              <ul class="qp-list">
+                {related.map((r) => (
+                  <li>
+                    <a href={`/blog/${r.slug}`} class="qp-row">
+                      <span class="qp-row__title">{r.type === 'writing' ? r.title : preview(r.body)}</span>
+                      <span class="qp-row__sub">
+                        {r.type === 'writing' ? 'an essay' : (r.attribution ?? 'unattributed')}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              {allSubjectsHref && (
+                <a href={allSubjectsHref} class="qp-door qp-door--ruled">
+                  More on {quote.subjects.map((s) => s.name).join(' · ')}
+                  <span class="qp-door__arrow">→</span>
+                </a>
+              )}
+            </Fragment>
+          </Reveal>
+        )
+      }
 
-        <span class="hidden sm:inline">
-          <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
-        </span>
-      </div>
+      <span class="hidden sm:inline">
+        <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
+      </span>
     </div>
-  </section>
-</main>
+  </div>
+</div>
 
 <style is:global>
   /* The strip's controls are sans, where Reveal's default register is the

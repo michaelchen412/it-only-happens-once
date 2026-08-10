@@ -830,6 +830,33 @@ html.reader-open .sky-return {
     color 0.4s ease,
     text-shadow 0.4s ease;
 }
+/* The feed's `Read →`. It borrows `.suite-cta` wholesale for the type and the
+   rest colour, and only re-points what warms it: the suite rides `.is-focus`
+   (proximity on touch, the cursor on a desktop), and the feed rides its own
+   card hover — the pre-existing split between a room you scroll THROUGH and a
+   list you point AT. On touch neither fires, and that is why the word is here
+   at all: it is legible at rest, where a fade and a warm are not. */
+.post-cta {
+  margin-top: 0.85rem;
+}
+.post-read:hover .suite-cta__word,
+.post-read:hover .suite-cta__arrow,
+.post-read:focus-within .suite-cta__word,
+.post-read:focus-within .suite-cta__arrow {
+  color: var(--lamp);
+}
+/* The arrow steps forward, the word follows — the suite's own gesture. */
+.post-read:hover .suite-cta__arrow,
+.post-read:focus-within .suite-cta__arrow {
+  transform: translateX(0.15em);
+}
+.suite-cta__arrow {
+  transition:
+    color 0.45s ease,
+    filter 0.45s ease,
+    transform 0.45s ease;
+}
+
 .post-read:hover .post-title,
 .post-read:focus-within .post-title {
   color: var(--lamp);

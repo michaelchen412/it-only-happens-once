@@ -46,14 +46,38 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
 
 {
   item.kind === 'quote' && (
+    /*
+      ⚠ THE STANZA OPENS NOW, and the anchor is what says so. Until 2026-08-10 a
+      quote here was inert by deliberation, and that was right while there was
+      nowhere for it to go — ConstellationSuite's header still carries the
+      argument, because the rule it states did not change, only the facts under
+      it: an openable stanza gets a word, an unopenable one does not. A quote
+      became openable when it got an apparatus worth opening (plan 32), so it
+      gets its word.
+
+      ⚠ IT DOES NOT NAVIGATE. `data-read` hands it to the Reader, which fills
+      itself from the `<template>` ConstellationSuite renders alongside — the
+      same drawer, and the same mechanism, an essay stanza has always used.
+      Michael, 2026-08-10: *"they should show up in a sheet and, obviously, not
+      in their own dedicated page."* The `href` is the no-JS floor and the
+      ⌘-click path, and it is a real page either way.
+
+      ⚠ THE ATTRIBUTION STAYS OUTSIDE THE ANCHOR. It is already a control (the
+      citation reveal), and nesting a button inside a link is both invalid and a
+      coin-toss about which one a click means. So the LINE opens the sheet and
+      the NAME opens its citation, which is the same division the sheet itself
+      uses once it is open.
+    */
     <figure>
-      <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
-        {item.body}
-      </blockquote>
-      {item.attribution && (
+      <a href={`/blog/${item.quote.slug}`} data-read={item.quote.slug} class="block">
+        <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
+          {item.quote.body}
+        </blockquote>
+      </a>
+      {item.quote.attribution && (
         <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
           {'— '}
-          <QuoteReveal reveal={item.reveal}>{item.attribution}</QuoteReveal>
+          <QuoteReveal reveal={item.quote.reveal}>{item.quote.attribution}</QuoteReveal>
         </figcaption>
       )}
     </figure>
