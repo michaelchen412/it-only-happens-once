@@ -22,6 +22,63 @@
 // its edits are written to `fragment_versions` on the same debounce a draft
 // uses. So the words survive a crash without the public site changing under a
 // reader — and every prompt below can finally say where they went.
+//
+// ════════════════════════════════════════════════════════════════════════════
+// THE MAP. ~1,000 lines, nineteen `// ---- ` markers, five concerns. Read this
+// before deciding where a change goes; the markers are fine-grained enough to
+// hide which of them belong together.
+//
+// ⚠ IT NAMES MARKERS RATHER THAN LINE NUMBERS, and that is not fussiness — the
+// first draft of this header used line numbers and invalidated all five of them
+// the moment it was inserted, by shifting the file down 52 lines. A line number
+// in a comment is a fact with a very short half-life. `grep -n '^// ---- '` is
+// the index; these are its groupings.
+//
+//   1. THE EDITOR         `TipTap editor` → `live signals`
+//                         Mount, toolbar, link/alt dialogs, the status
+//                         indicator, live word/minute counts.
+//   2. THE FORM           `publish-state bar toggle` → `date override`
+//                         Dirty tracking, the ⋯ menu, auto-slug, the
+//                         local-time date round-trip.
+//   3. ⚠ NEVER LOSE PROSE `edits: autosave…` → `second-tab guard`
+//                         Autosave/debounce · `save`/`doSave`/`buildFields` ·
+//                         conflict resolution (`saveAsCopy`, `handleConflict`)
+//                         · the edit lock. THE HARD THIRD — see below.
+//   4. THE TABS           `constellation membership` → `draft versions`
+//                         Each delegates to its own module and is thin here.
+//   5. THE LIFECYCLE      `opening` → end
+//                         Opening, populating, closing, the publish dialog,
+//                         note→draft, the published explicit-save path,
+//                         proofreading, and the event triggers.
+//
+// ⚠ REGION 3 IS THE ONLY PART THAT IS ACTUALLY HARD, and it is one story told
+// in three places rather than three features: a save must never silently lose
+// words. Autosave decides WHEN to write, the conflict path decides what happens
+// when someone else already did, and the edit lock decides who is allowed to.
+// They share module-scoped mutable state (`dirty`, `baseUpdatedAt`, the debounce
+// timer, the lock), which is exactly why the file has resisted being split —
+// the state is the coupling, not the line count. A change to any one of the
+// three wants the other two read first.
+//
+// ⚠ THIS FILE IS NOT GETTING SPLIT, AND THAT IS A DECISION (plan 31 §6,
+// 2026-08-10) RATHER THAN AN OMISSION. Five plans in a row wrote some version
+// of "writing-sheet.ts is too long and is nobody's piece" — 00 deferred it to
+// "whichever of 15/16 lands second"; both landed and neither split it; 16 wrote
+// "it is now nobody's piece, which is how a thing never gets done"; the tracks
+// table then assigned it to Track D, which never started. `45944b1` did take it
+// 1,268 → 954 by lifting out `writing-proofread.ts` and
+// `writing-publish-dialog.ts`, and deliberately left the state machine.
+//
+// The pattern is the finding: every attempt attached the split to a sitting
+// that was really about something else, and the something else won. So the
+// choice was made explicitly — 953 lines with a stated internal order is not a
+// defect, and a split of region 3 is genuine risk (module-scoped state behind a
+// new interface) on the one file where GROUND-RULES' "compiling is not
+// verifying" has already been paid for twice. **If a future session wants to
+// split it, that is fine — but it must be that sitting's whole job, not a
+// tidy-up inside another one.** What is not acceptable is a sixth plan writing
+// the paragraph again.
+// ════════════════════════════════════════════════════════════════════════════
 import { mountRichEditor } from './rich-editor';
 import { wireAltDialog } from './alt-dialog';
 import { uploadImage } from './upload';
