@@ -142,18 +142,13 @@ describe('briefsFor', () => {
     expect(briefs.map((b) => b.person.display_name)).toEqual(['Ben']);
   });
 
-  it('carries YOUR last words verbatim, from the newest entry', async () => {
-    // ⚠ The line the whole surface is for. It is never summarised, never
-    // generated, and never the second-newest — a brief quoting last year while
-    // a month-old entry exists is worse than no brief.
+  it('carries YOUR last words verbatim', async () => {
+    // ⚠ The line the whole surface is for. It is never summarised and never
+    // generated — a brief that paraphrases you is the one thing this page must
+    // not be.
     const db = fakeDb({
       event_people: { data: [tag(ana, { title: 'Coffee' })] },
-      interaction_people: {
-        data: [
-          { person_id: 'p-ana', interactions: { occurred_on: '2025-11-02', body: 'Talked about the move.' } },
-          { person_id: 'p-ana', interactions: { occurred_on: '2026-06-14', body: '  She started the PhD.  ' } },
-        ],
-      },
+      interactions: { data: [{ occurred_on: '2026-06-14', body: '  She started the PhD.  ' }] },
     });
 
     const [brief] = await briefsFor(db, TODAY);
@@ -162,6 +157,39 @@ describe('briefsFor', () => {
     // Trimmed, because the textarea keeps whatever whitespace you left — but
     // otherwise exactly what was typed.
     expect(brief.then).toBe('She started the PhD.');
+  });
+
+  it('⚠ asks for the NEWEST entry and only that one — the rule is in the query now', async () => {
+    // This used to be a `>` comparison over every row the person appeared on,
+    // and this file could watch it happen. Bounding that read (plans/30 · §6)
+    // moved both halves into PostgREST: `order` decides *which* entry, `limit`
+    // decides *how many* come back. The old assertion — feed it two rows, watch
+    // the newer win — cannot fail against the new code, because the picking no
+    // longer happens here. So it is replaced rather than deleted: what is
+    // pinned is the ask.
+    //
+    // ⚠ AND THE SECOND `order` IS NOT DECORATION. Two entries logged for the
+    // same DAY are a real case (a call in the morning, dinner that evening),
+    // and without a tiebreak the brief quotes whichever row the planner
+    // happened to hand back — stable until the day it isn't.
+    const db = fakeDb(
+      {
+        event_people: { data: [tag(ana, { title: 'Coffee' })] },
+        interactions: { data: [{ occurred_on: '2026-06-14', body: 'She started the PhD.' }] },
+      },
+      { record: true },
+    );
+
+    await briefsFor(db.client, TODAY);
+
+    const ops = db.ops('interactions');
+    expect(ops.filter((o) => o.method === 'order').map((o) => o.args)).toEqual([
+      ['occurred_on', { ascending: false }],
+      ['created_at', { ascending: false }],
+    ]);
+    expect(ops.find((o) => o.method === 'limit')?.args).toEqual([1]);
+    // One read per briefed person, never one read for the whole log.
+    expect(db.tables().filter((t) => t === 'interactions')).toHaveLength(1);
   });
 
   it('distinguishes “no logged entry” from “long ago”', async () => {

@@ -233,6 +233,20 @@ const COLUMNS = [
               ))}
             </tbody>
           </table>
+          {
+            /* ⚠ THE ONE THING A CAPPED LIST MUST DO IS SAY SO (plans/30 · §6).
+              PostgREST stops at 1000 rows with or without a `.limit()`, so this
+              table was always capped — it just had no way to tell you, and the
+              badge counts above come from a different query, so they would have
+              gone on reporting the real total beside a list quietly missing its
+              tail. Rendered below the rows rather than above them because it is
+              a fact about where the list ENDS, and that is where you meet it. */
+            data.truncated && (
+              <p class="border-base-300 text-base-content/60 border-t px-3 py-2 text-sm">
+                Showing the first {data.rows.length}. Filter or search to reach the rest.
+              </p>
+            )
+          }
         </div>
       )
     }

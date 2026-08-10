@@ -21,6 +21,42 @@ export type Person = Database['public']['Tables']['people']['Row'];
 export type Circle = Database['public']['Enums']['person_circle'];
 
 /**
+ * The columns a person needs to appear as a FACE somewhere — a brief, a "been a
+ * while" row, a birthday on the day grid — as opposed to a profile.
+ *
+ * ⚠ IT EXISTS BECAUSE `select('*')` PULLS THE BIOS (plans/30 · §6). Today asked
+ * for the whole roster on every render, and `people.bio` is a free-text column
+ * capped at 20k characters — so the most-visited page in the application was
+ * moving, at worst, a megabyte of prose it had no surface to show, to decide
+ * which three names to print. Nothing here is a guess about what a card wants:
+ * it is what `driftFor`, `upcomingBirthday`, `signPhotos` and the two zone
+ * components actually read, and adding a column to a card starts by adding it
+ * here.
+ *
+ * ⚠ AND IT IS A `Pick`, NOT A NEW SHAPE, which is the part that keeps it
+ * honest: a full `Person` satisfies it by construction, so the roster page can
+ * go on passing complete rows to the same functions and neither surface can
+ * drift from the other.
+ */
+export const PERSON_CARD_COLUMNS =
+  'id, slug, display_name, epithet, photo_path, archived_at, cadence_days, drift_muted_until, birth_month, birth_day, birthday_lead_days' as const;
+
+export type PersonCard = Pick<
+  Person,
+  | 'id'
+  | 'slug'
+  | 'display_name'
+  | 'epithet'
+  | 'photo_path'
+  | 'archived_at'
+  | 'cadence_days'
+  | 'drift_muted_until'
+  | 'birth_month'
+  | 'birth_day'
+  | 'birthday_lead_days'
+>;
+
+/**
  * The sections of the roster, in the order they appear.
  *
  * THREE, AND THERE IS NO `acquaintances` (§3). That is a statement about how
@@ -176,7 +212,10 @@ export interface UpcomingBirthday {
  * arrive. Outside the window a cake icon is noise for 340 days a year, which is
  * why this returns null rather than a distance for the caller to test.
  */
-export function upcomingBirthday(person: Person, today: Ymd): UpcomingBirthday | null {
+export function upcomingBirthday(
+  person: Pick<Person, 'birth_month' | 'birth_day' | 'birthday_lead_days'>,
+  today: Ymd,
+): UpcomingBirthday | null {
   if (person.birth_month == null || person.birth_day == null) return null;
   const ymd = nextOccurrence(person.birth_month, person.birth_day, today);
   const days = daysBetween(today, ymd);

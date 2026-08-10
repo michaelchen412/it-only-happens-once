@@ -27,7 +27,7 @@ import { briefsFor, type Brief } from './brief';
 import { driftList, type Drift } from './drift';
 import { OBSERVATION_DAYS, observationFor, type Observation } from './goals';
 import { lastContactMap } from './interactions';
-import { signPhotos, upcomingBirthday, type Person } from './people';
+import { PERSON_CARD_COLUMNS, signPhotos, upcomingBirthday, type PersonCard } from './people';
 import { staleness, type Staleness } from './mirror';
 import { announces, publishedSignal, type Signal } from './today';
 import { shiftYmd, type Ymd } from './time';
@@ -222,7 +222,12 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
   ] = await Promise.all([
     sb.from('events').select('*, event_people(person_id, people(id, display_name))').eq('starts_on', today),
     liveAndAnswered(sb, today),
-    sb.from('people').select('*').is('archived_at', null),
+    // ⚠ COLUMNS, NOT `*` (plans/30 · §6). This is the whole roster on every
+    // Today render, and `*` carried `bio` — up to 20k characters per person —
+    // to answer two questions that need eleven columns: is anyone drifting,
+    // and is anyone's birthday near. The projection is named once, in
+    // `people.ts`, so the query and the type cannot fall out of step.
+    sb.from('people').select(PERSON_CARD_COLUMNS).is('archived_at', null),
     lastContactMap(sb),
     // GUARD 2 (12-people.md §8): anyone with an event today is never drifting.
     // Asked separately from the brief even though both read today's tags — the
@@ -254,7 +259,7 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     sb.from('calendar_sync').select('synced_at, last_error, last_error_at').maybeSingle(),
   ]);
 
-  const roster: Person[] = everyone ?? [];
+  const roster: PersonCard[] = everyone ?? [];
 
   /* ── tasks: one query, three zones ─────────────────────────────────────── */
   const pastDue: PastDueRow[] = tasks.rows
@@ -282,11 +287,11 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
      person. */
   const birthdays = roster
     .map((person) => ({ person, birthday: upcomingBirthday(person, today) }))
-    .filter((x): x is { person: Person; birthday: NonNullable<typeof x.birthday> } => !!x.birthday);
+    .filter((x): x is { person: PersonCard; birthday: NonNullable<typeof x.birthday> } => !!x.birthday);
 
   // The door is set HERE rather than in `birthdayItem` because it is this
   // page's routing: the calendar renders the same birthdays and opens nothing.
-  const withDoor = (person: Person, on: Ymd): CalendarItem => ({
+  const withDoor = (person: PersonCard, on: Ymd): CalendarItem => ({
     ...birthdayItem(person, on),
     href: `/admin/people/${person.slug}`,
   });

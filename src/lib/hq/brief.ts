@@ -27,7 +27,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../database.types';
 import { plainish, rowTitle, type FragmentType } from '../fragments-display';
 import { one } from './relations';
-import type { Person } from './people';
+import { PERSON_CARD_COLUMNS, type PersonCard } from './people';
 import type { Ymd } from './time';
 
 type DB = SupabaseClient<Database>;
@@ -43,7 +43,8 @@ type DB = SupabaseClient<Database>;
 export const BRIEF_CAP = 3;
 
 export interface Brief {
-  person: Person;
+  /** A face and the facts a brief prints — never the bio (plans/30 · §6). */
+  person: PersonCard;
   /** The event that put them here — earliest of the day if there are several. */
   event: { id: string; title: string; at: string | null };
   /** `person_last_contact`. Null means no logged entry, which is NOT "long ago". */
@@ -55,7 +56,7 @@ export interface Brief {
 }
 
 /** `2 Nov` — the birthday line's register: a bare day and month, never a year. */
-export function birthdayLine(person: Pick<Person, 'birth_month' | 'birth_day'>): string | null {
+export function birthdayLine(person: Pick<PersonCard, 'birth_month' | 'birth_day'>): string | null {
   if (!person.birth_month || !person.birth_day) return null;
   const month = new Date(Date.UTC(2001, person.birth_month - 1, 1)).toLocaleDateString('en-US', {
     timeZone: 'UTC',
@@ -67,28 +68,33 @@ export function birthdayLine(person: Pick<Person, 'birth_month' | 'birth_day'>):
 /**
  * Everybody you are seeing today, with what you last knew about them.
  *
- * FIVE ROUND TRIPS AT MOST, AND USUALLY ZERO — the first query is the gate, and
- * on a day with no tagged event it returns nothing and the rest never run. That
- * ordering is deliberate: this is the front door, and the common morning must
- * not pay for the uncommon one.
+ * TWO WAVES, AND USUALLY NEITHER — the first query is the gate, and on a day
+ * with no tagged event it returns nothing and the rest never run. That ordering
+ * is deliberate: this is the front door, and the common morning must not pay
+ * for the uncommon one.
  *
- * Everything after the gate is batched with `.in(...)`, so the cost is flat in
- * the number of people rather than one round trip each.
+ * Everything after the gate goes out in ONE `Promise.all`, so the wall-clock
+ * cost is a single round trip's worth however the queries divide — and every
+ * one of them is bounded, by `.in(...)` over the three capped ids or by a
+ * `.limit(1)` per person. Both halves matter: batching alone still let the
+ * last-contact read return an entire logging history (plans/30 · §6).
  *
  * Never throws. A failure here should cost the brief, not the page.
  */
 export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
   const { data: tagged } = await sb
     .from('event_people')
-    .select('person_id, people(*), events!inner(id, title, starts_on, starts_at)')
+    // Columns rather than `people(*)`: a brief prints a face, a name and an
+    // epithet, and pulling the bio to do it is the same fault Today had.
+    .select(`person_id, people(${PERSON_CARD_COLUMNS}), events!inner(id, title, starts_on, starts_at)`)
     .eq('events.starts_on', ymd);
 
   // One brief per PERSON, not per tag: two events with the same person is one
   // person to prepare for.
-  const people = new Map<string, Person>();
+  const people = new Map<string, PersonCard>();
   const events = new Map<string, Brief['event'][]>();
   for (const row of tagged ?? []) {
-    const person = one<Person>(row.people);
+    const person = one<PersonCard>(row.people);
     const event = one<{ id: string; title: string; starts_at: string | null }>(row.events);
     if (!person || !event) continue;
     // Archived: they were deliberately removed from the roster, and a brief is
@@ -120,12 +126,39 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
     .slice(0, BRIEF_CAP);
   const ids = briefs.map((b) => b.person.id);
 
-  const [{ data: entries }, { data: workLinks }, { data: fragmentLinks }] = await Promise.all([
-    // The last entry AND its body in one read. `person_last_contact` gives the
-    // date only, and the "Then" line is the body — asking the view for the date
-    // and then the table for the words would be two queries answering one
-    // question, with a window between them where they can disagree.
-    sb.from('interaction_people').select('person_id, interactions(occurred_on, body)').in('person_id', ids),
+  const [entries, { data: workLinks }, { data: fragmentLinks }] = await Promise.all([
+    // The last entry AND its body in one read per person. `person_last_contact`
+    // gives the date only, and the "Then" line is the body — asking the view for
+    // the date and then the table for the words would be two queries answering
+    // one question, with a window between them where they can disagree.
+    //
+    // ⚠ ONE BOUNDED READ EACH, NOT ONE UNBOUNDED READ FOR ALL THREE, and the
+    // difference is linear in your logging history on the most-visited page in
+    // the application (plans/30 · §6). The `.in(...)` version asked for EVERY
+    // interaction row these people appear on — dates *and* full bodies, up to
+    // 20k characters apiece, unordered and uncapped — to use exactly one of
+    // them. It read as batched because it was one query; it was one query that
+    // grew for ever. PostgREST cannot cap rows per group, so the honest shape
+    // is to ask each person's question separately and cap it at 1 — at most
+    // three of them, they leave together, and they land in the same wave as
+    // the two below.
+    //
+    // Ordered by `created_at` after the day, so two entries logged for the same
+    // date resolve to the one written last rather than to whichever the planner
+    // happened to return. The old code's `>` comparison kept the FIRST of a tie,
+    // which was arbitrary in exactly the same way and simply undocumented.
+    Promise.all(
+      ids.map((id) =>
+        sb
+          .from('interactions')
+          .select('occurred_on, body, interaction_people!inner(person_id)')
+          .eq('interaction_people.person_id', id)
+          .order('occurred_on', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ),
+    ),
     sb
       .from('person_works')
       .select('person_id, created_at, works(title, authors(name))')
@@ -138,13 +171,13 @@ export async function briefsFor(sb: DB, ymd: Ymd): Promise<Brief[]> {
       .order('created_at', { ascending: false }),
   ]);
 
+  // Positional, because `ids` is what fanned the reads out — each answer is
+  // already its person's newest entry, so there is nothing left to compare.
   const last = new Map<string, { on: Ymd; body: string }>();
-  for (const row of entries ?? []) {
-    const e = one<{ occurred_on: string; body: string }>(row.interactions);
-    if (!e) continue;
-    const held = last.get(row.person_id);
-    if (!held || e.occurred_on > held.on) last.set(row.person_id, { on: e.occurred_on as Ymd, body: e.body });
-  }
+  ids.forEach((id, i) => {
+    const e = entries[i]?.data;
+    if (e) last.set(id, { on: e.occurred_on as Ymd, body: e.body });
+  });
 
   // ⚠ A WORK BEATS A FRAGMENT, always — and it is the two-hop edge that makes
   // the shelf worth having (12 §5): "Piranesi — Susanna Clarke" is what they

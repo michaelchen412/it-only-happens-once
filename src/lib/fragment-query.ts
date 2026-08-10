@@ -92,6 +92,14 @@ export interface ConstellationRefLite {
 
 export interface FragmentListData {
   rows: FragmentRowT[];
+  /**
+   * The list hit its ceiling and there are rows you are not being shown.
+   *
+   * Always false today (the corpus is in the hundreds). It exists so that the
+   * day it stops being false, the room says so instead of quietly serving a
+   * thousand of an unknown number.
+   */
+  truncated: boolean;
   subjectsByFragment: Record<string, string[]>;
   /** The other end of the composer: where each fragment already lives. */
   constellationsByFragment: Record<string, ConstellationRefLite[]>;
@@ -195,7 +203,18 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort
-  let query = scoped(supabase.from('fragments').select('*'));
+  //
+  // ⚠ THE CEILING IS STATED HERE FOR THE SAME REASON IT IS STATED FOR THE
+  // VOCABULARY ABOVE, one screen up — and this is the read that warning was
+  // actually about. PostgREST stops at 1000 rows whether or not you ask, so the
+  // manager has always had a limit; what it did not have was anybody's decision
+  // or any way to notice. At 1001 fragments the table would simply have stopped
+  // at a thousand, with correct-looking badge counts beside it (those come from
+  // `typeRows`, which is a separate query) and nothing on screen saying a word.
+  // Naming the number makes the truncation observable — `truncated` below is
+  // what the page renders — and turns "it silently lied" into "it says so".
+  const LIST_CEILING = 1000;
+  let query = scoped(supabase.from('fragments').select('*')).limit(LIST_CEILING);
   if (p.type) query = query.eq('type', p.type);
   if (authorFilterId) query = query.eq('author_id', authorFilterId);
   if (workFilterId) query = query.eq('work_id', workFilterId);
@@ -274,6 +293,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
 
   return {
     rows,
+    truncated: rows.length >= LIST_CEILING,
     subjectsByFragment,
     constellationsByFragment,
     allConstellations: allConstellations ?? [],

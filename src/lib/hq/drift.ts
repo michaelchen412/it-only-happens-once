@@ -26,15 +26,23 @@
 //     below, and `seenToday` optional so no existing caller had to change.
 //     The morning you are finally seeing somebody again, they no longer sit
 //     under "Been a while" accusing you of it while you are on your way out.
-import { type Person } from './people';
+import { type Person, type PersonCard } from './people';
 import type { LastContact } from './interactions';
 import { daysBetween, shiftYmd, type Ymd } from './time';
 
 /** Today, capped at three, most-drifted first — the roster holds the full list. */
 export const TODAY_DRIFT_CAP = 3;
 
-export interface Drift {
-  person: Person;
+/**
+ * ⚠ GENERIC OVER THE PERSON, so the two callers can differ in what they hold
+ * without this file having an opinion (plans/30 · §6). The roster page has
+ * whole `Person` rows because it renders profiles; Today has `PersonCard`
+ * projections because it renders faces and must not fetch every bio to do it.
+ * Both flow through the same `driftFor`, and `Drift<P>` hands each caller back
+ * exactly the shape it put in — so neither has to widen or cast.
+ */
+export interface Drift<P extends PersonCard = PersonCard> {
+  person: P;
   /** The last logged contact. Never null: no entries means no drift at all. */
   lastOn: Ymd;
   /** Whole days since it. */
@@ -49,8 +57,8 @@ export interface Drift {
  * `null` means no — and it means no for five different reasons, all of which
  * are the feature working rather than an edge case being swallowed.
  */
-export function driftFor(
-  person: Person,
+export function driftFor<P extends PersonCard>(
+  person: P,
   last: LastContact | undefined,
   today: Ymd,
   /**
@@ -58,7 +66,7 @@ export function driftFor(
    * calendar to ask simply behaves as it did before this existed.
    */
   seenToday?: ReadonlySet<string>,
-): Drift | null {
+): Drift<P> | null {
   // Archived: they left the roster deliberately (§3). Archiving is the release
   // valve for this indicator, so it would be perverse for it to keep firing.
   if (person.archived_at) return null;
@@ -91,15 +99,15 @@ export function driftFor(
  * though the second number is bigger. Sorting by raw days would quietly
  * override every cadence you had set by hand.
  */
-export function driftList(
-  people: Person[],
+export function driftList<P extends PersonCard>(
+  people: P[],
   map: Map<string, LastContact>,
   today: Ymd,
   seenToday?: ReadonlySet<string>,
-): Drift[] {
+): Drift<P>[] {
   return people
     .map((p) => driftFor(p, map.get(p.id), today, seenToday))
-    .filter((d): d is Drift => d !== null)
+    .filter((d): d is Drift<P> => d !== null)
     .sort((a, b) => b.over - a.over);
 }
 
