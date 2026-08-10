@@ -257,10 +257,17 @@ export const calendar = {
         // for seconds, or the credential is genuinely dead, and the stored
         // message now says which.
         const message = err instanceof Error ? err.message : 'Google couldn’t be reached.';
-        await sb
+        const { error: recordErr } = await sb
           .from('calendar_sync')
           .update({ last_error: message.slice(0, 500), last_error_at: new Date().toISOString() })
           .eq('id', true);
+        // ⚠ THE WRITE THAT RECORDS A FAILURE CAN ITSELF FAIL, and then there is
+        // nowhere left to put it: `staleness()` reads the very row that just
+        // refused us, so the mirror would go on looking healthy while being
+        // neither fresh nor able to say so. Throwing would replace the real
+        // error with a bookkeeping one and lose the reason entirely, so the log
+        // is the honest destination and the caller still gets `message`.
+        if (recordErr) console.error('[calendar.sync] could not record the failure:', recordErr.message);
         return { configured: true, skipped: false, changed: 0, error: message };
       }
     },

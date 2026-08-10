@@ -25,6 +25,10 @@ async function verifyTurnstile(secret: string, token: string, ip?: string): Prom
 }
 
 // --- editable singleton pages (docs/admin.md): About, and future pages ------
+
+/** The ceiling every long-text field in this layer shares. */
+const PROSE = 20_000;
+
 export const pages = {
   /** Save a page's structured content (a validated shape) to its `pages` row. */
   save: defineAction({
@@ -32,6 +36,14 @@ export const pages = {
       slug: z.string().min(1),
       // The About page is two co-equal movements: `me` (who I am) and `site`
       // (what this place is), plus an optional contact line. See docs/admin.md.
+      // ⚠ EVERY FIELD HERE IS BOUNDED, and it was the last long-text schema in
+      // the layer that wasn't. `PROSE` is the 20k every other long field caps
+      // at (`interactions.body`, `fragments.suggestSubjects`, `proofread`), and
+      // it is a guard rather than an editorial opinion: this row is a `jsonb`
+      // blob with no column widths of its own, so without a cap the only thing
+      // standing between a stuck paste and the database is nothing at all. The
+      // short fields get the length their control implies instead of the same
+      // number, so the refusal names the actual mistake.
       content: z.object({
         // ⚠ `me.interests[]`, `me.headline` and `site.thesis` were removed
         // 2026-08-07 — ADR-0020. They are absent from this schema on purpose, and
@@ -41,18 +53,19 @@ export const pages = {
         // to its heading) is the one it argues is strictly worse.
         me: z
           .object({
-            portrait: z.string().nullable().default(null),
-            portrait_caption: z.string().default(''),
-            body: z.string().default(''),
+            // A storage path inside the `site` bucket, never a pasted URL.
+            portrait: z.string().max(500).nullable().default(null),
+            portrait_caption: z.string().max(300).default(''),
+            body: z.string().max(PROSE).default(''),
           })
           .prefault({}),
         site: z
           .object({
-            body: z.string().default(''),
+            body: z.string().max(PROSE).default(''),
             name: z
               .object({
-                blurb: z.string().default(''),
-                spotify_url: z.string().default(''),
+                blurb: z.string().max(PROSE).default(''),
+                spotify_url: z.string().max(500).default(''),
               })
               .prefault({}),
           })
@@ -60,7 +73,7 @@ export const pages = {
         contact: z
           .object({
             // Optional copy shown above the public contact form.
-            intro: z.string().default(''),
+            intro: z.string().max(PROSE).default(''),
           })
           .prefault({}),
       }),

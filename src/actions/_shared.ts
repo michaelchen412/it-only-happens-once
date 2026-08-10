@@ -40,6 +40,25 @@ export const optYmd = z.preprocess(
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
     .optional(),
 );
+/**
+ * What `<input type="datetime-local">` puts on the wire: `YYYY-MM-DDTHH:MM`,
+ * with some browsers adding `:SS`.
+ *
+ * ⚠ IT IS A REGEX BECAUSE THE ALTERNATIVE WAS A 500. This field used to be a
+ * bare `optText` fed straight to `new Date(…).toISOString()`, so anything that
+ * wasn't a date threw `RangeError` out of the handler and surfaced as an opaque
+ * server error on a save — where a rejected *field* is the whole point of
+ * having a schema. Same family as `optYmd` above, and the same division of
+ * labour: this is the wire format's shape, and the "is that a real instant?"
+ * check belongs at the conversion site (see `occurredAtFrom` in fragments.ts).
+ */
+export const optDatetimeLocal = z.preprocess(
+  blankToUndef,
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/, 'Expected a date and time')
+    .optional(),
+);
 /** `<input type="time">` gives HH:MM, and some browsers add :SS. */
 export const optHhmm = z.preprocess(
   blankToUndef,

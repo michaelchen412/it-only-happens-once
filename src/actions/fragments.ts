@@ -12,7 +12,18 @@ import { slugify } from '../lib/slug';
 import { lookupSong, parseSongRef, songRefUrl } from '../lib/media';
 import { provenanceLine } from '../lib/provenance';
 import type { Database, Json } from '../lib/database.types';
-import { type DB, fail, fragmentStatus, requireAdmin, uniqueSlug, optText, optUrl, optInt, optUuid } from './_shared';
+import {
+  type DB,
+  fail,
+  fragmentStatus,
+  requireAdmin,
+  uniqueSlug,
+  optDatetimeLocal,
+  optText,
+  optUrl,
+  optInt,
+  optUuid,
+} from './_shared';
 
 type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 
@@ -30,6 +41,29 @@ export function yearToISO(year: number): string {
   return new Date(`${year}-01-01T12:00:00Z`).toISOString();
 }
 
+/**
+ * The manual `<input type="datetime-local">` override → the instant we store.
+ *
+ * ⚠ THE SHAPE IS THE SCHEMA'S JOB AND THE INSTANT IS THIS ONE'S, exactly as
+ * `optYmd` splits with `parseYmd`. `optDatetimeLocal` has already refused
+ * anything that isn't `YYYY-MM-DDTHH:MM`; what it cannot see is a string of
+ * the right shape naming a moment that does not exist, and `new Date` answers
+ * that with `NaN` rather than a throw — so a `RangeError` used to escape
+ * `toISOString()` as a 500 on a save the person could have fixed in a second.
+ *
+ * ⚠ AND ONE HOLE SURVIVES BOTH CHECKS, deliberately, because closing it costs
+ * more than it is worth: `2026-02-31T10:00` is neither malformed nor NaN — V8
+ * rolls it forward to **3 March**. No browser's date picker can produce it, it
+ * can only arrive from a hand-built request, and the failure it causes is a
+ * fragment dated three days late rather than anything lost. `optYmd` carries
+ * the same limit and says so in the same words.
+ */
+function occurredAtFrom(local: string): string {
+  const at = new Date(local);
+  if (Number.isNaN(at.getTime())) throw fail('That posted date isn’t a real moment', 'BAD_REQUEST');
+  return at.toISOString();
+}
+
 /** Upsert an author by name; return its id (or null for blank). Idempotent by slug. */
 async function resolveAuthor(sb: DB, name?: string): Promise<string | null> {
   const n = name?.trim();
@@ -37,8 +71,17 @@ async function resolveAuthor(sb: DB, name?: string): Promise<string | null> {
   const slug = slugify(n);
   const { error } = await sb.from('authors').upsert({ name: n, slug }, { onConflict: 'slug', ignoreDuplicates: true });
   if (error) throw fail(error.message);
-  const { data } = await sb.from('authors').select('id').eq('slug', slug).single();
-  return data?.id ?? null;
+  // ⚠ THE FOLLOW-UP READ'S ERROR IS CHECKED TOO, and it is not ceremony: this
+  // read is the only thing that turns a name into the id the fragment stores.
+  // A transient failure here used to return null, which is indistinguishable
+  // from "nobody was named" — so the quote saved with its WHO facet silently
+  // dropped and the derived attribution line lost the author. Same for the
+  // row-not-found case: the upsert just succeeded, so an absent row means the
+  // read is lying, not that there is no author.
+  const { data, error: readErr } = await sb.from('authors').select('id').eq('slug', slug).maybeSingle();
+  if (readErr) throw fail(readErr.message);
+  if (!data) throw fail('Couldn’t file that author — nothing was saved.');
+  return data.id;
 }
 
 /** Upsert a work by title (optionally linked to an author); return its id. */
@@ -50,8 +93,12 @@ async function resolveWork(sb: DB, title?: string, authorId?: string | null): Pr
     .from('works')
     .upsert({ title: t, slug, author_id: authorId ?? null }, { onConflict: 'slug', ignoreDuplicates: true });
   if (error) throw fail(error.message);
-  const { data } = await sb.from('works').select('id').eq('slug', slug).single();
-  return data?.id ?? null;
+  // Checked for the same reason as `resolveAuthor`'s — a dropped read here is a
+  // fragment filed under no work at all, reported as success.
+  const { data, error: readErr } = await sb.from('works').select('id').eq('slug', slug).maybeSingle();
+  if (readErr) throw fail(readErr.message);
+  if (!data) throw fail('Couldn’t file that work — nothing was saved.');
+  return data.id;
 }
 
 /** Replace a fragment's subject links, creating any new subjects on the fly. */
@@ -173,7 +220,7 @@ export const fragments = {
       slug: optText,
       excerpt: optText,
       body: optText,
-      occurred_at: optText, // datetime-local override; absent = auto (publish date)
+      occurred_at: optDatetimeLocal, // override; absent = auto (publish date)
       status: fragmentStatus,
       subjects: optText,
       base_updated_at: optText, // opaque concurrency token; mismatch → CONFLICT
@@ -198,7 +245,7 @@ export const fragments = {
         status: input.status,
       };
       if (input.occurred_at) {
-        row.occurred_at = new Date(input.occurred_at).toISOString();
+        row.occurred_at = occurredAtFrom(input.occurred_at);
         row.date_precision = 'day';
       }
       return persist(sb, input.id, row, input.subjects, input.base_updated_at);
@@ -233,7 +280,7 @@ export const fragments = {
        * path by which Michael becomes a row in `authors`.
        */
       is_self: optText,
-      occurred_at: optText, // datetime-local override for legacy quotes; absent = automatic
+      occurred_at: optDatetimeLocal, // override for legacy quotes; absent = automatic
       status: fragmentStatus,
       subjects: optText,
       slug: optText,
@@ -266,12 +313,23 @@ export const fragments = {
       // leave the chosen author untouched.
       let workTitle: string | null = null;
       if (work_id) {
-        const { data: w } = await sb.from('works').select('author_id, title').eq('id', work_id).single();
+        // ⚠ THIS READ DECIDES THE ATTRIBUTION, so a failure of it cannot be
+        // allowed to read as an answer. Unchecked, a blip left `w` undefined —
+        // the snap below didn't happen and `workTitle` stayed null — and the
+        // quote saved with a *wrong* line under a correct `work_id`, silently.
+        // That is the one failure this whole derivation exists to prevent.
+        const { data: w, error: workErr } = await sb
+          .from('works')
+          .select('author_id, title')
+          .eq('id', work_id)
+          .maybeSingle();
+        if (workErr) throw fail(workErr.message);
+        if (!w) throw fail('That work no longer exists.', 'NOT_FOUND');
         // ⚠ but never onto a self-authored quote — the snap exists to keep the
         // facet honest, and "Michael's own line, filed under a book he was
         // reading" must not become "by that book's author".
-        if (!is_self && w?.author_id) author_id = w.author_id;
-        workTitle = w?.title ?? null;
+        if (!is_self && w.author_id) author_id = w.author_id;
+        workTitle = w.title;
       }
       // ⚠ THE SHOWN LINE IS DERIVED HERE, FROM WHAT WAS ACTUALLY STORED — not
       // in the browser, and not from the names the form happened to send.
@@ -285,8 +343,13 @@ export const fragments = {
       // entire class of "the label doesn't match the facet" bug.
       let authorName: string | null = null;
       if (author_id) {
-        const { data: a } = await sb.from('authors').select('name').eq('id', author_id).single();
-        authorName = a?.name ?? null;
+        // Checked for the same reason as the work read: an unchecked failure
+        // here writes a quote whose stored `author_id` and whose shown line
+        // disagree — the exact class of bug the paragraph above is about.
+        const { data: a, error: authorErr } = await sb.from('authors').select('name').eq('id', author_id).maybeSingle();
+        if (authorErr) throw fail(authorErr.message);
+        if (!a) throw fail('That author no longer exists.', 'NOT_FOUND');
+        authorName = a.name;
       }
       const derived = provenanceLine({ isSelf: is_self, who: authorName, from: workTitle, where: input.citation });
       // An explicit override wins; otherwise the derivation; otherwise silence,
@@ -308,7 +371,7 @@ export const fragments = {
         status: input.status,
       };
       if (input.occurred_at) {
-        row.occurred_at = new Date(input.occurred_at).toISOString();
+        row.occurred_at = occurredAtFrom(input.occurred_at);
         row.date_precision = 'day';
       }
       return persist(sb, input.id, row, input.subjects);

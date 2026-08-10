@@ -16,6 +16,7 @@ import {
   fail,
   fragmentStatus,
   idList,
+  optDatetimeLocal,
   optHhmm,
   optInt,
   optText,
@@ -82,6 +83,33 @@ describe('optYmd', () => {
     // Stated in the source, and worth pinning: a reader who assumed this
     // validated the calendar would drop the real check downstream.
     expect(optYmd.parse('2026-02-31')).toBe('2026-02-31');
+  });
+});
+
+describe('optDatetimeLocal', () => {
+  it('accepts what the sheets actually send, and the seconds a browser may add', () => {
+    // `toLocalInput` in writing-sheet.ts / fragment-sheet.ts builds exactly
+    // this, so these two strings are the wire format rather than a guess.
+    expect(optDatetimeLocal.parse('2026-08-09T14:30')).toBe('2026-08-09T14:30');
+    expect(optDatetimeLocal.parse('2026-08-09T14:30:00')).toBe('2026-08-09T14:30:00');
+    expect(optDatetimeLocal.parse('')).toBeUndefined();
+  });
+
+  it('REFUSES THE MALFORMED VALUE THAT USED TO BE A 500', () => {
+    // The whole point of plans/30 §1: this was `optText`, so anything that is
+    // not a date reached `new Date(…).toISOString()` and threw RangeError out
+    // of the handler. A rejected field is what a schema is for.
+    expect(() => optDatetimeLocal.parse('yesterday')).toThrow(/date and time/);
+    expect(() => optDatetimeLocal.parse('2026-08-09')).toThrow();
+    expect(() => optDatetimeLocal.parse('2026-08-09 14:30')).toThrow();
+    expect(() => optDatetimeLocal.parse('2026-8-9T14:30')).toThrow();
+  });
+
+  it("checks the SHAPE only — the instant is occurredAtFrom's job", () => {
+    // Same division of labour as optYmd/parseYmd above, and the same hole:
+    // 31 February is the right shape and V8 rolls it to 3 March. Pinned so a
+    // reader who assumed otherwise finds out here.
+    expect(optDatetimeLocal.parse('2026-02-31T10:00')).toBe('2026-02-31T10:00');
   });
 });
 

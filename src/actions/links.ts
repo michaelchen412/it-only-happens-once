@@ -33,9 +33,16 @@ const note = z.preprocess(
  * The foreign key would reject a bad id anyway — this exists so the failure is
  * a sentence rather than a constraint name, which is the same reason
  * `songs.pair` checks `type` in the action instead of in the schema.
+ *
+ * ⚠ A FAILED READ IS NOT "IT DOESN'T EXIST", and conflating the two is worse
+ * than a 500. Unchecked, a database blip came back as *"That work no longer
+ * exists."* — a confident, specific, wrong sentence about somebody's library,
+ * which invites you to go and re-add a row that was there the whole time. The
+ * two cases get two answers now.
  */
 async function assertExists(sb: DB, table: 'works' | 'fragments', id: string, noun: string): Promise<void> {
-  const { data } = await sb.from(table).select('id').eq('id', id).maybeSingle();
+  const { data, error } = await sb.from(table).select('id').eq('id', id).maybeSingle();
+  if (error) throw fail(error.message);
   if (!data) throw fail(`That ${noun} no longer exists.`, 'NOT_FOUND');
 }
 
