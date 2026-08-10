@@ -13,8 +13,16 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
-const TRIGGER = '.qr__trigger';
-const POP = '.qr__pop';
+// ⚠ `.rv__*`, not `.qr__*`. QuoteReveal's mechanism moved into Reveal.astro on
+// 2026-08-10 (plan 32 · §4) so the quote page's strip could use the same control
+// with markup behind it instead of one string. QuoteReveal is now a thin wrapper
+// that supplies a citation and the rule that an empty one renders nothing.
+//
+// ⚠ THIS SPEC WENT RED ON A PURE RENAME AND `npm run verify` DID NOT NOTICE,
+// because verify runs vitest and not playwright. That is the gap this comment
+// exists to mark: a refactor that touches a class name has to grep `tests/`.
+const TRIGGER = '.rv__trigger';
+const POP = '.rv__pop';
 const openCount = (page: Page) => page.locator(`${POP}:popover-open`).count();
 
 test.beforeEach(async ({ page }) => {

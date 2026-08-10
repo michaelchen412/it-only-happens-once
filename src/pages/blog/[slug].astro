@@ -24,19 +24,53 @@ import { Icon } from 'astro-icon/components';
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import PostArticle from '../../components/PostArticle.astro';
 import PreviewBar from '../../components/PreviewBar.astro';
+import QuotePage from '../../components/QuotePage.astro';
 import { getWritingBySlug } from '../../lib/blog';
+import { getQuotePage } from '../../lib/quote-page';
 import { toPlainText } from '../../lib/markdown';
 
 const { slug } = Astro.params;
 const isAdmin = Astro.locals.user?.app_metadata?.role === 'admin';
-const item = slug ? await getWritingBySlug(Astro.locals.supabase, slug, { includeUnpublished: isAdmin }) : null;
+
+/*
+  ⚠ THIS ROUTE SERVES A QUOTE AS WELL AS AN ESSAY (plan 32 · §3), and it is not
+  a new route because it never needed to be: `fragments.slug` is `not null
+  unique` across EVERY type, and lib/slug.ts already claims the whole namespace
+  in its own docstring — "a fragment's URL identity (/blog/forgiveness) … unique
+  across all fragments". One namespace, collisions impossible by constraint, and
+  it is what ADR-0003's single table implies. A second route under /quotes would
+  be a second namespace guarding against a collision the database prevents.
+
+  ⚠ BOTH LOOKUPS RUN TOGETHER rather than one-then-the-other. The slug can only
+  be one of them, so the sequential version is a wasted round trip on every
+  quote page and on every 404 — plan 24's finding, and it matters more on a
+  reader-facing page than on any admin one. Two queries, one latency.
+
+  A side effect worth having: Reader.astro already falls back to /blog/<slug>
+  for anything not on the page it is open in. That fallback becomes CORRECT for
+  a quote instead of landing on this file's 404.
+*/
+const [item, quote] = slug
+  ? await Promise.all([
+      getWritingBySlug(Astro.locals.supabase, slug, { includeUnpublished: isAdmin }),
+      getQuotePage(Astro.locals.supabase, slug, { includeUnpublished: isAdmin }),
+    ])
+  : [null, null];
+
+const found = item ?? quote;
 
 // Anything not published is a preview — drafts and notes alike. One rule, so a
-// tier added later can't quietly fall through to the public cache branch.
+// tier added later can't quietly fall through to the public cache branch. The
+// quote branch is held to the same rule for the same reason: one route now
+// serves two renderers, and a cache header that only covered one of them is how
+// a draft reaches the CDN.
+const previewId = item ? item.id : quote?.quote.id;
 const preview =
-  item && item.status !== 'published' ? { status: item.status, editHref: `/admin/fragments#edit=${item.id}` } : null;
+  found && found.status !== 'published'
+    ? { status: found.status, editHref: `/admin/fragments#edit=${previewId}` }
+    : null;
 
-if (!item) {
+if (!found) {
   Astro.response.status = 404;
 } else if (preview) {
   Astro.response.headers.set('Cache-Control', 'private, no-store');
@@ -44,13 +78,28 @@ if (!item) {
   Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 }
 
-const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
+// A quote's description IS the quote: a client that ignores the card image
+// still shows the line, which is the whole thing being shared.
+const description = item
+  ? toPlainText(item.excerpt).slice(0, 200)
+  : quote
+    ? toPlainText(quote.quote.body).slice(0, 200)
+    : undefined;
+
+// A quote has no title of its own, so the tab and the card take its opening
+// words. Trailing punctuation cut mid-line reads as a typo, so it is trimmed.
+const quoteTitle = quote
+  ? toPlainText(quote.quote.body)
+      .slice(0, 70)
+      .replace(/[\s.,;:—-]+$/, '')
+  : '';
+const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70 ? '' : '…'}` : 'Not found';
 ---
 
-<SiteLayout title={item ? item.title : 'Not found'} active="blog" description={description} ogType="article">
+<SiteLayout title={title} active="blog" description={description} ogType="article">
   {preview && <PreviewBar status={preview.status} editHref={preview.editHref} />}
   {
-    !item ? (
+    !found ? (
       <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
         <p class="text-base-content/70 font-serif text-2xl">This piece isn’t here.</p>
         <p class="text-base-content/45 mt-2 font-sans text-sm">
@@ -60,7 +109,9 @@ const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
           <Icon name="ph:caret-left" class="size-3.5" /> Back to the blog
         </a>
       </div>
-    ) : (
+    ) : quote ? (
+      <QuotePage page={quote} />
+    ) : item ? (
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
         <a
           href="/blog"
@@ -73,6 +124,6 @@ const description = item ? toPlainText(item.excerpt).slice(0, 200) : undefined;
           <PostArticle item={item} />
         </div>
       </div>
-    )
+    ) : null
   }
 </SiteLayout>

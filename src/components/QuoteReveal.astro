@@ -2,32 +2,27 @@
 /*
   QuoteReveal — "where did this come from?", on demand.
 
-  Chosen from the reveal-lab bench, 2026-08-05 (candidate B of four). THE ATTRIBUTION
-  ITSELF IS THE CONTROL: no glyph, no icon, nothing added to the line at all.
-  A dotted underline appears on hover and focus, and the citation opens in the
-  native top layer.
+  ⚠ THIS IS NOW A NAME, NOT A MECHANISM. Everything it used to own — the
+  trigger's register, the popover, the placement, the `[data-*-live]` gate —
+  moved into [Reveal](./Reveal.astro) when the quote page needed the same
+  control holding markup instead of one string (plan 32 · §4). What survives
+  here is the one thing that was ever quote-specific: **a citation is the
+  content, and an empty citation means no control at all.**
 
-  WHY B, and what it costs. The attribution is serif all-small-caps in muted
-  ink, and every other candidate added something to it — a raised ＋, a caret, a
-  footnote numeral. Each was defensible and each made the quietest line on the
-  site slightly louder, on a reading surface where that is the whole point. B
-  adds nothing, so it cannot compete with the words. **The price is
-  discoverability**: nothing announces that the line is interactive until the
-  pointer or the focus ring is already on it. That is a real cost and it was
-  accepted knowingly — the citation is an answer to a question most readers
-  never ask, and the ones who do ask reach for the attribution first anyway.
+  Kept rather than replaced at its ~15 call sites for a reason that is not
+  inertia: `reveal` is a DERIVED value (src/lib/provenance.ts), and a component
+  named for it is where a reader of QuoteCard or SuiteStanza looks to find that
+  out. `<Reveal text={...}>` at those sites would be correct and would say
+  nothing about where the string came from.
 
-  ⚠ NOTHING RENDERS WHEN THERE IS NOTHING BEHIND IT. `reveal` is empty for a
-  quote with no work and no locator — a person quoted plainly, an anonymous
-  line — and the slot then renders bare. A control that opens onto an empty box
-  teaches you to stop pressing it.
-
-  ⚠ THE LINE IS NOT DERIVED HERE. It arrives already rendered, from the
-  `attribution` column, and this component only adds the second half. The
-  derivation lives in src/lib/provenance.ts and runs at save time; `reveal` is
-  computed by the query (lib/blog.ts, lib/constellations.ts) so that both public
-  surfaces get the same string from one place.
+  ⚠ TWO BUGS WERE FIXED BY THE MOVE, both latent here for the whole life of this
+  component and both invisible at its own call sites — the popover was measured
+  while still `display: none`, so its right-edge clamp and its flip-above check
+  were reading 0×0 and doing nothing. They never showed because an attribution
+  sits at the left edge of the measure. Reveal's script has the account.
 */
+import Reveal from './Reveal.astro';
+
 interface Props {
   /** What the control opens onto. Empty → no control at all, just the slot. */
   reveal: string;
@@ -35,153 +30,6 @@ interface Props {
 const { reveal } = Astro.props;
 ---
 
-{
-  reveal ? (
-    <span class="qr" data-qr>
-      {/*
-        A real <button>, so it is tab-reachable and announces itself. Hover is
-        never the only way in — plan 19 found four separate a11y failures that
-        all began as hover-only affordances, and this control is invisible
-        until interacted with, which makes the keyboard path the only one some
-        readers will ever have.
-
-        `popovertarget` is wired in the script rather than here, via
-        `popoverTargetElement`, so no id has to be minted server-side and two
-        quotes can never collide. The button is inert until that runs — see the
-        `[data-qr-live]` gate in the styles, which is why the underline does
-        not appear before the script has paired them.
-      */}
-      <button type="button" class="qr__trigger" aria-label={`Where this came from: ${reveal}`}>
-        <slot />
-      </button>
-      <span class="qr__pop" popover="auto">
-        {reveal}
-      </span>
-    </span>
-  ) : (
-    <slot />
-  )
-}
-
-<style>
-  /* Component-scoped on purpose: src/styles/app.css is another track's file,
-     and a control this small has no business in the global sheet until a second
-     surface needs it. */
-  .qr {
-    position: relative;
-  }
-  .qr__trigger {
-    /* Inherit everything — the caller owns the register (serif all-small-caps,
-       muted ink), and this must not become a second place that decides it. */
-    font: inherit;
-    color: inherit;
-    letter-spacing: inherit;
-    font-variant: inherit;
-    background: none;
-    border: 0;
-    padding: 0;
-    text-align: inherit;
-    cursor: default;
-  }
-  /* Live only once the script has paired the button with its popover. Without
-     JS the citation cannot be positioned, so it must not advertise itself. */
-  .qr[data-qr-live] .qr__trigger {
-    cursor: pointer;
-    text-decoration: underline dotted transparent;
-    text-underline-offset: 4px;
-    text-decoration-thickness: from-font;
-    transition:
-      text-decoration-color 160ms ease,
-      color 160ms ease;
-  }
-  .qr[data-qr-live] .qr__trigger:hover,
-  .qr[data-qr-live] .qr__trigger:focus-visible {
-    text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
-  }
-  .qr[data-qr-live] .qr__trigger:focus-visible {
-    outline: 1px dotted currentColor;
-    outline-offset: 3px;
-    border-radius: 2px;
-  }
-  .qr[data-qr-live] .qr__trigger[aria-expanded='true'] {
-    text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
-    color: var(--color-primary);
-  }
-
-  .qr__pop {
-    position: fixed;
-    margin: 0;
-    inset: auto;
-    max-width: min(22rem, calc(100vw - 2rem));
-    padding: 0.55rem 0.8rem;
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-box);
-    background: var(--color-base-100);
-    box-shadow: 0 12px 32px -12px color-mix(in oklab, var(--color-base-content) 35%, transparent);
-    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
-    font-family: var(--font-serif);
-    font-size: 0.9rem;
-    font-variant: normal;
-    letter-spacing: 0.02em;
-    line-height: 1.35;
-  }
-  .qr__pop::backdrop {
-    background: transparent;
-  }
-  /* The site honours prefers-reduced-motion elsewhere; there is no motion here
-     to reduce, which is itself the reason this is a popover and not a slide. */
-</style>
-
-<script>
-  // One script for every instance on the page (Astro bundles a component's
-  // script once), so this pairs by walking the DOM rather than by id.
-  for (const host of document.querySelectorAll<HTMLElement>('[data-qr]')) {
-    const trigger = host.querySelector<HTMLButtonElement>('.qr__trigger');
-    const pop = host.querySelector<HTMLElement>('.qr__pop');
-    if (!trigger || !pop) continue;
-
-    // ⚠ `popoverTargetElement`, NOT a manual showPopover() on click. That was
-    // the bug the lab surfaced: an `auto` popover light-dismisses on any
-    // outside pointerdown, so clicking the trigger while it was open CLOSED it
-    // and then the handler REOPENED it — the control could be opened and never
-    // shut from the same spot. Handing the pairing to the browser fixes it
-    // properly: the spec exempts the invoker from light-dismiss and then
-    // toggles, so the same click that opened it closes it.
-    //
-    // The IDL property rather than the attribute, so no id has to be minted
-    // server-side and two quotes on one page can never collide.
-    trigger.popoverTargetElement = pop;
-    trigger.setAttribute('aria-expanded', 'false');
-    host.setAttribute('data-qr-live', '');
-
-    const place = () => {
-      const r = trigger.getBoundingClientRect();
-      const p = pop.getBoundingClientRect();
-      // ⚠ BELOW FIRST — a correction, not a default. The usual tooltip habit is
-      // to prefer above when there is room, and the reveal-lab bench showed why that is
-      // wrong here: the attribution sits directly beneath the quote, so "above"
-      // covers the words being read. Below opens into the gap before the next
-      // one. Above is the fallback, near the viewport floor.
-      const roomBelow = window.innerHeight - r.bottom > p.height + 16;
-      pop.style.left = `${Math.min(Math.max(8, r.left - 8), window.innerWidth - p.width - 8)}px`;
-      pop.style.top = roomBelow ? `${r.bottom + 8}px` : `${r.top - p.height - 8}px`;
-    };
-
-    // ⚠ `beforetoggle`, not `toggle`, for BOTH jobs. It fires synchronously with
-    // the state change, where `toggle` is queued — so the placement happens
-    // before the first paint (otherwise it flashes at 0,0) and `aria-expanded`
-    // is never briefly wrong. The lag was invisible by eye and showed up the
-    // moment a test read the attribute straight after a click.
-    pop.addEventListener('beforetoggle', (e) => {
-      const opening = (e as ToggleEvent).newState === 'open';
-      if (opening) place();
-      trigger.setAttribute('aria-expanded', String(opening));
-    });
-    // Scroll and resize move the anchor out from under a fixed-position box.
-    // Reposition rather than close: closing on scroll would make it impossible
-    // to read a long citation on a phone, where reading IS scrolling.
-    for (const ev of ['scroll', 'resize'] as const) {
-      window.addEventListener(ev, () => pop.matches(':popover-open') && place(), { passive: true });
-    }
-  }
-</script>
+<Reveal text={reveal} label={reveal ? `Where this came from: ${reveal}` : undefined}>
+  <slot />
+</Reveal>

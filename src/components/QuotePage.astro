@@ -1,0 +1,346 @@
+---
+/*
+  QuotePage — one quote, on its own page (plan 32 · §3).
+
+  THE WHOLE PAGE IS: the line, the attribution, a rule, and one strip. That is a
+  ruling, not a starting point. The bench opened with "Appears in" and "Along the
+  same lines" as stacked sections below the quote, and Michael ruled them out on
+  sight — *"long, extended sections at the bottom … causes visual clutter, mixes
+  in with all the other main UI elements, and creates confusion."* So everything
+  with depth opens a POPOVER from the strip and nothing unrolls down the page.
+
+  WHY THE PAGE EXISTS AT ALL, since a quote is two lines and a permalink for it
+  sounds like overkill — it did to Michael too, until: *"it can actually tell us
+  a lot about interconnected ideas … showing the constellations that something
+  is in is very valuable to understand the context of the thing."* The page is
+  therefore a DOOR, not a destination. A quote alone on a page is a dead end;
+  the recipient of a shared link reads two lines and leaves. Everything in the
+  strip exists to give them somewhere to go, which is also the reason the share
+  verb is a LINK rather than copied text:
+
+    "people going to the site and willing to share content from the site
+     generally want other people to also visit the site and see if there are
+     other unique perspectives that might be worth exploring."
+
+  ⚠ THE STRIP IS ONE DESIGN AT TWO WIDTHS, not two layouts.
+    below `sm`  two tiers — subjects and the date above, the ACTIONS on their own
+                row beneath. Five controls do not fit a 390px line, and squeezing
+                them there is how a strip becomes a toolbar.
+    `sm` and up one line — subjects left, everything else right.
+  Both were benched as rivals. They are the same layout; the second is what the
+  first does when it has room.
+
+  ⚠ NOTE THE BACKTICKS ABOVE, AND DO NOT "TIDY" THEM INTO `< sm`. A bare `<` in
+  a frontmatter comment silently breaks the Astro compiler's `Props` extraction:
+  `Astro.props` degrades to `any`, every destructured field with it, and the only
+  symptom is a scatter of ts(7006) "implicitly has an 'any' type" errors on
+  callback parameters TWO HUNDRED LINES BELOW, pointing nowhere near the cause.
+  It cost a bisect to find. src/tests/astro-props.test.ts guards every component.
+*/
+import Timestamp from './Timestamp.astro';
+import Reveal from './Reveal.astro';
+import StarBloom from './StarBloom.astro';
+import ShareMark from './ShareMark.astro';
+// Aliased: the type and this component share a name, and the shadow silently
+// widened `page` to `any` — every callback below lost its parameter types.
+import type { QuotePage as QuotePageData } from '../lib/quote-page';
+
+interface Props {
+  page: QuotePageData;
+}
+const { page } = Astro.props as Props;
+const { quote, constellations, related, relatedTotal, author } = page;
+
+// The type ramps DOWN as the line grows. A six-word aphorism at essay size looks
+// lost; a stanza at display size overruns the screen. Three steps, chosen
+// against the real corpus (30 → 843 characters, mean 189).
+const len = quote.body.length;
+const size =
+  len < 90
+    ? 'text-[2rem] sm:text-[2.6rem]'
+    : len < 320
+      ? 'text-[1.6rem] sm:text-[2rem]'
+      : 'text-[1.35rem] sm:text-[1.6rem]';
+
+// ⚠ The attribution is a control whenever there is ANYTHING behind it, which is
+// the change from the feed's rule. QuoteReveal renders nothing without a
+// citation — but there is now a second thing there: the rest of this author's
+// lines. Michael, 2026-08-10: *"that author's name is clickable regardless of
+// whether there's a citation or not."*
+//
+// ⚠ AND `others > 0` IS LOAD-BEARING. 29 of 35 authors in the corpus have
+// exactly one quote, so without it the door would, for 40% of quotes, open onto
+// a page containing only the quote you are already reading.
+const hasDoor = Boolean(author && author.others > 0);
+// PROPOSED FACET, built in §5 — filters on `author_id`, never on the attribution
+// string, which is a derived LINE (three published quotes carry one with no
+// author row behind it).
+const authorHref = author ? `/blog?view=quotes&author=${author.slug}` : null;
+
+const preview = (s: string, n = 96) => (s.length > n ? s.slice(0, n).trimEnd() + '…' : s);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+// Each star breathes on its own phase — synchronised pulsing reads as machinery.
+// Derived from the slug so it is stable across renders (index.astro's rule).
+const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
+
+// ⚠ NOT "see all N" — a different set, and it must not claim to be the same one.
+// `related` is ranked by how many subjects each fragment shares (an OR, scored);
+// this is the feed's subject filter, which STACKS (AND — `?subject=a,b`, see
+// blog/index.astro). So it lands on everything carrying this quote's WHOLE
+// signature: a stricter kind of kin, not a longer version of the list. Naming
+// the subjects says that out loud and costs nothing.
+const allSubjectsHref =
+  quote.subjects.length > 0 ? `/blog?view=quotes&subject=${quote.subjects.map((s) => s.slug).join(',')}` : null;
+---
+
+<main class="px-6 pb-24">
+  <section class="mx-auto flex min-h-[76vh] max-w-3xl flex-col justify-center">
+    <figure>
+      <blockquote class:list={['text-base-content font-serif leading-[1.42] font-light whitespace-pre-line', size]}>
+        {quote.body}
+      </blockquote>
+
+      {
+        quote.attribution && (
+          <figcaption class="text-base-content/50 mt-6 font-serif text-[1.15rem] tracking-[0.06em] [font-variant:all-small-caps]">
+            {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
+                name, and underlining it on hover reads as a typo. (QuoteCard
+                makes the same point in the same words.) */}
+            {'— '}
+            {quote.reveal || hasDoor ? (
+              <Reveal label={`About ${quote.attribution}`}>
+                {quote.attribution}
+                <Fragment slot="content">
+                  {quote.reveal && <span class="qp-cite">{quote.reveal}</span>}
+                  {hasDoor && authorHref && (
+                    <a href={authorHref} class:list={['qp-door', quote.reveal && 'qp-door--ruled']}>
+                      {plural(author!.others, 'more line', 'more lines')} from {author!.name}
+                      <span class="qp-door__arrow">→</span>
+                    </a>
+                  )}
+                </Fragment>
+              </Reveal>
+            ) : (
+              quote.attribution
+            )}
+          </figcaption>
+        )
+      }
+    </figure>
+
+    {
+      /*
+      ⚠ THE SHARE MARK IS NOT IN THIS FLOW, and that is the point of `relative`
+      here. Everything else in the strip is a FACT ABOUT THE QUOTE — its
+      subjects, its constellations, its kin, when it arrived. Share is the only
+      ACTION, and while it sat at the end of the same wrapping row it inherited
+      that row's behaviour: it moved when the row rewrapped, sat beside "5
+      related lines" as though it were a fifth fact, and landed somewhere
+      different on a quote with two subjects than on one with four. Michael:
+      *"it kind of just oddly sits to the right, especially when it gets to 2
+      lines since it moves with the related stuff … I want it to be grounded
+      somewhere."* A control with no fixed address is one the reader has to find
+      again every time.
+
+      So it comes out of the flow and onto the RULE — the one element here that
+      is the same length in the same place on every quote at every width. See
+      ShareMark for why the line breaks around it.
+
+      ⚠ THE DATE RENDERS TWICE, sm:hidden / hidden sm:inline. It changes GROUP
+      between the two widths (metadata above, actions row beside) and no single
+      DOM position gives both. Duplicating one <time> is cheaper than a grid
+      whose areas re-flow, and it is why the two tiers can be pure flex-wrap
+      with no ordering tricks.
+    */
+    }
+    <div
+      class="border-base-content/10 text-base-content/40 relative mt-12 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-5 pr-12 font-sans text-sm sm:pr-14"
+    >
+      <ShareMark url={`/blog/${quote.slug}`} label="Share this quote" onRule />
+
+      {
+        quote.subjects.length > 0 && (
+          <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            {quote.subjects.map((s) => (
+              <li>
+                <a href={`/blog?view=quotes&subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
+                  {s.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      {/* mobile tier 1, right end */}
+      <span class="ml-auto text-xs sm:hidden">
+        <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
+      </span>
+
+      {/* the actions — their own row below `sm`, right-aligned at `sm` */}
+      <div class="flex w-full items-center gap-x-4 gap-y-2 sm:ml-auto sm:w-auto">
+        {
+          constellations.length > 0 && (
+            <Reveal wide label={`Appears in ${plural(constellations.length, 'constellation', 'constellations')}`}>
+              <span class="qp-ctl">{plural(constellations.length, 'constellation', 'constellations')}</span>
+              <Fragment slot="content">
+                <p class="qp-label">Appears in</p>
+                <ul class="qp-list">
+                  {constellations.map((c) => (
+                    <li>
+                      {/* The Sky's own vocabulary at popover scale — `cn-<slot>`
+                          hands the row its colour, `.sky-star` breathes and
+                          glows, `.sky-name` carries a TRACE of that colour at
+                          rest and comes to full on attention, and StarBloom
+                          parts on `.group:hover`. Every one of those is an
+                          existing class (admin.css, which app.css imports):
+                          nothing is redrawn for this surface, so the mark blooms
+                          here exactly as it does on the front page.
+
+                          ⚠ THE BLOOM IS HOVER-ONLY HERE, a deliberate departure
+                          from the overview where hover-only was the bug ADR-0022
+                          fixed. The overview had to ANNOUNCE that its names were
+                          links to a reader who had not touched anything. This
+                          list is already inside a popover the reader chose to
+                          open — the affordance was established by the act of
+                          opening it, so a proximity tracker in here would be
+                          motion with nothing left to say. */}
+                      <a href={`/${c.slug}`} class:list={['qp-row group', `cn-${c.color}`]}>
+                        <span class="qp-row__head">
+                          <span class="sky-star text-sm" style={`--glow: .72; --phase: ${phaseOf(c.slug)}`}>
+                            <StarBloom />
+                          </span>
+                          <span class="sky-name qp-row__name">{c.name}</span>
+                        </span>
+                        {c.description && <span class="qp-row__sub qp-row__sub--indent">{c.description}</span>}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </Fragment>
+            </Reveal>
+          )
+        }
+
+        {
+          related.length > 0 && (
+            <Reveal wide label={`${plural(relatedTotal, 'related line', 'related lines')}`}>
+              <span class="qp-ctl">{plural(relatedTotal, 'related line', 'related lines')}</span>
+              <Fragment slot="content">
+                <p class="qp-label">Along the same lines</p>
+                <ul class="qp-list">
+                  {related.map((r) => (
+                    <li>
+                      <a href={`/blog/${r.slug}`} class="qp-row">
+                        <span class="qp-row__title">{r.type === 'writing' ? r.title : preview(r.body)}</span>
+                        <span class="qp-row__sub">
+                          {r.type === 'writing' ? 'an essay' : (r.attribution ?? 'unattributed')}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                {allSubjectsHref && (
+                  <a href={allSubjectsHref} class="qp-door qp-door--ruled">
+                    More on {quote.subjects.map((s) => s.name).join(' · ')}
+                    <span class="qp-door__arrow">→</span>
+                  </a>
+                )}
+              </Fragment>
+            </Reveal>
+          )
+        }
+
+        <span class="hidden sm:inline">
+          <Timestamp date={quote.occurredAt} kind="added" precision={quote.precision} prefix="Added" />
+        </span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<style is:global>
+  /* The strip's controls are sans, where Reveal's default register is the
+     caller's — an attribution is serif small-caps and these are chrome. */
+  .qp-ctl {
+    font-family: var(--font-sans, ui-sans-serif);
+  }
+
+  .qp-cite {
+    display: block;
+  }
+  .qp-door {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    color: color-mix(in oklab, var(--color-base-content) 85%, transparent);
+    transition: color 160ms ease;
+  }
+  .qp-door:hover {
+    color: var(--color-primary);
+  }
+  .qp-door--ruled {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+  }
+  .qp-door__arrow {
+    opacity: 0.5;
+  }
+
+  .qp-label {
+    font-family: var(--font-sans, ui-sans-serif);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+    margin-bottom: 0.6rem;
+  }
+  .qp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .qp-row {
+    display: block;
+  }
+  .qp-row__head {
+    display: flex;
+    align-items: baseline;
+  }
+  /* ⚠ LAYOUT ONLY — `.sky-name` owns a constellation row's ink and this must not
+     become a second opinion about it. */
+  .qp-row__name {
+    font-family: var(--font-display, var(--font-serif));
+    font-size: 1.02rem;
+    font-weight: 300;
+    line-height: 1.3;
+  }
+  .qp-row__title {
+    display: block;
+    color: color-mix(in oklab, var(--color-base-content) 85%, transparent);
+    line-height: 1.4;
+    transition: color 160ms ease;
+  }
+  .qp-row:hover .qp-row__title {
+    color: var(--color-primary);
+  }
+  .qp-row__sub {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+    font-variant: all-small-caps;
+    letter-spacing: 0.06em;
+  }
+  /* Aligns a description under the NAME rather than under the star, the way the
+     overview's `ml-6` does. The number is the star's own reserved width: a 1em
+     mark at .875rem plus StarBloom's 0.85em of companion room on each side. */
+  .qp-row__sub--indent {
+    margin-left: calc(0.875rem * 2.7);
+    font-variant: normal;
+    letter-spacing: 0.01em;
+    font-size: 0.8rem;
+  }
+</style>

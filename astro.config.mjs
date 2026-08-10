@@ -29,6 +29,12 @@ export default defineConfig({
           'clock-light',
           'magnifying-glass',
           'x',
+          // The share mark (components/ShareMark.astro). ⚠ Chosen over
+          // `ph:export`, whose tray is the idiom most readers are trained to
+          // read as *share* — this one's dominant convention is "opens
+          // elsewhere". Picked knowingly: the link does leave for somewhere
+          // else, and the tooltip and aria-label carry the verb.
+          'arrow-square-out',
           'caret-down',
           'caret-left',
           'caret-right',

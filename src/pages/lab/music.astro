@@ -1,0 +1,749 @@
+---
+/*
+  /lab/music — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  THE QUESTION, narrowed 2026-08-10: **the palette is the room — now does it
+  hold up with the music actually in it?** Michael, after driving A/B/C:
+  "Option B is a clear winner here. Can we orient the lab around that only?"
+
+  A (the /blog rail, re-pointed) and C (songs shelved by where their arc landed)
+  were deleted the same day rather than kept as controls. The rule the 2026-08-10
+  sweep set is that a bench is legitimate while its question is live, and "which
+  of three shapes" stopped being live the moment it was answered. What A was —
+  stacking AND filters with contextual counts and dead ends disabled — survives
+  underneath this page, because B was never a different query, only a different
+  act. See `git log -- src/pages/lab/music.astro` for the losers.
+
+  ⚠ DIRECTION IS GONE, and this is a claim about jazz rather than about UI.
+  C rendered a song as an ordered arc (`regretful → redemptive`) on the theory
+  that a sequence is an object. Michael killed it on sight: "many songs go back
+  and forth (since most jazz songs have heads anyway)". A head-solos-head form
+  RETURNS to where it started, so an ordered list of feelings describes a shape
+  the music does not have — and worse, it would cost real authoring time to
+  record something false. A song's feelings are a SET. What looked like the most
+  distinctive idea here was the first thing the material refused.
+
+  ⚠ THE WORDS ARE SIZED BY COUNT, which overrules the argument this file made
+  yesterday. The first draft kept the field EVEN at rest, reasoning that sizing
+  by frequency "would make the library's accidents look like the vocabulary's
+  shape". Michael, 2026-08-10: "can we make the words different sizes based on
+  how many songs match? and better yet, make it dynamic as the filters change?"
+  He is right, and the earlier argument had the cost backwards: an even field
+  hides that some feelings are rare, and rarity is the most interesting thing a
+  spectrum can tell you about the person who built it. The field now collapses
+  visibly toward what is still reachable as you choose.
+
+  ⚠ EVERY FEELING BELOW IS INVENTED. Titles, artists and Spotify/YouTube URLs
+  are real — 48 rows from the live corpus, so the players actually play and long
+  jazz titles stress the layout for real. THE FEELINGS ATTACHED TO THEM ARE
+  MINE, NOT MICHAEL'S. Nothing here is a reading of a song. That is also why the
+  PROD gate on the first line of the body is not optional: /reading shipped a
+  fabricated essay one route from the real one, un-gated and indexable, and no
+  search engine could tell which was the writing.
+
+  ⚠ NO DATABASE WORK WAS DONE FOR THIS. No migration, no tables, no schema
+  opinion. The fixture is hardcoded and the whole bench is one deletable file.
+
+  ⚠ IFRAMES ARE CREATED ONCE AND NEVER DESTROYED. Every card is rendered
+  server-side but its player is a placeholder until the card is first revealed;
+  after that the iframe stays in the DOM and the card is hidden with `display`,
+  not removed. This is not an optimisation — a re-render on every filter change
+  would RESTART whatever is playing, and a room you cannot narrow without
+  killing the music is not the room. It also means a page-load costs zero
+  third-party frames, the same property `PostArticle` gets from <template>.
+
+  WHAT TO JUDGE:
+    1. The field at rest. Sizes are total matches, so this is the shape of the
+       spectrum. Does the big/small distribution read as true, or as noise?
+    2. Pick one word, then a second. Watch the field collapse. The transition
+       is 380ms on font-size and opacity — too slow and it feels sedated, too
+       fast and the collapse is invisible. That number is a guess; tune it.
+    3. Start a track, then change the selection while it plays. The player must
+       survive as long as its song stays in the set.
+    4. A song's own words are filters. Click one from inside a result and judge
+       whether "more like this" is the move you actually reach for.
+    5. `corpus: 12` — the room at the size it will ACTUALLY open at.
+    6. THE THING UNCONTAINERISING REVEALED, and it only shows at full bleed:
+       at rest on a 1280×1000 desktop the field occupies the top third and the
+       remaining two thirds are empty. Inside the old bordered card that read as
+       composed; on a real page it reads as unfinished. On a 390px phone the
+       same field fills the screen and is the better view of the two. So the
+       desktop rest state wants something — vertical centring until a word is
+       chosen, a larger type ramp, or an admission that the room should open
+       with something in it. Deliberately NOT fixed here: it is the first real
+       design question this bench produced, and it is Michael's to answer.
+
+  ⚠ AND THAT CHOICE HAS A BILL, measured here 2026-08-10: frames ACCUMULATE.
+  Browse a while and clear, and 33 Spotify iframes are still mounted and hidden
+  — never recreated, but never released either. Fine for a bench and fine for a
+  reader who picks two words; not fine for a long session. The fix is not to
+  unmount on hide (that is the bug this avoids) but to release frames that have
+  been hidden a while AND are not the one playing, which needs Spotify's iFrame
+  API to know what "playing" means. Out of scope until the shape is settled.
+  (Spotify's own frame also logs `compute-pressure is not allowed` — its
+  request, not ours, and not worth widening `allow` in src/lib/media.ts for.)
+
+  WHAT THIS BENCH STILL CANNOT ANSWER:
+    • Whether the vocabulary is the right sixteen. Discovered by tagging, not
+      by drafting.
+    • Whether tagging is affordable — 1,000 songs at 7 minutes is ~117 hours,
+      and if a song costs more than its own length to tag, the room never gets
+      stocked. That is the next bench, and it is the one that decides this.
+*/
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { embedForUrl } from '../../lib/media';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+/* The vocabulary, ORDERED DARK → LIGHT rather than alphabetically. Nine words
+   are Michael's own (2026-08-10: redemptive, compassionate, regretful, tense,
+   melancholic, reminiscent, hopeful, ecstatic, courageous); seven are mine,
+   filling gaps rather than shading meanings that already exist — near-synonyms
+   are the drift that kills a taxonomy, so `wistful` and `reminiscent` are
+   deliberately not both here. Sixteen is a guess at the size that stays
+   navigable; the 21-subject taxonomy is the precedent. */
+const VOCABULARY = [
+  'grieving',
+  'regretful',
+  'melancholic',
+  'reminiscent',
+  'yearning',
+  'searching',
+  'restless',
+  'tense',
+  'defiant',
+  'courageous',
+  'tender',
+  'compassionate',
+  'hopeful',
+  'redemptive',
+  'resolved',
+  'ecstatic',
+] as const;
+
+/* Real title, artist and URL; INVENTED feelings. A SET, not a sequence — the
+   words are written in the vocabulary's dark→light order rather than any
+   claimed order of arrival, precisely so nobody reads a shape into them. */
+const FIXTURE: [title: string, artist: string, feelings: string, url: string][] = [
+  [
+    'Tigran Hamasyan Quintet - VARDAVAR (Montreux Jazz Fest. 2014)',
+    'Mr. Gasparyan',
+    'searching restless ecstatic resolved',
+    'https://www.youtube.com/watch?v=gzFAR6aN20g',
+  ],
+  [
+    "Mark Guiliana's Beat Music: Public Interest",
+    'Rockwood Music Hall',
+    'restless defiant ecstatic',
+    'https://www.youtube.com/watch?v=_qsjJu53ghc',
+  ],
+  [
+    'Towards the Centre of Everything',
+    'Sam Crowe Group, Adam Waldmann, Alan Hampton, Emilia Martensson, Mark Guiliana, Will Davies, Will Vinson',
+    'yearning searching resolved',
+    'https://open.spotify.com/track/0P8TLSFHUBnZAhhJsJFuHc',
+  ],
+  [
+    'Ben Wendel Seasons Band // July',
+    'Ben Wendel - Saxophonist / Composer',
+    'reminiscent tender hopeful',
+    'https://www.youtube.com/watch?v=IXQN1mv6CtI',
+  ],
+  [
+    'Song for Looking in the Mirror',
+    'Mark Guiliana',
+    'regretful searching compassionate resolved',
+    'https://open.spotify.com/track/6Rj0tAPRLKzOCh7jl7AT0B',
+  ],
+  [
+    'Human Nature (Trio Extension)',
+    'Vijay Iyer Trio',
+    'reminiscent restless tender ecstatic',
+    'https://open.spotify.com/track/1aj5pTKPit19Rmmby4BfmC',
+  ],
+  [
+    'the most important question',
+    'Mark Guiliana',
+    'searching tense hopeful',
+    'https://open.spotify.com/track/3bTSZP6IwbBe8yhSbJSkDN',
+  ],
+  [
+    'Escape From The Underplay',
+    'Suwon Yim',
+    'restless defiant ecstatic',
+    'https://open.spotify.com/album/3INiRYxzmmq04CYPbx5v6H',
+  ],
+  [
+    'Gold Prisms Incorporated',
+    'The Bad Plus',
+    'restless tense ecstatic',
+    'https://open.spotify.com/track/1PoJanvces1oPEL2cWfu32',
+  ],
+  [
+    'Wounds Let in the Light',
+    'Kneebody, Becca Stevens',
+    'grieving tender redemptive',
+    'https://open.spotify.com/track/7uA5nmMfBArT2Er6bmMqLM',
+  ],
+  [
+    'Anthem for the Earnest',
+    'The Bad Plus',
+    'yearning courageous hopeful resolved',
+    'https://open.spotify.com/track/2HRqfB4IgXhMjW5zp3F82W',
+  ],
+  [
+    'In The Sky: Expansion',
+    'Greg Spero',
+    'searching hopeful ecstatic',
+    'https://open.spotify.com/track/5rF88vvIzQj97U59yXrqXM',
+  ],
+  [
+    'Lines of Oppression',
+    'Ari Hoenig',
+    'restless tense defiant',
+    'https://open.spotify.com/track/5QOtjJnT0wOTOJmOYBBr9o',
+  ],
+  [
+    "What She Didn't Say",
+    'Bob Reynolds',
+    'regretful melancholic tender',
+    'https://open.spotify.com/track/5MT3qDCvmiUv4zLhxYfcHk',
+  ],
+  [
+    'The Black and White',
+    'The Band CAMINO',
+    'yearning restless hopeful',
+    'https://open.spotify.com/track/6KtCRh78Hl0bgWvkruPNcs',
+  ],
+  ['Like Only You Can', 'Secret Nation', 'tender hopeful', 'https://open.spotify.com/track/3a37Zt2A8bbNucvdV8BTSB'],
+  [
+    'The Arrow of Time',
+    'Sam Crowe Group, Adam Waldmann, Alan Hampton, Emilia Martensson, Mark Guiliana, Will Davies, Will Vinson',
+    'melancholic reminiscent searching resolved',
+    'https://open.spotify.com/track/0XdqXXnDkVW9s71EV5V8KA',
+  ],
+  [
+    'Waterfall Dreams',
+    'George Colligan, Linda May Han Oh, Rudy Royston, Nicole Glover',
+    'reminiscent tender hopeful',
+    'https://open.spotify.com/track/45lurgt3aJmyxCS8dAKXI1',
+  ],
+  [
+    'Parallel Worlds',
+    'Janek Gwizdala',
+    'searching restless resolved',
+    'https://open.spotify.com/track/794mx29oRjySDkRpJqo7qX',
+  ],
+  [
+    'Pound For Pound',
+    'The Bad Plus',
+    'tense defiant ecstatic',
+    'https://open.spotify.com/track/45dgCGbXwGIBXOUcmOn42R',
+  ],
+  [
+    'Digital Society',
+    'Aaron Parks',
+    'searching restless tense',
+    'https://open.spotify.com/track/1dlxCxinnjsT3pSRXjEGZN',
+  ],
+  [
+    'What Happened?',
+    'Janek Gwizdala, Alex Gunia, Morgan Agren',
+    'regretful tense defiant',
+    'https://open.spotify.com/track/5xUGmhc6gSVMM9pLLuzYtT',
+  ],
+  [
+    'Motivations II',
+    'The Bad Plus',
+    'restless courageous ecstatic',
+    'https://open.spotify.com/track/4tkwa03etGfqoo2ncjNRih',
+  ],
+  ['Second Nature', 'Rush', 'reminiscent courageous resolved', 'https://open.spotify.com/track/6052jtfgpaXiVlHLUnoFFm'],
+  [
+    'Last Birthday',
+    'Valley',
+    'melancholic reminiscent tender',
+    'https://open.spotify.com/track/697MdxMbVWn1Ajbw8iaPv5',
+  ],
+  [
+    'Lost Machines',
+    'Sleeperstar',
+    'grieving yearning hopeful',
+    'https://open.spotify.com/track/1aDgqijUhH0JU3BbNT36O2',
+  ],
+  [
+    'The Struggle',
+    'Tenth Avenue North',
+    'grieving regretful redemptive resolved',
+    'https://open.spotify.com/track/53qbVEte9KmA50WLeUWHK0',
+  ],
+  [
+    'Lost Of Love',
+    'The Bad Plus',
+    'grieving melancholic tender',
+    'https://open.spotify.com/track/2Q72uWT7sLgU5TnAv4ULcE',
+  ],
+  [
+    'Breathe Out',
+    'Emil Brandqvist Trio, Sjoströmska String Quartet',
+    'melancholic tender resolved',
+    'https://open.spotify.com/track/6SPqLoND2nIPddFg3Qf0ZA',
+  ],
+  ['Prime Mover', 'Rush', 'restless defiant courageous', 'https://open.spotify.com/track/2SBKGHPQmo65mz9MxV30Fr'],
+  ['Black Sails', 'Mammal Hands', 'searching tense ecstatic', 'https://open.spotify.com/track/7pPadvTTIIaxSviKwnFSbZ'],
+  ['Shapeless', 'St. Barbe', 'melancholic yearning searching', 'https://open.spotify.com/track/3cDXvuYQyjPWAebDGebK3m'],
+  [
+    'Saturnine',
+    'GoGo Penguin',
+    'melancholic restless resolved',
+    'https://open.spotify.com/track/4QkOc5MFpxpQxcRBrAkxTz',
+  ],
+  ['One Time', 'Bill Laurance', 'reminiscent tender hopeful', 'https://open.spotify.com/track/5GW5Hs89Tc841zW4IMmmew'],
+  ['Two Bars', 'Janek Gwizdala', 'restless ecstatic', 'https://open.spotify.com/track/3TQP4A34wtzIJxo4NDRuup'],
+  ['You Are', 'The Bad Plus', 'yearning tender compassionate', 'https://open.spotify.com/track/4jGIDJ4flSJlovfAxBt137'],
+  ['Stumble', 'Gilad Hekselman', 'searching restless hopeful', 'https://open.spotify.com/track/55OpdXuR7Z4T4qQ0Rs6tkZ'],
+  [
+    'All Res',
+    'GoGo Penguin',
+    'restless tense resolved ecstatic',
+    'https://open.spotify.com/track/1hO7OwvPgWfLPYj4XasMYk',
+  ],
+  [
+    'No Deal',
+    'Melanie De Biasio',
+    'melancholic yearning defiant',
+    'https://open.spotify.com/track/4OScziNxO57biZpPhsYPVg',
+  ],
+  [
+    'Mantra',
+    'Makaya McCraven, Brandee Younger, Tomeka Reid, Dezron Douglas, Joel Ross',
+    'searching tender resolved',
+    'https://open.spotify.com/track/4EYx2QQoBTwMEzl5Tpfljx',
+  ],
+  ['Lymaks', 'FORQ', 'restless tense ecstatic', 'https://open.spotify.com/track/4PDkuoOoxFGfYtzpMYIIdz'],
+  [
+    'Deluge',
+    'Ari Hoenig, Gadi Lehavi, Ben Tiberio',
+    'restless tense defiant ecstatic',
+    'https://open.spotify.com/track/2EK5lHlBYrkddT2anAWTzp',
+  ],
+  [
+    'Creep',
+    'Bob Reynolds',
+    'regretful melancholic yearning redemptive',
+    'https://open.spotify.com/track/0Bx9T65ZsexNuiLSbBav9p',
+  ],
+  ['Stria', 'Donny McCaslin', 'searching tense ecstatic', 'https://open.spotify.com/track/4V64e7FhvsAKolwTn5F3vR'],
+  [
+    'Felt',
+    'Ambient Jazz Ensemble',
+    'melancholic tender resolved',
+    'https://open.spotify.com/track/4OBql2H37SOAq7ZA5Ilvre',
+  ],
+  [
+    'Dusk',
+    'Janek Gwizdala, Alex Gunia, Morgan Agren',
+    'melancholic reminiscent resolved',
+    'https://open.spotify.com/track/6kToRxeCpoBA6RquJV5Fkr',
+  ],
+  [
+    'Hush',
+    'Bob Reynolds',
+    'reminiscent tender compassionate resolved',
+    'https://open.spotify.com/track/1ZNRJry28A7EsSgoMpW49Z',
+  ],
+  [
+    'Sun',
+    'Sleeping At Last',
+    'yearning hopeful redemptive resolved',
+    'https://open.spotify.com/track/4VRml1BGkDaZWPmG6zxlIE',
+  ],
+];
+
+/* `embedForUrl` is the SAME function the published essay uses (src/lib/media.ts)
+   — not a lab reimplementation. If a URL stops embedding here it stops
+   embedding on /blog too, which is the only way a bench is worth trusting. */
+const SONGS = FIXTURE.map(([title, artist, feelings, url], i) => {
+  const embed = embedForUrl(url);
+  return {
+    i,
+    title,
+    artist,
+    url,
+    feelings: feelings.split(' '),
+    embedSrc: embed?.src ?? null,
+    embedHeight: embed?.height ?? null,
+    embedAllow: embed?.allow ?? '',
+  };
+});
+
+const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all-small-caps]';
+---
+
+{
+  /* SiteLayout, not Base — the room is rendered AS IT WOULD ACTUALLY SHIP, in
+    the real chrome, at the real width, with no bordered box around it. Michael,
+    2026-08-10: "can we actually render the page as it would be in reality? not
+    containerized like this." A bench inside a card flatters itself: the card
+    supplies edges the real page does not have, so whitespace that reads as
+    composed at 900px inside a border reads as abandoned at full bleed. The
+    bench controls are exiled to one corner widget below.
+
+    `backToTop={false}` because SiteLayout's own rule is one quiet corner
+    control at a time, and here that corner is the bench strip. */
+}
+<SiteLayout title="Music" active="blog" backToTop={false}>
+  <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
+    {
+      /* The real /blog axis, reproduced rather than approximated — Music is the
+        third tab, live here and still "soon" in production. */
+    }
+    <h1 class="sr-only">Music</h1>
+    <nav class="border-base-300 mb-16 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
+      <a
+        href="/blog"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light transition-colors sm:text-3xl"
+        >Writing</a
+      >
+      <a
+        href="/blog?view=quotes"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light transition-colors sm:text-3xl"
+        >Quotes</a
+      >
+      <span
+        aria-current="page"
+        class="font-display border-primary text-base-content -mb-px border-b-2 pb-3 text-2xl leading-none font-light sm:text-3xl"
+        >Music</span
+      >
+    </nav>
+
+    <p id="b-prompt" class="text-base-content/45 mb-14 text-center font-serif text-[1.05rem] italic">
+      How does it feel? Choose one, or a few.
+    </p>
+
+    {
+      /* Rendered server-side and NEVER re-rendered — the JS mutates font-size,
+        opacity and colour in place, because innerHTML on every click would kill
+        the transition it is meant to animate. */
+    }
+    <div id="b-field" class="mx-auto flex max-w-3xl flex-wrap items-baseline justify-center gap-x-7 gap-y-4">
+      {
+        VOCABULARY.map((w) => (
+          <button
+            type="button"
+            data-word={w}
+            class="pal-word font-display leading-none font-light"
+            style="font-size:1.6rem"
+          >
+            {w}
+          </button>
+        ))
+      }
+    </div>
+
+    <div id="b-results" class="mt-20">
+      <p id="b-count" class="text-base-content/30 mb-10 text-center font-sans text-xs tracking-wide uppercase"></p>
+      {
+        /* ⚠ NO TITLE, NO ARTIST — the same call as the essay's paired player
+          (docs/admin.md §6a, 2026-08-10): the embed prints the track, the
+          artist and the artwork in larger type than ours, so a line above it
+          says the same thing twice and says it smaller. What we know that the
+          player doesn't is the FEELING, and that is the only line here.
+
+          It sits BELOW the player, not above. Above, it reads as a label
+          telling you what to hear before you hear it — which is the
+          over-explaining Michael ruled out. Below, it reads as the response
+          the music left behind, which is what it actually is. The real title
+          survives on the iframe's accessible name for screen readers. */
+      }
+      <ul id="b-list" class="grid gap-x-8 gap-y-14 md:grid-cols-2">
+        {
+          SONGS.map((s) => (
+            <li class="song-card is-out" data-song={s.i} data-feelings={s.feelings.join(' ')} hidden>
+              <div
+                data-embed
+                data-src={s.embedSrc}
+                data-height={s.embedHeight === null ? 'video' : String(s.embedHeight)}
+                data-allow={s.embedAllow}
+                data-title={`${s.title} — ${s.artist}`}
+              />
+              <p class="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {s.feelings.map((f) => (
+                  <button
+                    type="button"
+                    data-word={f}
+                    class={`song-word text-base-content/45 hover:text-base-content/80 transition-colors ${SMALLCAPS}`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+      <div id="b-empty" class="hidden text-center"></div>
+    </div>
+  </div>
+
+  {
+    /* ─────  THE BENCH, kept out of the room  ─────
+      Everything that would not ship lives here: the corpus/match switches and
+      the invented-data warning. Collapsed to a single chip so the page above
+      can be judged as a page. */
+  }
+  <details
+    class="border-base-300 bg-base-100/90 fixed bottom-4 left-4 z-50 rounded-lg border font-sans text-xs shadow-lg backdrop-blur"
+  >
+    <summary class="text-base-content/50 cursor-pointer list-none px-3 py-2 tracking-wide uppercase select-none"
+      >bench</summary
+    >
+    <div class="border-base-300 flex flex-col gap-2 border-t px-3 py-3">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <button type="button" id="t-corpus" class="btn btn-xs normal-case">corpus: 48</button>
+        <button type="button" id="t-match" class="btn btn-ghost btn-xs normal-case">match: all</button>
+        <button type="button" id="t-clear" class="btn btn-ghost btn-xs normal-case">clear</button>
+      </div>
+      <p class="text-warning max-w-[15rem] leading-relaxed">
+        ⚠ Players are real. Every feeling is invented placeholder data — not Michael's readings.
+      </p>
+      <p class="text-base-content/35 max-w-[15rem] leading-relaxed">
+        Players survive a filter change: start one, then narrow.
+      </p>
+    </div>
+  </details>
+
+  <style>
+    /* 380ms is a guess, and it is the number most worth arguing about: faster
+       and the collapse is over before you have seen which words left, slower
+       and choosing a second word feels like waiting. The easing is weighted to
+       settle rather than arrive. */
+    .pal-word {
+      transition:
+        font-size 380ms cubic-bezier(0.2, 0.7, 0.3, 1),
+        opacity 380ms ease,
+        color 240ms ease;
+      color: var(--color-base-content);
+    }
+    .pal-word:not(.is-on):not(:disabled):hover {
+      opacity: 1 !important;
+    }
+    .pal-word.is-on {
+      color: var(--color-primary);
+    }
+    .pal-word:disabled {
+      cursor: not-allowed;
+    }
+
+    .song-card {
+      transition:
+        opacity 300ms ease,
+        transform 300ms ease;
+    }
+    .song-card.is-out {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .song-word.is-on {
+      color: var(--color-primary);
+    }
+  </style>
+
+  <script>
+    /*
+      One selection, one query, three things to keep in sync: the field's sizes,
+      the cards' visibility, and the empty state. Nothing is ever re-rendered —
+      see the header on why iframes may not be recreated.
+    */
+    const field = document.getElementById('b-field')!;
+    const list = document.getElementById('b-list')!;
+    const prompt = document.getElementById('b-prompt')!;
+    const countEl = document.getElementById('b-count')!;
+    const emptyEl = document.getElementById('b-empty')!;
+
+    const words = [...field.querySelectorAll<HTMLButtonElement>('.pal-word')];
+    const cards = [...list.querySelectorAll<HTMLLIElement>('.song-card')];
+    const featureOf = new Map(cards.map((c) => [c, new Set(c.dataset.feelings!.split(' '))]));
+
+    const selection = new Set<string>();
+    let matchAll = true;
+    const CORPUS_SIZES = [48, 12];
+    let corpusIdx = 0;
+    const hideTimers = new WeakMap<HTMLElement, number>();
+
+    const eligible = () => cards.slice(0, CORPUS_SIZES[corpusIdx]);
+
+    const holds = (card: HTMLLIElement, wordList: string[]): boolean => {
+      if (!wordList.length) return true;
+      const has = featureOf.get(card)!;
+      return matchAll ? wordList.every((w) => has.has(w)) : wordList.some((w) => has.has(w));
+    };
+
+    const countFor = (extra?: string): number => {
+      const wordList = extra ? [...selection, extra] : [...selection];
+      return eligible().filter((c) => holds(c, wordList)).length;
+    };
+
+    /* Size is a POWER curve, not linear: counts run 1..48 and a linear map
+       leaves the whole middle of the vocabulary looking identical. 0.6 keeps
+       the rare words legible instead of vanishing. */
+    const MIN_REM = 1.05;
+    const MAX_REM = 2.75;
+    const sizeFor = (n: number, max: number): string => {
+      if (n <= 0) return `${MIN_REM}rem`;
+      const t = Math.pow(n / Math.max(max, 1), 0.6);
+      return `${(MIN_REM + (MAX_REM - MIN_REM) * t).toFixed(3)}rem`;
+    };
+
+    const show = (card: HTMLLIElement) => {
+      const t = hideTimers.get(card);
+      if (t) {
+        clearTimeout(t);
+        hideTimers.delete(card);
+      }
+      if (!card.hidden && !card.classList.contains('is-out')) return;
+      mountEmbed(card);
+      card.hidden = false;
+      // Force a reflow so the transition runs from the hidden state rather than
+      // being collapsed into the same frame as `display`.
+      void card.offsetHeight;
+      card.classList.remove('is-out');
+    };
+
+    const hide = (card: HTMLLIElement) => {
+      if (card.hidden) return;
+      if (card.classList.contains('is-out')) return;
+      card.classList.add('is-out');
+      hideTimers.set(
+        card,
+        window.setTimeout(() => {
+          card.hidden = true;
+          hideTimers.delete(card);
+        }, 310),
+      );
+    };
+
+    /* The player is built on first reveal and then left alone forever. */
+    const mountEmbed = (card: HTMLLIElement) => {
+      const slot = card.querySelector<HTMLElement>('[data-embed]');
+      if (!slot || slot.dataset.mounted === '1') return;
+      const src = slot.dataset.src;
+      if (!src) return;
+      slot.dataset.mounted = '1';
+      const iframe = document.createElement('iframe');
+      iframe.src = src;
+      iframe.loading = 'lazy';
+      iframe.title = slot.dataset.title ?? '';
+      iframe.setAttribute('allow', slot.dataset.allow ?? '');
+      iframe.style.border = '0';
+      if (slot.dataset.height === 'video') {
+        slot.className = 'mt-5 aspect-video overflow-hidden';
+        slot.style.borderRadius = 'var(--radius-box)';
+        iframe.className = 'h-full w-full';
+      } else {
+        iframe.width = '100%';
+        iframe.height = slot.dataset.height!;
+        iframe.style.borderRadius = 'var(--radius-box)';
+      }
+      slot.appendChild(iframe);
+    };
+
+    const render = () => {
+      // ── the field
+      const counts = words.map((b) => {
+        const w = b.dataset.word!;
+        return selection.has(w) ? countFor() : countFor(w);
+      });
+      const max = Math.max(...counts, 1);
+      words.forEach((b, i) => {
+        const w = b.dataset.word!;
+        const on = selection.has(w);
+        const n = counts[i];
+        const dead = !on && n === 0;
+        b.style.fontSize = on ? `${MAX_REM}rem` : sizeFor(n, max);
+        b.style.opacity = on ? '1' : dead ? '0.12' : String(0.4 + 0.6 * (n / max));
+        b.classList.toggle('is-on', on);
+        b.disabled = dead;
+        b.setAttribute('aria-pressed', String(on));
+      });
+
+      // ── the cards
+      const wordList = [...selection];
+      const eligibleCards = new Set(eligible());
+      let hits = 0;
+      for (const card of cards) {
+        const visible = selection.size > 0 && eligibleCards.has(card) && holds(card, wordList);
+        if (visible) {
+          hits++;
+          show(card);
+        } else {
+          hide(card);
+        }
+      }
+
+      // ── the words inside each visible card
+      for (const card of cards) {
+        card.querySelectorAll<HTMLButtonElement>('.song-word').forEach((b) => {
+          b.classList.toggle('is-on', selection.has(b.dataset.word!));
+        });
+      }
+
+      // ── prompt, count, empty
+      prompt.textContent = selection.size
+        ? [...selection].join(matchAll ? ', and ' : ', or ')
+        : 'How does it feel? Choose one, or a few.';
+      countEl.textContent = selection.size && hits ? `${hits} ${hits === 1 ? 'song' : 'songs'}` : '';
+
+      if (selection.size && !hits) {
+        /* Failing well: name the nearest thing that DOES exist. Rarely seen —
+           every word that would empty the room is disabled before you can
+           click it — but reachable by choosing under `any` and flipping to
+           `all`, which is exactly what a returning reader with a saved URL
+           would hit. */
+        const near = [...selection]
+          .map((w) => {
+            const rest = [...selection].filter((x) => x !== w);
+            return { w, n: eligible().filter((c) => holds(c, rest)).length };
+          })
+          .sort((a, b) => b.n - a.n)[0];
+        emptyEl.innerHTML = `<p class="text-base-content/45 font-serif text-lg italic">Nothing holds all of that at once.</p>
+          <p class="text-base-content/35 mt-3 font-sans text-sm">Let go of
+            <button type="button" data-word="${near.w}" class="text-primary underline underline-offset-4">${near.w}</button>
+            and ${near.n} ${near.n === 1 ? 'song' : 'songs'} remain.</p>`;
+        emptyEl.classList.remove('hidden');
+      } else {
+        emptyEl.classList.add('hidden');
+      }
+    };
+
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-word]');
+      if (!btn || (btn as HTMLButtonElement).disabled) return;
+      const w = btn.dataset.word!;
+      if (selection.has(w)) selection.delete(w);
+      else selection.add(w);
+      render();
+    });
+
+    const corpusBtn = document.getElementById('t-corpus')!;
+    corpusBtn.addEventListener('click', () => {
+      corpusIdx = (corpusIdx + 1) % CORPUS_SIZES.length;
+      corpusBtn.textContent = `corpus: ${CORPUS_SIZES[corpusIdx]}`;
+      render();
+    });
+
+    const matchBtn = document.getElementById('t-match')!;
+    matchBtn.addEventListener('click', () => {
+      matchAll = !matchAll;
+      matchBtn.textContent = `match: ${matchAll ? 'all' : 'any'}`;
+      render();
+    });
+
+    document.getElementById('t-clear')!.addEventListener('click', () => {
+      selection.clear();
+      render();
+    });
+
+    render();
+  </script>
+</SiteLayout>

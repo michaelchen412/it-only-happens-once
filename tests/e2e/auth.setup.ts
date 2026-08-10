@@ -148,10 +148,33 @@ setup('mint an admin session and find fixtures', async () => {
     .limit(1)
     .maybeSingle();
 
+  // A QUOTE with its whole neighbourhood lit (plan 32): placed in a published
+  // constellation, and by an author who has other lines. That combination is
+  // what makes the page's strip show every control at once, and it is rarer
+  // than it sounds — 19 of 77 quotes are in no constellation and 29 of 35
+  // authors have exactly one quote. Discovered, never seeded, like everything
+  // else here; the spec skips what it cannot find.
+  const { data: quotes } = await service
+    .from('fragments')
+    .select('id, slug, author_id')
+    .eq('type', 'quote')
+    .eq('status', 'published')
+    .is('deleted_at', null);
+  const { data: placed } = await service.from('fragment_constellations').select('fragment_id');
+  const placedIds = new Set((placed ?? []).map((p) => p.fragment_id));
+  const authorTally = new Map<string, number>();
+  for (const q of quotes ?? []) {
+    if (q.author_id) authorTally.set(q.author_id, (authorTally.get(q.author_id) ?? 0) + 1);
+  }
+  const richQuote =
+    (quotes ?? []).find((q) => placedIds.has(q.id) && q.author_id && (authorTally.get(q.author_id) ?? 0) >= 2) ?? null;
+
   fs.writeFileSync(
     FIXTURES_FILE,
     JSON.stringify(
       {
+        quoteSlug: (quotes ?? [])[0]?.slug ?? null,
+        richQuoteSlug: richQuote?.slug ?? null,
         draftSlug: draft?.slug ?? null,
         draftStatus: draft?.status ?? null,
         publishedSlug: published?.slug ?? null,

@@ -1,0 +1,195 @@
+---
+/*
+  ShareMark — hand this page's address to someone (plan 32 · §8).
+
+  THE VERB IS "SHARE A LINK", NOT "COPY THE TEXT", and that decides the whole
+  shape of it. Michael, 2026-08-10:
+
+    "people going to the site and willing to share content from the site
+     generally want other people to also visit the site and see if there are
+     other unique perspectives that might be worth exploring."
+
+  So this sends a URL, and the page at the other end is built to be a door.
+
+  ⚠ ICON ONLY, which costs three things the word was giving away free and every
+  one of them is done on purpose below: `aria-label` (the button's ONLY
+  accessible name), `title` (a sighted reader's one chance to learn what it does
+  before pressing it), and a 44px tap target (the glyph is 16px; the padding
+  takes the box to 44 and a negative margin hands that space back, so no line
+  this sits on changes height or baseline — plan 19 · Piece 8). Without the last
+  one this is a 16px target on the one device where sharing actually happens.
+
+  ⚠ `onRule` — SET INTO A RULE, and this is the placement decision, benched
+  against three others. Michael on the version that trailed a row of controls:
+  *"it kind of just oddly sits to the right, especially when it gets to 2 lines
+  since it moves with the related stuff … I want it to be grounded somewhere."*
+
+  He was describing a real property. Everything beside it in that row was a FACT
+  about the thing being read; share is the only ACTION, and sharing the row's
+  flow meant sharing the row's behaviour — it moved when the row rewrapped and
+  landed somewhere different depending on how many subjects a quote had. A
+  control with no fixed address is one the reader has to find again every time.
+
+  A rule is the only element on those pages that is the same length in the same
+  place at every width, whatever wraps beneath it. So the mark pins to its right
+  terminus, straddles it, and paints the PAGE's own background so the line
+  appears to break around it. That break is the effect: it is why the glyph
+  reads as set into the line rather than parked on top of it. It also says the
+  right thing — a rule divides the work from the apparatus, and share is
+  apparatus. The caller supplies `position: relative` and enough right padding
+  to keep its own content clear.
+*/
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  /** Root-relative is fine; the script makes it absolute against the origin. */
+  url: string;
+  label: string;
+  /** Pin to the top-right of a `relative` parent, straddling its top border. */
+  onRule?: boolean;
+  class?: string;
+}
+const { url, label, onRule = false, class: className = '' } = Astro.props;
+---
+
+<button
+  type="button"
+  class:list={['share-mark', onRule && 'share-mark--rule', className]}
+  data-share={url}
+  aria-label={label}
+  title={label}
+>
+  <Icon name="ph:arrow-square-out" class="h-4 w-4" />
+</button>
+
+<style is:global>
+  .share-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    /* Hands the 44px box's extra space back to the line it sits on, so the tap
+       target exists without the layout knowing about it. */
+    margin: -14px;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition: color 160ms ease;
+  }
+  .share-mark:hover {
+    color: var(--color-primary);
+  }
+  .share-mark:focus-visible {
+    outline: 1px dotted currentColor;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .share-mark--rule {
+    position: absolute;
+    top: 0;
+    right: 0;
+    /* Straddles the line rather than clearing it. */
+    transform: translateY(-50%);
+    width: auto;
+    min-width: 44px;
+    margin: 0;
+    padding-inline: 0.7rem;
+    /* ⚠ THE PAGE'S OWN GROUND, not a panel colour — this is what makes the rule
+       appear to BREAK for the mark instead of running behind it. Any other ink
+       turns the break into a visible chip of the wrong colour, which is exactly
+       the floating quality this placement exists to remove. */
+    background: var(--color-base-100);
+    color: color-mix(in oklab, var(--color-base-content) 32%, transparent);
+  }
+  .share-mark--rule:hover {
+    color: var(--color-primary);
+  }
+
+  /* The confirmation. Centred-bottom deliberately: an inline "Copied!" beside
+     the control moves the layout, and a corner toast reads as an app
+     notification on a site that has none. */
+  .share-said {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    pointer-events: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 9999px;
+    background: var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+    font-family: var(--font-sans, ui-sans-serif);
+    font-size: 0.875rem;
+    box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .share-said[data-on] {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  // ⚠ DELEGATED FROM `document`, NOT BOUND AT PARSE TIME. This control renders
+  // inside cloned <template> content in the feed and the Reader, where a
+  // parse-time listener binds to the template's inert copy and silently does
+  // nothing on the clone that is actually clicked. Reader.astro and Reveal use
+  // the same pattern for the same reason.
+  //
+  // Idempotent across view transitions: the flag lives on <html>, which
+  // persists, so a second copy of this script cannot double-fire a share.
+  if (!document.documentElement.dataset.shareBound) {
+    document.documentElement.dataset.shareBound = '1';
+
+    let said: HTMLElement | null = null;
+    let timer = 0;
+    const say = (msg: string) => {
+      if (!said) {
+        said = document.createElement('div');
+        said.className = 'share-said';
+        said.setAttribute('role', 'status');
+        said.setAttribute('aria-live', 'polite');
+        document.body.append(said);
+      }
+      said.textContent = msg;
+      said.setAttribute('data-on', '');
+      clearTimeout(timer);
+      timer = window.setTimeout(() => said?.removeAttribute('data-on'), 1800);
+    };
+
+    document.addEventListener('click', async (e) => {
+      const btn = (e.target as Element)?.closest?.('[data-share]') as HTMLElement | null;
+      const path = btn?.dataset.share;
+      if (!path) return;
+      // Absolute, because a relative URL in a share sheet or on a clipboard is
+      // meaningless the moment it leaves this document.
+      const url = new URL(path, location.origin).href;
+
+      // navigator.share first: on a phone this is the native sheet — iMessage,
+      // WhatsApp, the thing people actually use. Clipboard is the desktop
+      // fallback, and it is the COMMON path on laptops rather than an edge case:
+      // Firefox desktop has no share API at all.
+      if (navigator.share) {
+        try {
+          await navigator.share({ url });
+          return;
+        } catch (err) {
+          // ⚠ AbortError means the reader DISMISSED the sheet — they chose not
+          // to share. It is not a failure, and falling through to "Link copied"
+          // would tell them a small lie about what just happened.
+          if ((err as Error)?.name === 'AbortError') return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        say('Link copied');
+      } catch {
+        say('Couldn’t copy — the link is in the address bar');
+      }
+    });
+  }
+</script>

@@ -1,0 +1,316 @@
+---
+/*
+  Reveal — "there is more behind this", on demand.
+
+  The register was chosen from the reveal-lab bench, 2026-08-05 (candidate B of
+  four), for the citation control: THE WORDS THEMSELVES ARE THE CONTROL. No
+  glyph, no icon, nothing added to the line — a dotted underline appears on
+  hover and focus, and the rest opens in the native top layer.
+
+  WHY B, and what it costs. Every other candidate added something to the line —
+  a raised ＋, a caret, a footnote numeral. Each was defensible and each made the
+  quietest line on the site slightly louder, on a reading surface where that is
+  the whole point. B adds nothing, so it cannot compete with the words. **The
+  price is discoverability**: nothing announces that the line is interactive
+  until the pointer or the focus ring is already on it.
+
+  ⚠ THIS IS THE GENERALISATION OF QuoteReveal, WHICH IT NOW BACKS (plan 32 §4).
+  That component took `reveal: string` and rendered that string, which is
+  exactly one popover. The quote page's strip needs three, holding markup —
+  lists, links, a rule — so the content became a SLOT. The trigger's register
+  and every mechanic below are unchanged; what left is the assumption that the
+  thing behind a control is a sentence.
+
+  ⚠ AND THE PRICE ABOVE IS PAID BACK WHERE THE TRIGGER IS A COUNT. "2
+  constellations" both names what is behind it and says whether pressing is
+  worth it, which the attribution can never do. That is not a licence to put
+  counts on prose triggers — it is why the strip's controls are worth having at
+  all, given what the attribution's silence costs.
+
+  Slots:
+    · default — the trigger's words. Whatever register the caller sets.
+    · content — what opens. Omit and the popover holds `text` instead.
+*/
+interface Props {
+  /** Plain-text content, for the one-line case. Ignored if `content` is filled. */
+  text?: string;
+  /** Wider box + a scroll cap, for a list. See the styles for the 17rem. */
+  wide?: boolean;
+  /** The control's accessible name. The trigger's own words are its label
+   *  otherwise, which is right for an attribution and wrong for a count. */
+  label?: string;
+}
+const { text = '', wide = false, label } = Astro.props;
+const hasContent = Astro.slots.has('content');
+---
+
+{
+  /* ⚠ NOTHING RENDERS WHEN THERE IS NOTHING BEHIND IT. A control that opens
+    onto an empty box teaches you to stop pressing it — and on a page of
+    seventy-seven quotes it only has to happen once. */
+}
+{
+  text || hasContent ? (
+    <span class="rv" data-rv>
+      {/*
+        A real <button>, so it is tab-reachable and announces itself. Hover is
+        never the only way in — plan 19 found four separate a11y failures that
+        all began as hover-only affordances, and this control is invisible until
+        interacted with, which makes the keyboard path the only one some readers
+        will ever have.
+
+        `popovertarget` is wired in the script via `popoverTargetElement` rather
+        than here, so no id has to be minted server-side and two instances can
+        never collide. The button is inert until that runs — see the
+        `[data-rv-live]` gate below, which is why the underline does not appear
+        before the script has paired them.
+      */}
+      <button type="button" class="rv__trigger" aria-label={label}>
+        <slot />
+      </button>
+      <span class:list={['rv__pop', wide && 'rv__pop--wide']} popover="auto">
+        {hasContent ? <slot name="content" /> : text}
+      </span>
+    </span>
+  ) : (
+    <slot />
+  )
+}
+
+<style is:global>
+  /* Global rather than component-scoped: `--wide` content arrives through a
+     SLOT, so its markup belongs to the caller and a scoped rule would not reach
+     it. (QuoteReveal's were scoped because its content was one string.) */
+  .rv {
+    position: relative;
+  }
+  .rv__trigger {
+    /* Inherit everything — the caller owns the register, and this must not
+       become a second place that decides it. */
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    font-variant: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: inherit;
+    cursor: default;
+  }
+  /* Live only once the script has paired the button with its popover. Without
+     JS the box cannot be positioned, so it must not advertise itself. */
+  .rv[data-rv-live] .rv__trigger {
+    cursor: pointer;
+    text-decoration: underline dotted transparent;
+    text-underline-offset: 4px;
+    text-decoration-thickness: from-font;
+    transition:
+      text-decoration-color 160ms ease,
+      color 160ms ease;
+  }
+  .rv[data-rv-live] .rv__trigger:hover,
+  .rv[data-rv-live] .rv__trigger:focus-visible {
+    text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
+  }
+  .rv[data-rv-live] .rv__trigger:focus-visible {
+    outline: 1px dotted currentColor;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .rv[data-rv-live] .rv__trigger[aria-expanded='true'] {
+    text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
+    color: var(--color-primary);
+  }
+
+  .rv__pop {
+    position: fixed;
+    margin: 0;
+    inset: auto;
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background: var(--color-base-100);
+    box-shadow: 0 12px 32px -12px color-mix(in oklab, var(--color-base-content) 35%, transparent);
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    font-variant: normal;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    text-align: left;
+  }
+  /* ⚠ THE HEIGHT CAP IS COMPUTED AT PLACEMENT, NOT WRITTEN HERE — see `place()`.
+     A fixed value was tried first (17rem, measured against an 844px window) and
+     it is exactly the kind of number that passes where it was measured and fails
+     one viewport over: at 1280×720 the same list had ~200px beneath the strip,
+     overflowed it, flipped above, and landed across the quote. An e2e assertion
+     caught it. The room below a trigger is knowable at the moment of opening, so
+     that is what bounds it.
+
+     Scrolling inside the box is the price of an honest count: the trigger can
+     say "12 related lines" and mean it, instead of capping the list and then
+     having to choose between a label that lies and a label that says "3"
+     forever. */
+  .rv__pop--wide {
+    max-width: min(26rem, calc(100vw - 2rem));
+    padding: 0.7rem 0.9rem 0.8rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .rv__pop::backdrop {
+    background: transparent;
+  }
+
+  /* ⚠ BELOW `sm` A LIST POPOVER STOPS BEING A POPOVER AND BECOMES A SHEET, and
+     the reason is measured. Anchored to a strip ~530px down an 844px screen, a
+     five-row box (459px) has no room beneath it, flips above, and lands across
+     the whole quote — at 1280 as well as at 390. On a phone that is most of the
+     viewport, at which point it is a modal pretending to be a tooltip, and it
+     is dismissed by tapping a part of the screen whose point the reader can no
+     longer see.
+
+     A sheet is the same content told honestly: it comes from the edge the thumb
+     is nearest, never claims to be attached to a word, and leaves the top of
+     the screen — the quote — standing. It is also the vocabulary this site
+     already speaks; the Reader is a full-width sheet at this width for the same
+     reason. 55vh, not the 62 first tried, which swallowed the quote's last line.
+
+     The one-line case (`.rv__pop` without `--wide`) is deliberately NOT swept
+     up: it fits under its trigger at any width, and a sheet for six words is
+     theatre. */
+  @media (max-width: 639px) {
+    .rv__pop--wide {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: auto;
+      max-width: none;
+      width: 100%;
+      max-height: 55vh;
+      border-inline: 0;
+      border-bottom: 0;
+      border-radius: var(--radius-box) var(--radius-box) 0 0;
+      padding: 1.1rem 1.25rem 1.6rem;
+      box-shadow: 0 -18px 40px -16px color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    }
+    /* The sheet DOES earn a scrim where the tooltip does not: it covers enough
+       that "tap outside to close" needs somewhere visible to tap. */
+    .rv__pop--wide::backdrop {
+      background: color-mix(in oklab, var(--color-base-300) 55%, transparent);
+    }
+  }
+
+  /* The site honours prefers-reduced-motion elsewhere; there is no motion here
+     to reduce, which is itself the reason this is a popover and not a slide. */
+</style>
+
+<script>
+  // One script for every instance on the page (Astro bundles a component's
+  // script once), so this pairs by walking the DOM rather than by id.
+  for (const host of document.querySelectorAll<HTMLElement>('[data-rv]')) {
+    const trigger = host.querySelector<HTMLButtonElement>('.rv__trigger');
+    const pop = host.querySelector<HTMLElement>('.rv__pop');
+    if (!trigger || !pop) continue;
+
+    // ⚠ `popoverTargetElement`, NOT a manual showPopover() on click. That was
+    // the bug the lab surfaced: an `auto` popover light-dismisses on any outside
+    // pointerdown, so clicking the trigger while it was open CLOSED it and then
+    // the handler REOPENED it — the control could be opened and never shut from
+    // the same spot. Handing the pairing to the browser fixes it properly: the
+    // spec exempts the invoker from light-dismiss and then toggles, so the same
+    // click that opened it closes it.
+    trigger.popoverTargetElement = pop;
+    trigger.setAttribute('aria-expanded', 'false');
+    host.setAttribute('data-rv-live', '');
+
+    // Below `sm` a wide popover is a bottom sheet, positioned by CSS alone. JS
+    // must not only skip placing it — it must CLEAR anything it wrote at a wider
+    // viewport, or an inline `left` from before a rotation outlives the media
+    // query that stopped applying.
+    const isSheet = () => pop.classList.contains('rv__pop--wide') && matchMedia('(max-width: 639px)').matches;
+
+    const place = () => {
+      if (isSheet()) {
+        pop.style.removeProperty('left');
+        pop.style.removeProperty('top');
+        pop.style.removeProperty('max-height'); // the sheet's 55vh is CSS's to decide
+        return;
+      }
+      const r = trigger.getBoundingClientRect();
+
+      // ⚠ BELOW FIRST — a correction, not a default. The usual tooltip habit is
+      // to prefer above when there is room, and the reveal-lab bench showed why
+      // that is wrong here: the attribution sits directly beneath the quote, so
+      // "above" covers the words being read. Below opens into the gap before the
+      // next one.
+      //
+      // ⚠ AND A TALL BOX IS CAPPED RATHER THAN FLIPPED. The old rule measured
+      // the popover and moved it above whenever it did not fit — which on a
+      // quote page means laying a list of links across the line the reader came
+      // for. Bounding it to the room that exists keeps it below and lets it
+      // scroll instead.
+      //
+      // ⚠ `USABLE` IS DELIBERATELY LOW (90px, ~one row and a scrollbar), and the
+      // low number IS the decision. At 1280×720 a quote page's strip sits at
+      // y≈583, leaving 121px below and 547px above; a threshold that called 121
+      // "too small" flipped the box up and covered the quote — measured, and
+      // caught by an e2e assertion after a fixed 17rem cap had already failed
+      // the same way one viewport over. Between a cramped box and a covered
+      // line, the line wins every time: it is the only thing on the page that
+      // cannot be scrolled into view again. Above survives only for a trigger
+      // genuinely at the viewport floor, where below would show nothing at all.
+      const GAP = 8;
+      const USABLE = 90;
+      const roomBelow = window.innerHeight - r.bottom - GAP * 2;
+      const roomAbove = r.top - GAP * 2;
+      const below = roomBelow >= USABLE || roomBelow >= roomAbove;
+      pop.style.maxHeight = `${Math.max(USABLE, below ? roomBelow : roomAbove)}px`;
+
+      // Measured AFTER the cap, or the width is read from a box that is about to
+      // reflow — and this is the measurement the right-edge clamp depends on.
+      const p = pop.getBoundingClientRect();
+      pop.style.left = `${Math.min(Math.max(8, r.left - 8), window.innerWidth - p.width - 8)}px`;
+      pop.style.top = below ? `${r.bottom + GAP}px` : `${r.top - p.height - GAP}px`;
+    };
+
+    // ⚠ PLACED TWICE, AND THE SECOND TIME IS A BUG FIX RATHER THAN CAUTION.
+    //
+    // `beforetoggle` fires while the popover is still `display: none`, so
+    // `getBoundingClientRect()` there returns 0×0. Measured at 390px: w=0 at
+    // beforetoggle, w=269 at toggle. Both of place()'s corrections read that
+    // zero and therefore do nothing:
+    //   · the right-edge clamp becomes `innerWidth - 0 - 8`, a no-op, so the box
+    //     is positioned purely at `r.left - 8` and runs off-screen whenever the
+    //     trigger is right of centre;
+    //   · `roomBelow` compares against `p.height + 16` = 16, so it is true
+    //     essentially always and the box never flips above near the floor.
+    //
+    // QuoteReveal shipped with both and neither ever showed, because its only
+    // trigger is an attribution at the left edge of the measure — verified on
+    // /blog?view=quotes at 390px, where the citation lands at left=25 and fits
+    // by position rather than by the clamp written to save it. The quote page's
+    // strip is what exposes it: a control at the right-hand end of a line,
+    // opening a wider box.
+    //
+    // `beforetoggle` still runs first, because it is what stops the flash at
+    // 0,0 — it fires synchronously with the state change where `toggle` is
+    // queued. So: place blind for a flash-free first paint, then again with real
+    // numbers. The correction is sub-pixel whenever the blind guess was fine.
+    pop.addEventListener('beforetoggle', (e) => {
+      const opening = (e as ToggleEvent).newState === 'open';
+      if (opening) place();
+      trigger.setAttribute('aria-expanded', String(opening));
+    });
+    pop.addEventListener('toggle', (e) => {
+      if ((e as ToggleEvent).newState === 'open') place();
+    });
+
+    // Scroll and resize move the anchor out from under a fixed-position box.
+    // Reposition rather than close: closing on scroll would make it impossible
+    // to read a long citation on a phone, where reading IS scrolling.
+    for (const ev of ['scroll', 'resize'] as const) {
+      window.addEventListener(ev, () => pop.matches(':popover-open') && place(), { passive: true });
+    }
+  }
+</script>

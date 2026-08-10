@@ -158,6 +158,13 @@ export async function allowActions(page: Page, only?: string[]): Promise<void> {
 }
 
 export interface Fixtures {
+  /** Any published quote — `/blog/<slug>` now serves one (plan 32 · §3). */
+  quoteSlug: string | null;
+  /** A published quote with its whole neighbourhood lit: placed in a
+   *  constellation AND by an author with other lines. Rarer than it sounds —
+   *  19 of 77 quotes are in no constellation, and 29 of 35 authors have exactly
+   *  one quote — so the spec skips rather than asserting against a stub. */
+  richQuoteSlug: string | null;
   /** An existing unpublished essay (draft or note), or null if there is none. */
   draftSlug: string | null;
   draftStatus: 'note' | 'draft' | null;
