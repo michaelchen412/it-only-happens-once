@@ -301,7 +301,13 @@ const { subjects, constellations = [] } = Astro.props;
           class="font-display placeholder:text-base-content/25 w-full border-none bg-transparent text-4xl font-light outline-none"
         />
         <p id="ws-error" hidden role="alert" class="admin-alert mt-4"></p>
-        <div id="ws-editor" class="reading mt-6"></div>
+        {
+          /* `min-h-96` is the canvas: an essay opens with a page's worth of room
+            to click into, not one line. It sits here rather than on the shared
+            `.tiptap-doc` (where it used to live) because it is this editor's
+            decision — see admin.css. */
+        }
+        <div id="ws-editor" class="reading mt-6 min-h-96"></div>
 
         {
           /* DELETE LEFT THE TOP BAR (docs/plans/16 · Piece 1). It was sitting

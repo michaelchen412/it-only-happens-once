@@ -1662,10 +1662,42 @@ html.reader-open .sky-return {
   color: var(--color-primary);
 }
 
-/* TipTap document surface: placeholder + min height. (Content typography is
-   inherited from `.reading`, which the editor element also carries.) */
-.tiptap-doc {
-  min-height: 24rem;
+/* TipTap: the host element the caller supplies, and the surface TipTap builds
+   inside it. (Content typography is inherited from `.reading` / `.jot-prose`,
+   which the surface also carries.)
+
+   ⚠ THE HOST IS THE FIELD, THE SURFACE FILLS IT — and it did not used to be.
+   `.tiptap-doc` carried `min-height: 24rem`, which is the writing composer's
+   canvas: a page you can click anywhere in. Through this shared class it
+   reached every other editor too, so the quote sheet asked for a 10rem field
+   and got a 24rem surface inside it — enough to pin the box at its
+   `max-h-[45vh]` and leave ~330px of nothing under one line of placeholder.
+   The floor lives on whichever element decides the field's size now (the host,
+   e.g. `#ws-editor`, or the surface where a room already sets its own metrics:
+   `.cap-shell .jot-prose`, `.dump__shell .jot-prose`), and `flex: 1 0 auto`
+   makes the editable surface fill it — so the empty part of a field is still
+   somewhere you can click and start typing. `1 0 auto`, not `1`: inside a
+   scroller the surface must be free to grow past the host, never squeezed. */
+.tt-host {
+  display: flex;
+  flex-direction: column;
+}
+.tt-host > .tiptap-doc {
+  flex: 1 0 auto;
+}
+/* ⚠ THE FIRST AND LAST BLOCKS SIT FLUSH. `.reading` gives a paragraph 1.4em of
+   margin, which is right between two paragraphs and wrong at the two ends of a
+   FIELD: ~26px of untouchable air above the first line and below the last, on
+   top of whatever padding the field already had. Every editor read as three
+   times more generous vertically than horizontally for no reason anyone chose.
+   The padding is the whole inset now. (`.jot-prose` and `.suite-note` have
+   carried the same two rules for the same reason; this puts them where every
+   editable surface gets them.) */
+.tiptap-doc > :first-child {
+  margin-block-start: 0;
+}
+.tiptap-doc > :last-child {
+  margin-block-end: 0;
 }
 .tiptap-doc p.is-editor-empty:first-child::before,
 .tiptap-doc .is-empty::before {

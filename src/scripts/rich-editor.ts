@@ -95,6 +95,19 @@ export interface ImageSupport {
 }
 
 /**
+ * Marks the caller's element as an editor host (see admin.css `.tt-host`).
+ *
+ * Applied here rather than asked of every caller: the host is the element
+ * TipTap builds its surface inside, so "make the surface fill the field" is a
+ * fact about mounting, not a style each of the six call sites should have to
+ * remember. Adding a class is also the only way to reach an element whose
+ * classes are otherwise the caller's business.
+ */
+function markHost(el: HTMLElement) {
+  el.classList.add('tt-host');
+}
+
+/**
  * Upload FIRST, insert on success — deliberately not the usual optimistic
  * placeholder.
  *
@@ -127,6 +140,7 @@ async function insertImages(editor: Editor, files: File[], img: ImageSupport) {
 
 export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
   const img = opts.images;
+  markHost(opts.editorEl);
   const editor = new Editor({
     element: opts.editorEl,
     extensions: [
@@ -313,6 +327,7 @@ export interface MiniEditorOptions {
  * Same handle as `mountRichEditor`, so callers serialize the same way.
  */
 export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
+  markHost(opts.editorEl);
   const editor = new Editor({
     element: opts.editorEl,
     extensions: [

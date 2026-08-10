@@ -144,7 +144,12 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           <label class={fieldLabel}>Your story (the main identity prose)</label>
           <div class="rounded-box border-base-300 border" data-editor="me">
             <EditorToolbar class="border-base-300 border-b px-3 py-1.5" />
-            <div id="me-editor" class="reading px-4 py-4"></div>
+            {
+              /* min-h: these two hold long prose, so they open at a page's
+                height rather than growing from one line. Stated here since
+                `.tiptap-doc` stopped assuming it (admin.css). */
+            }
+            <div id="me-editor" class="reading min-h-96 px-4 py-4"></div>
           </div>
         </div>
       </section>
@@ -164,7 +169,7 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           <label class={fieldLabel}>Why I write here (the ethos prose)</label>
           <div class="rounded-box border-base-300 border" data-editor="site">
             <EditorToolbar class="border-base-300 border-b px-3 py-1.5" />
-            <div id="site-editor" class="reading px-4 py-4"></div>
+            <div id="site-editor" class="reading min-h-96 px-4 py-4"></div>
           </div>
         </div>
 
