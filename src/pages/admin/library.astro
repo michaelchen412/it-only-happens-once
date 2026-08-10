@@ -29,6 +29,24 @@ const tally = (rows: any[] | null, key: string) => {
 const subjCount = tally(fs, 'subject_id');
 const authorCount = tally(frs, 'author_id');
 const workCount = tally(frs, 'work_id');
+
+// ⚠ THE SHELF COUNT, BECAUSE A DELETE TAKES IT AND THE DIALOG NEVER SAID SO
+// (plans/30 · §6a). Plan 26 stopped `works.merge` destroying `person_works`
+// rows and the notes written on them; `works.remove` still does, by cascade,
+// and that is what a delete MEANS — but "only this label and its links are
+// removed" is doing a lot of quiet work when one of those links is somebody's
+// shelf with a sentence on it. Counted here so the confirm can say the number.
+//
+// Notes counted separately from links: losing a shelf entry is a fact you can
+// re-add from the person's page in ten seconds, and losing what you wrote on it
+// is not.
+const { data: shelved } = await supabase.from('person_works').select('work_id, note');
+const shelfCount: Record<string, number> = {};
+const shelfNotes: Record<string, number> = {};
+for (const row of shelved ?? []) {
+  shelfCount[row.work_id] = (shelfCount[row.work_id] || 0) + 1;
+  if (row.note?.trim()) shelfNotes[row.work_id] = (shelfNotes[row.work_id] || 0) + 1;
+}
 ---
 
 <AdminLayout title="Library" active="library">
@@ -83,6 +101,8 @@ const workCount = tally(frs, 'work_id');
                   class="lib-row border-base-300 border-b align-top last:border-0"
                   data-entity="subject"
                   data-id={s.id}
+                  data-name={s.name}
+                  data-uses={subjCount[s.id] ?? 0}
                 >
                   <td class="px-3 py-2">
                     <input
@@ -147,6 +167,9 @@ const workCount = tally(frs, 'work_id');
                   class="lib-row border-base-300 border-b align-top last:border-0"
                   data-entity="author"
                   data-id={a.id}
+                  data-name={a.name}
+                  data-uses={authorCount[a.id] ?? 0}
+                  data-own-note={a.note?.trim() ? '1' : ''}
                 >
                   <td class="px-3 py-2">
                     <input
@@ -208,7 +231,15 @@ const workCount = tally(frs, 'work_id');
           <tbody>
             {
               (works ?? []).map((w) => (
-                <tr class="lib-row border-base-300 border-b align-top last:border-0" data-entity="work" data-id={w.id}>
+                <tr
+                  class="lib-row border-base-300 border-b align-top last:border-0"
+                  data-entity="work"
+                  data-id={w.id}
+                  data-name={w.title}
+                  data-uses={workCount[w.id] ?? 0}
+                  data-shelves={shelfCount[w.id] ?? 0}
+                  data-shelf-notes={shelfNotes[w.id] ?? 0}
+                >
                   <td class="px-3 py-2">
                     <input
                       data-field="title"
@@ -264,8 +295,10 @@ const workCount = tally(frs, 'work_id');
   <script>
     import { actions } from 'astro:actions';
     import { confirmDialog } from '../../scripts/confirm-dialog';
+    import { deleteWarning } from '../../lib/library-delete';
 
     const A: Record<string, any> = { subject: actions.subjects, author: actions.authors, work: actions.works };
+
     const err = document.getElementById('lib-error') as HTMLParagraphElement;
     const showErr = (m: string) => {
       err.textContent = m;
@@ -295,7 +328,17 @@ const workCount = tally(frs, 'work_id');
       row.querySelector('.lib-delete')?.addEventListener('click', async () => {
         const ok = await confirmDialog({
           title: 'Delete',
-          message: 'Delete this? Fragments themselves stay — only this label and its links are removed.',
+          // The counts are rendered onto the row above; this reads them back
+          // rather than re-querying, so the number in the dialog is exactly the
+          // number in the "Used" column beside the button you pressed.
+          message: deleteWarning({
+            entity: row.dataset.entity as 'subject' | 'author' | 'work',
+            name: row.dataset.name,
+            uses: Number(row.dataset.uses ?? 0),
+            shelves: Number(row.dataset.shelves ?? 0),
+            shelfNotes: Number(row.dataset.shelfNotes ?? 0),
+            ownNote: !!row.dataset.ownNote,
+          }),
           confirmLabel: 'Delete',
           danger: true,
         });
