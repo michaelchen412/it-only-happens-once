@@ -49,27 +49,34 @@ const view = raw === 'quotes' ? 'quotes' : raw === 'music' ? 'music' : 'writing'
 const type = view === 'quotes' ? 'quote' : 'writing';
 
 /*
-  ⚠ THE MUSIC ROOM IS BUILT AND THE TAB STILL SAYS "SOON", and that is §9 rather
-  than an unfinished edge. *"The room is only as good as its density. At 30 songs
-  most combinations return nothing, and a spectrum that keeps saying 'nothing
-  holds all of that at once' teaches a visitor that the vocabulary is
-  decoration."* Ruling 2 turned that from a feeling into a number you can query:
-  a song qualifies when it carries at least one feeling.
+  ⚠ THE MUSIC ROOM IS BUILT AND THE TAB SAYS "SOON" UNTIL THIS NUMBER, and that
+  is §9 rather than an unfinished edge. *"The room is only as good as its
+  density. At 30 songs most combinations return nothing, and a spectrum that
+  keeps saying 'nothing holds all of that at once' teaches a visitor that the
+  vocabulary is decoration."* Ruling 2 turned that from a feeling into something
+  you can query: a song qualifies when it carries at least one feeling.
 
-  So the ROUTE works — `/blog?view=music` renders, and is how the room gets
-  judged — and the TAB stays a plain word until the corpus is worth announcing.
-  Michael's call to change, and it is this one constant.
+  So the ROUTE always works — `/blog?view=music` renders whatever qualifies, and
+  is how the room gets judged — and only the TAB waits.
+
+  ⚠ FORTY, NOT THE HUNDRED THIS PLAN PROPOSED. Michael's call, 2026-08-11. It is
+  §9's OTHER number and the more defensible one: *"the room must be beautiful at
+  40 songs, not merely at 400"* is the design constraint the whole room was built
+  under, so opening at the size it was designed for is consistent, where a
+  hundred was a guess at when it would feel abundant. A hundred also had a cost
+  the plan did not price — months of listening during which the room exists,
+  works, and is reachable by nobody who does not already know the URL.
 */
-const MUSIC_THRESHOLD = 100;
+const MUSIC_THRESHOLD = 40;
 
 const room = view === 'music' ? await listMusicRoom(supabase) : null;
 
 /*
   ⚠ DEDUPED, BECAUSE THE QUESTION IS "HOW MANY SONGS", NOT "HOW MANY LINKS".
   `count: 'exact'` on `fragment_feelings` would count ROWS — a song wearing five
-  words would be five — and the tab would open at twenty songs instead of a
-  hundred. PostgREST has no `count(distinct)`, so the ids come back and a Set
-  answers it.
+  words would be five — so the tab would open at roughly a fifth of the songs it
+  is meant to wait for. PostgREST has no `count(distinct)`, so the ids come back
+  and a Set answers it.
 
   The limit is explicit rather than PostgREST's silent 1000 (see
   `export.json.ts` for the backup this same default truncated). One `uuid`
