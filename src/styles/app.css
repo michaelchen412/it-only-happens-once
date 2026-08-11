@@ -214,8 +214,8 @@
    A literal `white` slot was the obvious fix and is WRONG, because `--cn` is
    not only a tint: it is also `--lamp`, the light a whole suite reads under.
    White light is no light — *not looking away* would stop being lit differently
-   from *conditions, not character*, and the drawn arcs (quiet phrase marks)
-   would come out brighter than the prose they sit beside. It fails a third way
+   from *conditions, not character*, and the drawn line (a quiet phrase mark)
+   would come out brighter than the prose it sits beside. It fails a third way
    out front: brightness is already the MAGNITUDE channel (`--glow`, and §13's
    "weighted by brightness more than size"), so a white star would read as
    *big* rather than as its own colour.

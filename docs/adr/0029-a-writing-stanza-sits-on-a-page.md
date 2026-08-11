@@ -47,6 +47,17 @@ at all:
 > sheet with a solid left edge therefore **eats the constellation** where it
 > crosses.
 
+*Amended 2026-08-11, the same day, and the reasoning survives the amendment
+intact.* The figure stopped being arcs hours after this was written — it is now
+one centripetal Catmull–Rom spline through the marks (`lib/sky-figure.ts`), so
+"bow up to 30px" no longer describes anything. **The premise it was supporting
+is unchanged and in fact strengthened**: the line still crosses the sheet, the
+stanza still paints above it, and a solid left edge would still eat the drawing.
+The new figure strays *less* — measured max lateral distance from the nearest
+mark is 16.6px at 1280px and 1.7px at 390px, against the arcs' 16.5px and 10.1px
+— so it sits further inside the transparent zone rather than testing it.
+`--sw-reach` needed no retune.
+
 Michael, 2026-08-11: *"slowly gains opacity from left to right so it blends in
 better with the constellation lines and is less jarring."* Every other candidate
 asked the reader to accept an object dropped on the drawing. This one lets the

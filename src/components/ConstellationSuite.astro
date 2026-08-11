@@ -4,8 +4,11 @@
 
   Typeset, not carded (decided 2026-07-23 after the sky-lab bench): each medium in its
   own register at its natural size. The margin carries the actual figure — a
-  star at every fragment, joined by a drawn line (gentle arcs — phrase marks,
-  not a wire) that stops short of each one so the stars sit in its gaps.
+  star at every fragment, joined by a drawn line — one continuous spline through
+  the marks, interrupted by a gap at each so the stars sit in its gaps rather
+  than on it. (It was per-segment alternating arcs until 2026-08-11, which put a
+  26–46° corner at every star and a fixed periodic wave down every phone; see
+  `lib/sky-figure.ts` for the whole account.)
 
   TWO lights answer the same reading line as you scroll (app.css "The Sky"):
   the stanza lamplight, a spotlight on the single nearest fragment; and the
@@ -45,8 +48,10 @@
   it is not this component's to draw, but it IS this component's to keep. Rename
   either, or move the `Read →` out of `.grow`, and the page silently stops being
   one. The left edge of that sheet is deliberately absent so the drawn line
-  passes through it rather than being interrupted; the arcs and the paper are
-  therefore no longer independent, and changing `INDENTS` moves both.
+  passes through it rather than being interrupted; the figure and the paper are
+  therefore no longer independent, and changing `INDENTS` moves both. (Since
+  2026-08-11 that coupling is tighter still: the offsets are now the ONLY thing
+  shaping the line, so a stanza that moves redraws the constellation.)
 
   The zoom out is navigation: the name itself (popover semantics — the trigger
   that opened it closes it), the ✦ beside it, the floating ✦ once you scroll,
@@ -71,8 +76,28 @@ interface Props {
 }
 const { constellation } = Astro.props;
 
-// asymmetric offsets (sm+) — the drawn line gets its angles from these
+/*
+  Asymmetric offsets — the drawn line gets its angles from these, and that is
+  the whole reason they exist: the figure's shape is meant to be a consequence
+  of where the stanzas sit, not a decoration laid over them.
+
+  ⚠ NARROW GETS ITS OWN SET, AND WITHOUT IT THE PHONE FIGURE IS A RULER. Until
+  2026-08-11 the offsets were `sm:` only, so on a phone every mark shared an x
+  and the marks were COLLINEAR — which left the drawn line nothing to take its
+  angles from. What actually curved it there was the old arcs builder's ±30px
+  alternating bow, clamped to the same amplitude on every segment: a periodic
+  sine wave down the margin, identical for every constellation, unrelated to
+  anything you were reading. So design.md §235's "on phones it degrades to a
+  near-vertical thread" described the most decorative figure on the site.
+  Removing the bow without adding these would have swapped one wrong answer for
+  another — a spline through collinear marks is dead straight.
+
+  A third of the desktop amplitude: enough for the line to drift and lean, small
+  enough that the prose does not visibly stagger. Max excursion on a 390px
+  screen is ~23px.
+*/
 const INDENTS = ['0%', '9%', '3%', '15%', '0%', '11%', '5%', '13%'];
+const NARROW_INDENTS = ['0%', '3%', '1%', '5%', '0%', '4%', '2%', '4%'];
 
 const writings = constellation.items
   .filter((i): i is Extract<SuiteItem, { kind: 'writing' }> => i.kind === 'writing')
@@ -144,7 +169,7 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
       constellation.items.map((f, i) => (
         <article
           class:list={['suite-item flex gap-4 sm:gap-6', f.kind === 'writing' && 'suite-writing']}
-          style={`--indent:${INDENTS[i % INDENTS.length]}`}
+          style={`--indent:${INDENTS[i % INDENTS.length]};--indent-narrow:${NARROW_INDENTS[i % NARROW_INDENTS.length]}`}
         >
           {/* The margin column. It carries NO type glyph any more (2026-08-07):
               ” ♪ ▤ answered a question nobody asked — a reader can see that a

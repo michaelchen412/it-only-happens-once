@@ -633,7 +633,15 @@ html.reader-open .sky-return {
   position: relative;
   z-index: 1;
 }
-/* asymmetric offsets (wide screens) — the drawn line gets its angles here */
+/* Asymmetric offsets — the drawn line gets its angles here, and since
+   2026-08-11 that is the ONLY thing giving it any. BOTH widths carry them: a
+   phone used to leave every mark on one x, which left the figure nothing to
+   bend around and an alternating ±30px bow doing all the work (see the note on
+   NARROW_INDENTS in ConstellationSuite.astro). Narrow runs at about a third of
+   the amplitude — the line still leans, the prose does not visibly stagger. */
+.suite-item {
+  margin-inline-start: var(--indent-narrow, 0%);
+}
 @media (min-width: 640px) {
   .suite-item {
     margin-inline-start: var(--indent, 0%);
@@ -655,8 +663,8 @@ html.reader-open .sky-return {
 }
 
 /* Stars at the figure's JOINTS — one per fragment, dropped into the gap each
-   arc leaves around its endpoints. So the stars line up with what you are
-   reading and the arcs read as drawn BETWEEN them, which is what a
+   curve leaves around its endpoints. So the stars line up with what you are
+   reading and the line reads as drawn BETWEEN them, which is what a
    constellation is. The halo pools around the fragment's glyph, which sits on
    top of it (stanzas are z-index 1, the figure 0) and becomes the star's body.
 
@@ -798,8 +806,8 @@ html.reader-open .sky-return {
    The sheet says which of those you are looking at before a word is read.
 
    ⚠ IT MATERIALISES LEFT TO RIGHT, AND THAT IS WHAT LETS IT EXIST AT ALL. An
-   opaque card here would be an object dropped on the constellation: the arcs bow
-   up to 30px off the marks and stanzas paint ABOVE the drawn line (`.suite-item`
+   opaque card here would be an object dropped on the constellation: the drawn
+   line strays up to ~17px off the marks and stanzas paint ABOVE it (`.suite-item`
    z-1, `.suite-line` z-0), so a solid left edge EATS the figure where it crosses.
    This sheet has no substance on that edge — the drawing passes through it and
    only becomes paper once it is clear. Michael, 2026-08-11: *"slowly gains

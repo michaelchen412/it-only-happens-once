@@ -1,5 +1,6 @@
 import { navigate } from 'astro:transitions/client';
 import { STAR_PATH } from '../lib/star-mark';
+import { splineFigure, type Pt } from '../lib/sky-figure';
 // Puts the overview back where you left it, so the name morphs home into its
 // own line instead of flying to the top of the page. None of the ways out
 // below know about it — it keys on ARRIVAL at `/`, which is the only reason
@@ -14,8 +15,38 @@ import './sky-slot';
 import { focusTracker, isTouch, type FocusTracker } from './focus-mode';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
-type Pt = { x: number; y: number };
-type Star = { x: number; y: number; size: number };
+
+/**
+ * The drawn line's brightness, as a gradient that travels with the reading line.
+ *
+ * ⚠ THE LINE USED TO BE INERT, and that is the defect this replaced. It was one
+ * `stroke-opacity: 0.22`, written at draw time and never touched again, while
+ * the stars beside it ran a smoothstep field from 0 to 0.7. Two halves of one
+ * figure obeying different physics: measured mid-scroll, stars at 0, 0.19,
+ * 0.63, 0.58, 0.15, 0, 0 — and a line joining them at a flat 0.22 the whole way
+ * down, which near the top of a suite is BRIGHTER than the star it is attached
+ * to. Michael: *"the stars gradually appear but the lines do not."*
+ *
+ * ⚠ ONE LIGHT, TWO THINGS SAMPLING IT. The stops are the same smoothstep
+ * `updateLight` applies to each star, at the same `FALLOFF`, so this is not a
+ * second effect tuned to look similar — it is the same field read a second way.
+ * If the star falloff is ever retuned, these stops move with it or the figure
+ * comes apart again.
+ *
+ * PEAK is a shade above the old flat value and the floor is ZERO — the line
+ * goes dark away from the reading line exactly as a star does, chosen over a
+ * faint always-on trace on the bench (2026-08-11). The cost, accepted
+ * knowingly: you can no longer see the whole figure at a glance, only the
+ * stretch you are reading. That is the same bargain the stars have always made,
+ * and making the line keep its own counsel is what stopped the two reading as
+ * separate systems.
+ */
+const PEAK = 0.32;
+/** smoothstep sampled across the light's reach, mirrored about the reading line */
+const STOPS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1].map((offset) => {
+  const k = 1 - Math.abs(offset - 0.5) * 2; // 0 at the edges of reach, 1 at the line
+  return { offset, lit: k * k * (3 - 2 * k) };
+});
 
 let tracker: FocusTracker | null = null;
 let suiteEl: HTMLElement | null = null;
@@ -28,73 +59,69 @@ let ro: ResizeObserver | null = null;
 // offset only changes on relayout, so a scroll frame needs one rect read for
 // the whole figure rather than one per star.
 let starEls: { el: SVGElement; y: number; shown: number }[] = [];
+// The line's gradient, when it is in the same light as the stars. Held so a
+// scroll frame moves the light by writing two attributes rather than rebuilding.
+let lampGrad: SVGLinearGradientElement | null = null;
 
-// The drawn line: per-segment arcs that stop short of each mark and bow
-// gently side to side — phrase marks in a score, not a wire. (The single
-// continuous-spline "thread" variant lives in the sky-lab bench if we ever swap.)
-//
-// It also yields the STARS — one per mark, at the figure's JOINTS, which is
-// where a constellation's stars actually are. Each arc stops GAP short of
-// its endpoints, so the line already leaves a gap at every mark: the star
-// drops into that gap, centred on the fragment it belongs to, and the arcs
-// read as drawn BETWEEN stars. (Scattering them along the arcs instead makes
-// them decoration — they line up with nothing you are reading.)
-function buildFigure(pts: Pt[]): { d: string; stars: Star[] } {
-  const GAP = 14;
-  let d = '';
-  const stars: Star[] = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const len = Math.hypot(dx, dy);
-    if (len < GAP * 2.5) continue;
-    const ux = dx / len;
-    const uy = dy / len;
-    const a = { x: p1.x + ux * GAP, y: p1.y + uy * GAP };
-    const b = { x: p2.x - ux * GAP, y: p2.y - uy * GAP };
-    const bow = Math.min(30, len * 0.16) * (i % 2 ? -1 : 1);
-    const c = { x: (a.x + b.x) / 2 + -uy * bow, y: (a.y + b.y) / 2 + ux * bow };
-    d += `M ${a.x} ${a.y} Q ${c.x} ${c.y} ${b.x} ${b.y} `;
+// The drawn line and the stars it joins are built by `lib/sky-figure` — pure
+// geometry, unit-tested in `src/tests/sky-figure.test.ts` rather than by
+// eye. Each segment stops short of its endpoints, so the line leaves a gap at
+// every mark: the star drops into that gap, centred on the fragment it belongs
+// to, and the line reads as drawn BETWEEN stars. (Scattering stars along the
+// curve instead makes them decoration — they line up with nothing you are
+// reading.) Every mark gets a star, including the first and last and any whose
+// segment was too short to draw between.
+
+/** The line's own light, as a gradient that travels with the reading line. */
+function buildLamp(): SVGLinearGradientElement {
+  const grad = document.createElementNS(SVGNS, 'linearGradient');
+  grad.setAttribute('id', 'suite-lamp');
+  // In the SVG's own coordinates — the same space the path is drawn in — so a
+  // scroll frame only has to move y1/y2. `pad` clamps everything beyond the
+  // light's reach to the end stops, which is what makes `floor` the rest state.
+  grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+  grad.setAttribute('spreadMethod', 'pad');
+  grad.setAttribute('x1', '0');
+  grad.setAttribute('x2', '0');
+  for (const s of STOPS) {
+    const stop = document.createElementNS(SVGNS, 'stop');
+    stop.setAttribute('offset', String(s.offset));
+    // `--lamp` is the constellation's own colour, inherited from the `cn-*`
+    // class on the section — the line burns in it exactly as the stars do.
+    stop.setAttribute('stop-color', 'var(--lamp)');
+    stop.setAttribute('stop-opacity', (PEAK * s.lit).toFixed(3));
+    grad.appendChild(stop);
   }
-
-  // Every mark gets one, including the first and last (which no arc reaches
-  // past) and any whose segment was too short to draw. Magnitude varies a
-  // little — a figure of identical stars reads as a diagram.
-  //
-  // Size is pinned between two hard limits. Its tips must stay inside GAP
-  // (14) so the star stops exactly where the line resumes and never collides
-  // with it — and must clear the fragment's glyph, which paints on top of it
-  // out to roughly half the 16px em box, or the star is simply swallowed.
-  // 22–27 sits squarely in that band: tips 11–13.5.
-  pts.forEach((p, i) => stars.push({ x: p.x, y: p.y, size: 22 + (i % 3) * 2.5 }));
-
-  return { d, stars };
+  return grad;
 }
 
 function drawLine() {
   if (!suiteEl?.isConnected) return;
   svg?.remove();
   svg = null;
+  lampGrad = null;
   starEls = [];
   const box = suiteEl.getBoundingClientRect();
-  const pts = items.map((el) => {
+  const pts: Pt[] = items.map((el) => {
     const r = el.querySelector('.suite-mark')!.getBoundingClientRect();
     return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
   });
-  const { d, stars } = buildFigure(pts);
+  const { d, stars } = splineFigure(pts);
   if (!d) return;
   svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('class', 'suite-line');
   svg.setAttribute('aria-hidden', 'true');
+  const defs = document.createElementNS(SVGNS, 'defs');
+  lampGrad = buildLamp();
+  defs.appendChild(lampGrad);
+  svg.appendChild(defs);
   const path = document.createElementNS(SVGNS, 'path');
   path.setAttribute('d', d);
   path.setAttribute('fill', 'none');
-  // the drawn line takes the constellation's own light, like everything else
-  // in the suite (app.css --lamp, set by the `cn-*` class on the section)
-  path.setAttribute('stroke', 'var(--lamp)');
-  path.setAttribute('stroke-opacity', '0.22');
+  // The line takes the constellation's own light like everything else in the
+  // suite — `--lamp`, set by the `cn-*` class on the section — but through the
+  // gradient, so WHERE it burns answers the reading line.
+  path.setAttribute('stroke', 'url(#suite-lamp)');
   path.setAttribute('stroke-width', '1');
   path.setAttribute('stroke-linecap', 'round');
   svg.appendChild(path);
@@ -169,11 +196,19 @@ function updateGlow() {
 // and mapped to opacity in CSS.
 const FALLOFF = 0.62; // share of the viewport the light reaches, either way
 
-function updateStars() {
+function updateLight() {
   if (!suiteEl?.isConnected || !starEls.length) return;
   const top = suiteEl.getBoundingClientRect().top; // one read for the figure
   const line = readingLine();
   const reach = window.innerHeight * FALLOFF;
+  // The line, when it is in the same light: slide the gradient's window so it
+  // straddles the reading line. Two attribute writes, the stops never change,
+  // and the whole path gets its brightness from the same field the stars read.
+  if (lampGrad) {
+    const y = line - top; // the reading line, in the figure's own coordinates
+    lampGrad.setAttribute('y1', (y - reach).toFixed(1));
+    lampGrad.setAttribute('y2', (y + reach).toFixed(1));
+  }
   for (const s of starEls) {
     const d = Math.abs(top + s.y - line);
     const k = Math.max(0, 1 - d / reach);
@@ -200,7 +235,7 @@ function onScroll() {
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(() => {
     updateGlow();
-    updateStars();
+    updateLight();
     updateReturn();
   });
 }
@@ -220,19 +255,19 @@ function init() {
   tracker = focusTracker(items);
   drawLine();
   updateGlow();
-  updateStars();
+  updateLight();
   updateReturn();
   // Redrawing rebuilds the stars, so their brightness has to be re-applied
   // in the same frame — otherwise a resize leaves the whole figure dark
   // until the next scroll.
   ro = new ResizeObserver(() => {
     drawLine();
-    updateStars();
+    updateLight();
   });
   ro.observe(document.body);
   (document as any).fonts?.ready?.then(() => {
     drawLine();
-    updateStars();
+    updateLight();
   });
 }
 
