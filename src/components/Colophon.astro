@@ -2,14 +2,25 @@
 /*
   Colophon — the "how this was made" note, editorial-style. See design.md §3.
 
-  A quiet GitHub mark in the top bar opens a native top-layer popover: the
-  typefaces (and *why* Atkinson), the stack as monochrome marks, and a link to
-  the source. Not a "powered by" badge strip.
+  THE DRAWER ONLY. A native top-layer popover holding the typefaces (and *why*
+  Atkinson), the stack as monochrome marks, the authorship attestation, and a
+  link to the source. Not a "powered by" badge strip.
 
-  Positioned with a small script relative to its trigger (just below it, since it
-  lives in the top bar) — more reliable across browsers than CSS anchor
-  positioning, and it works whether the trigger is inline (desktop) or inside the
-  mobile menu. The listeners are delegated on `document`, so they survive view-
+  ⚠ IT RENDERS NO TRIGGER, AND THAT IS THE FIX FOR A REAL BUG. This used to be
+  button-plus-panel, mounted inside the top bar's utilities `<div>` — which is
+  inside `#site-menu`, which is `display: none` below `md:` until the hamburger
+  opens it. That was invisible while the only trigger lived in there with it:
+  the menu was necessarily open. The moment the footer grew a second trigger, a
+  phone could press a visible button, flip the popover to `:popover-open`, and
+  get NOTHING — an element in a `display: none` subtree paints no box, measured
+  0×0. So the panel is mounted once at layout level, outside every trigger's
+  container, and the triggers are plain `popovertarget` buttons wherever they
+  belong (SiteLayout renders both: the bar's ⌗ and the footer's).
+
+  Positioned with a small script relative to the trigger that was pressed — more
+  reliable across browsers than CSS anchor positioning, and it works whether the
+  trigger is inline (desktop), inside the mobile menu, or at the foot of the
+  page. The listeners are delegated on `document`, so they survive view-
   transition navigations without re-binding.
 */
 import { Icon } from 'astro-icon/components';
@@ -25,15 +36,6 @@ const stack = [
 ];
 ---
 
-<button
-  type="button"
-  popovertarget="site-colophon"
-  aria-label="How this site was built"
-  class="rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content inline-flex p-1.5 transition-colors"
->
-  <Icon name="simple-icons:github" class="size-4" />
-</button>
-
 <div
   id="site-colophon"
   popover
@@ -41,9 +43,24 @@ const stack = [
 >
   {
     /* Built with — the stack as monochrome marks, in muted ink (a colophon, not
-      a badge strip; see design.md §3). */
+      a badge strip; see design.md §3).
+
+      ⚠ "THIS SITE IS AN INDEPENDENT PROJECT BUILT WITH", not "Built with"
+      (2026-08-11). Michael's ask, and the reason is what this whole drawer is
+      for: *"I do want it to be known that I didn't use a website builder."* The
+      ⌗ in the bar says there is a repo; the stack list says which tools. Neither
+      says the thing actually being claimed, which is that nobody assembled this
+      from a template. The lead-in is the one line in here that can.
+
+      It went out first as "An independent project built with" and gained its
+      subject an hour later, also Michael's call. The longer one is the better
+      one for a reason worth keeping: without "This site is", the phrase floats —
+      it could be describing the STACK below it as independent, which is not a
+      claim about anything. Naming the subject is what turns a label into an
+      assertion. It is still a LEAD-IN rather than a sentence of its own — the
+      list completes it — so the register does not change and no badge appears. */
   }
-  <p class="text-base-content/40 font-sans text-xs tracking-wide">Built with</p>
+  <p class="text-base-content/40 font-sans text-xs tracking-wide">This site is an independent project built with</p>
   <ul class="text-base-content/60 mt-2 flex flex-wrap gap-x-4 gap-y-2 font-sans text-sm">
     {
       stack.map((s) => (
@@ -102,7 +119,12 @@ const stack = [
       class="text-primary inline-flex items-center gap-1.5 font-sans text-sm hover:underline"
     >
       <Icon name="simple-icons:github" class="size-4" />
-      View on GitHub
+      {
+        /* "my project", not just "on GitHub" — same 2026-08-11 reason as the
+          lead-in above. "View on GitHub" describes a destination; the point is
+          whose it is. */
+      }
+      View my project on GitHub
       <Icon name="ph:arrow-up-right" class="size-3" />
     </a>
     <a href="/rss.xml" class="text-base-content/55 hover:text-base-content font-sans text-sm transition-colors">
@@ -112,16 +134,28 @@ const stack = [
 </div>
 
 <script>
-  function positionColophon() {
+  const TRIGGER = 'button[popovertarget="site-colophon"]';
+
+  /* ⚠ TAKES THE TRIGGER AS AN ARGUMENT — it used to look it up as
+     `document.querySelector(TRIGGER)`, which is the FIRST such button in the
+     document and therefore always the top bar's. That was invisible while the
+     bar was the only trigger, and became a real defect the moment the footer
+     grew a second one: pressing it placed the drawer under a button ~2,000px
+     above, i.e. off-screen, at the top of a page you are at the bottom of.
+     Found on a bench that mounted a second trigger, which is the only way it
+     could ever have been found. */
+  function positionColophon(btn: HTMLElement) {
     const pop = document.getElementById('site-colophon');
-    const btn = document.querySelector('button[popovertarget="site-colophon"]') as HTMLElement | null;
-    if (!pop || !btn) return;
+    if (!pop) return;
     const r = btn.getBoundingClientRect();
     const pad = 8;
     const pw = pop.offsetWidth;
     const ph = pop.offsetHeight;
     const left = Math.max(pad, Math.min(r.right - pw, window.innerWidth - pw - pad));
-    let top = r.bottom + pad; // open downward — the trigger sits in the top bar
+    // Open downward by default (the bar's trigger has the whole page below it);
+    // the flip then handles the footer's, which never has room underneath and
+    // always has room above. No footer-specific branch is needed.
+    let top = r.bottom + pad;
     if (top + ph > window.innerHeight - pad) {
       const above = r.top - ph - pad;
       if (above >= pad) top = above; // flip up only if it actually fits
@@ -132,16 +166,22 @@ const stack = [
     pop.style.bottom = 'auto';
   }
 
+  // Remembered so a resize repositions against the trigger that opened it,
+  // rather than guessing at one.
+  let opener: HTMLElement | null = null;
+
   // Delegated on document, so it survives view-transition navigation.
   document.addEventListener('click', (e) => {
-    if (!(e.target as Element)?.closest?.('button[popovertarget="site-colophon"]')) return;
+    const btn = (e.target as Element)?.closest?.(TRIGGER) as HTMLElement | null;
+    if (!btn) return;
+    opener = btn;
     requestAnimationFrame(() => {
       const pop = document.getElementById('site-colophon');
-      if (pop && pop.matches(':popover-open')) positionColophon();
+      if (pop && pop.matches(':popover-open')) positionColophon(btn);
     });
   });
   window.addEventListener('resize', () => {
     const pop = document.getElementById('site-colophon');
-    if (pop && pop.matches(':popover-open')) positionColophon();
+    if (pop && opener && pop.matches(':popover-open')) positionColophon(opener);
   });
 </script>

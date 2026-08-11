@@ -2,12 +2,24 @@
 /*
   SiteLayout — chrome for the PUBLIC site (the reader-facing rooms).
 
-  A quiet top bar with a plain wordmark (design.md §8). On desktop the nav, the
-  theme toggle, and the colophon sit inline at the right; on mobile they collapse
-  into a hamburger menu (a single set of controls that reflows — no duplicated
-  ids). No footer: the colophon lives in the bar now. Wraps Base.astro (which
-  owns <head>, fonts, the no-flash theme script, and opts this layout into view
-  transitions). Pages set an `active` nav item.
+  A quiet top bar with a plain wordmark (design.md §8), and a footer that is an
+  address block rather than an ending. On desktop the nav, the theme toggle, and
+  the colophon sit inline at the right; on mobile they collapse into a hamburger
+  menu (a single set of controls that reflows — no duplicated ids). Wraps
+  Base.astro (which owns <head>, fonts, the no-flash theme script, and opts this
+  layout into view transitions). Pages set an `active` nav item.
+
+  ⚠ THE BAR IS A RUNNING HEAD, NOT A MASTHEAD (2026-08-11, ADR 0029). It used
+  to be the starter-template strip — translucent blurred ground, hairline
+  bottom, wordmark set as a logo, accent underline on the active link — and on
+  /blog that put TWO mastheads on screen, the bar and the page's own
+  Writing · Quotes · Music switch, both marking "where you are" with the same
+  `border-primary` underline. The page's switch is the good one. So the bar
+  recedes to one uniform register (serif small caps, one size, distinguished
+  only by ink) and the room's own switch becomes the only masthead. Every
+  variant was driven on a bench over this exact element before any of it
+  shipped; the alternatives — the bar as a journal cover, the nav dropping down
+  to join the page's switch row — are in ADR 0029.
 
   ⚠ THE COLLAPSE POINT IS `md:` (768px), AND IT IS A DECISION, NOT A DEFAULT.
   This nav collapsed at `sm:` (640px) while the Observatory's sidebar collapsed
@@ -46,11 +58,22 @@ interface Props {
 const { title, description, active, backToTop = true, image, ogType, canonical } = Astro.props;
 const pageTitle = title ? `${title} — It Only Happens Once` : 'It Only Happens Once';
 
-// "Home" is explicit (not only the wordmark): the homepage is the site's
+// The room is explicit (not only the wordmark): the homepage is the site's
 // strangest, most load-bearing room — visitors wandering the blog need an
 // unambiguous way back to it. Constellation pages light it as active.
+//
+// ⚠ "CONSTELLATIONS", NOT "HOME" (2026-08-11). design.md §13 had been holding
+// both positions since July — chrome that says Home, prose that says "visitors
+// see constellations" — and `/constellations` has 301'd to `/` the whole time,
+// so the routing was already calling the room by this name. "Home" was the more
+// generic of the two words in the most-seen row on the site. Measured at 780px
+// (the tightest width where the bar is still horizontal, since the burger
+// arrives at 768) there is still a 264px gap between wordmark and nav.
+//
+// The `key` stays `home`: it is the prop every page passes as `active`, and
+// renaming that is a six-file change for no reader-visible gain.
 const nav = [
-  { key: 'home', label: 'Home', href: '/' },
+  { key: 'home', label: 'Constellations', href: '/' },
   { key: 'blog', label: 'Blog', href: '/blog' },
   { key: 'about', label: 'About', href: '/about' },
 ] as const;
@@ -58,13 +81,44 @@ const nav = [
 
 <Base title={pageTitle} description={description} image={image} ogType={ogType} canonical={canonical} transitions>
   <div class="flex min-h-screen flex-col">
-    {/* Top bar — the site's primary navigation. */}
-    <header
-      class="border-base-300 bg-base-100/90 sticky top-0 z-30 flex h-14 items-center gap-4 border-b px-5 backdrop-blur"
-    >
+    {
+      /* Top bar — the site's primary navigation.
+
+        ⚠ NO HAIRLINE, NO BLUR, AND THE GROUND IS SOLID. Dropping the border is
+        the load-bearing move: it makes the PAGE's own rule the only one on
+        screen. Dropping the blur is the second — a translucent frosted strip is
+        itself one of the tells design.md §3 bans on sight. But the ground goes
+        SOLID rather than transparent, because a sticky header still has to hide
+        what passes under it; "no background" is a different proposal (an
+        overlay) and nothing here is making it.
+
+        `sticky` is deliberate and was re-tested, not inherited: the bench
+        carried an unpin toggle through every variant and never found a reason
+        to use it. It does not need re-litigating.
+
+        ⚠ WHAT REPLACES THE HAIRLINE IS `.site-bar::after` — see app.css. A
+        solid strip over a same-coloured page had no lower EDGE, so content
+        under it was guillotined mid-letterform with no cue at all. The answer
+        is a scrim, not a rule and not glass; the three were driven side by side
+        and the argument is written beside the CSS. */
+    }
+    <header class="site-bar bg-base-100 sticky top-0 z-30 flex h-13 items-center gap-4 px-5">
+      {
+        /* The site's name is not a logo here — it is the first item of a running
+          head. Same face, same size, same small caps as the links beside it,
+          distinguished only by ink (80% against their 60%). This is design.md
+          §7's VOICE register applied to chrome, which is a claim worth arguing
+          with, since §7 assigns voice to the evocative rooms and sans to the
+          machinery ones and this bar spans both. It is here because the bar is
+          identity before it is instrument.
+
+          The `aria-label` still says "home", deliberately: it names the
+          DESTINATION, and "home" is what a browser calls that regardless of
+          what the visible link now reads. */
+      }
       <a
         href="/"
-        class="font-display mr-auto text-base leading-none whitespace-nowrap sm:text-lg"
+        class="text-base-content/80 mr-auto font-serif text-base tracking-[0.09em] whitespace-nowrap [font-variant:all-small-caps] md:leading-none"
         aria-label="It Only Happens Once — home"
       >
         It Only Happens Once
@@ -93,14 +147,29 @@ const nav = [
         ]}
       >
         {
+          /* ⚠ THE ACTIVE ITEM IS MARKED BY INK ALONE — it used to carry
+            `md:border-primary md:border-b md:pb-0.5`, and that is accent in
+            chrome, which design.md §5 forbids in the sentence that defines it:
+            "Accent color is for content, never for chrome … it never colors a
+            label, an eyebrow, or a category tag." An active-state marker is
+            furniture. The lamplight underline stays on the PAGE's switch, where
+            the thing being marked is content navigation — so "where you are" is
+            still said once, loudly, below.
+
+            One register with the wordmark, at all widths including the mobile
+            dropdown: a panel that switched back to sans would be exactly the
+            unexplained fork §7 warns about. Only `leading-none` is held back to
+            `md:`, so the dropdown's rows keep their tappable height. */
+        }
+        {
           nav.map((item) => (
             <a
               href={item.href}
               aria-current={active === item.key ? 'page' : undefined}
               class:list={[
-                'rounded-field w-full px-2 py-1.5 font-sans text-sm transition-colors md:w-auto md:rounded-none md:p-0',
+                'rounded-field w-full px-2 py-1.5 font-serif text-base tracking-[0.09em] transition-colors [font-variant:all-small-caps] md:w-auto md:rounded-none md:p-0 md:leading-none',
                 active === item.key
-                  ? 'text-base-content md:border-primary md:border-b md:pb-0.5'
+                  ? 'text-base-content'
                   : 'text-base-content/60 hover:bg-base-200 hover:text-base-content md:hover:bg-transparent',
               ]}
             >
@@ -109,10 +178,37 @@ const nav = [
           ))
         }
 
-        {/* Utilities: theme toggle + colophon (a divider above them on mobile). */}
+        {
+          /* Utilities: colophon + theme toggle (a divider above them on mobile).
+
+            ⚠ THE ⌗ COMES FIRST, AND THE ORDER IS THE POINT (2026-08-11). It
+            used to trail the sun/moon, which put the site's one piece of
+            authorship at the far edge of the bar — past the instrument, in the
+            corner reserved for things you dismiss. Reading inward from the nav
+            the line now goes destinations → who made this → how you'd like to
+            read it, which is descending order of what it says about the site.
+            The footer's group was reordered to match on the same principle:
+            "Say hello" (a sentence) then ⌗ then ⌁, credential before utility. */
+        }
         <div
           class="border-base-300 mt-1 flex w-full items-center gap-1 border-t px-1 pt-2 md:mt-0 md:w-auto md:border-0 md:p-0"
         >
+          {
+            /* A trigger only; the drawer it opens is mounted once at layout
+              level (see the note on <Colophon /> below). It stays in the bar
+              even though the footer now carries the same mark, because the two
+              are not the same claim: this one is a CREDENTIAL, seen rather than
+              read, saying at a glance and before anything is opened that a
+              person built this. */
+          }
+          <button
+            type="button"
+            popovertarget="site-colophon"
+            aria-label="How this site was built"
+            class="rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content inline-flex p-1.5 transition-colors"
+          >
+            <Icon name="simple-icons:github" class="size-4" />
+          </button>
           <button
             id="theme-toggle"
             class="theme-toggle rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content p-1.5"
@@ -122,7 +218,6 @@ const nav = [
             <Icon name="ph:sun" class="theme-icon-sun text-base" />
             <Icon name="ph:moon" class="theme-icon-moon text-base" />
           </button>
-          <Colophon />
         </div>
       </nav>
     </header>
@@ -138,7 +233,100 @@ const nav = [
     <main class="min-w-0 flex-1">
       <slot />
     </main>
+
+    {
+      /* ─────────  THE FOOTER  ─────────
+        Five things, one line, one register — the bar's own language, so both
+        ends of the page speak the same way.
+
+            Constellations · Blog · About        Say hello   ⌁ RSS   ⌗ GitHub
+
+        ⚠ NOTHING HERE CLOSES THE PAGE, AND THAT IS THE DECISION (ADR 0029).
+        Four variants were built on the assumption that a footer's job is to
+        CLOSE — a rule and a display-size "← return" under every room, the
+        wordmark set again as a back cover — and all four are wrong for the same
+        reason: THE SUITE ALREADY CLOSES, AND IT CLOSES UPWARD. A site-wide
+        return duplicates that in the one room where it works and INVENTS a
+        destination in the room where it does not (at the front door "upward"
+        means nothing, so the variant had to turn its arrow around and offer
+        "the writing"). A close that changes direction per room is two patterns
+        wearing one coat. A footer is where the addresses live.
+
+        ⚠ THE ⌗ IS IN BOTH THE BAR AND HERE, DELIBERATELY. A variant that
+        unfolded the colophon into the page and took the mark out of the bar was
+        answering the wrong question: the ⌗ up there is not end matter, it is a
+        CREDENTIAL, and a credential works by being seen rather than read. The
+        bar says THAT a person built this, at a glance, before anything is
+        opened; this says HOW. The drawer is opened on demand and reachable from
+        every page including short ones; the footer is a terminus, reached only
+        by finishing. Different jobs, so there is nothing to de-duplicate.
+
+        ⚠ AND THEREFORE: NOTHING A READER NEEDS MAY LIVE ONLY HERE. On /blog,
+        `scripts/blog-feed.ts` appends pages as you scroll and stops only at
+        `pageCount`, so in the site's busiest room this is reached last or never.
+        RSS passes that test only because it stays in the drawer too.
+
+        Two measurements killed the alternatives and are worth keeping:
+        · Dropping the utilities to §7's CHROME register (uppercase sans,
+          11.5px) while the links stayed serif small caps measured 243px against
+          245px, cap heights nearly identical. The two registers land in the
+          same place at this size. A fork that cannot be seen is not a fork.
+        · Two lines flush left vs one line split measured 143px against 149px
+          tall at 390px — BOTH two lines. `stack` is just what this already
+          becomes on a phone, and it only differs above ~600px, where one line
+          reads better anyway.
+
+        It is a sibling of <main> rather than its last child so the wrapper's
+        `flex-1` pushes it to the bottom on a short page. (The bench could only
+        render it inside main, since slot content lands there; both benched rooms
+        overflow the viewport, so it never showed.) */
+    }
+    <footer class="site-foot">
+      <div class="site-foot__inner">
+        <nav class="site-foot__group" aria-label="Site">
+          {
+            nav.map((item) => (
+              <a href={item.href} aria-current={active === item.key ? 'page' : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+
+        {
+          /* "Say hello" carries no icon and the other two do — which is the
+            brief, and it is also the honest split: the first is a sentence you
+            read, the other two are marks you recognise. The ⌗ is a <button>
+            targeting the bar's own popover by id; one drawer, two triggers. */
+        }
+        <div class="site-foot__group">
+          <a href="/about#mv-hello">Say hello</a>
+          <button type="button" popovertarget="site-colophon" aria-label="How this site was built">
+            <Icon name="simple-icons:github" class="site-foot__icon" />
+            GitHub
+          </button>
+          <a href="/rss.xml">
+            <Icon name="ph:rss-simple" class="site-foot__icon" />
+            RSS
+          </a>
+        </div>
+      </div>
+    </footer>
   </div>
+
+  {
+    /* ⚠ MOUNTED HERE, OUTSIDE EVERY TRIGGER'S CONTAINER, DELIBERATELY. It is one
+      drawer with two triggers now — the bar's ⌗ and the footer's — and it used
+      to render both panel and button together inside the bar's utilities
+      <div>, which lives inside `#site-menu` and is therefore `display: none`
+      below `md:` until the hamburger opens it. With only one trigger that was
+      harmless (pressing it meant the menu was open). With two it is a silent
+      failure: on a phone the footer's ⌗ flips the popover to `:popover-open`
+      and paints nothing, because an element in a `display: none` subtree has no
+      box at all. Layout level is the only place that belongs to neither
+      trigger. */
+  }
+  <Colophon />
 
   {backToTop && <BackToTop />}
 

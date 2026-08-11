@@ -14,7 +14,8 @@
 //
 // ⚠ WHY SEVEN WAYS AND NOT FIVE. design.md §13 gives a suite five deliberate
 // ways home (the ✦, the name, the outro, the floating ✦, Escape) — and
-// SiteLayout puts a wordmark and a Home nav item on the same page, which also
+// SiteLayout puts a wordmark and a Constellations nav item on the same page,
+// which also
 // land on `/`. Seven code paths to one destination is exactly the situation
 // that looks fine one at a time and wrong in sequence, so every one of them is
 // driven here rather than assumed. If a future change wires the restore into
@@ -195,7 +196,7 @@ const WAYS: { name: string; take: (page: Page) => Promise<void> }[] = [
     take: async (page) => void (await page.locator('header a[aria-label*="home"]').click()),
   },
   {
-    name: 'the Home nav item',
+    name: 'the Constellations nav item',
     take: async (page) => void (await page.locator('#site-menu a[href="/"]').click()),
   },
 ];

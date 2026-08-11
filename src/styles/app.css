@@ -351,15 +351,24 @@
 
 /* ---------------------------------------------------------------------------
    Colophon popover — the "how this site was built" note, triggered from the top
-   bar. Native top-layer (so it never clips); a script in Colophon.astro
-   positions it just under its trigger on open. This fixed default (top-right,
-   under the bar) is only what shows for the one frame before the script runs.
+   bar AND from the footer. Native top-layer (so it never clips); a script in
+   Colophon.astro positions it under whichever trigger was pressed. This fixed
+   default (top-right, under the bar) is only what shows for the one frame
+   before the script runs — hence `top` tracking the bar's 3.25rem height.
+
+   ⚠ 24rem, NOT 22rem (2026-08-11). The lead-in reads "This site is an
+   independent project built with", which measured 310px inside 22rem's 312px
+   content box — one line, and one line only by luck. A fallback face while
+   Newsreader loads, or one more word, wraps it. Of the three ways out (widen,
+   accept the wrap, shorten back) widening is the one that costs nothing: this
+   is a drawer rather than a card, and nothing else inside it is width-
+   constrained. It stays well under the 8px viewport padding the script keeps.
    ------------------------------------------------------------------------ */
 [popover].colophon-popover {
-  max-width: 22rem;
+  max-width: 24rem;
   position: fixed;
   margin: 0;
-  top: 3.5rem;
+  top: 3.25rem;
   right: 1rem;
 }
 
@@ -367,6 +376,170 @@
    Base is `hidden sm:flex`; this compound selector out-specifies `hidden`. */
 .site-menu.is-open {
   display: flex;
+}
+
+/* ---------------------------------------------------------------------------
+   The top bar's lower edge — 1.5rem of ground fading out beneath the sticky
+   strip, so content DISSOLVES on its way under it instead of being cut.
+
+   ⚠ THIS IS WHAT PAYS FOR DROPPING THE HAIRLINE (2026-08-11, ADR 0030). A solid
+   bar over a page of the same colour has no lower edge at all, and the result is
+   worse than plain: at scroll 640 on `/blog` a line of an excerpt was
+   **guillotined mid-letterform** at exactly y=52, descenders sliced, with
+   nothing to attribute the disappearance to. It did not read as text passing
+   behind a bar — it read as a clipping bug. Michael: *"you clearly see the
+   content going into a uniform background into the void."*
+
+   Three answers were driven side by side over the real feed in both themes.
+
+   · **A hairline** works and is honest, and costs twice: it re-imports one of
+     the four pieces of the starter-template shape §3 objects to, and on `/blog`
+     it puts a FULL-BLEED rule 78px above the page's own `max-w-6xl` rule under
+     the Writing · Quotes · Music switch — two rules, different widths, close
+     together, which is the "bolted on" geometry the footer was designed to
+     avoid at the other end of the page.
+   · **Glass** (translucent + `backdrop-filter`) is the obvious reach and is the
+     worst trade of the three. Measured at 82% over `oklch(20%)` ground with a
+     14px blur: cream text at `oklch(91%)` smears to a faint grey ghost, **and
+     the guillotine is still there underneath it.** A frosted strip is the most
+     recognisable single item on §3's list of tells, and on dusk — the theme
+     nearly every visitor sees, since Base.astro never consults the OS — it buys
+     almost nothing. It reads strongest on `paper`, which fewest people see.
+   · **This.** Content fades to the ground before the edge, so there is no edge
+     to notice.
+
+   Two properties make it better rather than merely different:
+
+   1. **IT SELF-HIDES, WITH NO JAVASCRIPT.** The other good answer is a hairline
+      that fades in past scroll 0, which needs a listener, a class and a state.
+      This needs none: when nothing is under the bar the gradient is the ground
+      fading into the ground. Verified invisible at scroll 0 on `/`.
+   2. **It is a gesture the site already makes twice** — `.excerpt-fade` on a
+      truncated excerpt, and ADR 0029's writing sheet fading in from the left so
+      the drawn figure passes through it. On a constellation suite the SPLINE
+      now fades as it goes under the bar, which makes the bar the same kind of
+      soft boundary the sheet is rather than a lid the drawing hits.
+
+   Costs, accepted: it eats ~24px, so on a post roughly one line dissolves (that
+   line is leaving anyway). And over a photograph a fade-to-ground would read as
+   a smear rather than a dissolve — text and sheets are what it is good at, so
+   cover images in the feed would reopen this.
+
+   ⚠ `z-index: -1` IS LOAD-BEARING, NOT TIDINESS. `::after` is the header's last
+   child in tree order, and the mobile dropdown (`#site-menu`, `absolute
+   top-full mt-2`) opens into exactly the band this paints. Both are positioned
+   at `z-index: auto`, so tree order would decide and the scrim would wash the
+   top of the open menu. A negative z-index puts it in its own layer — above the
+   header's background, below every positioned descendant. It stays visible
+   because it never overlaps the header's own box.
+
+   ⚠ `pointer-events: none` is mandatory: without it the top 24px of every page
+   silently stops taking clicks.
+   ------------------------------------------------------------------------ */
+.site-bar::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 1.5rem;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--color-base-100), transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Site footer — the address block at the foot of every public room. The WHAT
+   and the WHY are in SiteLayout.astro beside the markup; this is the how.
+   ------------------------------------------------------------------------ */
+
+/* ⚠ THE MEASURE IS A DECISION, AND THE SITE HAS FOUR OF THEM: the sky is
+   `max-w-4xl`, the feed `max-w-6xl`, a post `max-w-3xl`, /about `max-w-2xl`.
+   So "line up with the content" is not available — no single width aligns with
+   more than one room. The footer takes the WIDEST, because its job at the end
+   of the page is to be the outermost thing: anything narrower reads as inset
+   INSIDE the feed it is closing, and full-bleed (the bar's own measure) strands
+   two link groups at opposite ends of a 1900px viewport, which is the generic
+   footer this replaced. `space-between` needs a bounded line. The padding is
+   the bar's `px-5`, so both ends of the page start at the same x. */
+.site-foot__inner {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+  margin-top: 6rem;
+  /* ⚠ 5rem CLEARS THE FLOATING CONTROL. `.back-to-top` (and the sky's ✦) is
+     fixed at bottom 1.25rem and is 2.75rem tall, so it owns the bottom 4rem of
+     the viewport at the right edge — exactly where this line's last item sits
+     when you are scrolled to the end. At the bench's 3rem the ⌗ and the ↑ met
+     to the pixel. */
+  padding-bottom: 5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.9rem 3rem;
+}
+
+/* ⚠ THE RULE IS A PSEUDO-ELEMENT, NOT A BORDER ON THE CONTAINER. `__inner` is
+   the page measure, so a `border-top` on it draws at the container's edge —
+   outside the padding, 20px wider each side than every other rule on the site,
+   all of which sit on elements inside it. A footer whose one line does not line
+   up with the rules above it looks bolted on. As a flex item at `1 0 100%` the
+   pseudo is the padded width instead, and it forces the two groups onto the
+   row below it. */
+.site-foot__inner::before {
+  content: '';
+  flex: 1 0 100%;
+  border-top: 1px solid var(--color-base-300);
+  margin-bottom: 2rem;
+}
+
+/* Both groups in the bar's language: design.md §7's VOICE register. */
+.site-foot__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.6rem;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-variant: all-small-caps;
+  letter-spacing: 0.09em;
+  line-height: 1;
+}
+.site-foot__group a,
+.site-foot__group button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  transition: color 150ms;
+  cursor: pointer;
+  /* ⚠ A NO-OP TODAY, AND KEPT ON PURPOSE. The small caps here come from
+     `font-variant`, which inherits fine, so this line changes nothing as long
+     as nothing above sets a text-transform. The trap it guards is real and cost
+     an hour on the bench: Tailwind's preflight gives form elements
+     `font: inherit`, so a <button> picks up the face and the size — but
+     text-transform is NOT part of the `font` shorthand, so the UA stylesheet's
+     `button { text-transform: none }` beats inheritance. A register that used
+     uppercase shipped as "SAY HELLO · RSS · GitHub", one control quietly
+     refusing what its two neighbours took. Add a text-transform to this group
+     and remove this, and it comes straight back. */
+  text-transform: inherit;
+}
+.site-foot__group a:hover,
+.site-foot__group button:hover,
+.site-foot__group a[aria-current='page'] {
+  color: var(--color-base-content);
+}
+
+/* ⚠ SIZED IN `em`, not `rem`, so the mark tracks whatever type it sits in. And
+   small caps sit on a cap height well under the em box, so an icon centred on
+   the em box floats above the letters — the translate drops it onto them. */
+.site-foot__icon {
+  width: 1.05em;
+  height: 1.05em;
+  transform: translateY(0.05em);
 }
 
 /* ---------------------------------------------------------------------------

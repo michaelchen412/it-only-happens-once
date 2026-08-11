@@ -159,6 +159,14 @@ export default defineConfig({
           'check-circle',
           'circle',
           'chat-circle',
+          // The feed's mark, for the site footer being designed on /lab/chrome
+          // (2026-08-11). ⚠ `rss-simple` and not `rss`: the boxed variant reads
+          // as an app icon, and the bare arcs are the mark every reader already
+          // knows. This is the ONE shipped line that bench needed — an icon
+          // cannot be rendered without being on this list, and hand-rolling an
+          // SVG in the bench would have tested a different mark than the one
+          // that would ship. Delete it with the footer if the footer dies.
+          'rss-simple',
           'phone',
           'lock-simple',
           'target',
