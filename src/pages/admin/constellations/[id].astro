@@ -171,37 +171,35 @@ const suite = (placements ?? []).map((p) => {
               .sort((a, b) => a.name.localeCompare(b.name)),
           },
         }
-      : f.type === 'song'
-        ? {
-            kind: 'song',
+      : /* ⚠ NO `song` ARM, AND ANYTHING NOT A QUOTE FALLS TO `writing` (ADR
+           0031). A song is never a suite stanza, and `constellations.place`
+           refuses one — so a song reaching this line means a row that predates
+           the rule, and rendering it as an untitled writing stanza is a visible
+           oddity in the composer rather than a crash on the page you would use
+           to remove it. */
+        {
+          kind: 'writing',
+          item: {
+            id: f.id,
+            slug: f.slug,
             title: f.title || '(untitled)',
-            body: f.body ?? '',
-            attribution: f.attribution,
-            sourceUrl: f.source_url,
-          }
-        : {
-            kind: 'writing',
-            item: {
-              id: f.id,
-              slug: f.slug,
-              title: f.title || '(untitled)',
-              bodyMarkdown: f.body ?? '',
-              excerpt: lede,
-              hasMore: (f.body ?? '').trim().length > lede.length,
-              occurredAt: f.occurred_at,
-              updatedAt: f.updated_at,
-              precision: f.date_precision,
-              readMinutes: readingMinutes(f.body),
-              subjects: (f.fragment_subjects ?? [])
-                .map((fs) => fs.subjects)
-                .filter((s): s is SubjectRef => !!s)
-                .sort((a, b) => a.name.localeCompare(b.name)),
-              // Same PostArticle as the public Reader, so the pairing has to
-              // travel here too — this is the construction site plan 04's
-              // Piece 1 missed, and it is still the easy one to forget.
-              paired: pairedMediaOf(f),
-            },
-          };
+            bodyMarkdown: f.body ?? '',
+            excerpt: lede,
+            hasMore: (f.body ?? '').trim().length > lede.length,
+            occurredAt: f.occurred_at,
+            updatedAt: f.updated_at,
+            precision: f.date_precision,
+            readMinutes: readingMinutes(f.body),
+            subjects: (f.fragment_subjects ?? [])
+              .map((fs) => fs.subjects)
+              .filter((s): s is SubjectRef => !!s)
+              .sort((a, b) => a.name.localeCompare(b.name)),
+            // Same PostArticle as the public Reader, so the pairing has to
+            // travel here too — this is the construction site plan 04's
+            // Piece 1 missed, and it is still the easy one to forget.
+            paired: pairedMediaOf(f),
+          },
+        };
 
   return {
     id: f.id,

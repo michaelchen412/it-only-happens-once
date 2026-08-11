@@ -18,35 +18,21 @@
                 `.suite-writing > .grow`, which both this component's callers
                 already build, so the public suite and the composer's Read view
                 get it from one definition and neither can drift.
-    • song    — the ANNOTATION leads and the embed closes as citation (ADR-0009).
-                A song is Michael's words about a track plus the track itself —
-                structurally what a quote is, inverted: someone else's words plus
-                who said them. So the display-register title is gone when there
-                are words (the embed already shows title and artist, and an
-                essay-sized heading made a song stanza read like an essay); the
-                artist keeps the attribution register a quote's figcaption uses.
-                An UNANNOTATED song falls back to title + artist — there's
-                nothing else to set, and the embed may be blocked.
-                A song is a STANZA: it plays where it was placed (design.md §14).
-                The score above the suite is independent — either, or both, or
-                neither.
+  ⚠ AND THERE IS NO SONG STANZA — there was one, and ADR 0031 deleted it. Music
+  accompanies a constellation as its SCORE (`constellations.score_url`) or
+  through one essay's `paired_song_id`; both are relations rather than
+  membership, and neither renders here. A suite is a sequence read at the
+  reader's pace, and a four-minute song does not queue. In the three weeks the
+  stanza existed, zero of 48 songs were placed in one. `git log` has the
+  implementation if that ever reverses.
 */
 import type { SuiteItem } from '../lib/constellations';
-import { renderMarkdown } from '../lib/markdown';
-import { parseSongRef, songEmbed } from '../lib/media';
 import QuoteReveal from './QuoteReveal.astro';
 
 interface Props {
   item: SuiteItem;
 }
 const { item } = Astro.props;
-
-// `parseSongRef`, not `parseSpotifyEmbed`: a song may cite a YouTube video as
-// well as a Spotify track or album (docs/plans/04 Piece 3), and a placed song
-// has to render wherever it was placed.
-const ref = item.kind === 'song' && item.sourceUrl ? parseSongRef(item.sourceUrl) : null;
-const embed = ref ? songEmbed(ref) : null;
-const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
 ---
 
 {
@@ -97,54 +83,5 @@ const noteHtml = item.kind === 'song' ? renderMarkdown(item.body) : '';
         {item.item.excerpt}
       </p>
     </a>
-  )
-}
-
-{
-  item.kind === 'song' && (
-    <div>
-      {noteHtml ? (
-        <div class="suite-note reading prose-measure" set:html={noteHtml} />
-      ) : (
-        <h2 class="sw-title font-display text-2xl leading-tight font-light sm:text-3xl">{item.title}</h2>
-      )}
-      {item.attribution && (
-        <p
-          class:list={[
-            'suite-attrib text-base-content/50 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]',
-            // prose wants a little more air beneath it than a title does
-            noteHtml ? 'mt-3' : 'mt-2',
-          ]}
-        >
-          — {item.attribution}
-        </p>
-      )}
-      {embed &&
-        (embed.height === null ? (
-          // Video has no natural row height — it's 16:9 and scales with the
-          // measure, so the box sets the ratio and the frame fills it.
-          <div class="mt-4 aspect-video max-w-xl overflow-hidden" style="border-radius: var(--radius-box)">
-            <iframe
-              class="h-full w-full"
-              src={embed.src}
-              loading="lazy"
-              allow={embed.allow}
-              title={item.title}
-              style="border: 0"
-            />
-          </div>
-        ) : (
-          <iframe
-            class="mt-4 max-w-xl"
-            src={embed.src}
-            width="100%"
-            height={embed.height}
-            loading="lazy"
-            allow={embed.allow}
-            title={item.title}
-            style="border-radius: var(--radius-box); border: 0"
-          />
-        ))}
-    </div>
   )
 }

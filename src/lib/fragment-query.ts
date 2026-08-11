@@ -46,6 +46,17 @@ export interface FragmentListParams {
    * not answer before. Distinct from `constellation`, which only marks rows.
    */
   membership: string | null;
+  /**
+   * Only fragments that may be PLACED in a suite — the composer's browser
+   * ([ADR 0031](../../docs/adr/0031-a-song-carries-a-feeling-not-an-idea.md)).
+   *
+   * ⚠ NOT A URL PARAM, and deliberately not one. This is a property of the
+   * ROOM rather than a filter the reader chose — a song is not something you
+   * have filtered out of the picker, it is something that cannot go in a suite
+   * at all. `fragments-panel.astro` sets it in pick mode, the way it already
+   * pins `view` to 'list' there.
+   */
+  placeable: boolean;
   filtered: boolean;
 }
 
@@ -75,6 +86,8 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     workSlug,
     constellation: (sp.get('constellation') || '').trim() || null,
     membership,
+    placeable: false, // the picker turns it on; see the field's comment
+
     filtered:
       !!typeParam || subjectSlugs.length > 0 || q.length >= MIN_SEARCH || !!authorSlug || !!workSlug || !!membership,
   };
@@ -197,9 +210,18 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // deleted dump is reversible from the pile's own undo strip and after that it
   // is simply gone from the interface; the row survives in the database and in
   // the nightly backup, which is the right amount of ceremony for scratch.
+  //
+  // ⚠ AND SONGS ARE OUT OF THE PICKER FOR THE SAME REASON, not a different one
+  // (ADR 0031). A song is never a suite stanza: music accompanies a
+  // constellation through `score_url` or through an essay's `paired_song_id`,
+  // both of which are RELATIONS rather than membership. Excluding it HERE
+  // rather than in the list query is what keeps the badge above each column
+  // honest — filter the rows in one place and the counts in another, and the
+  // picker ends up offering a segment that leads to nothing.
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
     const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
-    return live.neq('status', 'note') as T;
+    const working = live.neq('status', 'note') as T;
+    return (p.placeable ? working.neq('type', 'song') : working) as T;
   };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort

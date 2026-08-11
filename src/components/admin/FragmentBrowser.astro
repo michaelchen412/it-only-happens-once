@@ -89,12 +89,16 @@ const { constellation, constellationName, constellationDescription, constellatio
             class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
             ><TypeMark type="quote" /> Quote</button
           >
-          <button
-            data-new="song"
-            role="menuitem"
-            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-            ><TypeMark type="song" /> Song</button
-          >
+          {
+            /* NO SONG, and its absence is the decision rather than an omission
+              (ADR 0031). This menu makes a fragment *to place in this suite*,
+              and a song is never a suite stanza — it accompanies a
+              constellation through `score_url` or through an essay's
+              `paired_song_id`, both relations rather than membership. Offering
+              a create here would make something the picker below cannot show
+              and `constellations.place` refuses. Songs enter at
+              /admin/listening, in the same motion as the listening. */
+          }
         </div>
       </div>
       <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close"

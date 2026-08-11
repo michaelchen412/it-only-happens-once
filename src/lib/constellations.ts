@@ -25,9 +25,18 @@ export interface ConstellationRef {
   count: number;
 }
 
-/** One stanza of a suite, in whichever register its medium reads at.
- *  `SuiteStanza.astro` renders every variant, public and composer alike —
- *  a song plays where it was placed (design.md §14, resolved 2026-07-25). */
+/*
+  One stanza of a suite, in whichever register its medium reads at.
+  `SuiteStanza.astro` renders every variant, public and composer alike.
+
+  ⚠ THERE IS NO `song` VARIANT, AND THERE USED TO BE (ADR 0031). A song is never
+  a suite stanza: music accompanies a constellation as its SCORE
+  (`constellations.score_url`) or through one essay's `paired_song_id`, and both
+  of those are relations rather than membership. A suite is a sequence read at
+  the reader's pace; a four-minute song does not queue — which ADR 0009 observed
+  and then gave a stanza to anyway. Zero of 48 songs were ever placed in one, in
+  the three weeks the stanza existed.
+*/
 export type SuiteItem =
   /** `reveal` is what the citation control opens onto, or `''` for no control
    *  at all — derived once in lib/provenance.ts so the suite and the blog feed
@@ -37,11 +46,7 @@ export type SuiteItem =
    *  to agree about which quote it is — and `body`/`attribution`/`reveal` alone
    *  could not say. Carrying the shape the blog already uses is what keeps the
    *  two renderings from drifting. */
-  | { kind: 'quote'; quote: QuoteItem }
-  | { kind: 'writing'; item: WritingItem }
-  /** `body` is the annotation — Michael's words on why this song (ADR-0009).
-   *  Empty is normal: a song may say nothing and simply play. */
-  | { kind: 'song'; title: string; body: string; attribution: string | null; sourceUrl: string | null };
+  { kind: 'quote'; quote: QuoteItem } | { kind: 'writing'; item: WritingItem };
 
 export interface Constellation {
   name: string;
@@ -217,18 +222,15 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
           paired: pairedMediaOf(f),
         },
       });
-    } else if (f.type === 'song') {
-      // A song is a stanza in the sequence (design.md §14, resolved 2026-07-25):
-      // it plays where it was placed. The score above the suite and stanzas
-      // inside it are independent — either, both, or neither.
-      items.push({
-        kind: 'song',
-        title: f.title || '(untitled)',
-        body: f.body ?? '',
-        attribution: f.attribution,
-        sourceUrl: f.source_url,
-      });
     }
+    /*
+      ⚠ A `song` ROW FALLS THROUGH AND RENDERS NOTHING, ON PURPOSE (ADR 0031).
+      There is deliberately no branch and no `else` that throws: `place` and
+      `setMembership` both refuse a song now, and the corpus has none placed,
+      so this is unreachable — but if a row ever arrives from a hand-written
+      insert or an old backup, a suite that quietly omits it is a far better
+      failure than one that 500s. The absence is the statement; see `SuiteItem`.
+    */
   }
 
   /*
