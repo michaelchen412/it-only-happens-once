@@ -33,6 +33,7 @@ import BackToTop from './BackToTop.astro';
 
 <script>
   import { navigate } from 'astro:transitions/client';
+  import { closeWithExit } from '../scripts/dialog-close';
 
   const PREFIX = 'read=';
 
@@ -46,26 +47,21 @@ import BackToTop from './BackToTop.astro';
   // on close); false when we arrived already pointing at it (deep link / refresh).
   let openedViaTrigger = false;
 
-  // Pending scroll-unlock, deferred until the slide-out finishes (see close()).
-  let unlockTimer = 0;
-
   // Lock page scroll without shifting the layout: measure the scrollbar we're
   // about to hide and pad the page by exactly that width. (scrollbar-gutter was
   // unreliable across browsers, so we compensate explicitly.)
+  //
+  // ⚠ THE LOCK IS HELD THROUGH THE SLIDE-OUT and dropped after it, which is why
+  // `close()` waits rather than releasing on a timer. Drop it while the drawer
+  // is still moving and the frozen feed gets its scrollbar back and reflows
+  // sideways BEHIND it — a jump at the exact moment the eye is following
+  // something leave.
   function lockScroll() {
-    if (unlockTimer) {
-      clearTimeout(unlockTimer);
-      unlockTimer = 0;
-    } // reopened mid-close
     const sbw = window.innerWidth - document.documentElement.clientWidth;
     document.documentElement.style.setProperty('--reader-sbw', `${sbw}px`);
     document.documentElement.classList.add('reader-open');
   }
   function unlockScroll() {
-    if (unlockTimer) {
-      clearTimeout(unlockTimer);
-      unlockTimer = 0;
-    }
     document.documentElement.classList.remove('reader-open');
     document.documentElement.style.removeProperty('--reader-sbw');
   }
@@ -110,6 +106,11 @@ import BackToTop from './BackToTop.astro';
   }
 
   function show(d: HTMLDialogElement, slug: string) {
+    // Reopened while the last close was still sliding out — tapping a second
+    // fragment straight after dismissing the first. Clearing the flag is what
+    // `closeWithExit` watches for: it stands down instead of shutting a sheet
+    // that has just been handed new content.
+    delete d.dataset.closing;
     if (!d.open) d.showModal();
     // Which slug this sheet is currently showing. On the ELEMENT, not in a
     // module variable: this script is not re-executed across view transitions,
@@ -153,14 +154,18 @@ import BackToTop from './BackToTop.astro';
   function close() {
     const d = reader();
     if (!d || !d.open) return unlockScroll();
+    if (d.dataset.closing) return; // already sliding out; don't restart it
     delete d.dataset.readerSlug;
-    d.close(); // begins the slide-out (translate + backdrop fade)
-    // Hold the scroll-lock until the slide-out finishes. Drop it now and the
-    // frozen feed regains its scrollbar and reflows sideways *behind* the
-    // still-animating drawer — the close-jank. Reopening cancels this (lockScroll
-    // clears the timer). Reduced motion zeroes the duration → unlock at once.
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    unlockTimer = window.setTimeout(unlockScroll, reduce ? 0 : 320); // ≥ the 0.28s slide
+    // ⚠ THE SHEET STAYS OPEN WHILE IT LEAVES. `d.close()` here would be the
+    // obvious line and it is the one that made this vanish on an iPhone —
+    // animating a CLOSED dialog needs the `overlay` property, which Safari and
+    // Firefox do not have. `closeWithExit` slides it out while it is still open
+    // and shuts it afterwards; see scripts/dialog-close.ts for the whole story.
+    //
+    // The scroll-lock is NOT released here. It comes off on the dialog's own
+    // `close` event (bindDialog), which is the only signal that covers every way
+    // this sheet can shut — including the ones we don't initiate.
+    void closeWithExit(d);
   }
 
   // The URL hash is the single source of truth; reconcile the DOM to it.
@@ -256,19 +261,31 @@ import BackToTop from './BackToTop.astro';
 
   // Escape on a modal <dialog> is governed by the `cancel` event — a keydown
   // preventDefault() does NOT stop the native close. If the browser pre-closes
-  // the dialog, close() then sees it already shut and drops the scroll-lock
-  // synchronously, so the feed reflows behind the still-sliding drawer (the very
-  // close-jank the deferred unlock exists to avoid). Intercept `cancel` and route
-  // Escape through dismiss() instead — exactly like the admin drawer. (cancel
-  // doesn't bubble, so it binds on the element; the dataset flag keeps it
-  // idempotent across the view-transition swaps that replace the reader.)
-  function bindCancel() {
+  // the dialog, the sheet snaps away instead of leaving. Intercept `cancel` and
+  // route Escape through dismiss() instead — exactly like the admin drawer.
+  // (Neither `cancel` nor `close` bubbles, so both bind on the element; the
+  // dataset flag keeps it idempotent across the view-transition swaps that
+  // replace the reader.)
+  function bindDialog() {
     const d = reader();
     if (!d || d.dataset.cancelBound) return;
     d.dataset.cancelBound = '1';
     d.addEventListener('cancel', (e) => {
       e.preventDefault();
       dismiss();
+    });
+    // ⚠ THE SCROLL-LOCK COMES OFF HERE, on the one event that means "this sheet
+    // is now shut" no matter who shut it. Releasing it inside close() instead
+    // covers only the paths we control, and the browser has at least one of its
+    // own: Chromium's close watcher fires `cancel` only while the press still
+    // carries user activation, so a SECOND Escape during the slide-out closes
+    // the dialog directly, past the handler above. That is a fine outcome — you
+    // pressed Escape twice, the sheet goes — but the teardown has to notice.
+    // Keying on `close` makes every route out land in the same place.
+    d.addEventListener('close', () => {
+      delete d.dataset.closing;
+      delete d.dataset.readerSlug;
+      unlockScroll();
     });
   }
 
@@ -280,11 +297,11 @@ import BackToTop from './BackToTop.astro';
   // Deep links + view-transition navigation: reconcile on arrival.
   document.addEventListener('astro:page-load', () => {
     openedViaTrigger = false;
-    bindCancel();
+    bindDialog();
     void sync();
   });
   // <html> persists across view transitions — never leak the scroll lock.
   document.addEventListener('astro:before-swap', unlockScroll);
-  bindCancel();
+  bindDialog();
   void sync(); // first load
 </script>

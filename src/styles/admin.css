@@ -48,6 +48,43 @@ dialog,
   }
 }
 
+/* ⚠ THE EXIT IS DRIVEN BY `[data-closing]`, NOT BY `[open]` GOING AWAY, and
+   that is a browser-support fact rather than a style choice. Animating a dialog
+   OUT after `close()` needs the `overlay` property to hold it in the top layer,
+   and `overlay` is Chromium-only — not in Safari (desktop or iOS) and not in
+   Firefox. Since every iOS browser is WebKit, "Chrome on an iPhone" is Safari,
+   and there the sheet vanished in a single frame while looking perfect on a
+   desktop. `scripts/dialog-close.ts` carries the full account.
+
+   So a dialog that is leaving stays genuinely OPEN — in the top layer, where an
+   ordinary transition on an ordinary visible element works in every engine —
+   and only closes once this has finished. `[open][data-closing]` rather than
+   `[data-closing]` alone so it out-specifies the `[open]` rules above rather
+   than relying on source order.
+
+   The `overlay`/`display` transitions on the rules below STAY: they are what
+   makes the ENTER animate (`@starting-style` needs the display flip deferred),
+   and both of those ARE baseline. It was only ever the exit that needed the
+   part Safari lacks. */
+.modal-dialog[open][data-closing],
+.drawer-dialog[open][data-closing] {
+  /* Not interactive on the way out — a click during the slide should reach what
+     is underneath rather than a sheet that has already been dismissed. */
+  pointer-events: none;
+}
+.modal-dialog[open][data-closing]::backdrop,
+.drawer-dialog[open][data-closing]::backdrop {
+  opacity: 0;
+  pointer-events: none;
+}
+.drawer-dialog[open][data-closing] {
+  translate: 100% 0;
+}
+.modal-dialog[open][data-closing] {
+  opacity: 0;
+  scale: 0.97;
+}
+
 /* Centered modal — fade + subtle scale. */
 .modal-dialog {
   border: 1px solid var(--color-base-300);
@@ -110,6 +147,33 @@ html.reader-open {
   max-width: 100vw;
   flex-direction: column;
   /* height, right-pin, and the slide-in come from .drawer-dialog */
+
+  /* ⚠ `display`/`overlay` MOVED TO THE `[open]` STATE, for this dialog only.
+     A transition runs from the property list of the state being moved TO, so
+     listing them under `[open]` still animates the ENTER — which needs the
+     display flip deferred, or `@starting-style` has nothing to start from —
+     while letting the eventual `close()` take `display: none` at once.
+
+     It has to be at once because this sheet closes AFTER its slide rather than
+     during it (`closeWithExit`), so by then it has already left the screen and
+     the deferral buys nothing: the drawer just sat in the layout as a phantom
+     `display: flex` box for a further 0.28s, translated fully off the right —
+     which at 100vw on a phone is a page-width of horizontal scroll that should
+     not exist.
+
+     ⚠ AND IT IS SCOPED HERE RATHER THAN ON `.drawer-dialog` because the
+     workshop's ~40 dialogs still call `dialog.close()` directly and rely on the
+     base rule to animate out. They have the same Safari/Firefox defect this
+     fixes (see scripts/dialog-close.ts) and the same one-line cure available,
+     but taking the base rule away without converting them would trade a bug
+     they have on one engine for a bug on every engine. */
+  transition: translate 0.28s ease;
+}
+.reader[open] {
+  transition:
+    translate 0.28s ease,
+    overlay 0.28s ease allow-discrete,
+    display 0.28s ease allow-discrete;
 }
 /* Lay the sheet out ONLY while it's open. A bare `.reader { display: flex }`
    would beat the UA's `dialog:not([open]) { display: none }` — author origin

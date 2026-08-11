@@ -22,6 +22,20 @@
 // 50% off-screen at 140ms" would fail on a slow CI box for a reason that has
 // nothing to do with the bug.
 //
+// ⚠⚠ AND THERE WAS A SECOND CAUSE UNDERNEATH THE FIRST, which is why there is a
+// third assertion. Fixing the swap made the exit correct in Chromium and
+// changed nothing on a phone: animating a dialog OUT after `close()` needs the
+// CSS `overlay` property to hold it in the top layer, and `overlay` is
+// Chromium-only — absent in Safari (desktop and iOS) and Firefox. Every iOS
+// browser is WebKit, so "Chrome on an iPhone" is Safari, and there the sheet
+// still vanished in a frame. The cure is that the dialog now stays OPEN for the
+// length of its slide and closes afterwards.
+//
+//   3. The exit ran on an OPEN dialog — `slidWhileOpen`. This is the only
+//      assertion that would catch a regression to the `overlay`-dependent
+//      pattern, because Chromium passes 1 and 2 either way. It is a property
+//      test standing in for a browser this suite cannot run.
+//
 // Signed out, and read-only by construction — every route touched is a GET.
 import type { Page } from '@playwright/test';
 // ⚠ `test` FROM ./fixtures, never from @playwright/test — that import is what
@@ -35,6 +49,11 @@ interface Exit {
   swapped: boolean;
   /** The slide-out ran to completion on a node still in the document. */
   slid: boolean;
+  /**
+   * The slide finished while the dialog was still OPEN — the whole of the
+   * cross-engine fix, in one boolean. See the second test below.
+   */
+  slidWhileOpen: boolean;
   /** Still attached when the dust settled (a swap replaces the node). */
   sameNode: boolean;
   open: boolean;
@@ -53,6 +72,19 @@ async function openReader(page: Page): Promise<void> {
   // so the close is measured against a settled page, as a reader's would be.
   await expect(page.locator(`${READER} .reader-inner`)).not.toHaveText('Opening…');
   await expect(page).toHaveURL(/#read=/);
+  // ⚠ AND WAIT FOR IT TO STOP MOVING, which the three assertions above do not
+  // guarantee — they can all pass inside the 280ms slide-IN. Closing a sheet
+  // that is still arriving REVERSES the transition, and a reversed transition is
+  // shortened to match how far it got: caught in the act, `transitionend`
+  // reported `elapsedTime: 0.035` and the sheet was shut 67ms after the press.
+  // That is correct behaviour (dismiss something on its way in and it should
+  // leave promptly) and useless as a measurement of the exit — it made this file
+  // fail about half the time for a reason that had nothing to do with the code
+  // under test.
+  await page.waitForFunction(() => {
+    const d = document.getElementById('site-reader');
+    return !!d && ['0px', 'none', '0px 0px'].includes(getComputedStyle(d).translate);
+  });
 }
 
 /**
@@ -63,14 +95,22 @@ async function openReader(page: Page): Promise<void> {
  */
 async function closeReader(page: Page, how: 'button' | 'escape' | 'backdrop'): Promise<Exit> {
   await page.evaluate(() => {
-    const d = document.getElementById('site-reader')!;
-    const w = window as unknown as { __exit: { swapped: boolean; slid: boolean; node: Element } };
-    w.__exit = { swapped: false, slid: false, node: d };
+    const d = document.getElementById('site-reader') as HTMLDialogElement;
+    const w = window as unknown as {
+      __exit: { swapped: boolean; slid: boolean; slidWhileOpen: boolean; node: Element };
+    };
+    w.__exit = { swapped: false, slid: false, slidWhileOpen: false, node: d };
     document.addEventListener('astro:before-swap', () => (w.__exit.swapped = true), { once: true });
     // `transitionend` fires once per property and bubbles; take the drawer's own
     // `translate` and ignore a hover transition on some button inside it.
     d.addEventListener('transitionend', (e) => {
-      if (e.target === d && e.propertyName === 'translate' && document.contains(d)) w.__exit.slid = true;
+      if (e.target !== d || e.propertyName !== 'translate' || !document.contains(d)) return;
+      w.__exit.slid = true;
+      // ⚠ THE ONE THAT TRAVELS. `d.open` is still true here because the sheet is
+      // only closed AFTER its slide — which is what lets the animation run on an
+      // engine without the `overlay` property. Chromium would pass this test
+      // either way; Safari and Firefox only pass it this way.
+      if (d.open) w.__exit.slidWhileOpen = true;
     });
   });
 
@@ -85,10 +125,13 @@ async function closeReader(page: Page, how: 'button' | 'escape' | 'backdrop'): P
 
   return page.evaluate(() => {
     const d = document.getElementById('site-reader') as HTMLDialogElement;
-    const w = window as unknown as { __exit: { swapped: boolean; slid: boolean; node: Element } };
+    const w = window as unknown as {
+      __exit: { swapped: boolean; slid: boolean; slidWhileOpen: boolean; node: Element };
+    };
     return {
       swapped: w.__exit.swapped,
       slid: w.__exit.slid,
+      slidWhileOpen: w.__exit.slidWhileOpen,
       sameNode: w.__exit.node === d && document.contains(d),
       open: d.open,
       hash: location.hash,
@@ -110,6 +153,10 @@ for (const how of ['button', 'escape', 'backdrop'] as const) {
     expect(exit.slid, 'the slide-out never finished on the live node — the sheet vanished instead of leaving').toBe(
       true,
     );
+    expect(
+      exit.slidWhileOpen,
+      'the slide finished on a CLOSED dialog — that only renders in Chromium, and on WebKit the sheet vanishes instantly',
+    ).toBe(true);
     expect(exit.sameNode).toBe(true);
     expect(exit.open).toBe(false);
     expect(exit.hash).toBe('');
@@ -127,6 +174,7 @@ test('the quotes view closes the same way', async ({ page }) => {
 
   expect(exit.swapped).toBe(false);
   expect(exit.slid).toBe(true);
+  expect(exit.slidWhileOpen).toBe(true);
   expect(exit.hash).toBe('');
 });
 
@@ -173,4 +221,94 @@ test('a deep-linked reader closes without leaving the page', async ({ page }) =>
   expect(exit.slid).toBe(true);
   expect(exit.hash).toBe('');
   await expect(page).toHaveURL(/\/blog$/);
+});
+
+test('reopening mid-slide keeps the new sheet, not the one that was leaving', async ({ page }) => {
+  // Tapping a second fragment straight after dismissing the first. The close in
+  // flight must stand down rather than shutting a sheet that has just been
+  // handed new content — and it must not take the scroll-lock with it.
+  //
+  // ⚠ BOTH CLICKS ARE DISPATCHED FROM INSIDE THE PAGE, and that is the only way
+  // this test means what it says. Driving it with `locator.click()` spends
+  // ~300ms on actionability checks before the press lands, which is longer than
+  // the 280ms slide — so the first draft of this test waited 90ms, reopened
+  // after the sheet had already finished closing, and was measuring the
+  // ordinary sequential path while claiming to measure the overlap. It failed
+  // on timing noise rather than on behaviour.
+  //
+  // The trigger is also chosen BY SLUG rather than by index: a card carries
+  // three `[data-read]` elements (title, excerpt, `Read →`), so `nth(1)` is the
+  // same essay as `nth(0)` and the test proved nothing about switching.
+  await page.goto('/blog');
+  await openReader(page);
+  const first = await page.locator(READER).getAttribute('data-reader-slug');
+  expect(first).toBeTruthy();
+
+  const after = await page.evaluate(async (firstSlug) => {
+    const d = document.getElementById('site-reader') as HTMLDialogElement;
+    const other = [...document.querySelectorAll<HTMLElement>('[data-read]')].find(
+      (el) => el.dataset.read && el.dataset.read !== firstSlug,
+    );
+    if (!other) return { skipped: true } as const;
+
+    document.querySelector<HTMLElement>('[data-reader-close]')!.click();
+    await new Promise((r) => setTimeout(r, 90)); // squarely mid-slide
+    const midSlide = { open: d.open, closing: d.dataset.closing ?? null };
+    other.click();
+    // Well past where the abandoned close would otherwise have landed, fallback
+    // timer (350ms) included.
+    await new Promise((r) => setTimeout(r, 900));
+    return {
+      skipped: false as const,
+      midSlide,
+      open: d.open,
+      closing: d.dataset.closing ?? null,
+      slug: d.dataset.readerSlug ?? null,
+      locked: document.documentElement.classList.contains('reader-open'),
+      chars: d.querySelector('.reader-inner')?.textContent?.trim().length ?? 0,
+    };
+  }, first);
+
+  test.skip(after.skipped, 'this page has only one distinct fragment to open');
+  if (after.skipped) return;
+
+  // The overlap really happened — otherwise the rest asserts nothing.
+  expect(after.midSlide.open, 'the sheet had already closed before the reopen').toBe(true);
+  expect(after.midSlide.closing).toBe('1');
+
+  expect(after.open, 'the abandoned close shut the sheet that replaced it').toBe(true);
+  expect(after.closing, 'the sheet is still flagged as leaving while it is on screen').toBeNull();
+  expect(after.slug).not.toBe(first);
+  expect(after.chars).toBeGreaterThan(40);
+  expect(after.locked, 'the scroll-lock was released out from under an open sheet').toBe(true);
+});
+
+test('a second Escape during the slide still tears everything down', async ({ page }) => {
+  // ⚠ CHROMIUM CLOSES THE DIALOG PAST OUR HANDLER HERE, and that is by design:
+  // its close watcher fires `cancel` only while the press still carries user
+  // activation, so a second Escape shuts the dialog directly. Cutting the
+  // animation short is a fine answer to pressing Escape twice — what must not
+  // happen is a scroll-lock left behind on a page with no sheet on it. The
+  // teardown hangs off the dialog's own `close` event for exactly this reason.
+  await page.goto('/blog');
+  await openReader(page);
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(40);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+
+  const after = await page.evaluate(() => ({
+    open: (document.getElementById('site-reader') as HTMLDialogElement).open,
+    closing: (document.getElementById('site-reader') as HTMLElement).dataset.closing ?? null,
+    locked: document.documentElement.classList.contains('reader-open'),
+    padded: document.documentElement.style.paddingRight,
+    hash: location.hash,
+  }));
+
+  expect(after.open).toBe(false);
+  expect(after.closing).toBeNull();
+  expect(after.locked, 'the page was left unscrollable with no sheet open').toBe(false);
+  expect(after.padded).toBe('');
+  expect(after.hash).toBe('');
 });
