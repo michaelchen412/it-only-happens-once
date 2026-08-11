@@ -7,7 +7,7 @@ Date: 2026-08-06
 
 Two surfaces existed for typing a brain dump, and both were plain `<textarea>`s:
 the **✚ capture box** reachable from every Observatory room, and the **pencil**
-on a card in the Notes pile. That was not an omission. [Plan 14](../plans/archive/14-capture.md)
+on a card in the Notes pile. That was not an omission. Plan 14 (`docs/plans/archive/14-capture.md`)
 §4 wrote it down as a rule:
 
 > ⚠ **The box must stay a plain `<textarea>`.** Wispr Flow dictates into any

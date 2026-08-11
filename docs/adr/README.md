@@ -15,7 +15,76 @@ Date: YYYY-MM-DD
 ## Alternatives — what else we considered and why we passed
 ```
 
+## When one is owed
+
+*Added 2026-08-10 (plan 35 · §1). This file defined the SHAPE of an ADR and said
+nothing about **when** one is due, so the habit ran on memory — and a sweep of
+all 36 plan files found five decisions that met every test below and had never
+been written down. Four of them were load-bearing enough to be cited as
+precedent by later work.*
+
+**Three questions. All three must be yes.**
+
+1. **Does it constrain work that hasn't been specified yet?** A decision about
+   *this* feature is a code comment. A decision about *every future feature of a
+   kind* is an ADR. [0013](0013-absence-never-accumulates.md) is the model — it
+   ends *"this constrains every future HQ surface."*
+2. **Is there a rejected alternative a competent person would re-propose?** If
+   nobody would argue the other way, it is a fact rather than a decision, and
+   facts belong in the `docs/` file that describes the thing.
+3. **Could someone with only this repository — no `docs/plans/`, no
+   `design.md` — reconstruct it?** If yes, don't write one.
+
+⚠ **Question 3 is the one that catches the actual drift**, because it is the
+only one of the three that fails on the two homes that are **git-ignored**. The
+worked example: plan 18 rejected an entire navigation architecture by citing
+`design.md` §13 as binding precedent — quoting both the rule and a reversal that
+had been *built, felt and reversed* — so for a year a reader could work through
+every ADR here and still not learn why the Sky navigates the way it does. That
+is what [0024](0024-the-sky-is-navigation.md) exists to fix.
+
+**Every plan ends with an `## ADR` line, and "none, because…" is a valid answer
+that still has to be written.** See GROUND-RULES (`docs/plans/GROUND-RULES.md`).
+Writing the *refusal* is what makes the acceptance reliable: an optional prompt
+gets skipped by exactly the sessions that most needed it — the ones deep in a
+build, where the ADR-grade decision was taken two hours ago and now reads as
+obvious.
+
+## Immutability, and what it binds
+
 ADRs are immutable once Accepted. To change a decision, write a new ADR that supersedes the old one (and update its Status).
+
+⚠ **Immutability binds the CLAIM, not the POINTERS.** *(Ruled 2026-08-10, plan
+35 · §3, after plan 31 left it open.)* A path, a link, a filename or a typo may
+be corrected in place, and should be. A premise, a decision, a consequence or a
+rejected alternative may not — those need a superseding ADR.
+
+The case that forced the ruling: `0017` is **Accepted** and its §Decision linked
+`/reveal-lab`, a dev bench deleted in plan 31 · §7. Repairing the link changes
+where the sentence points and not what it says. Under a rule with no maintenance
+category, the only compliant options were *leave a published document linking to
+nothing* or *supersede a decision that had not changed* — and every source path
+named in an Accepted ADR is a future instance of the same bind.
+
+**The test is whether a reader who accepted the original would object.** Nobody
+accepted 0017 *because* the bench was at that URL.
+
+## A plan is cited, never linked
+
+⚠ **`docs/plans/` is git-ignored, so a link into it is dead for every reader who
+is not Michael.** An ADR is a *published* document; a published document whose
+provenance citations all 404 fails question 3 above — the one it was written
+under.
+
+So a plan is named in prose with its path in code —
+*plan 18 (`docs/plans/archive/18-sky-return.md`)* — which stays copy-pasteable
+locally and is honest that it is not in the repository. Same for `design.md`,
+`vision.md` and `about-michael.md`: **quote them, don't link them.**
+
+*Applied to all 21 such links on 2026-08-10 (plan 35 · §2), across nine files
+including three Accepted ADRs — which is the immutability ruling above doing
+exactly the job it was made for. Three of the twenty-one were already broken
+even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 
 ## Index
 
@@ -44,6 +113,25 @@ ADRs are immutable once Accepted. To change a decision, write a new ADR that sup
 | [0021](0021-dark-is-the-default-not-the-system-preference.md) | Dark is the default, not the system preference: `dusk` is unconditional, `paper` is a sticky opt-in, `prefers-color-scheme` is not consulted, and the standalone status bar follows the choice | **Proposed** |
 | [0022](0022-the-sky-affords-differently-on-a-thumb.md) | The Sky affords differently on a thumb: every affordance used to be a `:hover` rule, so touch gets three signals arriving as one — and touch and pointer are two models, each consulting exactly one ambient input, never one model with a fallback | **Proposed** |
 | [0023](0023-the-apparatus-closes-the-reading.md) | A fragment's apparatus sits at the FOOT; a word is only for a stanza that is incomplete without the click | Proposed |
+| [0024](0024-the-sky-is-navigation.md) | The zoom is navigation and the overview is home: `/{slug}` is canonical and shareable, returning is remember-and-restore, and a suite resolves upward | Accepted |
+| [0025](0025-an-element-names-its-table.md) | If an element cannot name a table, it does not belong on the page — and a suggestion is never an automatic write | Accepted |
+| [0026](0026-a-multi-row-write-is-one-transaction.md) | A write that must not partly happen is a `plpgsql` function, `SECURITY INVOKER`, so RLS stays the trust boundary | Accepted |
+| [0027](0027-one-lifecycle-for-every-action-call.md) | Every action call goes through `submitAction`/`callAction`, and a per-file allowlist test — not a lint rule — enforces it | Accepted |
+| [0028](0028-the-e2e-suite-is-read-only-against-live.md) | The e2e suite runs against the live project; read-only is a fixture that blocks `/_actions/**` by default, and branching is refused with three named triggers | Accepted |
+
+⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
+(plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all
+36 plan files found five decisions that met every test above and had never been
+written down. Each had been governing work for weeks or months from a
+**git-ignored** file — `design.md`, or the plans folder — and four had already
+been cited as precedent by later plans.
+
+**They are relocations rather than reconstructions**, which is why they could be
+written at all and why they are Accepted rather than Proposed: three of the five
+arguments already existed in full, in a migration header, a test fixture header,
+and a script header. What they lacked was an address a stranger could find. The
+two that were genuinely homeless are 0024 (quoted out of `design.md`, which
+cannot be linked) and 0027.
 
 **Every HQ draft has now graduated.** 0012 and 0015 landed 2026-08-02 with the
 move; **0013 and 0014 on 2026-08-03**, each with the thing that made it real —

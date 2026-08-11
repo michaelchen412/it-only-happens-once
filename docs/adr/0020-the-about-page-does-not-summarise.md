@@ -1,7 +1,7 @@
 # 0020 — The About page does not summarise the sky
 
 Status: **Accepted** *(2026-08-07, with the commit that removes the three fields —
-[plan 23](../plans/23-about-stops-summarising.md). Written before the removal
+plan 23 (`docs/plans/archive/23-about-stops-summarising.md`). Written before the removal
 rather than after, because the reasoning is the part that has to survive: three
 sessions could each re-derive "the About page should introduce his interests" from
 first principles and each be wrong for the same reason.)*
@@ -173,7 +173,7 @@ the heading) is on the record as **worse**, not better.
 - `/admin/about` loses the room's most complex control — a per-row TipTap
   instance, a clone `<template>`, four delegated buttons and a `WeakMap`
   teardown — and `InterestRow.astro` is deleted.
-- ⚠ **[22 · Piece 4](../plans/22-proofread.md) goes stale by one number.** It
+- ⚠ **22 · Piece 4 (`docs/plans/archive/22-proofread.md`) goes stale by one number.** It
   enumerates `mountRichEditor`'s five callers and counts *three editors in the
   About builder*; after this it is two. 22 gates its plugin behind an option
   either way, so nothing breaks — but 22's own header is a lesson about plans

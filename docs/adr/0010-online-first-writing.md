@@ -14,7 +14,7 @@ songs and loose notes.
 A fear rode along with that goal: **losing hours of offline writing.** Every
 route is `output: 'server'` with no `prerender` anywhere, so a failed save
 leaves prose only in the editor's memory. A flight without Wi-Fi looked like it
-could cost an afternoon. [Plan 09](../plans/archive/09-offline-and-notes.md) was written
+could cost an afternoon. Plan 09 (`docs/plans/archive/09-offline-and-notes.md`) was written
 to remove that risk, and its first piece shipped on 2026-07-29: a
 document-keyed IndexedDB outbox, optimistic-concurrency tokens, a drain loop
 under a Web Lock, and 13 unit tests.
@@ -65,7 +65,7 @@ else — is a small cost.
 - **Crash safety for published pieces moves server-side.** Published pieces
   save on explicit intent only, so a crash mid-edit loses that work — the local
   snapshot had been the only thing catching it. Its replacement is
-  [plan 07](../plans/archive/07-revision-history.md): editing a published piece
+  plan 07 (`docs/plans/archive/07-revision-history.md`): editing a published piece
   autosaves into a **draft revision** on the server, and promotion to canonical
   is a deliberate, online act. No local store, no queue, no drain.
 
@@ -82,7 +82,7 @@ else — is a small cost.
 - **We keep the smaller wins the experiment produced**: compare-and-set, the
   confirm-dialog queue, the TipTap `emitUpdate` fix, plain-English network
   errors, and the vitest harness.
-- **The web manifest and app icons stay** ([09 Piece 4](../plans/archive/09-offline-and-notes.md)),
+- **The web manifest and app icons stay** (09 Piece 4 (`docs/plans/archive/09-offline-and-notes.md`)),
   but their justification changes. They were built to earn the iOS
   home-screen storage exemption; with no local queue to protect, they are now
   simply a pleasant way to open the workshop. The favicon fix they carried —
@@ -111,7 +111,7 @@ else — is a small cost.
   solved sync rather than building one. Rejected for now because it reintroduces
   a second source of truth alongside the database, and because the file mirror
   is worth having for its own reasons — see
-  [plan 09 Piece 3](../plans/archive/09-offline-and-notes.md).
+  plan 09 Piece 3 (`docs/plans/archive/09-offline-and-notes.md`).
 - **Leave the outbox in place, unfinished.** Rejected: dead complexity is a tax
   forever, and this particular dead complexity had already caused a false
   belief ("it doesn't seem to be persisting anything locally") in the one
