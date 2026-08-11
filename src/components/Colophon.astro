@@ -81,16 +81,34 @@ const stack = [
     only used to streamline the development process of the site itself.
   </p>
 
-  <a
-    href={repo}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="text-primary mt-5 inline-flex items-center gap-1.5 font-sans text-sm hover:underline"
-  >
-    <Icon name="simple-icons:github" class="size-4" />
-    View on GitHub
-    <Icon name="ph:arrow-up-right" class="size-3" />
-  </a>
+  {
+    /* The feed's only visible address (plan 34 · §5). A <link rel="alternate">
+      in Base is what a reader's *browser* uses; this is what a *person* uses,
+      and a feed nobody can find is a feed nobody reads.
+
+      ⚠ HERE RATHER THAN IN THE NAV, DELIBERATELY. The top bar is three links
+      and a wordmark, and RSS is a minority affordance — putting it up there
+      would spend the site's most contested row on a control most visitors will
+      never press. The colophon is already the drawer for *how this was made*,
+      which is the same register: infrastructure, offered quietly to whoever
+      goes looking. It also keeps the mark out of the mobile burger, where the
+      three real destinations need the room. */
+  }
+  <div class="mt-5 flex items-center justify-between gap-3">
+    <a
+      href={repo}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-primary inline-flex items-center gap-1.5 font-sans text-sm hover:underline"
+    >
+      <Icon name="simple-icons:github" class="size-4" />
+      View on GitHub
+      <Icon name="ph:arrow-up-right" class="size-3" />
+    </a>
+    <a href="/rss.xml" class="text-base-content/55 hover:text-base-content font-sans text-sm transition-colors">
+      RSS
+    </a>
+  </div>
 </div>
 
 <script>

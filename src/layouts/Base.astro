@@ -100,6 +100,14 @@ const { title = 'It Only Happens Once', description, transitions = false, image,
         ask for one. See the component for why it is not opt-in. */
     }
     <Social title={title} description={description} image={image} type={ogType} canonical={canonical} />
+    {
+      /* Feed discovery — how a reader's "subscribe" button finds anything at
+        all (plan 34 · §5). ⚠ IN Base, NOT PER PAGE, on the argument Social's
+        own header already won and this repo has already paid for once: the
+        fourth page forgets, the fifth copies the fourth, and a missing <link>
+        has no symptom on the page it is missing from. */
+    }
+    <link rel="alternate" type="application/rss+xml" title="It Only Happens Once" href="/rss.xml" />
     <Font cssVariable="--font-newsreader" preload />
     <Font cssVariable="--font-atkinson" preload />
     {transitions && <ClientRouter />}

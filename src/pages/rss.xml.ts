@@ -1,0 +1,107 @@
+/*
+  /rss.xml — the feed (plan 34 · §5).
+
+  Of everything plan 34 found, this is the one a reader would *feel* rather than
+  audit: a site whose shape is essays, quotes and music had no feed at all, and
+  the audience for a site like this is disproportionately people who still run a
+  reader.
+
+  ── WRITING ONLY, AND THAT IS THE DECISION THIS FILE CARRIES ────────────────
+
+  The container has to match the thing, which is the same argument plan 33 makes
+  about feelings and subjects.
+
+    • **An essay is a feed item.** Title, date, body, and a reason to arrive in
+      somebody's reader.
+    • **A quote is not.** It has no title of its own — `blog/[slug].astro` has
+      to MANUFACTURE one from its opening 70 characters just to fill a tab and a
+      card. Seventy-seven published quotes arriving as seventy-seven untitled
+      items would bury the essays inside the essays' own feed, and a reader who
+      unsubscribes over that loses both.
+    • **A song is not either.** Its content is an embed, and ADR-0009's
+      annotation is dead by plan 33's finding — so a song here is a link to
+      Spotify with no words around it.
+
+  ⚠ **If quotes are ever wanted in a feed, they want their own — `/quotes.xml`.**
+  Two feeds is a real answer; one mixed feed is the answer that makes both
+  worse. Written down so it is a decision next time rather than a flag on this
+  one.
+
+  ── EXCERPT, NOT FULL CONTENT ───────────────────────────────────────────────
+
+  Two reasons, and the second is the real one. An essay here is *typeset* — the
+  Reader, the paired song, the constellation it sits in — and a feed reader
+  renders none of it; the feed's job is to say *there is a new one, and here is
+  how it opens*. And sending the whole body means every later edit either
+  silently diverges from what was delivered or re-notifies everybody.
+*/
+import type { APIRoute } from 'astro';
+import rss from '@astrojs/rss';
+import { excerpt } from '../lib/markdown';
+
+/**
+ * ⚠ Twenty, not everything. A feed is a recent-items protocol, not an archive —
+ * the archive is `/blog`, which the feed links into. Shipping 120 essays every
+ * time a reader polls is bandwidth spent to tell them nothing new.
+ */
+const FEED_SIZE = 20;
+
+export const GET: APIRoute = async (context) => {
+  const { data } = await context.locals.supabase
+    .from('fragments')
+    .select('slug, title, excerpt, body, occurred_at')
+    .eq('type', 'writing')
+    // Explicit, for the reason `sitemap.xml.ts` states at length: this route
+    // runs under the caller's session, and Michael's can read drafts.
+    .eq('status', 'published')
+    .is('deleted_at', null)
+    /*
+      ⚠ `occurred_at`, WHICH IS THE PIECE'S OWN DATE — matching `listWriting`,
+      so the feed and the blog agree about what "latest" means. A feed ordered
+      differently from the room it points into is a feed that reads as broken.
+
+      *The alternative that lost:* `created_at`, so that publishing a backdated
+      piece surfaces it at the top of everyone's reader. It buys discoverability
+      for the legacy import and pays for it with a permanent disagreement
+      between two orderings of the same corpus — and `updated_at`, the third
+      option, is worse still: it would re-surface an essay as new every time a
+      typo was fixed.
+    */
+    .order('occurred_at', { ascending: false })
+    .limit(FEED_SIZE);
+
+  return rss({
+    title: 'It Only Happens Once',
+    description: 'Essays, gathered into constellations — ways of seeing rather than topics.',
+    // Derived from the request, never configured — `astro.config.mjs` sets no
+    // `site`. See `components/Social.astro` for why, and `lib/robots.ts` for
+    // what stops this being advertised on a host that should not be indexed.
+    site: context.url.origin,
+    /*
+      ⚠ FALSE, AND IT IS A CORRECTNESS FIX RATHER THAN A STYLE PREFERENCE.
+      `@astrojs/rss` appends a trailing slash by default, so the first build of
+      this file emitted `/blog/color/` — and this site serves BOTH forms with a
+      200 while `Social.astro` derives its canonical from `Astro.url.pathname`,
+      which preserves whatever slash it was given. So the feed's URL would have
+      answered, and then declared ITSELF canonical.
+
+      That is §2's `.vercel.app` defect wearing a different costume: a second
+      indexable address for every essay, each one vouching for itself. Caught by
+      loading the route, not by `verify` — nothing in the gate can see it.
+
+      ⚠ The narrow fix is here because the FEED must emit canonical URLs. The
+      wider hole — that any inbound trailing-slash link still self-canonicalises
+      — is NOT closed by this line and is recorded in plan 34 as a finding.
+    */
+    trailingSlash: false,
+    items: (data ?? []).map((p) => ({
+      title: p.title ?? 'Untitled',
+      link: `/blog/${p.slug}`,
+      pubDate: new Date(p.occurred_at),
+      // The authored excerpt when there is one, the opening otherwise — the
+      // same rule `listWriting` applies for a card, so the feed shows what the
+      // blog shows rather than a second summary that can drift from it.
+      description: (p.excerpt ?? '').trim() || excerpt(p.body, 400),
+    })),
+  });
+};

@@ -27,6 +27,8 @@
   empty one makes it render a broken box. Every tag here is conditional on
   having something true to say.
 */
+import { canonicalHref } from '../lib/canonical';
+
 interface Props {
   /** The full document title — the same string that reaches <title>. */
   title: string;
@@ -40,11 +42,12 @@ interface Props {
 }
 const { title, description, image, type = 'website', canonical } = Astro.props;
 
-// Path only: query strings are the reader's filter state (`?subject=`, `?q=`,
-// `?page=`), not different documents, and every one of them would otherwise be
-// indexed as a near-duplicate of the same feed.
+// The derivation lives in `lib/canonical.ts` — query dropped, trailing slash
+// stripped, and both rules argued there. ⚠ It moved out of this file on
+// 2026-08-10 because `src/tests/social-meta.test.ts` was MIRRORING it by hand,
+// so a change here would have left a green test asserting the old rule.
 const origin = Astro.url.origin;
-const href = canonical ?? new URL(Astro.url.pathname, origin).href;
+const href = canonicalHref(Astro.url, canonical);
 const imageHref = image ? new URL(image, origin).href : null;
 ---
 

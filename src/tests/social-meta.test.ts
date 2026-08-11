@@ -9,12 +9,15 @@
 // Astro components cannot be imported into vitest, so these assert the two
 // rules that are pure logic and that a future edit is most likely to get wrong.
 // The tags themselves are covered by the e2e suite, which can render a page.
+//
+// ⚠ THE CANONICAL RULE IS NOW IMPORTED, NOT RESTATED — changed 2026-08-10
+// (plan 34 · §5). This file used to carry its own copy of the derivation, on
+// the reasoning above, and that copy was the problem: the first time the real
+// rule changed, the mirror kept passing against the version it had memorised.
+// A test that cannot fail when the code changes is not a test. `canonicalHref`
+// lives in `lib/canonical.ts` and `Social.astro` imports the same function.
 import { describe, it, expect } from 'vitest';
-
-/** Social.astro's canonical derivation, stated once so a test can hold it. */
-function canonicalOf(url: URL, override?: string): string {
-  return override ?? new URL(url.pathname, url.origin).href;
-}
+import { canonicalHref as canonicalOf } from '../lib/canonical';
 
 /** Social.astro's card choice. An image is the whole difference. */
 const twitterCard = (image: string | null) => (image ? 'summary_large_image' : 'summary');
@@ -31,6 +34,31 @@ describe('the canonical URL', () => {
   it('keeps the path exactly, including a permalink’s slug', () => {
     const u = new URL('https://example.com/blog/never-complain-never-explain');
     expect(canonicalOf(u)).toBe('https://example.com/blog/never-complain-never-explain');
+  });
+
+  it('STRIPS A TRAILING SLASH — the slashed form must not vouch for itself', () => {
+    // This site answers both forms with a 200 (Astro's `trailingSlash` default
+    // is `'ignore'`). Taken verbatim, `/blog/color/` emitted a canonical
+    // pointing at ITSELF — two indexable pages, each declaring its own address
+    // the real one. `@astrojs/rss` appends that slash by default, so the feed's
+    // first build handed every essay a second self-declared canonical.
+    expect(canonicalOf(new URL('https://example.com/blog/color/'))).toBe('https://example.com/blog/color');
+    expect(canonicalOf(new URL('https://example.com/about/'))).toBe('https://example.com/about');
+    // A path can arrive with more than one, from a naive join upstream.
+    expect(canonicalOf(new URL('https://example.com/blog/color//'))).toBe('https://example.com/blog/color');
+  });
+
+  it('leaves the root alone — `/` is the one path whose slash IS the path', () => {
+    // Stripping here would emit an empty canonical, which is worse than the
+    // duplicate it was fixing.
+    expect(canonicalOf(new URL('https://example.com/'))).toBe('https://example.com/');
+  });
+
+  it('still drops the query when the path also carries a slash', () => {
+    // The two rules compose; each was added at a different time, and this is
+    // the case neither one's own test would catch.
+    const u = new URL('https://example.com/blog/?view=quotes&page=2');
+    expect(canonicalOf(u)).toBe('https://example.com/blog');
   });
 
   it('follows the REQUEST’s origin rather than a hardcoded domain', () => {
