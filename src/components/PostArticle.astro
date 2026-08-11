@@ -7,13 +7,19 @@
     • the card's reader <template> in the feed,
     • the /blog/[slug] permalink page.
 
-  Header: the subjects the piece touches (quiet serif links — NOT ✦, which is
-  reserved for constellations, §3), the display title, the Timestamp, and read
-  time. Body is authored Markdown scoped to `.reading`. The caller supplies the
-  measure (`.prose-measure`) and padding.
+  Header: the display title, the Timestamp and the read time — the two facts a
+  reader wants before committing to a long piece, and nothing else. Body is
+  authored Markdown scoped to `.reading`. The caller supplies the measure
+  (`.prose-measure`) and padding.
+
+  ⚠ THE SUBJECTS AND THE SHARE MARK ARE AT THE FOOT, in `FragmentStrip`, and
+  that is a reversal — both shipped in the header first. See
+  docs/adr/0023-the-apparatus-closes-the-reading.md and the note above the strip. It also makes three surfaces agree where two used
+  to: PostCard already footed its subjects, the quote page foots its whole
+  apparatus, and this was the one that did not.
 */
 import Timestamp from './Timestamp.astro';
-import ShareMark from './ShareMark.astro';
+import FragmentStrip from './FragmentStrip.astro';
 import { renderMarkdown } from '../lib/markdown';
 import { embedForUrl } from '../lib/media';
 import type { WritingItem } from '../lib/blog';
@@ -75,43 +81,18 @@ const pairedTitle = item.paired?.title
 
   {
     /*
-    ⚠ THE SHARE MARK IS PINNED RIGHT, NOT APPENDED. Same principle as the quote
-    page's — a control the reader has to hunt for is one they find again from
-    scratch every time — but a DIFFERENT expression of it, because an essay has
-    no rule beneath its title to set a mark into. What it has is this metadata
-    line, whose left side is short and fixed (a date and a read time), so
-    `ml-auto` against the measure's right edge is already the stable address that
-    the quote page had to build a rule break to get.
-
-    ⚠ AND IT IS AT THE HEAD RATHER THAN THE FOOT, which is the opposite of the
-    quote page and is right for the opposite reason. A quote is read in one
-    glance, so its apparatus belongs after it. An essay is a sitting: a reader
-    who decides to pass it on usually decides that partway through, and a control
-    at the end is only reachable by finishing something they already stopped
-    reading to share.
+    ⚠ TWO FACTS AND NOTHING ELSE. This line briefly carried the share mark and,
+    below it, the subjects — four layers of chrome between the title and the
+    first sentence of a piece that averages 5,700 characters. Both moved to the
+    foot (docs/adr/0023-the-apparatus-closes-the-reading.md); what is left is the two things a reader wants BEFORE they
+    commit: when it was written, and how long it will take.
   */
   }
   <div class="text-base-content/40 mt-5 flex flex-wrap items-center gap-3 text-sm">
     <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
     <span class="font-sans">·</span>
     <span class="font-sans">{item.readMinutes} min read</span>
-    {share && <ShareMark url={`/blog/${item.slug}`} label="Share this piece" class="ml-auto" />}
   </div>
-
-  {
-    item.subjects.length > 0 && (
-      <p class="text-base-content/45 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-serif text-sm italic">
-        {item.subjects.map((s, i) => (
-          <>
-            {i > 0 && <span class="text-base-content/20 not-italic">·</span>}
-            <a href={`/blog?subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
-              {s.name}
-            </a>
-          </>
-        ))}
-      </p>
-    )
-  }
 
   {
     pairedEmbed && (
@@ -143,4 +124,45 @@ const pairedTitle = item.paired?.title
   }
 
   {bodyHtml && <div class="reading mt-10" set:html={bodyHtml} />}
+
+  {
+    /*
+    ⚠ THE APPARATUS CLOSES THE PIECE
+    (docs/adr/0023-the-apparatus-closes-the-reading.md). Michael, 2026-08-10: *"a lot of
+    pieces of writing can be rather long. By the time the user is done reading
+    and they feel really inspired, we should have some kind of share affordance
+    near the bottom."*
+
+    He is right, and the first build was wrong in a way worth naming: the share
+    mark shipped at the HEAD, argued from a reader who decides partway through.
+    That reader exists, but the one who matters is the one who has just FINISHED
+    — the whole premise of this feature is that a link is worth sending because
+    the recipient will come and look around, and that impulse arrives at the last
+    paragraph, thousands of pixels below where the control was. These essays
+    average 5,700 characters and run to 14,000.
+
+    ⚠ MOVED, NOT DUPLICATED. Two share marks on one essay is the same redundancy
+    this file already removed once — the paired-song caption said what the embed
+    was saying, and the smaller saying lost. A reader who wants to send a piece
+    without reading it still has the feed card's own permalink.
+
+    Rendered only where the whole piece is: `share` is off in the composer's Read
+    view, and `neighbourhood` is absent on any surface that loaded an excerpt
+    rather than an essay.
+  */
+  }
+  {
+    share && item.neighbourhood && (
+      <FragmentStrip
+        slug={item.slug}
+        subjects={item.subjects}
+        constellations={item.neighbourhood.constellations}
+        related={item.neighbourhood.related}
+        relatedTotal={item.neighbourhood.relatedTotal}
+        occurredAt={item.occurredAt}
+        precision={item.precision}
+        shareLabel="Share this piece"
+      />
+    )
+  }
 </article>

@@ -22,7 +22,7 @@ import PostCard from '../../components/PostCard.astro';
 import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
 import { Icon } from 'astro-icon/components';
-import { listWriting, listQuotes, listSubjects } from '../../lib/blog';
+import { attachNeighbourhoods, listWriting, listQuotes, listSubjects } from '../../lib/blog';
 import { MIN_SEARCH } from '../../lib/search-highlight';
 
 const supabase = Astro.locals.supabase;
@@ -68,6 +68,11 @@ const writing =
   view === 'writing'
     ? await listWriting(supabase, { page, subjects: selectedSubjects, q: q || null, subjectRank })
     : null;
+// ⚠ ONE BATCH FOR THE PAGE, not one per card. Each card carries a full essay in
+// a reader template, and each of those closes with a strip that wants the same
+// three questions answered — asked per essay that is twenty-eight round trips on
+// the busiest route on the site.
+if (writing) await attachNeighbourhoods(supabase, writing.items);
 const quotes =
   view === 'quotes'
     ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, author: authorSlug, subjectRank })

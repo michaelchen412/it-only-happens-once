@@ -9,6 +9,7 @@ import type { createSupabaseServerClient } from './supabase';
 // pure presentation constants with no imports of its own, so this costs the
 // public bundle nothing.
 import type { FragmentType } from './fragments-display';
+import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { excerpt, readingMinutes } from './markdown';
 import { revealOf } from './provenance';
 
@@ -66,6 +67,9 @@ export interface WritingItem {
   subjects: SubjectRef[];
   /** The paired song, if this piece has one (ADR-0009). */
   paired: PairedMedia | null;
+  /** The closing strip's neighbourhood, when a caller has loaded it. Absent on
+   *  a card that only ever renders an excerpt (plan 32 · §11). */
+  neighbourhood?: QuotePage | null;
 }
 
 export interface QuoteItem {
@@ -391,6 +395,16 @@ export type WritingStatus = 'note' | 'draft' | 'published';
  *  never does: whether what you're looking at is actually public. */
 export interface WritingPost extends WritingItem {
   status: WritingStatus;
+  /**
+   * The closing strip's neighbourhood — the constellations this piece sits in
+   * and the lines it is kin to (plan 32 · §11).
+   *
+   * ⚠ NULL WHEN THE CALLER DID NOT ASK. A feed page renders seven of these into
+   * reader templates, and loading each one's neighbourhood separately would be
+   * twenty-eight round trips on the site's busiest route. The feed asks ONCE for
+   * all seven (`attachNeighbourhoods`); the permalink asks for its own.
+   */
+  neighbourhood: QuotePage | null;
 }
 
 /**
@@ -415,7 +429,7 @@ export async function getWritingBySlug(
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`,
+      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subject_id, subjects(name, slug)), ${PAIRED_SELECT}`,
     )
     .eq('type', 'writing')
     .is('deleted_at', null)
@@ -427,8 +441,22 @@ export async function getWritingBySlug(
   if (!r) return null;
 
   const lede = (r.excerpt ?? '').trim() || excerpt(r.body, 400);
+  // One essay, so the batch is a batch of one — but it is the SAME function the
+  // feed and the suite call, which is what stops "related" from meaning three
+  // things on three surfaces.
+  const [neighbourhood] = [
+    ...(
+      await getQuoteNeighbourhoods(supabase, [
+        {
+          id: r.id,
+          subjectIds: ((r.fragment_subjects ?? []) as { subject_id: string }[]).map((fs) => fs.subject_id),
+        },
+      ])
+    ).values(),
+  ];
   return {
     status: r.status,
+    neighbourhood: neighbourhood ?? null,
     id: r.id,
     slug: r.slug,
     title: r.title || '(untitled)',
@@ -517,4 +545,36 @@ export async function listSubjects(
       return { slug, name: m.name, total: m.total, count, selected: isSelected, disabled: count === 0 && !isSelected };
     })
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+}
+
+/**
+ * Fill in `neighbourhood` for a page of essays, in one batch.
+ *
+ * ⚠ THE FEED IS THE REASON THIS IS NOT A LOOP. `/blog` renders seven full
+ * essays into reader templates, and each closing strip wants the same three
+ * questions answered. Asked per essay that is twenty-eight round trips on the
+ * site's busiest route; asked set-wise it is four, whatever the page size.
+ *
+ * Mutates in place and returns the same array, because every caller wants the
+ * items it already has rather than a second list to keep in step.
+ */
+export async function attachNeighbourhoods(supabase: DB, items: WritingItem[]): Promise<WritingItem[]> {
+  if (items.length === 0) return items;
+  const { data } = await supabase
+    .from('fragment_subjects')
+    .select('fragment_id, subject_id')
+    .in(
+      'fragment_id',
+      items.map((i) => i.id),
+    );
+  const byFragment = new Map<string, string[]>();
+  for (const row of data ?? []) {
+    const list = byFragment.get(row.fragment_id) ?? [];
+    list.push(row.subject_id);
+    byFragment.set(row.fragment_id, list);
+  }
+  const seeds: QuoteSeed[] = items.map((i) => ({ id: i.id, subjectIds: byFragment.get(i.id) ?? [] }));
+  const found = await getQuoteNeighbourhoods(supabase, seeds);
+  for (const item of items) (item as WritingPost).neighbourhood = found.get(item.id) ?? null;
+  return items;
 }

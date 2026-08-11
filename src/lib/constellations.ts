@@ -6,7 +6,7 @@
 import type { createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, QuoteItem, SubjectRef } from './blog';
-import { PAIRED_SELECT, pairedMediaOf } from './blog';
+import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { revealOf } from './provenance';
 
@@ -235,6 +235,13 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     which two of the eleven published constellations do.
   */
   const neighbourhoods = await getQuoteNeighbourhoods(supabase, seeds);
+
+  // The essays in the suite want the same closing strip, and the same batch
+  // logic — one page's worth of questions asked once (plan 32 · §11).
+  await attachNeighbourhoods(
+    supabase,
+    items.filter((i): i is Extract<SuiteItem, { kind: 'writing' }> => i.kind === 'writing').map((i) => i.item),
+  );
 
   return {
     name: c.name,

@@ -241,14 +241,23 @@ async function siblingCount(supabase: DB, id: string, authorId: string | null): 
 
 // ── The batched form, for a suite ────────────────────────────────────────────
 
-/** What a caller already holds about each quote, from its own query. */
+/**
+ * What a caller already holds about each fragment, from its own query.
+ *
+ * ⚠ `quote` AND `author*` ARE OPTIONAL BECAUSE AN ESSAY USES THIS TOO. The
+ * closing strip is the same on both (plan 32 · §11, ADR-0023) — subjects,
+ * constellations, kin, a date and a share mark — and only the attribution above
+ * it is a quote's alone. A second near-identical loader for writing was the
+ * alternative and would have been two places that decide what "related" means.
+ */
 export interface QuoteSeed {
   id: string;
-  quote: QuoteItem;
-  authorId: string | null;
-  authorName: string | null;
-  authorSlug: string | null;
-  /** Subject ids — the suite's own select carries names, not ids, so it asks. */
+  /** Absent for an essay: nothing downstream of the strip needs the quote body. */
+  quote?: QuoteItem;
+  authorId?: string | null;
+  authorName?: string | null;
+  authorSlug?: string | null;
+  /** Subject ids — a suite's own select carries names, not ids, so it asks. */
   subjectIds: string[];
 }
 
@@ -358,7 +367,7 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
     const ranked = (rankedPerQuote.get(seed.id) ?? []).filter((fid) => neighbours.has(fid));
     const others = seed.authorId ? Math.max(0, (perAuthor.get(seed.authorId) ?? 0) - 1) : 0;
     out.set(seed.id, {
-      quote: seed.quote,
+      quote: seed.quote as QuoteItem,
       status: 'published', // a suite only ever carries published fragments
       constellations: byConstellation.get(seed.id) ?? [],
       related: ranked.slice(0, RELATED_SHOWN).map((fid) => neighbours.get(fid)!),

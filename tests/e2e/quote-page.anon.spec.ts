@@ -17,7 +17,7 @@
 import { test, expect } from './fixtures';
 import { fixtures } from './fixtures';
 
-const { quoteSlug, richQuoteSlug, quoteConstellationSlug } = fixtures();
+const { quoteSlug, richQuoteSlug, quoteConstellationSlug, publishedSlug } = fixtures();
 
 test.describe('the route serves a quote', () => {
   test.skip(!quoteSlug, 'no published quote in the database');
@@ -204,5 +204,58 @@ test.describe('a quote inside a constellation', () => {
       .locator('.rv__pop:popover-open a')
       .evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute('href')));
     expect(hrefs).not.toContain(here);
+  });
+});
+
+// ── The essay closes the same way ───────────────────────────────────────────
+//
+// ADR-0023. The share mark shipped at an essay's HEAD and moved to the foot:
+// published essays average 5,738 characters and run to 14,296, so the reader who
+// has just finished — the one the whole feature is for — was thousands of pixels
+// below it.
+test.describe('an essay closes with its apparatus', () => {
+  test.skip(!publishedSlug, 'no published essay in the database');
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/blog/${publishedSlug}`);
+    await expect(page.locator('.post-article')).toBeVisible();
+  });
+
+  test('THE SHARE MARK IS BELOW THE PROSE, not above it', async ({ page }) => {
+    const body = (await page.locator('.post-article .reading').boundingBox())!;
+    const mark = (await page.locator('[data-share]').boundingBox())!;
+    expect(mark.y, 'the share mark is back in the header').toBeGreaterThan(body.y + body.height);
+  });
+
+  test('there is exactly ONE of them — moved, not duplicated', async ({ page }) => {
+    // Two would be the same redundancy that deleted the paired-song caption.
+    await expect(page.locator('[data-share]')).toHaveCount(1);
+  });
+
+  test('the header carries only what a reader needs before committing', async ({ page }) => {
+    // The date and the read time. Subjects moved down with the share mark, so
+    // the runway from title to first sentence is one row of chrome, not four.
+    const head = page.locator('.post-article > div').first();
+    await expect(head).toContainText('min read');
+    const links = await head.locator('a[href*="subject="]').count();
+    expect(links, 'the subjects are back in the header').toBe(0);
+  });
+
+  test('the subjects are in the strip, and still filter the feed', async ({ page }) => {
+    const strip = page.locator('[data-share]').locator('..');
+    const first = strip.locator('a[href*="subject="]').first();
+    await expect(first).toBeVisible();
+    // Writing filters the writing feed — no `view=quotes` on an essay's tags.
+    expect(await first.getAttribute('href')).not.toContain('view=quotes');
+  });
+
+  test('and it closes the piece inside the Reader too, not only on the page', async ({ page }) => {
+    await page.goto('/blog');
+    await page.locator('.post-title a').first().click();
+    await expect(page.locator('#site-reader')).toBeVisible();
+    const mark = page.locator('#site-reader [data-share]');
+    await expect(mark).toHaveCount(1);
+    const body = (await page.locator('#site-reader .reading').boundingBox())!;
+    expect((await mark.boundingBox())!.y).toBeGreaterThan(body.y + body.height);
   });
 });
