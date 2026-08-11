@@ -965,6 +965,66 @@ export const songs = {
   }),
 
   /**
+   * Everything the song sheet shows, in one read (plan 37 §2).
+   *
+   * ⚠ AN ACTION RATHER THAN DATA ATTRIBUTES ON THE ROW, and the choice is about
+   * what a list is allowed to weigh. The listening bench used to carry title,
+   * artist, feelings and a pre-resolved embed on every `<li>`; the sheet needs
+   * the album, the year, the private note, the public note and the paired essays
+   * too, and putting those on every row would ship every note in the corpus to
+   * open one of them. One round trip on open is cheaper than a page that grows
+   * with the library.
+   *
+   * The embed is resolved HERE for the same reason `songs.lookup` resolves one:
+   * `lib/media.ts` reaches `astro:env/server` and forbids `src/scripts/` from
+   * importing it, so the browser cannot turn a stored URL into a player.
+   */
+  forSheet: defineAction({
+    input: z.object({ id: z.uuid() }),
+    handler: async ({ id }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+      const [{ data: song }, { data: priv }, { data: essays }] = await Promise.all([
+        sb
+          .from('fragments')
+          .select(
+            'id, type, title, body, attribution, source_url, details, occurred_at, deleted_at, fragment_feelings(feeling_id)',
+          )
+          .eq('id', id)
+          .maybeSingle(),
+        // A separate read because it is a separate TABLE, and an admin-only one
+        // — a PostgREST embed would re-apply its policy and come back null for
+        // anyone but Michael, which is correct and also indistinguishable from
+        // "there is no note". Asking directly makes the difference legible.
+        sb.from('fragment_private_notes').select('notes').eq('fragment_id', id).maybeSingle(),
+        sb.from('fragments').select('title').eq('paired_song_id', id).is('deleted_at', null),
+      ]);
+      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
+      if (song.type !== 'song') throw fail('That is not a song.', 'BAD_REQUEST');
+
+      const details = (song.details ?? {}) as { album?: string };
+      const ref = song.source_url ? parseSongRef(song.source_url) : null;
+      const embed = ref ? songEmbed(ref) : null;
+      return {
+        id: song.id,
+        title: song.title ?? '',
+        artist: song.attribution ?? '',
+        album: details.album ?? '',
+        // The year it ENTERED the corpus, which is `occurred_at` — deliberately
+        // not `details.release_year`, the album's own claim. The two are easy to
+        // conflate and mean different things; `saveSong`'s comment has the account.
+        year: new Date(song.occurred_at).getUTCFullYear(),
+        url: song.source_url ?? '',
+        feelingIds: (song.fragment_feelings ?? []).map((f) => f.feeling_id),
+        publicNote: song.body ?? '',
+        privateNote: priv?.notes ?? '',
+        paired: (essays ?? []).map((e) => e.title || '(untitled)'),
+        embed: { src: embed?.src ?? '', height: embed?.height ?? 0, allow: embed?.allow ?? '' },
+      };
+    },
+  }),
+
+  /**
    * Both notes on a song, in one call (ADR 0031).
    *
    * ⚠ THIS REPLACES "WHY THIS ONE", AND THE RENAME IS THE WHOLE POINT. ADR 0009

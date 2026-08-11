@@ -1,0 +1,358 @@
+---
+/*
+  SongSheet — THE editor for a song, and the only one (docs/plans/37 §2, ADR 0031).
+
+  ⚠ IT REPLACES TWO EDITORS THAT WERE SPLIT BY FIELD, which is the defect it
+  exists to close. `/admin/listening` owned the feelings and could not touch the
+  metadata; `FragmentSheet`'s song form owned the metadata and knew nothing about
+  feelings — so filing a song meant two surfaces, and neither could show you the
+  whole object. Michael, 2026-08-11: *"this division is really uncomfortable for
+  me, and I don't think it's a clean implementation. Ideally… we open up a sheet
+  to edit all the fields, all in one place, albeit separated in tabs."*
+
+  ⚠ THE PASTE BAR LIVES IN HERE RATHER THAN ON THE PAGE (Michael's call,
+  2026-08-11), and that is what makes the consolidation cheap rather than
+  expensive. A sheet carrying its own front door is MOUNTABLE ANYWHERE — so the
+  Fragment Manager can open the same editor instead of needing a second copy or
+  a navigation out of the room. A page-level paste bar would have forced one of
+  those two. The cost is one press to open the sheet that the inline bench did
+  not charge; plan 37's exit condition (twenty songs in a sitting) is what judges
+  whether that was worth it.
+
+  ⚠ AND NOTHING HERE PROPOSES A FEELING. The corpus tags SUBJECTS with a model
+  (ADR-0007) because a subject is what a piece is about and that is legible from
+  the text. A feeling is not a property of the song — it is what happened in
+  Michael — so `songs.setFeelings` has no `suggestFeelings` beside it and this
+  sheet has no button that would call one. Michael, 2026-08-10: *"AI can't tell
+  me what I feel."* Since ADR 0031 also took subjects off songs, **no part of a
+  song is machine-taggable at all**, which is a cleaner line than the one it
+  replaced.
+*/
+import SharedByField from './SharedByField.astro';
+import BackToTop from '../BackToTop.astro';
+
+interface Props {
+  /** The vocabulary, in `sort` order — dark to light. That order is a claim. */
+  feelings: { id: string; name: string }[];
+  /** The roster, for "Shared by" — a song someone sent is its clearest case. */
+  people?: { id: string; display_name: string }[];
+  /** `fragment_id → person_id[]`, rendered once so opening needs no round trip. */
+  sharedBy?: Record<string, string[]>;
+}
+const { feelings, people = [], sharedBy = {} } = Astro.props;
+const thisYear = new Date().getUTCFullYear();
+---
+
+<dialog
+  id="song-sheet"
+  class="drawer-dialog w-full max-w-md"
+  aria-labelledby="sng-title"
+  data-shared-by={JSON.stringify(sharedBy)}
+>
+  <div id="sng-scroll" class="flex h-full flex-col overflow-y-auto overscroll-contain">
+    <header class="border-base-300 flex items-center justify-between border-b px-6 py-4">
+      <h2 id="sng-title" class="font-display truncate text-xl">New song</h2>
+      <button
+        type="button"
+        data-sng-close
+        class="text-base-content/50 hover:text-base-content shrink-0"
+        aria-label="Close">✕</button
+      >
+    </header>
+
+    <p id="sng-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+
+    {
+      /* THE FRONT DOOR. `type="url"` rather than `search`: this field takes one
+        specific kind of string, and the keyboard a phone raises for a URL is the
+        one with the slash on it. On an existing song it holds the CANONICAL
+        `source_url` we stored — not what was once pasted — so changing it is how
+        you re-point a song at a better link. */
+    }
+    <div class="px-6 pt-4">
+      <label class="block">
+        <span class="sr-only">Paste a Spotify or YouTube link</span>
+        <input
+          id="sng-url"
+          type="url"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Paste a Spotify or YouTube link…"
+          class="input input-sm input-bordered w-full font-sans"
+        />
+      </label>
+      {
+        /* ⚠ THE PLAYER IS A DIV THE SCRIPT FILLS, AND REMOVING THE IFRAME IS THE
+          ONLY PAUSE WE HAVE. A cross-origin frame cannot be controlled from
+          outside — no API, no postMessage we own. So closing the sheet, loading
+          a different song, and saving all DESTROY the frame, and that is what
+          stops the sound. Anything that "hides" a player instead of removing it
+          leaves music playing in a room you have left. */
+      }
+      <div id="sng-player" class="mt-4 empty:mt-0"></div>
+    </div>
+
+    <div class="admin-tabs mt-4 px-6" role="tablist" aria-label="Song sections">
+      {
+        /* ⚠ FEELINGS IS FIRST AND IS THE DEFAULT, and that is the ergonomic
+          argument for the whole sheet. The loop plan 33 §3 says decides whether
+          any of this happens — paste, listen, press the words, save, next — must
+          never require visiting a second tab. The metadata arrives already
+          filled from `songs.lookup`, so "The song" is the tab you open when the
+          lookup got something wrong, not the one you pass through. */
+      }
+      <button
+        type="button"
+        role="tab"
+        class="admin-tab"
+        data-tab="feelings"
+        aria-selected="true"
+        aria-controls="sng-panel-feelings"
+      >
+        Feelings<span id="sng-feel-count" class="admin-tab__n"></span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="admin-tab"
+        data-tab="song"
+        aria-selected="false"
+        tabindex="-1"
+        aria-controls="sng-panel-song"
+      >
+        The song
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="admin-tab"
+        data-tab="notes"
+        aria-selected="false"
+        tabindex="-1"
+        aria-controls="sng-panel-notes"
+      >
+        Notes<span id="sng-notes-mark" class="admin-tab__n"></span>
+      </button>
+    </div>
+
+    {/* ── FEELINGS ─────────────────────────────────────────────────────── */}
+    <div id="sng-panel-feelings" role="tabpanel" data-tabpanel="feelings" class="px-6 py-5">
+      {
+        /* Buttons, not checkboxes, and pressed rather than checked:
+          `aria-pressed` is the role for a toggle that changes a thing rather
+          than submitting a value, and it keeps the row reading as a row of WORDS
+          instead of a form. The order is `feelings.sort` — dark to light — which
+          is the spectrum's claim and not an alphabetisation. */
+      }
+      <div id="sng-words" class="flex flex-wrap gap-2">
+        {
+          feelings.map((f) => (
+            <button
+              type="button"
+              class="sng-word rounded-field border-base-300 hover:border-base-content/40 border px-2.5 py-1 font-sans text-sm transition-colors"
+              data-feeling={f.id}
+              aria-pressed="false"
+            >
+              {f.name}
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        /* ADDING A WORD MID-LISTEN. Not a convenience: plan 33 §1 says the
+          vocabulary is *discovered by tagging, not by drafting*, and that is only
+          true if a word can be added without stopping the track. A sheet that
+          made you leave for the Library would fail on exactly the songs that
+          matter most — the ones whose feeling is not in the list yet.
+
+          ⚠ AND IT IS DELIBERATELY PLAIN. The counterweight is size discipline: a
+          prominent "+ new word" turns sixteen words into sixty by month three.
+          It types the whole word, it lands at the bright end of the spectrum
+          where it is visibly unplaced, and the Library is where it gets its
+          position. */
+      }
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <input
+          id="sng-newword"
+          placeholder="a word that isn’t here…"
+          aria-label="Add a word to the vocabulary"
+          class="input input-xs input-bordered w-48 font-sans"
+        />
+        <button id="sng-addword" type="button" class="btn btn-ghost btn-xs normal-case">Add it</button>
+        <span id="sng-wordnote" hidden class="admin-hint italic"></span>
+      </div>
+    </div>
+
+    {/* ── THE SONG ─────────────────────────────────────────────────────── */}
+    <div
+      id="sng-panel-song"
+      role="tabpanel"
+      data-tabpanel="song"
+      hidden
+      class="flex flex-col gap-4 px-6 py-5 font-sans"
+    >
+      {
+        /* Auto-filled from the lookup but editable: a five-artist track joins to
+          "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans", which is
+          a credit list rather than an attribution. */
+      }
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Title</span>
+        <input id="sng-song-title" class="input input-sm input-bordered font-serif" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Artist</span>
+        <input id="sng-artist" class="input input-sm input-bordered" placeholder="Miles Davis" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Album</span>
+        <input id="sng-album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70"
+          >Added <span class="text-base-content/40">— the year it entered the corpus</span></span
+        >
+        <input id="sng-year" type="number" value={thisYear} class="input input-sm input-bordered" />
+      </label>
+
+      {
+        /* THE PAIRING, SHOWN AND READ-ONLY (ADR 0011, plan 37 §2). It is the
+          single most useful fact about 46 of the 48 songs here and was invisible
+          anywhere in the workshop until now.
+
+          ⚠ NOT EDITABLE, and that is the decision rather than a shortcut.
+          Pairing is the ESSAY's decision — `songs.pair` is called from the
+          writing sheet's Music tab, which is where you are when the question
+          "what goes with this piece?" actually arises. A second control here
+          would be a second write path for a relation that already has one, and
+          the pairing would then have two homes that could disagree about which
+          essay a song belongs to. */
+      }
+      <div id="sng-paired-wrap" hidden class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">Paired with</span>
+        <p id="sng-paired" class="text-base-content/60 font-serif"></p>
+        <span class="admin-hint">Set from the essay’s own Music tab.</span>
+      </div>
+
+      <SharedByField scope="song" people={people} />
+    </div>
+
+    {/* ── NOTES ────────────────────────────────────────────────────────── */}
+    <div
+      id="sng-panel-notes"
+      role="tabpanel"
+      data-tabpanel="notes"
+      hidden
+      class="flex flex-col gap-5 px-6 py-5 font-sans"
+    >
+      {
+        /* ⚠ THIS IS NOT "WHY THIS ONE", AND THE RENAME IS THE WHOLE POINT (ADR
+          0031). ADR 0009 gave a song `body` as an annotation — the sentence on
+          *why this song* — and in seventeen days one song in forty-eight used
+          it. What it was used for was *"I love Janek's playing in the beginning;
+          it really sets the tone for the whole piece"*: an observation, not a
+          justification. The field was mislabelled from the hour it was created,
+          and the label is what kept it empty.
+
+          Michael, 2026-08-11: *"I don't need to tell you why the music is good.
+          That's violating a really big aesthetic principle of mine — I want to
+          show and not tell."*
+
+          SPLIT BY AUDIENCE, NOT BY LENGTH, and the helper lines say which is
+          which in the one place the choice is actually made. That sentence
+          existed nowhere in the old form, and its absence WAS the bug: nothing
+          said who would read what you were typing. */
+      }
+      <div class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">A note <span class="text-base-content/40">— anyone can open this</span></span
+        >
+        <div id="sng-pub-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
+          <div
+            class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
+            role="toolbar"
+            aria-label="Formatting"
+          >
+            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button
+            >
+            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+              ><i>I</i></button
+            >
+          </div>
+          <div id="sng-pub" class="max-h-[28vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
+        </div>
+        <span class="text-base-content/45 text-xs">
+          Opens from a small mark beside the song in the music room. Leave it empty and there is no mark — which is the
+          normal case.
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-1 text-sm">
+        <span class="text-base-content/70">For you <span class="text-base-content/40">— nobody else, ever</span></span>
+        <div id="sng-priv-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
+          <div
+            class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
+            role="toolbar"
+            aria-label="Formatting"
+          >
+            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button
+            >
+            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+              ><i>I</i></button
+            >
+          </div>
+          <div id="sng-priv" class="max-h-[28vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
+        </div>
+        <span class="text-base-content/45 text-xs">
+          Where it came from, the week it belongs to, what to listen for. Stored in its own table, admin-only, and
+          revoked from the public key — it is never rendered anywhere.
+        </span>
+      </div>
+    </div>
+
+    {
+      /* ONE SAVE, IN THE FOOTER, FOR THE WHOLE SHEET — and this deviates from
+        plan 37's table, which had feelings and notes applying immediately while
+        the metadata kept a Save.
+
+        WHY IT CHANGED once it was laid out: "applies immediately" exists to stop
+        a relation riding along with a COMPARE-AND-SET save that could lose a
+        rewrite — that is the rule `pair` and the constellation picker follow,
+        and both live on the writing sheet, which has exactly such a save. A song
+        has none: `saveSong` carries no `base_updated_at` and there is no
+        autosave to collide with. So the reason for splitting the writes does not
+        apply here, and three write moments across three tabs would have made
+        "have I saved?" a question you answer by remembering which tab you were
+        on.
+
+        One object, one editor, one Save. The fast loop stays one press:
+        paste → listen → press the words → Save.
+
+        The exception is Shared by, which keeps its own immediate contract and
+        queues its ticks until a new song has an id — see SharedByField. */
+    }
+    <div class="border-base-300 bg-base-100 sticky bottom-0 mt-auto flex items-center gap-2 border-t px-6 py-4">
+      <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save</button>
+      <button id="sng-delete" type="button" hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+      <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
+    </div>
+  </div>
+  <BackToTop scroller="#sng-scroll" inDialog />
+</dialog>
+
+<style>
+  /* The pressed state, and it is the only styling this sheet adds.
+
+     A border and a weight rather than a fill: the row is a row of WORDS, and a
+     block of coloured chips reads as a form control. `--color-primary` is the
+     same accent the rest of the workshop uses for "this is on". */
+  .sng-word[aria-pressed='true'] {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  import '../../scripts/song-sheet';
+</script>
