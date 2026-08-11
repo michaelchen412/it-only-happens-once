@@ -38,9 +38,12 @@ export function wireListeningBench(): void {
   const bench = bench0;
 
   const playerEl = document.getElementById('lst-player') as HTMLElement;
+  const fieldsEl = document.getElementById('lst-fields') as HTMLElement;
   const titleEl = document.getElementById('lst-title') as HTMLInputElement;
   const artistEl = document.getElementById('lst-artist') as HTMLInputElement;
-  const knownEl = document.getElementById('lst-known') as HTMLElement;
+  const lineEl = document.getElementById('lst-line') as HTMLElement;
+  const lineTitleEl = document.getElementById('lst-line-title') as HTMLElement;
+  const lineArtistEl = document.getElementById('lst-line-artist') as HTMLElement;
   const wordsEl = document.getElementById('lst-words') as HTMLElement;
   const newWordEl = document.getElementById('lst-newword') as HTMLInputElement;
   const addWordBtn = document.getElementById('lst-addword') as HTMLButtonElement;
@@ -173,14 +176,16 @@ export function wireListeningBench(): void {
     loaded = args.song;
     bench.hidden = false;
     raisePlayer(args.embed.src, args.embed.height, args.embed.allow);
+    // Fields for a song with no row yet; a plain line for one that has one. Both
+    // are always populated — `save` reads the inputs, and a song that already
+    // exists never reaches that branch — so the two can never disagree about
+    // what is on the bench.
     titleEl.value = args.title;
     artistEl.value = args.artist;
-    // A saved song's metadata belongs to the Fragment Manager; this screen is
-    // about what it does to you. Read-only rather than absent, so you can still
-    // read the title beside the player you are listening to.
-    titleEl.readOnly = args.known;
-    artistEl.readOnly = args.known;
-    knownEl.hidden = !args.known;
+    lineTitleEl.textContent = args.title;
+    lineArtistEl.textContent = args.artist;
+    fieldsEl.hidden = args.known;
+    lineEl.hidden = !args.known;
     setSelection(args.feelingIds);
     statusEl.textContent = '';
     bench.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

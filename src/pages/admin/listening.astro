@@ -101,26 +101,30 @@ const filed = rows.filter((r) => r.feelingIds.length > 0);
     <section id="lst-bench" hidden class="border-base-300 rounded-box mb-10 border p-4">
       <div id="lst-player" class="mb-4"></div>
 
-      <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-        {
-          /* Editable for a song that does not exist yet, because the oEmbed
-            fallback often knows the title and not the artist and a five-artist
-            track joins to a mouthful nobody wants as an attribution. Locked once
-            the row exists — the Fragment Manager owns a saved song's metadata,
-            and a second editor for it here would be a second write path. */
-        }
-        <input
-          id="lst-title"
-          aria-label="Song title"
-          class="input input-sm input-bordered min-w-0 grow font-serif read-only:border-transparent read-only:bg-transparent read-only:px-0"
-        />
-        <input
-          id="lst-artist"
-          aria-label="Artist"
-          class="input input-sm input-bordered min-w-0 grow font-sans read-only:border-transparent read-only:bg-transparent read-only:px-0"
-        />
-        <span id="lst-known" hidden class="admin-hint shrink-0 italic">already in the corpus</span>
+      {
+        /* TWO PRESENTATIONS, NOT ONE CONTROL IN TWO STATES, and the difference is
+          worth the extra element.
+
+          A song that does not exist yet needs FIELDS: the oEmbed fallback often
+          knows the title and not the artist, and a five-artist track joins to a
+          credit list rather than an attribution. A song that already has a row
+          needs a LINE: its metadata belongs to the Fragment Manager, and a second
+          editor for it here would be a second write path.
+
+          Read-only inputs were tried first and read badly — two borderless boxes
+          still occupying field-shaped space, stranded at opposite ends of a flex
+          row, sized by the layout rather than by the words. The fix is not to
+          restyle an input into looking like text; it is to use text. */
+      }
+      <div id="lst-fields" class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <input id="lst-title" aria-label="Song title" class="input input-sm input-bordered min-w-0 grow font-serif" />
+        <input id="lst-artist" aria-label="Artist" class="input input-sm input-bordered min-w-0 grow font-sans" />
       </div>
+      <p id="lst-line" hidden class="mb-4 flex flex-wrap items-baseline gap-x-2">
+        <span id="lst-line-title" class="font-serif"></span>
+        <span id="lst-line-artist" class="text-base-content/55 font-sans text-sm"></span>
+        <span id="lst-known" class="admin-hint italic">already in the corpus</span>
+      </p>
 
       {
         /* THE WORDS. Buttons, not checkboxes, and pressed rather than checked:
