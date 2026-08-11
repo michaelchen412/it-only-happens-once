@@ -66,7 +66,7 @@ const [
       // `is_self` and `details` join `authors`/`works` in feeding the Read
       // view's citation reveal (2026-08-05, plan 17a) — the composer previews
       // what a reader gets, so it has to derive from the same three facts.
-      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, status, occurred_at, updated_at, date_precision, author_id, work_id, deleted_at, authors(name), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
+      `position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, status, occurred_at, updated_at, date_precision, author_id, work_id, deleted_at, authors(name, slug), works(title), fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT})`,
     )
     .eq('constellation_id', c.id)
     .is('fragments.deleted_at', null)
@@ -111,7 +111,7 @@ const suite = (placements ?? []).map((p) => {
     details: Record<string, unknown> | null;
     author_id: string | null;
     work_id: string | null;
-    authors: { name: string } | null;
+    authors: { name: string; slug: string } | null;
     works: { title: string } | null;
     fragment_subjects: { subjects: SubjectRef | null }[] | null;
   };
@@ -160,6 +160,8 @@ const suite = (placements ?? []).map((p) => {
             sourceUrl: f.source_url,
             occurredAt: f.occurred_at,
             precision: f.date_precision,
+            author: f.authors?.slug ? { name: f.authors.name, slug: f.authors.slug } : null,
+            authorSiblings: 0,
             // ⚠ NOT the `subjects` const above — that one is comma-joined for
             // the sheet's TagInput, and this wants the {name, slug} pairs the
             // public renderer links with.

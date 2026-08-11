@@ -75,6 +75,17 @@ export interface WritingItem {
 export interface QuoteItem {
   id: string;
   slug: string;
+  /**
+   * Who said it, as a FACET rather than as the rendered line — the feed's
+   * attribution can offer "everything by this person" only if it knows the
+   * structured fact behind the words (plan 32 · §5).
+   *
+   * ⚠ Null for the three quotes filed under an authorless work (The Bible), the
+   * one that is Michael's own, and the one nobody knows. Those get no door.
+   */
+  author: { name: string; slug: string } | null;
+  /** OTHER published quotes by that author. 0 → the door leads back to here. */
+  authorSiblings: number;
   body: string;
   attribution: string | null;
   /**
@@ -355,7 +366,7 @@ export async function listQuotes(
     // in RLS, verified before this shipped; a policy change that closed them
     // would empty the reveal rather than break the page.
     .select(
-      'id, slug, body, attribution, is_self, details, source_url, occurred_at, date_precision, authors(name), works(title), fragment_subjects(subjects(name, slug))',
+      'id, slug, body, attribution, is_self, details, source_url, occurred_at, date_precision, author_id, authors(name, slug), works(title), fragment_subjects(subjects(name, slug))',
       {
         count: 'exact',
       },
@@ -371,6 +382,29 @@ export async function listQuotes(
   if (searchTerm) query = query.or(`body.ilike.%${searchTerm}%,attribution.ilike.%${searchTerm}%`);
 
   const { data, count } = await query;
+
+  /*
+    ⚠ ONE COUNT FOR THE PAGE. Each card's attribution offers "N more lines from
+    …", which needs a per-author total — asked per card that is twenty-five
+    round trips on the quotes view. One `IN` over the authors actually on this
+    page answers all of them, and the corpus is small enough that the rows are
+    cheaper than the queries. Same reasoning as `getQuoteNeighbourhoods`.
+  */
+  const pageAuthorIds = [...new Set((data ?? []).map((r) => r.author_id).filter((a): a is string => Boolean(a)))];
+  const siblingsByAuthor = new Map<string, number>();
+  if (pageAuthorIds.length > 0) {
+    const { data: sib } = await supabase
+      .from('fragments')
+      .select('author_id')
+      .eq('type', 'quote')
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .in('author_id', pageAuthorIds);
+    for (const row of sib ?? []) {
+      if (row.author_id) siblingsByAuthor.set(row.author_id, (siblingsByAuthor.get(row.author_id) ?? 0) + 1);
+    }
+  }
+
   const items: QuoteItem[] = (data ?? []).map((r) => ({
     id: r.id,
     slug: r.slug,
@@ -381,6 +415,8 @@ export async function listQuotes(
     occurredAt: r.occurred_at,
     precision: r.date_precision,
     subjects: subjectsOf(r, opts.subjectRank),
+    author: r.authors?.slug ? { name: r.authors.name, slug: r.authors.slug } : null,
+    authorSiblings: r.author_id ? (siblingsByAuthor.get(r.author_id) ?? 1) - 1 : 0,
   }));
 
   const total = count ?? items.length;
@@ -559,13 +595,42 @@ export async function listSubjects(
  * items it already has rather than a second list to keep in step.
  */
 export async function attachNeighbourhoods(supabase: DB, items: WritingItem[]): Promise<WritingItem[]> {
-  if (items.length === 0) return items;
+  const found = await neighbourhoodsFor(
+    supabase,
+    items.map((i) => ({ id: i.id })),
+  );
+  for (const item of items) (item as WritingPost).neighbourhood = found.get(item.id) ?? null;
+  return items;
+}
+
+/**
+ * Neighbourhoods for a page of fragments, resolving their subjects for them.
+ *
+ * ⚠ THE SUBJECT LOOKUP IS THE WHOLE REASON THIS EXISTS. `getQuoteNeighbourhoods`
+ * wants subject IDS, and the public item types carry subject NAMES — the two
+ * callers that have items rather than rows would each have written this lookup,
+ * and one of them did: the quotes feed's first version passed `subjectIds: []`
+ * to save a query and silently produced sheets with no constellations, no
+ * related lines and no door. It rendered, it threw nothing, and the apparatus
+ * was simply absent. One lookup, one place.
+ */
+export async function neighbourhoodsFor(
+  supabase: DB,
+  seeds: {
+    id: string;
+    quote?: QuoteItem;
+    authorName?: string | null;
+    authorSlug?: string | null;
+    authorOthers?: number;
+  }[],
+): Promise<Map<string, QuotePage>> {
+  if (seeds.length === 0) return new Map();
   const { data } = await supabase
     .from('fragment_subjects')
     .select('fragment_id, subject_id')
     .in(
       'fragment_id',
-      items.map((i) => i.id),
+      seeds.map((s) => s.id),
     );
   const byFragment = new Map<string, string[]>();
   for (const row of data ?? []) {
@@ -573,10 +638,8 @@ export async function attachNeighbourhoods(supabase: DB, items: WritingItem[]): 
     list.push(row.subject_id);
     byFragment.set(row.fragment_id, list);
   }
-  const seeds: QuoteSeed[] = items.map((i) => ({ id: i.id, subjectIds: byFragment.get(i.id) ?? [] }));
-  const found = await getQuoteNeighbourhoods(supabase, seeds);
-  for (const item of items) (item as WritingPost).neighbourhood = found.get(item.id) ?? null;
-  return items;
+  const full: QuoteSeed[] = seeds.map((s) => ({ ...s, subjectIds: byFragment.get(s.id) ?? [] }));
+  return getQuoteNeighbourhoods(supabase, full);
 }
 
 // ---------------------------------------------------------------------------

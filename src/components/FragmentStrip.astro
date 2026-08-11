@@ -42,13 +42,46 @@ interface Props {
   /** The fragment's own address — what the share mark hands over. */
   slug: string;
   subjects: SubjectRef[];
-  constellations: QuoteConstellation[];
-  related: QuoteNeighbour[];
+  /**
+   * ⚠ BOTH DEFAULT TO EMPTY, AND THE FEED DELIBERATELY PASSES NEITHER. A card is
+   * one of seven or twenty-five on a page; "1 constellation · 4 related lines"
+   * repeated twenty-five times down the quotes view is a toolbar, not a feed,
+   * and it is the same repetition that kept a share mark off every suite stanza.
+   * Michael, 2026-08-10: *"should be the full strip but no need for
+   * related/constellations. share mark, date, for consistency."*
+   *
+   * They belong to the OPENED fragment, where there is one of it.
+   */
+  constellations?: QuoteConstellation[];
+  related?: QuoteNeighbour[];
   /** The TRUE size of the related set. The popover shows the top few and
    *  scrolls; a count that was really a cap would be worse than no count. */
-  relatedTotal: number;
+  relatedTotal?: number;
   occurredAt: string;
   precision: 'day' | 'year';
+  /**
+   * ⚠ OFF WHERE THE CARD ALREADY SHOWS ONE. A writing card carries
+   * "date · read time" under its title — the two facts you weigh before opening
+   * it — so repeating the date at the foot would be the same duplication that
+   * moved the share mark down in the first place. A quote card has no head line
+   * at all, so its date lives here.
+   */
+  showDate?: boolean;
+  /**
+   * The rule above the strip.
+   *
+   * ⚠ OFF IN A FEED, ON A PAGE. A rule means "a boundary", and a list already
+   * has one at every card edge — using the same mark for *between items* and
+   * *within an item* makes neither legible. Measured on the quotes view before
+   * this existed: **49 horizontal rules on one page**, 25 strip rules and 24
+   * card separators, at near-identical weight. Michael: *"the divider line is
+   * too visually similar to the divider lines separating each quote."*
+   *
+   * On a page or in a sheet the fragment owns the screen, nothing else divides
+   * it from what follows, and the rule is the only thing saying the work has
+   * ended and the apparatus has begun. There it earns its mark.
+   */
+  ruled?: boolean;
   /** "Share this quote" / "Share this piece" — the mark's only accessible name. */
   shareLabel: string;
   /** A quote's date is provenance ("Added"); an essay's is publication. */
@@ -60,12 +93,14 @@ interface Props {
 const {
   slug,
   subjects,
-  constellations,
-  related,
-  relatedTotal,
+  constellations = [],
+  related = [],
+  relatedTotal = 0,
   occurredAt,
   precision,
   shareLabel,
+  showDate = true,
+  ruled = true,
   sharesWholeSignature = 0,
   dateKind = 'posted',
   datePrefix,
@@ -127,9 +162,14 @@ const allSubjectsHref =
     */
 }
 <div
-  class="border-base-content/10 text-base-content/40 relative mt-12 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-5 pr-12 font-sans text-sm sm:pr-14"
+  class:list={[
+    'text-base-content/40 relative flex flex-wrap items-center gap-x-5 gap-y-3 font-sans text-sm',
+    // The mark straddles the rule, so it only needs room reserved when there IS
+    // one; unruled, it sits at the end of the row like any other item.
+    ruled ? 'border-base-content/10 mt-12 border-t pt-5 pr-12 sm:pr-14' : 'mt-6',
+  ]}
 >
-  <ShareMark url={`/blog/${slug}`} label={shareLabel} onRule />
+  {ruled && <ShareMark url={`/blog/${slug}`} label={shareLabel} onRule />}
 
   {
     subjects.length > 0 && (
@@ -146,9 +186,13 @@ const allSubjectsHref =
   }
 
   {/* mobile tier 1, right end */}
-  <span class="ml-auto text-xs sm:hidden">
-    <Timestamp date={occurredAt} kind={dateKind} precision={precision} prefix={datePrefix} />
-  </span>
+  {
+    showDate && (
+      <span class="ml-auto text-xs sm:hidden">
+        <Timestamp date={occurredAt} kind={dateKind} precision={precision} prefix={datePrefix} />
+      </span>
+    )
+  }
 
   {/* the actions — their own row below `sm`, right-aligned at `sm` */}
   <div class="flex w-full items-center gap-x-4 gap-y-2 sm:ml-auto sm:w-auto">
@@ -224,9 +268,18 @@ const allSubjectsHref =
       )
     }
 
-    <span class="hidden sm:inline">
-      <Timestamp date={occurredAt} kind={dateKind} precision={precision} prefix={datePrefix} />
-    </span>
+    {
+      showDate && (
+        <span class="hidden sm:inline">
+          <Timestamp date={occurredAt} kind={dateKind} precision={precision} prefix={datePrefix} />
+        </span>
+      )
+    }
+    {
+      /* Unruled, the mark has no line to be set into — so it ends the row, which
+        is the same PLACE, just without a rule drawn through it. */
+    }
+    {!ruled && <ShareMark url={`/blog/${slug}`} label={shareLabel} />}
   </div>
 </div>
 

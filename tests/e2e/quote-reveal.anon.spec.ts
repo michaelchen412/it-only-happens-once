@@ -47,9 +47,23 @@ test.describe('the attribution is the control', () => {
   test('is a real button, labelled with what it opens', async ({ page }) => {
     const t = page.locator(TRIGGER).first();
     await expect(t).toHaveJSProperty('tagName', 'BUTTON');
-    const reveal = ((await page.locator(POP).first().textContent()) ?? '').trim();
-    await expect(t).toHaveAttribute('aria-label', `Where this came from: ${reveal}`);
     await expect(t).toHaveAttribute('aria-expanded', 'false');
+
+    // ⚠ THE LABEL IS NO LONGER THE LITERAL "Where this came from: …", and the
+    // change is the behaviour rather than the test. This control used to open
+    // onto exactly one thing — a citation — so naming the citation named the
+    // control. Since plan 32 · §5 it can also carry "N more lines from …", and
+    // on a quote with no citation at all that door is the ONLY thing behind it.
+    // A name promising provenance would then describe a control that offers a
+    // filter.
+    //
+    // So this asserts the property that has to hold on every surface: the
+    // trigger has a name of its own, and it is NOT merely its visible text —
+    // which is the whole reason a label is set here, the words being an
+    // attribution that says nothing about being pressable.
+    const label = (await t.getAttribute('aria-label')) ?? '';
+    expect(label.length, 'the trigger has no accessible name').toBeGreaterThan(0);
+    expect(label).not.toBe(((await t.textContent()) ?? '').trim());
   });
 });
 

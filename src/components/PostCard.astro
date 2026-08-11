@@ -33,6 +33,7 @@
 */
 import Timestamp from './Timestamp.astro';
 import PostArticle from './PostArticle.astro';
+import FragmentStrip from './FragmentStrip.astro';
 import Highlighted from './admin/Highlighted.astro';
 import { highlight, excerpts, toPlain, MIN_SEARCH } from '../lib/search-highlight';
 import type { WritingItem } from '../lib/blog';
@@ -48,12 +49,6 @@ const searching = term.trim().length >= MIN_SEARCH;
 const titleSegs = searching ? highlight(item.title, term) : null;
 const { windows, more } = searching ? excerpts(toPlain(item.bodyMarkdown), term) : { windows: [], more: 0 };
 const showWindows = searching && windows.length > 0;
-
-// Subjects arrive busiest-first (lib/blog.ts). Show a few; the rest fold into a
-// quiet "+N" so a heavily-tagged essay never overruns the footer.
-const SUBJECT_CAP = 3;
-const shownSubjects = item.subjects.slice(0, SUBJECT_CAP);
-const extraSubjects = item.subjects.length - shownSubjects.length;
 ---
 
 <article class="post-card py-9 first:pt-0">
@@ -121,21 +116,34 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
     </a>
   </div>
 
-  {/* Subjects — left-aligned filter links, the quiet chrome at the foot (§7). */}
   {
-    item.subjects.length > 0 && (
-      <ul class="text-base-content/40 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs">
-        {shownSubjects.map((s) => (
-          <li>
-            <a href={`/blog?subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
-              {s.name}
-            </a>
-          </li>
-        ))}
-        {extraSubjects > 0 && <li class="text-base-content/30">+{extraSubjects}</li>}
-      </ul>
-    )
+    /*
+    ⚠ THE CARD CLOSES LIKE THE PIECE DOES (ADR-0023). This was a bare list of
+    subjects with no rule — a third answer to "how does a fragment present its
+    metadata", alongside the quote card's crammed figcaption and the opened
+    view's ruled strip. Michael, 2026-08-10: *"I think we need to apply these
+    changes to the blog view for the entries for writing/quotes."*
+
+    ⚠ NO related/constellation CONTROLS, and no date. The controls belong to the
+    opened fragment, where there is one of it — twenty-five "4 related lines"
+    down the quotes view is a toolbar. The date is already in the head line
+    above, which is where a card's "should I open this?" facts live.
+
+    The subject CAP goes with the old list, deliberately: `+2` was there because
+    a bare wrapping list had nothing to hold it. The strip is a two-column rule
+    that already wraps, and a reader scanning a feed is better served by the
+    tags than by a count of the ones being withheld.
+  */
   }
+  <FragmentStrip
+    slug={item.slug}
+    subjects={item.subjects}
+    occurredAt={item.occurredAt}
+    precision={item.precision}
+    showDate={false}
+    ruled={false}
+    shareLabel="Share this piece"
+  />
 
   {/* Full essay, cloned into the Reader on demand. Inert until then. */}
   <template data-reader-content={item.slug}>

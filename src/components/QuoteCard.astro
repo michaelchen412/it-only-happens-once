@@ -22,8 +22,8 @@
       it was said — putting a bare date next to the attribution wrongly
       implies the latter.
 */
-import Timestamp from './Timestamp.astro';
-import QuoteReveal from './QuoteReveal.astro';
+import Reveal from './Reveal.astro';
+import FragmentStrip from './FragmentStrip.astro';
 import Highlighted from './admin/Highlighted.astro';
 import { MIN_SEARCH } from '../lib/search-highlight';
 import type { QuoteItem } from '../lib/blog';
@@ -35,10 +35,13 @@ interface Props {
 const { item, term = '' } = Astro.props;
 const searching = term.trim().length >= MIN_SEARCH;
 
-// Subjects arrive busiest-first (lib/blog.ts); cap to a few, fold the rest into
-// a quiet "+N" so the caption stays on a tidy line or two.
-const shownSubjects = item.subjects.slice(0, 3);
-const extraSubjects = item.subjects.length - shownSubjects.length;
+// ⚠ The attribution is a control when there is ANYTHING behind it — a citation,
+// or the rest of that author's lines. Until 2026-08-10 the feed offered only the
+// citation, so a plainly-quoted person was a dead end here while the same quote's
+// own page offered the door. One rule, both surfaces (plan 32 · §5).
+const hasDoor = Boolean(item.author && item.authorSiblings > 0);
+const authorHref = item.author ? `/blog?view=quotes&author=${item.author.slug}` : null;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 ---
 
 <style>
@@ -87,41 +90,77 @@ const extraSubjects = item.subjects.length - shownSubjects.length;
     being read and a quote is a movement in it, not a card that leads away.
   */
   }
-  <a href={`/blog/${item.slug}`} class="quote-line block">
+  {
+    /*
+    ⚠ `data-read` — IT OPENS THE SHEET, IT DOES NOT NAVIGATE (2026-08-10).
+    Michael: *"when we click a quote, just how there's a reading viewer sheet
+    for the writing on the blog, we should also have a sheet for the quote. and
+    getting to a dedicated page should follow a similar path as the writing."*
+
+    Until now this was the one place on the site where clicking a fragment threw
+    the reader out of the list they were reading — a constellation's quote had
+    opened a sheet since earlier the same day, and an essay card always had. The
+    `href` is what makes "a similar path as the writing" literally true: the
+    Reader's own capture handler lets ⌘/Ctrl/Shift-click and any non-primary
+    button fall through to the permalink, and it IS the no-JS floor.
+  */
+  }
+  <a href={`/blog/${item.slug}`} data-read={item.slug} class="quote-line block">
     <blockquote class="font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
       {searching ? <Highlighted text={item.body} term={term} /> : item.body}
     </blockquote>
   </a>
-  <figcaption class="text-base-content/45 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm">
-    {
-      item.attribution && (
-        <span class="text-base-content/50 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
-          {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
-              name, and underlining it on hover reads as a typo. */}
-          {'— '}
-          <QuoteReveal reveal={item.reveal}>
+  {
+    item.attribution && (
+      <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">
+        {/* The em-dash stays OUTSIDE the control: it is punctuation, not the
+            name, and underlining it on hover reads as a typo. */}
+        {'— '}
+        {item.reveal || hasDoor ? (
+          <Reveal label={`About ${item.attribution}`}>
             {searching ? <Highlighted text={item.attribution} term={term} /> : item.attribution}
-          </QuoteReveal>
-        </span>
-      )
-    }
-    {/* Subjects then the "Added" date, pinned right (provenance, not when-said). */}
-    <div class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
-      {
-        item.subjects.length > 0 && (
-          <ul class="text-base-content/40 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            {shownSubjects.map((s) => (
-              <li>
-                <a href={`/blog?view=quotes&subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
-                  {s.name}
+            <Fragment slot="content">
+              {item.reveal && <span class="qp-cite">{item.reveal}</span>}
+              {hasDoor && authorHref && (
+                <a href={authorHref} class:list={['qp-door', item.reveal && 'qp-door--ruled']}>
+                  {plural(item.authorSiblings, 'more line', 'more lines')} from {item.author!.name}
+                  <span class="qp-door__arrow">→</span>
                 </a>
-              </li>
-            ))}
-            {extraSubjects > 0 && <li class="text-base-content/30">+{extraSubjects}</li>}
-          </ul>
-        )
-      }
-      <Timestamp date={item.occurredAt} kind="added" precision={item.precision} prefix="Added" />
-    </div>
-  </figcaption>
+              )}
+            </Fragment>
+          </Reveal>
+        ) : searching ? (
+          <Highlighted text={item.attribution} term={term} />
+        ) : (
+          item.attribution
+        )}
+      </figcaption>
+    )
+  }
+
+  {
+    /*
+    ⚠ THE CARD CLOSES LIKE THE QUOTE DOES (ADR-0023). The subjects and the date
+    used to be crammed onto the attribution line, right-aligned against it —
+    a third answer to "how does a fragment present its metadata", next to the
+    writing card's bare list and the opened view's ruled strip.
+
+    The date lives here rather than in the head, because a quote card HAS no
+    head: the line is the content, and "Added Wednesday" is filing.
+
+    No related/constellation controls — see FragmentStrip. Twenty-five of them
+    down this view is a toolbar, and they belong to the opened quote.
+  */
+  }
+  <FragmentStrip
+    slug={item.slug}
+    subjects={item.subjects}
+    occurredAt={item.occurredAt}
+    precision={item.precision}
+    ruled={false}
+    shareLabel="Share this quote"
+    dateKind="added"
+    datePrefix="Added"
+    subjectView="quotes"
+  />
 </figure>

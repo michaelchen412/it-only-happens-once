@@ -177,6 +177,10 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
         occurredAt: f.occurred_at,
         precision: f.date_precision,
         subjects,
+        author: f.authors?.slug ? { name: f.authors.name, slug: f.authors.slug } : null,
+        // The suite fills this from its batch below; a stanza is not where the
+        // door renders, so 0 here is the honest placeholder rather than a lie.
+        authorSiblings: 0,
       };
       seeds.push({
         id: f.id,

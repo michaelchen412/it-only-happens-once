@@ -27,9 +27,18 @@ import Label from '../../components/Label.astro';
 import PostCard from '../../components/PostCard.astro';
 import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
+import QuoteArticle from '../../components/QuoteArticle.astro';
 import MusicRoom from '../../components/MusicRoom.astro';
 import { Icon } from 'astro-icon/components';
-import { attachNeighbourhoods, listMusicRoom, listWriting, listQuotes, listSubjects } from '../../lib/blog';
+import {
+  attachNeighbourhoods,
+  listMusicRoom,
+  listWriting,
+  listQuotes,
+  listSubjects,
+  neighbourhoodsFor,
+} from '../../lib/blog';
+
 import { parseFeelings } from '../../lib/music-room';
 import { MIN_SEARCH } from '../../lib/search-highlight';
 
@@ -128,6 +137,7 @@ const writing =
 // three questions answered — asked per essay that is twenty-eight round trips on
 // the busiest route on the site.
 if (writing) await attachNeighbourhoods(supabase, writing.items);
+
 const quotes =
   view === 'quotes'
     ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, author: authorSlug, subjectRank })
@@ -136,6 +146,27 @@ const quotes =
 // one page of everything that qualifies (ruling 3: card delivery is a separate,
 // swappable concern, and windowing it is a later decision with a measured
 // trigger).
+/*
+  The quotes view fills the Reader from a `<template>` per card, so each one
+  needs its whole apparatus — and ONE batch answers all twenty-five, the same
+  way the constellation suite does it. Asked per card this would be a hundred
+  round trips on a view that currently makes two.
+*/
+const quoteSheets = quotes
+  ? await neighbourhoodsFor(
+      supabase,
+      quotes.items.map((q) => ({
+        id: q.id,
+        quote: q,
+        authorName: q.author?.name ?? null,
+        authorSlug: q.author?.slug ?? null,
+        // Already counted once for the cards' own doors — handing it over saves
+        // asking the same question twice on one render.
+        authorOthers: q.authorSiblings,
+      })),
+    )
+  : new Map();
+
 const feed = writing ?? quotes;
 
 const noun = view === 'quotes' ? 'quote' : 'essay';
@@ -402,13 +433,13 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                   </p>
                 </div>
               ) : view === 'writing' ? (
-                <div id="feed-list" class="divide-base-300 divide-y">
+                <div id="feed-list" class="divide-base-content/10 divide-y">
                   {writing!.items.map((item) => (
                     <PostCard item={item} term={q} />
                   ))}
                 </div>
               ) : (
-                <div id="feed-list" class="divide-base-300 divide-y">
+                <div id="feed-list" class="divide-base-content/10 divide-y">
                   {quotes!.items.map((item) => (
                     <QuoteCard item={item} term={q} />
                   ))}
@@ -439,9 +470,31 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
     /* The in-context reader. The writing view fills it from a `<template>` per
       card; the music room ships none and lets it fetch the permalink instead —
       one room of the whole corpus would otherwise inline every essay it mentions
-      (measured at 51% of the document). See Reader.astro. */
+      (measured at 51% of the document). See Reader.astro.
+
+      ⚠ THE QUOTES VIEW USES IT TOO, as of 2026-08-10. Michael: *"when we click a
+      quote, just how there's a reading viewer sheet for the writing on the blog,
+      we should also have a sheet for the quote."* A quote card used to NAVIGATE
+      to the permalink, which is the one place on the site where clicking a
+      fragment threw the reader out of the list they were reading — a
+      constellation's quote had opened a sheet since earlier the same day.
+
+      The templates are cheap here in a way they are not for essays: a quote's
+      whole apparatus is a few hundred bytes, where the essay measurement above
+      was 51% of the document. */
   }
-  {(view === 'writing' || view === 'music') && <Reader />}
+  {(view === 'writing' || view === 'music' || view === 'quotes') && <Reader />}
+  {
+    view === 'quotes' &&
+      quotes!.items.map((q) => {
+        const page = quoteSheets.get(q.id);
+        return page ? (
+          <template data-reader-content={q.slug}>
+            <QuoteArticle page={page} />
+          </template>
+        ) : null;
+      })
+  }
 </SiteLayout>
 
 <script>

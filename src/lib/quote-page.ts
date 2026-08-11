@@ -136,6 +136,11 @@ export async function getQuotePage(
         subjects: subjectRows
           .map((x) => ({ name: x.subjects?.name ?? '', slug: x.subjects?.slug ?? '' }))
           .filter((x) => x.slug),
+        // The page's door reads `QuotePage.author`, which the batch computes —
+        // these two carry the same fact for the FEED's card, which has no
+        // neighbourhood loaded.
+        author: r.authors?.slug ? { name: r.authors.name, slug: r.authors.slug } : null,
+        authorSiblings: 0,
       },
       authorId: r.author_id,
       authorName: r.authors?.name ?? null,
@@ -204,6 +209,9 @@ export interface QuoteSeed {
   authorId?: string | null;
   authorName?: string | null;
   authorSlug?: string | null;
+  /** A precomputed sibling count, when the caller already batched one (the
+   *  quotes feed does, for its cards). Absent → this function counts. */
+  authorOthers?: number;
   /** Subject ids — a suite's own select carries names, not ids, so it asks. */
   subjectIds: string[];
 }
@@ -322,7 +330,7 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
 
   for (const seed of seeds) {
     const ranked = (rankedPerQuote.get(seed.id) ?? []).filter((fid) => neighbours.has(fid));
-    const others = seed.authorId ? Math.max(0, (perAuthor.get(seed.authorId) ?? 0) - 1) : 0;
+    const others = seed.authorOthers ?? (seed.authorId ? Math.max(0, (perAuthor.get(seed.authorId) ?? 0) - 1) : 0);
     // ⚠ Counted against PUBLISHED rows only, like everything else here — the
     // whole-signature set comes off `fragment_subjects`, which carries drafts
     // and trashed rows, so an unfiltered count would keep the link alive
