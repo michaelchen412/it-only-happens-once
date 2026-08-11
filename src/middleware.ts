@@ -35,6 +35,77 @@ function rendersChrome(request: Request, pathname: string): boolean {
   return dest === null || dest === 'document';
 }
 
+/**
+ * The four-and-a-half security headers, on every response (plan 34 · §6c).
+ *
+ * ⚠ THIS IS HALF OF §6, AND THE OTHER HALF — THE CSP ITSELF — IS DELIBERATELY
+ * NOT HERE. Three things were established on 2026-08-10, in this order, and
+ * together they mean a Content-Security-Policy for this app currently has no
+ * environment in which it can be tested before it reaches readers:
+ *
+ *   1. Astro's `security.csp` emits a `<meta http-equiv>` element and nothing
+ *      else. **There is no report-only mode** — and `Content-Security-Policy-
+ *      Report-Only` is forbidden in a meta element by the CSP spec itself, so
+ *      this is not an Astro gap that a flag will close. Plan 34 · §6d's whole
+ *      de-risking strategy ("Report-Only for a week, then flip") assumed one.
+ *   2. `security.csp` is **not supported in dev mode** — Astro says so plainly.
+ *   3. `astro preview` **does not run under `@astrojs/vercel`** (the process
+ *      exits before becoming ready). So the `build` + `preview` loop §6d named
+ *      as the substitute for dev does not exist on this project either.
+ *
+ * Net: the first execution of any CSP written here would be in production — for
+ * a policy whose risky half is a hand-written origin allowlist, where each
+ * wrong entry breaks a feature SILENTLY (Turnstile injects its own `<script>`,
+ * so no hash can cover it; Spotify and YouTube need `frame-src` or every song
+ * is a blank box; the workshop's uploads need the Supabase origin in
+ * `connect-src`). That is the exact shape of failure GROUND-RULES' *compiling
+ * is not verifying* was written about, and shipping into it would be the
+ * workaround rather than the fix.
+ *
+ * **Two named ways forward, both decisions rather than details.** Either move
+ * the whole policy here as a **nonce-based header** — which restores
+ * report-only, restores `frame-ancestors`, and leaves one mechanism instead of
+ * two, at the cost of threading a nonce into the three `is:inline` scripts — or
+ * get a local preview working (`vercel dev`) so Astro's meta CSP can be
+ * exercised first. Measured while deciding: the homepage alone renders **55
+ * inline `style=` attributes**, which hashes cannot cover, so `style-src` will
+ * need `'unsafe-inline'` either way.
+ *
+ * What IS here cannot break a render. Every header below is inert to layout,
+ * script and network, which is why it ships today and the CSP does not.
+ */
+function harden(res: Response, url: URL): Response {
+  // Clickjacking. `frame-ancestors` would be the modern spelling and it is
+  // ignored in a meta element — one more reason the CSP wants to be a header
+  // when it comes. Nothing on this site is meant to be framed by anybody;
+  // framing OTHERS (Spotify, YouTube) is `frame-src` and is unaffected.
+  res.headers.set('X-Frame-Options', 'DENY');
+
+  // MIME sniffing. The OG route serves image bytes and the two feeds serve XML;
+  // a sniffed content type is how one of those becomes something executable.
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+
+  // Referrer: full URL to ourselves, origin-only cross-site. A reader arriving
+  // at Spotify from a constellation should not hand over which constellation.
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  // Nothing in this app uses any of them, and the workshop's uploads are file
+  // pickers rather than device capture.
+  res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+
+  // ⚠ HTTPS ONLY, and ⚠ NO `preload`. HSTS is ignored over plain HTTP anyway,
+  // but sending it from `localhost` is how a dev machine pins itself to a
+  // scheme the dev server does not speak. And `preload` is effectively
+  // irreversible — submitted to a browser-vendor list, removed on nobody's
+  // schedule — which is not a commitment to make while `itonlyhappensonce.blog`
+  // still points somewhere else entirely (see `lib/robots.ts`).
+  if (url.protocol === 'https:') {
+    res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
+  return res;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createSupabaseServerClient(context);
 
@@ -83,9 +154,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // Protect the admin area: require the admin role (Michael only).
   if (context.url.pathname.startsWith('/admin')) {
-    if (!user) return context.redirect('/sign-in');
+    // ⚠ THE TWO REFUSALS ARE HARDENED EXPLICITLY, because they return WITHOUT
+    // calling `next()` and would otherwise be the only responses this app sends
+    // that carry no security headers at all. Caught by reading `curl -I /admin`
+    // rather than by any check — a 302 has no body to break, so nothing about
+    // it looks wrong. `Referrer-Policy` is the one that earns its place here:
+    // the refusal is the one response most likely to be followed off-site.
+    if (!user) return harden(context.redirect('/sign-in'), context.url);
     if (user.app_metadata?.role !== 'admin') {
-      return context.redirect('/sign-in?denied=1');
+      return harden(context.redirect('/sign-in?denied=1'), context.url);
     }
 
     // ── The day, resolved once ──────────────────────────────────────────────
@@ -144,8 +221,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // side, where bfcache is doing real work for real readers.
     const res = await next();
     res.headers.set('Cache-Control', 'no-store');
-    return res;
+    return harden(res, context.url);
   }
 
-  return next();
+  return harden(await next(), context.url);
 });
