@@ -137,6 +137,18 @@ const subjectRank = new Map(subjects.map((s) => [s.slug, s.total]));
 
 // The rail shows the whole taxonomy on desktop, but a long list crowds the top
 // of the mobile page — so we cap it there and reveal the tail behind "Show all".
+//
+// ⚠ THE CAP IS BY POSITION, NOT BY LIVENESS, AND THAT WAS CHECKED RATHER THAN
+// ASSUMED. Ordering is global (see `listSubjects`), so under a narrow filter the
+// first eight can in principle all be dead ends — eight grey tags over "Show all
+// (18)" reads as a broken rail. Measured against the corpus when the author
+// filter learned to count (2026-08-11): of 35 authors, 3 would show an all-dead
+// first eight, and all 3 have exactly one quote. A one-quote author is
+// UNREACHABLE by the door that leads here — the attribution only offers "N more
+// from …" when N > 0 — so the case needs a hand-typed URL to reach at all.
+// Sorting live-first would fix a page nobody can arrive at, and would cost the
+// stability rule on every page they can. Left alone on purpose; revisit if the
+// taxonomy grows past ~30 or a one-quote author ever gets a door.
 const SUBJECT_CAP = 8;
 const subjectOverflow = Math.max(0, subjects.length - SUBJECT_CAP);
 

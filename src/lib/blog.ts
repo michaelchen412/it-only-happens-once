@@ -597,6 +597,14 @@ export async function listSubjects(
   // never where it sits or whether it is in the taxonomy at all. A rail that
   // reordered itself when you followed an attribution would make the reader
   // re-find every tag, and dead tags are the shape of the corpus — worth seeing.
+  //
+  // DISABLED RATHER THAN HIDDEN, and that is not a new rule the author filter
+  // introduced — it is the register this rail already speaks in. Measured on the
+  // quote taxonomy (18 subjects, 2026-08-11): selecting ONE subject already
+  // leaves between 5 and 15 of them inert, so an author leaving 7 to 13 is
+  // nothing a reader has not already seen. Hiding them would make the list's
+  // length jump on every click and quietly deny that the rest of the corpus
+  // exists; a greyed tag with a 0 says *there is a there there, just not here*.
   const ctx = new Map<string, number>();
   for (const [fid, set] of fragSubs) {
     if (author && authorOf.get(fid) !== author) continue;
