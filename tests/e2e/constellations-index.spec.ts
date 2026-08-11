@@ -8,8 +8,8 @@
 //
 // ⚠ EVERY WRITE IS STUBBED. This suite runs against the live project and these
 // two gestures both persist, so a spec that let one through would recolour or
-// reorder Michael's real sky. `constellations.save` and `.reorder` are answered
-// here and never reach the database.
+// reorder Michael's real sky. `constellations.setColor`, `.setStatus` and
+// `.reorder` are answered here and never reach the database.
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
@@ -26,7 +26,12 @@ async function openIndex(page: Page, { failSave = false } = {}) {
       .replace(/^.*\/_actions\//, '')
       .replace(/\/$/, '');
     const body = route.request().postData() ?? '';
-    if (name === 'constellations.save') {
+    // Both one-click writes land here. They stopped being `constellations.save`
+    // on 2026-08-11: a whole-card save to change one field meant resending a
+    // `name` and `slug` read out of `data-` attributes, and it is what made
+    // `save` grow the "absent means leave as-is" sentinel that broke clearing
+    // a score in the composer.
+    if (name === 'constellations.setColor' || name === 'constellations.setStatus') {
       saves.push(body);
       if (failSave) {
         return void (await route.fulfill({
@@ -38,7 +43,7 @@ async function openIndex(page: Page, { failSave = false } = {}) {
       return void (await route.fulfill({
         status: 200,
         contentType: 'application/json+devalue',
-        body: '[{"id":1,"slug":2},"x","y"]',
+        body: '[{"ok":1},true]',
       }));
     }
     if (name === 'constellations.reorder') {
@@ -94,14 +99,19 @@ test.describe('colour is chosen where the sky is visible', () => {
     await expect(first).not.toHaveClass(new RegExp(`cn-${before}\\b`));
     await expect(first).toHaveAttribute('data-color', target);
 
-    // The save carried the row's whole identity, not just the changed field:
-    // `constellations.save` rebuilds the slug from what it is given and
-    // DEFAULTS status to draft, so a partial call unpublishes things.
+    // ⚠ AND IT SENT THE ROW'S ID AND THE SLOT, AND NOTHING ELSE. This assertion
+    // used to say the opposite — that the call carried `name`, `slug` and
+    // `status` too — because a recolour was a whole-card `constellations.save`
+    // and a partial one would have rewritten a hand-edited URL or unpublished a
+    // live constellation. Resending three fields rendered when the page loaded
+    // is its own bug (a rename made in the composer next door, quietly undone),
+    // so the write got narrow instead: `setColor` can only set a colour.
     expect(saves).toHaveLength(1);
     expect(saves[0]).toContain(`name="color"`);
     expect(saves[0]).toContain(target);
-    for (const field of ['id', 'name', 'slug', 'status']) {
-      expect(saves[0], `the save dropped ${field}`).toContain(`name="${field}"`);
+    expect(saves[0]).toContain(`name="id"`);
+    for (const field of ['name', 'slug', 'status']) {
+      expect(saves[0], `a recolour resent ${field} — it can only overwrite something`).not.toContain(`name="${field}"`);
     }
   });
 

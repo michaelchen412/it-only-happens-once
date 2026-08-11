@@ -9,7 +9,16 @@ import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
 import { COLOR_SLOTS, leastUsedSlot } from '../lib/constellation-colors';
 import type { Database } from '../lib/database.types';
-import { constellationStatus, fail, idList, optText, optUuid, requireAdmin, uniqueSlug } from './_shared';
+import {
+  CONSTELLATION_STATUSES,
+  constellationStatus,
+  fail,
+  idList,
+  optText,
+  optUuid,
+  requireAdmin,
+  uniqueSlug,
+} from './_shared';
 
 /**
  * ⚠ A SONG MAY NOT SIT IN A SUITE (ADR 0031), AND THIS IS WHERE THE DOOR SHUTS.
@@ -45,15 +54,26 @@ export const constellations = {
       id: optUuid,
       name: z.string().trim().min(1, 'A constellation needs a name'),
       slug: optText,
-      // Plain optional (no blank→undefined): an ABSENT field means "leave
-      // as-is" (the index's status toggle), an EMPTY one means "clear"
-      // (the composer form always submits both).
+      /**
+       * ⚠ THESE TWO ARE WRITTEN FROM WHAT ARRIVES, AND WHAT DOESN'T ARRIVE IS
+       * WRITTEN AS NULL. There used to be a sentinel here — "an ABSENT field
+       * means leave as-is, an EMPTY one means clear" — and the second half of
+       * that sentence was UNREACHABLE. `accept: 'form'` runs the FormData
+       * through Astro's own coercion, and its `handleFormDataGet` answers
+       * `undefined` for any FALSY value on an optional field: a cleared input
+       * arrives byte-identically to a field that was never sent. So emptying
+       * the score and pressing Save wrote nothing, and reopening the composer
+       * put the playlist back — the same for the description (reported
+       * 2026-08-11).
+       *
+       * The rule that replaces it is the one every caller already follows for
+       * `name`, `slug` and `status`: TO CALL `save` IS TO EDIT THE WHOLE CARD.
+       * Changing one field of a row you are not editing goes through
+       * `setStatus`/`setColor` below — which is what the index does, and the
+       * reason it can stop resending a name it read out of a `data-` attribute.
+       */
       description: z.string().optional(),
       score_url: z.string().optional(),
-      // The colour SLOT (app.css owns the value). Absent on create → we pick
-      // the least-used one, so a new constellation is distinguishable from
-      // its neighbours without anyone thinking about it.
-      color: z.enum(COLOR_SLOTS).optional(),
       status: constellationStatus,
     }),
     handler: async (input, ctx) => {
@@ -84,10 +104,9 @@ export const constellations = {
         name: input.name.trim(),
         slug,
         status: input.status,
+        description: input.description?.trim() || null,
+        score_url: scoreUrl || null,
       };
-      if (input.description !== undefined) row.description = input.description.trim() || null;
-      if (input.score_url !== undefined) row.score_url = scoreUrl || null;
-      if (input.color) row.color = input.color;
       if (input.id) {
         const { error } = await sb.from('constellations').update(row).eq('id', input.id);
         if (error) throw fail(error.message);
@@ -99,18 +118,70 @@ export const constellations = {
         .order('sort', { ascending: false })
         .limit(1);
       // A new star should not arrive wearing a neighbour's colour: take the
-      // least-used slot, earliest on the ramp breaking ties.
-      if (!row.color) {
-        const { data: taken } = await sb.from('constellations').select('color');
-        row.color = leastUsedSlot((taken ?? []).map((t) => t.color));
-      }
+      // least-used slot, earliest on the ramp breaking ties. Nothing SENDS a
+      // colour to this action — the sky is where that judgement is made, one
+      // star against the rest of them (`setColor`) — so the pick is
+      // unconditional rather than a fallback.
+      const { data: taken } = await sb.from('constellations').select('color');
       const { data, error } = await sb
         .from('constellations')
-        .insert({ ...row, name: input.name.trim(), slug, sort: (last?.[0]?.sort ?? 0) + 1 })
+        .insert({
+          ...row,
+          name: input.name.trim(),
+          slug,
+          color: leastUsedSlot((taken ?? []).map((t) => t.color)),
+          sort: (last?.[0]?.sort ?? 0) + 1,
+        })
         .select('id')
         .single();
       if (error) throw fail(error.message);
       return { id: data.id, slug };
+    },
+  }),
+  /**
+   * ⚠ THE ONE-CLICK WRITES FROM THE SKY'S INDEX, AND THEY ARE THEIR OWN ACTIONS
+   * BECAUSE `save` IS A WHOLE-CARD WRITE. On `/admin/constellations` the click
+   * IS the commit: there is no form and no Save button, and what you changed is
+   * the one field you touched.
+   *
+   * Both of these used to go through `save`, which meant every list row had to
+   * carry its `name`, `slug` and `status` in `data-` attributes and resend all
+   * three — a whole row rebuilt from the DOM to flip one boolean, and a rename
+   * made in another tab quietly overwritten by whatever the list was rendered
+   * with. `description` and `score_url` were the fields that could NOT be
+   * resent that way (Markdown in a `data-` attribute, and one of them long),
+   * and covering for that is where the unreachable "empty means clear" sentinel
+   * in `save` came from. Two four-line actions retire the whole arrangement.
+   *
+   * `status` takes no Zod default here, unlike `save`'s: an absent field on a
+   * form post is what a real unchecked switch looks like, and defaulting it
+   * would turn a dropped field into a silent unpublish.
+   */
+  setStatus: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid(), status: z.enum(CONSTELLATION_STATUSES) }),
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      const { error } = await ctx.locals.supabase
+        .from('constellations')
+        .update({ status: input.status })
+        .eq('id', input.id);
+      if (error) throw fail(error.message);
+      return { ok: true };
+    },
+  }),
+  /** The star's colour SLOT (app.css owns the value it resolves to). */
+  setColor: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid(), color: z.enum(COLOR_SLOTS) }),
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      const { error } = await ctx.locals.supabase
+        .from('constellations')
+        .update({ color: input.color })
+        .eq('id', input.id);
+      if (error) throw fail(error.message);
+      return { ok: true };
     },
   }),
   remove: defineAction({

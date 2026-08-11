@@ -77,17 +77,17 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
       ) : (
         <ul id="cl-list" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 divide-y border">
           {rows.map((c) => (
-            /* `data-slug` and `data-status` ride along because every save from
-               this page goes through `constellations.save`, which rebuilds the
-               slug from whatever it is given and DEFAULTS `status` to draft.
-               A call that sends only the field it means to change would quietly
-               rewrite a hand-edited URL, or unpublish a live constellation. */
+            /* `data-name` and `data-slug` ride along for what stays on the
+               PAGE — the delete confirmation names the constellation, and a
+               recolour announces `{id, name, slug, color}` to anything else
+               mounted beside this list. They are no longer sent anywhere:
+               `data-status` went with the last caller that resent a whole row
+               to change one field (see `fieldForm` in the script). */
             <li
               class:list={['group flex items-center gap-3 px-4 py-3', `cn-${c.color}`]}
               data-id={c.id}
               data-name={c.name}
               data-slug={c.slug}
-              data-status={c.status}
               data-color={c.color}
               draggable="true"
             >

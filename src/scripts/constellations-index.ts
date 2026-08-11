@@ -11,20 +11,24 @@ const list = document.getElementById('cl-list');
 const listRows = () => [...(list?.querySelectorAll<HTMLElement>('li[data-id]') ?? [])];
 
 /**
- * Every write from this page goes through `constellations.save`, which is a
- * whole-row update: it rebuilds the slug from what it is given and DEFAULTS
- * `status` to draft. So a call that sends only the field it means to change
- * doesn't leave the rest alone — it rewrites a hand-edited URL, or unpublishes
- * something that was live. Each row carries its own identity in `data-*` for
- * exactly this reason, and every caller sends the lot.
+ * One field of one row, and NOTHING else on the wire.
+ *
+ * ⚠ THIS USED TO REBUILD THE WHOLE ROW, and the reason it stopped is worth
+ * keeping. Both gestures on this page went through `constellations.save`, which
+ * is a whole-card update — it rebuilds the slug from what it is given and
+ * defaults `status` to draft — so a flip or a recolour had to resend the row's
+ * `name`, `slug` and `status`, read back out of `data-` attributes rendered
+ * when the page loaded. That made every click a chance to overwrite a rename
+ * made in the composer next door, and it could never resend the two fields it
+ * didn't have (the description and the score) — which is precisely why `save`
+ * grew an "absent means leave as-is" sentinel that Astro's form coercion made
+ * unreachable, and why clearing a playlist did nothing at all.
+ * `setStatus`/`setColor` say only what the click said.
  */
-function rowForm(row: HTMLElement, change: Record<string, string>): FormData {
+function fieldForm(id: string, field: string, value: string): FormData {
   const fd = new FormData();
-  fd.set('id', row.dataset.id!);
-  fd.set('name', row.dataset.name ?? '');
-  fd.set('slug', row.dataset.slug ?? '');
-  fd.set('status', row.dataset.status ?? 'draft');
-  for (const [k, v] of Object.entries(change)) fd.set(k, v);
+  fd.set('id', id);
+  fd.set(field, value);
   return fd;
 }
 
@@ -86,7 +90,7 @@ list?.addEventListener('click', async (e) => {
 
   if (btn.hasAttribute('data-toggle-status')) {
     const next = btn.dataset.toggleStatus === 'published' ? 'draft' : 'published';
-    const { error } = await callAction(actions.constellations.save(rowForm(row, { status: next })));
+    const { error } = await callAction(actions.constellations.setStatus(fieldForm(id, 'status', next)));
     if (error) return show(formatActionError(error));
     location.reload();
     return;
@@ -190,7 +194,7 @@ async function chooseSlot(slot: string) {
   pop.hidePopover();
   if (slot === prev) return;
   paintRow(row, slot);
-  const { error } = await callAction(actions.constellations.save(rowForm(row, { color: slot })));
+  const { error } = await callAction(actions.constellations.setColor(fieldForm(row.dataset.id!, 'color', slot)));
   if (error) {
     paintRow(row, prev);
     return show(formatActionError(error));

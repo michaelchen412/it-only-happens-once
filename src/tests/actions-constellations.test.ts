@@ -123,6 +123,108 @@ describe('setMembership', () => {
   });
 });
 
+/**
+ * ⚠ THESE ARE THE TESTS THAT ONLY WORK BECAUSE THE INPUT IS A `FormData`.
+ *
+ * `save` shipped a sentinel — "an ABSENT field means leave as-is, an EMPTY one
+ * means clear" — and half of it was a fiction: `accept: 'form'` runs the form
+ * through Astro's own coercion first, and `handleFormDataGet` answers
+ * `undefined` for ANY falsy value on an optional field. Clearing the score in
+ * the composer and pressing Save therefore wrote nothing at all, and reopening
+ * the page put the playlist back (reported 2026-08-11).
+ *
+ * A test that called the handler with a plain object would have PASSED against
+ * the broken code — `{ score_url: '' }` is not `undefined` — which is the whole
+ * argument for `stubs/astro-actions.ts` re-exporting the real `defineAction`
+ * rather than reaching past it. The trip through the form encoding is the part
+ * under test.
+ */
+describe('save', () => {
+  const CID = '33333333-3333-4333-8333-333333333333';
+  /** The composer's card, as the browser posts it. */
+  const card = (over: Record<string, string> = {}) => ({
+    id: CID,
+    name: 'Grief',
+    slug: 'grief',
+    status: 'published',
+    description: 'Why this way of seeing exists',
+    score_url: 'https://open.spotify.com/playlist/abc',
+    ...over,
+  });
+  const written = (db: FakeDb) => db.ops('constellations').find((o) => o.method === 'update')?.args[0];
+
+  it('an emptied score is CLEARED, not ignored', async () => {
+    const db = fakeDb({ constellations: { data: [] } }, { record: true });
+
+    await run(constellations.save, db, card({ score_url: '' }));
+
+    expect(written(db)).toMatchObject({ score_url: null });
+  });
+
+  it('an emptied description is cleared too — same field, same bug', async () => {
+    // ⚠ `''`, not `'   '`. Whitespace is TRUTHY, so it survived the coercion
+    // and the old sentinel cleared it correctly — a test written that way
+    // passes against the broken code and proves nothing. An emptied TipTap
+    // serializes to the empty string, which is the case that was silently lost.
+    const db = fakeDb({ constellations: { data: [] } }, { record: true });
+
+    await run(constellations.save, db, card({ description: '' }));
+
+    expect(written(db)).toMatchObject({ description: null });
+  });
+
+  it('a filled card writes exactly what it was given', async () => {
+    const db = fakeDb({ constellations: { data: [] } }, { record: true });
+
+    await run(constellations.save, db, card());
+
+    expect(written(db)).toMatchObject({
+      name: 'Grief',
+      status: 'published',
+      description: 'Why this way of seeing exists',
+      score_url: 'https://open.spotify.com/playlist/abc',
+    });
+  });
+});
+
+/**
+ * The other half of the same change: the index's one-click writes. They exist
+ * so that "publish this" and "recolour this" stop being whole-card saves — and
+ * what makes them worth a test is the NEGATIVE, since a row rebuilt from stale
+ * `data-` attributes is exactly how a rename made in the composer got lost.
+ */
+describe('setStatus / setColor', () => {
+  const CID = '44444444-4444-4444-8444-444444444444';
+
+  it('a flip writes the status and NOTHING else', async () => {
+    const db = fakeDb({ constellations: {} }, { record: true });
+
+    await run(constellations.setStatus, db, { id: CID, status: 'published' });
+
+    const update = db.ops('constellations').find((o) => o.method === 'update');
+    expect(update?.args[0]).toEqual({ status: 'published' });
+  });
+
+  it('a recolour writes the slot and NOTHING else', async () => {
+    const db = fakeDb({ constellations: {} }, { record: true });
+
+    await run(constellations.setColor, db, { id: CID, color: 'ember' });
+
+    const update = db.ops('constellations').find((o) => o.method === 'update');
+    expect(update?.args[0]).toEqual({ color: 'ember' });
+  });
+
+  it('a missing status is a refusal, not a quiet unpublish', async () => {
+    // `save`'s schema DEFAULTS status to draft, because an unchecked switch
+    // sends no field. Here the field is the entire message, so the default
+    // would turn a dropped one into an unpublish nobody asked for.
+    const db = fakeDb({ constellations: {} }, { record: true });
+
+    await expect(run(constellations.setStatus, db, { id: CID })).rejects.toThrow();
+    expect(db.ops('constellations').some((o) => o.method === 'update')).toBe(false);
+  });
+});
+
 describe('reorder', () => {
   it('issues every update, and checks every one of them', async () => {
     // The one loop where a single upsert is NOT available — `constellations`

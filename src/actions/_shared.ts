@@ -14,7 +14,23 @@ import { slugify } from '../lib/slug';
 
 export type DB = SupabaseClient<Database>;
 
-// --- Zod helpers: empty form fields arrive as '' — treat them as absent ------
+// --- Zod helpers: an empty form field is ABSENT, and Astro got there first ---
+//
+// ⚠ AN EMPTY FIELD NEVER REACHES YOUR SCHEMA AS `''`, WHICH IS THE OPPOSITE OF
+// WHAT THIS HEADER USED TO SAY. `accept: 'form'` runs the FormData through
+// Astro's own coercion first, and `handleFormDataGet` answers on FALSINESS:
+// a plain `z.string().optional()` gets `undefined`, and a `z.preprocess(…)`
+// (a pipe, so not an optional at the outer layer) gets `null`. Either way the
+// empty string is gone before Zod runs, and `blankToUndef` earns its keep on
+// the `v == null` half, not the `v === ''` one.
+//
+// So AN ACTION CANNOT TELL "cleared" FROM "not sent". `constellations.save`
+// tried, with a `!== undefined` sentinel meaning "absent → leave as-is, empty →
+// clear", and the clearing half was dead code: emptying a constellation's score
+// and pressing Save wrote nothing (fixed 2026-08-11). If a field needs to be
+// clearable, the ACTION must own the whole row and write `null` for what didn't
+// arrive — and callers that mean to change one field get their own narrow
+// action, as `constellations.setStatus`/`setColor` do.
 //
 // ⚠ USE THESE. Three action modules had re-declared `blankToUndef` verbatim and
 // two had written `hhmm` byte-identically, because it was private here and easy
@@ -89,8 +105,15 @@ export const fragmentStatus = z.enum(['note', 'draft', 'published']).default('dr
  * ('draft','published'), NOT the fragment_status enum, so a shared Zod const
  * would happily have let a constellation be filed as a note and only failed at
  * the database. Two lists, because they are two vocabularies.
+ *
+ * The tuple is exported beside the schema because the DEFAULT is not always
+ * wanted: `constellations.save` needs it (an unchecked switch sends no field,
+ * and that is what makes a draft a draft), while `setStatus` must not have it
+ * (there the field is the entire message, so a missing one is a bug, not a
+ * draft). One list, two schemas over it.
  */
-export const constellationStatus = z.enum(['draft', 'published']).default('draft');
+export const CONSTELLATION_STATUSES = ['draft', 'published'] as const;
+export const constellationStatus = z.enum(CONSTELLATION_STATUSES).default('draft');
 
 export const fail = (
   message: string,
