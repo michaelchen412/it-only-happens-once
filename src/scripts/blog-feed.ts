@@ -161,6 +161,14 @@ function setupSearch() {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     clearTimeout(searchTimer);
+    // The Search key on a phone keyboard means "I'm done typing, show me" — but
+    // a prevented submit leaves the field focused, so the results arrive behind
+    // a keyboard that covers half of them. Blur where the keyboard is real. On
+    // a desktop Enter, focus stays: the field is not in the reader's way there,
+    // and taking focus off it mid-search would be the surprising thing.
+    // (The zoom this used to leave behind on iOS is prevented upstream now —
+    //  see app.css, THE 16px FLOOR. This is about the keyboard, not the zoom.)
+    if (window.matchMedia('(pointer: coarse)').matches) qInput?.blur();
     runSearch(form);
   });
   qInput.addEventListener('input', () => {
