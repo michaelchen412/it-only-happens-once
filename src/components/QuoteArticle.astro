@@ -99,8 +99,6 @@ const hasDoor = Boolean(author && author.others > 0);
 // string, which is a derived LINE (three published quotes carry one with no
 // author row behind it).
 const authorHref = author ? `/blog?view=quotes&author=${author.slug}` : null;
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 ---
 
 {
@@ -129,7 +127,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
                 {quote.reveal && <span class="qp-cite">{quote.reveal}</span>}
                 {hasDoor && authorHref && (
                   <a href={authorHref} class:list={['qp-door', quote.reveal && 'qp-door--ruled']}>
-                    {plural(author!.others, 'more line', 'more lines')} from {author!.name}
+                    {author!.others} more from {author!.name}
                     <span class="qp-door__arrow">→</span>
                   </a>
                 )}

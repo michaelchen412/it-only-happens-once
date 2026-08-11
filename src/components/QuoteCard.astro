@@ -41,7 +41,6 @@ const searching = term.trim().length >= MIN_SEARCH;
 // own page offered the door. One rule, both surfaces (plan 32 · §5).
 const hasDoor = Boolean(item.author && item.authorSiblings > 0);
 const authorHref = item.author ? `/blog?view=quotes&author=${item.author.slug}` : null;
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 ---
 
 <style>
@@ -123,7 +122,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
               {item.reveal && <span class="qp-cite">{item.reveal}</span>}
               {hasDoor && authorHref && (
                 <a href={authorHref} class:list={['qp-door', item.reveal && 'qp-door--ruled']}>
-                  {plural(item.authorSiblings, 'more line', 'more lines')} from {item.author!.name}
+                  {item.authorSiblings} more from {item.author!.name}
                   <span class="qp-door__arrow">→</span>
                 </a>
               )}
@@ -158,6 +157,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
     occurredAt={item.occurredAt}
     precision={item.precision}
     ruled={false}
+    share={false}
     shareLabel="Share this quote"
     dateKind="added"
     datePrefix="Added"

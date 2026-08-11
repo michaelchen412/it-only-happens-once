@@ -82,6 +82,27 @@ interface Props {
    * ended and the apparatus has begun. There it earns its mark.
    */
   ruled?: boolean;
+  /**
+   * The share mark.
+   *
+   * ⚠ OFF IN A FEED, ON AN OPENED FRAGMENT. It was briefly on the cards too,
+   * and Michael took it back off on sight: *"the share button is back in a
+   * strange place off to the side, and even on a 3rd line by itself in smaller
+   * screens. I think lets just remove it and keep it only in the sheet view as
+   * we had before."*
+   *
+   * He is right, and the reason is the one this component's `ruled` prop is
+   * already about. The mark is designed to be SET INTO A RULE — that is what
+   * gives it a fixed address at the line's right terminus. A feed card has no
+   * rule (the card edge does that job), so the mark had nothing to sit in and
+   * fell back to being the last item in a wrapping row: the exact floating
+   * behaviour ADR-0023 · Decision 2 removed from the essay header, reintroduced
+   * one surface over. On a narrow screen it wrapped to a line of its own.
+   *
+   * So this returns to what ADR-0023 already said: ONE share mark per fragment,
+   * where the fragment is being read.
+   */
+  share?: boolean;
   /** "Share this quote" / "Share this piece" — the mark's only accessible name. */
   shareLabel: string;
   /** A quote's date is provenance ("Added"); an essay's is publication. */
@@ -101,6 +122,7 @@ const {
   shareLabel,
   showDate = true,
   ruled = true,
+  share = true,
   sharesWholeSignature = 0,
   dateKind = 'posted',
   datePrefix,
@@ -169,7 +191,7 @@ const allSubjectsHref =
     ruled ? 'border-base-content/10 mt-12 border-t pt-5 pr-12 sm:pr-14' : 'mt-6',
   ]}
 >
-  {ruled && <ShareMark url={`/blog/${slug}`} label={shareLabel} onRule />}
+  {ruled && share && <ShareMark url={`/blog/${slug}`} label={shareLabel} onRule />}
 
   {
     subjects.length > 0 && (
@@ -241,8 +263,16 @@ const allSubjectsHref =
 
     {
       related.length > 0 && (
-        <Reveal wide label={`${plural(relatedTotal, 'related line', 'related lines')}`}>
-          <span class="qp-ctl">{plural(relatedTotal, 'related line', 'related lines')}</span>
+        <Reveal wide label={`${relatedTotal} related`}>
+          {/* ⚠ "N related", not "N related lines". Two reasons, and the first is
+                  this repo's own vocabulary: ADR-0017 is titled *"A quote is
+                  three facts; the line under it is derived"* — **the line**
+                  already means the ATTRIBUTION here, so counting quotes in
+                  "lines" collides with it. The second is that this list is
+                  MIXED: across the corpus 318 of these entries are quotes and
+                  214 are essays, so a noun naming either is wrong for two
+                  fifths of it. No noun is needed. */}
+          <span class="qp-ctl">{relatedTotal} related</span>
           <Fragment slot="content">
             <p class="qp-label">Along the same lines</p>
             <ul class="qp-list">
@@ -279,7 +309,6 @@ const allSubjectsHref =
       /* Unruled, the mark has no line to be set into — so it ends the row, which
         is the same PLACE, just without a rule drawn through it. */
     }
-    {!ruled && <ShareMark url={`/blog/${slug}`} label={shareLabel} />}
   </div>
 </div>
 

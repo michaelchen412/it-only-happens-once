@@ -321,6 +321,43 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
               {view === 'quotes' && <input type="hidden" name="view" value="quotes" />}
             </form>
 
+            {/*
+              ⚠ THE AUTHOR FILTER GETS A CHIP, and an earlier version of this
+              file argued it should not — *"the rail's Clear already drops every
+              filter, and a second dismissal control would be the only ✕ on a
+              page whose subjects, search and view all clear the same way."* That
+              was wrong about where a reader looks. Michael: *"I think we still
+              need to show the filter chip … right now there is nothing showing
+              you in the filter section that that's what it's filtering by."*
+
+              The summary above the feed does say "20 quotes by Seneca" — but the
+              RAIL is the instrument panel, and an active filter that appears
+              nowhere on it reads as no filter at all. Every other one is visible
+              and individually removable here; this one arrives by a link from a
+              quote's attribution, which is the path where a reader is least
+              likely to know what just happened.
+
+              ABOVE Subjects rather than among them, because it is a different
+              KIND of filter — one author, never a stack — and mixing it into a
+              list that stacks would promise it composes the same way. Same chip
+              register, so it still reads as the same instrument.
+            */}
+            {authorName && (
+              <div class="mt-7">
+                <Label variant="chrome">Who said it</Label>
+                <div class="mt-3">
+                  <a
+                    href={buildHref({ author: null, page: null })}
+                    aria-current="true"
+                    class="border-base-content/30 bg-base-200 text-base-content md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors"
+                  >
+                    {authorName}
+                    <Icon name="ph:x" class="text-base-content/50 size-3" aria-hidden="true" />
+                  </a>
+                </div>
+              </div>
+            )}
+
             {subjects.length > 0 && (
               <div class="mt-7" data-subjects>
                 <div class="flex items-baseline justify-between gap-2">
