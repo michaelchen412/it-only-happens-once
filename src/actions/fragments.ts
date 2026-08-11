@@ -443,7 +443,6 @@ export const fragments = {
       title: z.string().min(1, 'A song title is required'),
       attribution: z.string().min(1, 'Who’s the artist?'),
       album: optText,
-      body: optText,
       thumbnail_url: optText,
       /** Web API extras, carried as hidden fields so provenance can be exact. */
       release_year: optInt,
@@ -451,26 +450,29 @@ export const fragments = {
       spotify_album_id: optText,
       year: z.coerce.number().int(),
       status: fragmentStatus,
-      subjects: optText,
       slug: optText,
     }),
     /*
-      ⚠ `body` AND `subjects` ARE ON THEIR WAY OUT OF THIS INPUT (ADR 0031), and
-      they are still here on purpose until the sheet that sends them is gone.
+      ⚠ NO `body` AND NO `subjects` IN THAT INPUT, AND BOTH ABSENCES ARE THE
+      DECISION (ADR 0031).
 
-      `body` becomes the song's PUBLIC NOTE, owned by `songs.setNotes`. Once the
-      quick-editor's song form is deleted, this action must stop writing it —
-      `persist` updates whatever keys the row object carries, so a save of the
-      metadata tab would otherwise blank a note written on the next tab over.
-      `subjects` goes because a song has none: the one time this corpus filed a
-      song by subject it produced `jazz`, deleted 2026-08-11 as a category
-      error, and songs are filed by FEELING instead.
+      `body` is the song's PUBLIC NOTE now, and `songs.setNotes` is its only
+      writer. Keeping it here would be worse than redundant: this action saves
+      the metadata, and `persist` updates whatever keys the row object carries —
+      so a save from the song sheet's "The song" tab would silently blank a note
+      written on the Notes tab beside it. Omitting the key is what leaves it
+      alone.
 
-      Removing them BEFORE that form goes would be worse than leaving them:
-      Zod strips unknown keys silently, so the "Why this one" editor would keep
-      rendering, keep accepting typing, and quietly discard it on save. A field
-      that lies is a worse intermediate state than a field that is merely
-      deprecated.
+      `subjects` is gone because a song has none. A subject is what a piece is
+      ABOUT, and a song is not about anything you can paraphrase; the one time
+      this corpus filed one that way it produced `jazz`, a genre alone in a
+      taxonomy of words about living, deleted 2026-08-11 as a category error.
+      Songs are filed by FEELING, in the Listening room, with the track playing.
+
+      ⚠ THE ORDER MATTERED. Zod strips unknown keys SILENTLY, so removing these
+      while the old song form still rendered would have left its "Why this one"
+      editor accepting typing and discarding it on save. They came out in the
+      commit that deleted the form, not before it.
     */
     handler: async (input, ctx) => {
       requireAdmin(ctx);
@@ -511,7 +513,9 @@ export const fragments = {
         type: 'song',
         title: input.title,
         slug,
-        body: input.body?.trim() || null,
+        // ⚠ NO `body` KEY AT ALL — see the note above the handler. `persist`
+        // updates the keys it is given, so its ABSENCE is what protects the
+        // public note from a metadata save.
         attribution: input.attribution,
         // Canonical, not what was pasted: Spotify's share sheet appends a `?si=`
         // tracking token, and that token has no business on a public page.
@@ -523,7 +527,11 @@ export const fragments = {
         occurred_at: yearToISO(input.year),
         date_precision: 'year',
       };
-      return persist(sb, input.id, row, input.subjects);
+      // `undefined` subjects, which `syncSubjects` reads as "none" — so a save
+      // here CLEARS any a song still carries. Stated rather than left to be
+      // discovered: it is deliberate self-healing under ADR 0031 (no song has
+      // one today), not a side effect of dropping the field.
+      return persist(sb, input.id, row, undefined);
     },
   }),
 
@@ -585,7 +593,17 @@ export const fragments = {
   suggestSubjects: defineAction({
     input: z.object({
       text: z.string().min(1).max(20_000),
-      kind: z.enum(['quote', 'song', 'writing']),
+      /*
+        ⚠ NO `song`, AND ITS ABSENCE IS THE AI BOUNDARY THIS CORPUS DRAWS
+        (ADR 0031). Subjects are model-suggested (ADR-0007) because a subject is
+        what a piece is ABOUT and that is legible from the text. A song is not
+        about anything you can paraphrase — the one time this corpus filed one
+        that way it produced `jazz` — and what a song does to you is a FEELING,
+        which is not a property of the song at all: it is what happened in
+        Michael. So there is no `suggestFeelings` beside this, and now no song
+        arm within it either. **No part of a song is machine-taggable.**
+      */
+      kind: z.enum(['quote', 'writing']),
     }),
     handler: async ({ text, kind }, ctx) => {
       requireAdmin(ctx);

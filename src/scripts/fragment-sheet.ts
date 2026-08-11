@@ -1,12 +1,20 @@
 // Client logic for the FragmentSheet drawer (components/admin/FragmentSheet.astro)
-// — the quote & song quick-editors: two short-form TipTap bodies (the quote's
-// words, the song's annotation), the Author→Work provenance combos, AI subject
-// suggestions, the Spotify lookup, and the constellations tab. Kept out of the
-// .astro file so the markup stays legible.
+// — the QUOTE quick-editor: a short-form TipTap body, the Author→Work
+// provenance combos, AI subject suggestions, and the constellations tab. Kept
+// out of the .astro file so the markup stays legible.
+//
+// ⚠ IT USED TO EDIT SONGS TOO, and ADR 0031 took that half out. A song has its
+// own sheet now (`scripts/song-sheet.ts`), because the division this file
+// carried was two editors split by FIELD: the metadata lived here and the
+// feelings lived in /admin/listening, and neither surface could show you the
+// whole object. What went with it: the annotation editor ("why this one",
+// retired — a song has notes, split by audience), the Spotify lookup (the song
+// sheet's paste bar owns that now), and the song subject suggester (a song has
+// no subjects at all).
 import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
 import { slugify } from '../lib/slug';
-import { callAction, isNetworkError, submitAction } from './action-error';
+import { submitAction } from './action-error';
 import { onBackdropDismiss } from './backdrop-close';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
@@ -21,7 +29,6 @@ const sheet = document.getElementById('sheet') as HTMLDialogElement;
 const sheetTitle = document.getElementById('sheet-title')!;
 const sheetError = document.getElementById('sheet-error') as HTMLParagraphElement;
 const quoteForm = document.getElementById('quote-form') as HTMLFormElement;
-const songForm = document.getElementById('song-form') as HTMLFormElement;
 
 // --- quote body: the shared short-form editor (bold/italic; breaks preserved) ---
 const quoteBody = document.getElementById('quote-body') as HTMLInputElement;
@@ -35,17 +42,6 @@ const quote = mountMiniEditor({
 });
 const quoteEditor = quote.editor;
 const quoteMarkdown = quote.getMarkdown;
-
-// --- song annotation: the same editor, the same register (ADR-0009). This is
-// the "why", the field Spotify doesn't have — optional, and it LEADS the public
-// stanza, with the embed closing as citation. ---
-const songBody = document.getElementById('song-body') as HTMLInputElement;
-const song = mountMiniEditor({
-  editorEl: document.getElementById('song-editor')!,
-  toolbarRoot: document.getElementById('song-editor-wrap')!,
-  placeholder: 'Why this one…',
-  ariaLabel: 'Why this song',
-});
 
 // The only required field is the words themselves (2026-08-05, docs/plans/17a).
 // Attribution used to gate this too, which is what made an unattributed quote
@@ -272,32 +268,24 @@ const quoteSuggest = wireSubjectSuggest({
   onError: (m) => showError(m),
 });
 
-const songSuggest = wireSubjectSuggest({
-  root: document.getElementById('song-subjects')!,
-  kind: 'song',
-  /**
-   * The annotation is REQUIRED here, though the field itself is optional on a
-   * song (ADR 0009). Title + artist + album is exactly the thin signal that
-   * produces "jazz, 1950s, modal" — true, useless, and not what this taxonomy
-   * is for. A song's subjects on this site come from why it matters, and the
-   * only place that exists is what you wrote about it.
-   */
-  gather: () => {
-    const why = song.editor.getText().trim();
-    if (!why) {
-      return {
-        missing: 'Say why this one first — a song’s subjects come from what you wrote about it, not from its genre.',
-      };
-    }
-    const field = (n: string) => (songForm.elements.namedItem(n) as HTMLInputElement | null)?.value.trim() ?? '';
-    const heading = [field('title'), field('attribution')].filter(Boolean).join(' — ');
-    return { text: [heading, field('album'), '', why].filter((l, i) => l || i === 2).join('\n') };
-  },
-  readTags: () => tagsOf(songForm),
-  writeTags: (tags) => setSubjects(songForm, tags.join(', ')),
-  onStart: () => clearError(),
-  onError: (m) => showError(m),
-});
+/*
+  ⚠ THERE WAS A SECOND SUGGESTER HERE, FOR A SONG, AND ADR 0031 DELETED IT
+  ALONG WITH THE FIELD IT FILLED. A song has no subjects: a subject is what a
+  piece is ABOUT, and a song is not about anything you can paraphrase. The one
+  time this corpus filed one that way it produced `jazz` — a genre, alone in a
+  taxonomy of words about living, attached to no essay and no quote — deleted
+  2026-08-11 as a category error.
+
+  Its old comment was already most of the argument. It made the annotation
+  REQUIRED before it would suggest, because title + artist + album is exactly
+  the thin signal that produces *"jazz, 1950s, modal"* — true, useless, and not
+  what this taxonomy is for. The annotation is gone now too, so the last input
+  that could have made a song's subjects meaningful went with it.
+
+  Songs are filed by FEELING, in /admin/listening, with the track playing — and
+  nothing proposes those, ever (plan 33 ruling 1). So no part of a song is
+  machine-taggable at all, which is a cleaner line than the one this replaced.
+*/
 
 // date: automatic unless the toggle is on
 const quoteDateToggle = document.getElementById('quote-date-toggle') as HTMLInputElement;
@@ -343,7 +331,6 @@ const markDirty = (e?: Event) => {
 sheet.addEventListener('input', markDirty); // typing in any field, incl. the editor
 sheet.addEventListener('change', markDirty); // toggles, selects, the date field
 quoteEditor.on('update', () => markDirty()); // TipTap passes its own props, not an Event
-song.editor.on('update', () => markDirty());
 
 // --- constellation membership: its own tab, one picker for both types ---
 // (It applies immediately, so it never belonged inside either <form>.)
@@ -352,7 +339,6 @@ const picker = wireConstellationPicker(
 );
 const tabs = wireSheetTabs(sheet);
 const cnCount = document.getElementById('sheet-cn-count')!;
-const fieldsTabLabel = document.getElementById('sheet-tab-fields-label')!;
 const cnPanel = document.getElementById('sheet-panel-cn')!;
 
 function refreshCnCount() {
@@ -365,25 +351,19 @@ cnPanel.addEventListener('change', refreshCnCount);
 const membershipTouched = () => picker.changed();
 
 // --- "Shared by": the corpus side of the person link (12 · Piece 3) ---
-// One handle per form, because the field lives beside the provenance facets in
-// each rather than in a shared tab — a song someone sent and a quote someone
-// said are the same link, but they are asked for in two different places.
-// Absent when the roster is empty: the component renders nothing at all then.
-const sharedByHandles = new Map<'quote' | 'song', ReturnType<typeof wireSharedBy>>();
-for (const scope of ['quote', 'song'] as const) {
-  const el = sheet.querySelector<HTMLElement>(`[data-sby="${scope}"]`);
-  if (el) sharedByHandles.set(scope, wireSharedBy(el));
-}
+// One handle, since ADR 0031 left one form here. The song's own copy of this
+// field lives on its own sheet, beside its own provenance — a song someone sent
+// and a quote someone said are the same link, asked for in two different rooms.
+// Null when the roster is empty: the component renders nothing at all then.
+const sharedByEl = sheet.querySelector<HTMLElement>('[data-sby="quote"]');
+const sharedByHandle = sharedByEl ? wireSharedBy(sharedByEl) : null;
 /** `fragment_id → person_id[]`, rendered by the server so an open needs no fetch. */
 const sharedByMap: Record<string, string[]> = JSON.parse(sheet.dataset.sharedBy || '{}');
 /** Set when you arrived from a profile's "Add a quote" (`?person=<slug>`). */
 const linkPersonId = sheet.dataset.linkPerson || '';
 
-function openSheet(type: 'quote' | 'song', tab = 'fields') {
+function openSheet(tab = 'fields') {
   clearError();
-  quoteForm.hidden = type !== 'quote';
-  songForm.hidden = type !== 'song';
-  fieldsTabLabel.textContent = type === 'quote' ? 'Quote' : 'Song';
   // Default: the content, never mid-composition. The exception is a caller that
   // names a tab — the row's membership cell asks for 'constellations', so the
   // gesture lands where you were already looking instead of one tab away.
@@ -445,34 +425,30 @@ function toggleDelete(form: HTMLFormElement, show: boolean) {
   (form.querySelector('[data-delete]') as HTMLElement).hidden = !show;
 }
 
-// --- New quote / New song (buttons live in the list page) ---
+// --- New quote (the button lives in the list page) ---
+// ⚠ `[data-new]` USED TO CARRY A TYPE, and "song" was the other value. Songs
+// enter at /admin/listening now (ADR 0031), so every remaining one says quote —
+// the attribute is kept rather than renamed because the list pages, the
+// composer's browser and the deep-link handler all emit it.
 document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
   btn.addEventListener('click', () => {
-    const type = btn.dataset.new as 'quote' | 'song';
-    const form = type === 'quote' ? quoteForm : songForm;
+    const form = quoteForm;
     form.reset();
     setField(form, 'id', '');
     setSubjects(form, '');
     toggleDelete(form, false);
-    if (type === 'quote') {
-      // emitUpdate: false — TipTap v3 fires `update` on setContent, which would
-      // arm the unsaved-work guard against words we just put there ourselves.
-      quoteEditor.commands.setContent('', { emitUpdate: false });
-      authorCombo.clear();
-      workCombo.clear();
-      recomputeWorkScope();
-      setOverrideOpen(false); // a fresh quote is never an exception to its own rule
-      setSlugState(null); // ⚠ BEFORE refreshPreview — it clears `slugTouched`, which is what re-arms the auto-fill
-      refreshPreview();
-      resetQuoteDate();
-      refreshQuoteValid();
-      quoteSuggest.reset();
-    }
-    if (type === 'song') {
-      song.editor.commands.setContent('', { emitUpdate: false });
-      document.getElementById('song-lookup')!.textContent = '';
-      songSuggest.reset();
-    }
+    // emitUpdate: false — TipTap v3 fires `update` on setContent, which would
+    // arm the unsaved-work guard against words we just put there ourselves.
+    quoteEditor.commands.setContent('', { emitUpdate: false });
+    authorCombo.clear();
+    workCombo.clear();
+    recomputeWorkScope();
+    setOverrideOpen(false); // a fresh quote is never an exception to its own rule
+    setSlugState(null); // ⚠ BEFORE refreshPreview — it clears `slugTouched`, which is what re-arms the auto-fill
+    refreshPreview();
+    resetQuoteDate();
+    refreshQuoteValid();
+    quoteSuggest.reset();
     // Nothing to be a member of yet — ticks queue until the first save. In a
     // composer context, pre-tick that constellation (the old data-place-in
     // hook, now visible in the UI rather than implicit).
@@ -483,14 +459,16 @@ document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {
     // queue until the first save. Arriving from a profile's "Add a quote"
     // pre-ticks that person, which is the whole flow §5 asked for — the quote
     // enters the corpus AND attaches, in one move.
-    sharedByHandles.get(type)?.setFragment(null, []);
-    if (linkPersonId) sharedByHandles.get(type)?.preselect(linkPersonId);
-    sheetTitle.textContent = type === 'quote' ? 'New quote' : 'New song';
-    openSheet(type);
+    sharedByHandle?.setFragment(null, []);
+    if (linkPersonId) sharedByHandle?.preselect(linkPersonId);
+    sheetTitle.textContent = 'New quote';
+    openSheet();
   });
 });
 
-// --- Edit existing quote / song (opened by a row click in the manager) ---
+// --- Edit an existing quote (opened by a row click in the manager) ---
+// A SONG NO LONGER ARRIVES HERE: its row carries `data-song` and the seam
+// dispatches `song:edit` instead (ADR 0031, scripts/open-editor.ts).
 document.addEventListener('fragment:edit', (e) => {
   {
     // Either shape: a bare JSON string, or `{ data, tab }` from a row that
@@ -503,14 +481,13 @@ document.addEventListener('fragment:edit', (e) => {
     } catch {
       return showError('Could not read that fragment.');
     }
-    const type = d.type as 'quote' | 'song';
-    const form = type === 'quote' ? quoteForm : songForm;
+    const form = quoteForm;
     form.reset();
     setField(form, 'id', d.id);
     setField(form, 'attribution', d.attribution);
     setField(form, 'status', d.status);
     setSubjects(form, d.subjects);
-    if (type === 'quote') {
+    {
       quoteEditor.commands.setContent(d.body || '', { emitUpdate: false });
       setField(form, 'source_url', d.source_url);
       // "Where in it" absorbs the legacy `page`, so the two locators Michael
@@ -543,113 +520,38 @@ document.addEventListener('fragment:edit', (e) => {
       resetQuoteDate(d.occurredIso, d.datePrecision);
       refreshQuoteValid();
       quoteSuggest.reset();
-    } else {
-      setField(form, 'year', String(d.year));
-      setField(form, 'title', d.title);
-      setField(form, 'spotify_url', d.source_url);
-      setField(form, 'thumbnail_url', d.details.thumbnail_url ?? '');
-      setField(form, 'album', d.details.album ?? '');
-      // Carry the Web API provenance back in. `form.reset()` blanked these, and
-      // saveSong writes `details` wholesale — so without this, opening a song
-      // and pressing Save would quietly drop the ids the lookup had found.
-      setField(form, 'release_year', d.details.release_year != null ? String(d.details.release_year) : '');
-      setField(form, 'spotify_album_id', d.details.spotify_album_id ?? '');
-      setField(form, 'spotify_artist_ids', (d.details.spotify_artist_ids ?? []).join(','));
-      song.editor.commands.setContent(d.body || '', { emitUpdate: false });
-      document.getElementById('song-lookup')!.textContent = '';
-      songSuggest.reset();
     }
     toggleDelete(form, true);
     picker.setFragment(d.id, Array.isArray(d.constellationIds) ? d.constellationIds : []);
-    sharedByHandles.get(type)?.setFragment(d.id, sharedByMap[d.id] ?? []);
-    sheetTitle.textContent = type === 'quote' ? 'Edit quote' : 'Edit song';
-    openSheet(type, intent.tab);
+    sharedByHandle?.setFragment(d.id, sharedByMap[d.id] ?? []);
+    sheetTitle.textContent = 'Edit quote';
+    openSheet(intent.tab);
   }
 });
 
-// --- metadata lookup on paste/change (docs/plans/04 Piece 4) ---
-// The Web API fills artist, album and release year; oEmbed can only manage a
-// title (and, on YouTube, the channel). Either way this only ever writes into
-// an EMPTY field — merge, never replace, so a correction you typed survives
-// re-pasting the link.
-const urlField = songForm.elements.namedItem('spotify_url') as HTMLInputElement;
-const lookupNote = document.getElementById('song-lookup')!;
-/** Write `value` only if the field is currently blank. Returns what's there now. */
-function fillIfEmpty(name: string, value: string | null | undefined): string {
-  const el = songForm.elements.namedItem(name) as HTMLInputElement | null;
-  if (!el) return '';
-  if (!el.value.trim() && value) setField(songForm, name, value);
-  return el.value;
-}
-/** Lookups are async and this one fires on BOTH `paste` and `change`, so a
- *  paste-then-correct sends two and they can land out of order. The token is
- *  the same guard `music-panel.ts` carries for its search, for the same reason:
- *  a stale answer must never overwrite a newer one. Damage was bounded by
- *  `fillIfEmpty` — the visible fields survive — but `thumbnail_url` and the
- *  three hidden Spotify ids are written unconditionally, and those are exactly
- *  the ones nobody would notice were wrong. */
-let lookupSeq = 0;
-async function runLookup() {
-  const url = urlField.value.trim();
-  if (!url) return;
-  const seq = ++lookupSeq;
-  lookupNote.textContent = 'Looking up…';
-  const { data, error } = await callAction(actions.songs.lookup({ url }));
-  if (seq !== lookupSeq) return; // a newer paste already answered
-  if (error || !data) {
-    // A DEAD NETWORK IS NOT A BAD LINK, and before this the note said only the
-    // second thing — sending you off to re-check a URL that was fine while the
-    // real answer was that nothing could be reached. Worse, without the
-    // `callAction` above the throw skipped this line entirely and left
-    // "Looking up…" on screen for the life of the sheet.
-    lookupNote.textContent = isNetworkError(error)
-      ? 'Couldn’t reach the lookup — the fields are yours to fill in.'
-      : 'Couldn’t read that link — paste a Spotify track/album or a YouTube video, or fill the fields in by hand.';
-    return;
-  }
-  fillIfEmpty('title', data.title);
-  fillIfEmpty('attribution', data.artist);
-  fillIfEmpty('album', data.album);
-  if (data.thumbnailUrl) setField(songForm, 'thumbnail_url', data.thumbnailUrl);
-  // Hidden provenance — always overwritten, because unlike the visible fields
-  // these are never hand-edited and a stale id is worse than none.
-  setField(songForm, 'release_year', data.releaseYear != null ? String(data.releaseYear) : '');
-  setField(songForm, 'spotify_album_id', data.albumId ?? '');
-  setField(songForm, 'spotify_artist_ids', data.artistIds.join(','));
-
-  // Name the kind: an album link is easy to paste by accident, and the whole
-  // record embeds rather than the one song.
-  const kind = data.ref.kind === 'album' ? ' — the whole album' : data.ref.kind === 'video' ? ' — a YouTube video' : '';
-  // Say when we're on the thin tier, so an empty Artist field reads as a known
-  // limitation rather than a bug. This is the difference Piece 4 bought.
-  const thin = data.source === 'oembed' && !data.artist ? ' · no artist from this link — type it in' : '';
-  lookupNote.textContent = `✓ ${data.title}${kind}${thin}`;
-}
-urlField.addEventListener('change', runLookup);
-urlField.addEventListener('paste', () => setTimeout(runLookup, 50));
+// ⚠ THE SPOTIFY LOOKUP LIVED HERE AND HAS MOVED (ADR 0031). It filled this
+// form's artist/album/year from a pasted link, merge-never-replace, with a
+// sequence token so a paste-then-correct could not land out of order. All of
+// that is now the song sheet's paste bar (`scripts/song-sheet.ts`), which owns
+// the same `songs.lookup` call — one lookup path, not two.
 
 // --- submit via the action ---
-for (const [form, action] of [
-  [quoteForm, actions.fragments.saveQuote],
-  [songForm, actions.fragments.saveSong],
-] as const) {
+{
+  const form = quoteForm;
+  const action = actions.fragments.saveQuote;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
-    if (form === quoteForm) {
+    {
       quoteBody.value = quoteMarkdown();
       if (quoteEditor.isEmpty) {
         showError('A quote needs its words.');
         return;
       }
-    } else if (form === songForm) {
-      // An empty doc still serializes to whitespace — send nothing at all, so
-      // an unannotated song stores `body: null` rather than a blank paragraph.
-      songBody.value = song.editor.isEmpty ? '' : song.getMarkdown();
     }
     const fd = new FormData(form);
-    if (form === quoteForm && !quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic
-    if (form === quoteForm) {
+    if (!quoteDateToggle.checked) fd.delete('occurred_at'); // absent = automatic
+    {
       // ABSENT `attribution` MEANS "derive it" — the server owns that, so a
       // stale sheet can never write a line that disagrees with its own facts.
       // Sent only when it is a genuine exception: the box is open AND says
@@ -702,7 +604,7 @@ for (const [form, action] of [
     // report whether what was queued actually landed.
     if (res.data?.id) {
       const wrote = await picker.flush(res.data.id);
-      const linked = (await sharedByHandles.get(form === quoteForm ? 'quote' : 'song')?.flush(res.data.id)) ?? true;
+      const linked = (await sharedByHandle?.flush(res.data.id)) ?? true;
       // The id goes back into the form whatever happens, so pressing Save again
       // UPDATES this fragment rather than minting a second one. Without it the
       // retry after a half-written save is a duplicate quote, which is a worse

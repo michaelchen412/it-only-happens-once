@@ -1,11 +1,17 @@
-// The "Suggest with AI" flow, for any fragment type (docs/plans/02).
+// The "Suggest with AI" flow, for a quote or a piece of writing (docs/plans/02).
 //
-// The server was always ready for this: `fragments.suggestSubjects` has
-// accepted `kind: 'quote' | 'song' | 'writing'` since it was written, and the
-// kind is interpolated into the system prompt and used nowhere else — there are
-// no per-kind branches on the server and never were. Only the UI was
-// quote-only. This is that UI, written once, so the three call sites can't
-// drift apart.
+// The kind is interpolated into the system prompt and used nowhere else —
+// there are no per-kind branches on the server and never were. This is the UI,
+// written once, so the call sites can't drift apart.
+//
+// ⚠ THERE WERE THREE KINDS AND THERE ARE NOW TWO (ADR 0031). A song has no
+// subjects: a subject is what a piece is ABOUT, and a song is not about
+// anything you can paraphrase — the one time this corpus filed one that way it
+// produced `jazz`, a genre alone in a taxonomy of words about living. What a
+// song does to you is a FEELING, and a feeling is not a property of the song at
+// all; it is what happened in Michael, which no model has access to. So there
+// is no `suggestFeelings` anywhere, and **no part of a song is
+// machine-taggable.** That is a cleaner line than the one it replaced.
 //
 // THE HUMAN STAYS IN THE LOOP BY CONSTRUCTION, which is the whole design:
 // existing subjects are MERGED into the tag field rather than replacing what
@@ -21,7 +27,7 @@ export type Gathered = { text: string } | { missing: string };
 export interface SubjectSuggestOptions {
   /** The element rendered by SubjectsField.astro. */
   root: HTMLElement;
-  kind: 'quote' | 'song' | 'writing';
+  kind: 'quote' | 'writing';
   /** What to send. Each type is incomplete in its own way — see the callers. */
   gather(): Gathered;
   readTags(): string[];

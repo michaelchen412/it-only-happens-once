@@ -1,6 +1,6 @@
 ---
 /*
-  FragmentSheet — the quick-editor for quotes & songs (docs/admin.md §6–7),
+  FragmentSheet — the quick-editor for QUOTES (docs/admin.md §6–7),
   as a native <dialog> drawer. Native gives focus-trapping, Escape, scroll-lock,
   and focus restoration for free; we add the slide/fade animation via the
   `.drawer-dialog` utility in app.css. Self-contained: its script wires the
@@ -10,6 +10,14 @@
   writing composer; ADR-0006) with `breaks: true` so poetry line breaks survive.
   Dates follow the composer convention: automatic (now) unless a legacy date is
   set explicitly.
+
+  WIDER THAN THE OTHER SHEETS (max-w-2xl, 42rem — half again the max-w-md the
+  task/goal/person/link drawers use, 2026-08-11). Those are a handful of short
+  inputs; this one is a WYSIWYG editor with a derived-attribution preview under
+  it, and at 28rem the quote wrapped every few words while the "Shows as" line
+  broke mid-attribution — you couldn't read the sentence you were judging. Not
+  the writing composer's max-w-5xl: that sheet is a full-page essay surface, and
+  a quote is still a drawer beside the list you opened it from.
 
   ⚠ THE WORDS ARE THE ONLY REQUIRED FIELD ON A QUOTE (2026-08-05, plan 17a).
   Attribution used to be required too, which made an unattributed quote
@@ -69,12 +77,11 @@ const {
 const SELF_ID = 'self';
 const authorOptions = [{ id: SELF_ID, name: 'Me' }, ...authors.map((a) => ({ id: a.id, name: a.name }))];
 const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.authorId }));
-const thisYear = new Date().getUTCFullYear();
 ---
 
 <dialog
   id="sheet"
-  class="drawer-dialog w-full max-w-md"
+  class="drawer-dialog w-full max-w-2xl"
   aria-labelledby="sheet-title"
   data-shared-by={JSON.stringify(sharedBy)}
   data-link-person={linkPersonId ?? undefined}
@@ -377,105 +384,30 @@ const thisYear = new Date().getUTCFullYear();
         </div>
       </form>
 
-      {/* SONG */}
-      <form
-        id="song-form"
-        method="POST"
-        action={actions.fragments.saveSong}
-        hidden
-        class="flex flex-col gap-4 p-6 font-sans"
-      >
-        <input type="hidden" name="id" />
-        <input type="hidden" name="thumbnail_url" />
-        <input type="hidden" name="body" id="song-body" />
-        {
-          /* Filled by the Web API lookup only (docs/plans/04 Piece 4) — the album's
-          release year, kept apart from `occurred_at` (the year YOU added it),
-          and the Spotify ids that make provenance exact instead of name-matched. */
-        }
-        <input type="hidden" name="release_year" />
-        <input type="hidden" name="spotify_artist_ids" />
-        <input type="hidden" name="spotify_album_id" />
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70"
-            >Link <span class="text-base-content/40">— a Spotify track or album, or a YouTube video</span></span
-          >
-          <input
-            name="spotify_url"
-            type="url"
-            required
-            class="input input-sm input-bordered"
-            placeholder="https://open.spotify.com/track/…"
-          />
-          <span id="song-lookup" class="text-base-content/55 text-xs" role="status"></span>
-        </label>
-        {
-          /* Artist and album auto-fill from the API but stay editable: a five-artist
-          track joins to "Miles Davis, John Coltrane, Cannonball Adderley, Bill
-          Evans", which is a credit list, not an attribution. Autofill only ever
-          writes into an EMPTY field — same merge-never-replace rule the AI
-          subject suggester follows. */
-        }
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Title <span class="text-base-content/40">(auto-filled)</span></span>
-          <input name="title" required class="input input-sm input-bordered" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Artist <span class="text-base-content/40">(auto-filled)</span></span>
-          <input name="attribution" required class="input input-sm input-bordered" placeholder="Miles Davis" />
-        </label>
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Album <span class="text-base-content/40">(auto-filled)</span></span>
-          <input name="album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
-        </label>
+      {
+        /* ⚠ THE SONG FORM WAS HERE, AND ADR 0031 TOOK IT OUT. A song has its own
+          sheet now (`SongSheet.astro`), because the split this file carried was
+          two editors divided by FIELD: the metadata lived here and the feelings
+          lived in /admin/listening, and neither surface could show you the whole
+          object. Michael, 2026-08-11: *"this division is really uncomfortable
+          for me, and I don't think it's a clean implementation."*
 
-        {
-          /* The annotation (ADR 0009) — the one thing Spotify has no field for, and
-          what makes this a fragment rather than a link. Optional, always: the
-          stanza falls back to title + artist when a song says nothing. */
-        }
-        <div class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70"
-            >Why this one <span class="text-base-content/40">— optional; it leads the stanza</span></span
-          >
-          <div id="song-editor-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
-            <div
-              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
-              role="toolbar"
-              aria-label="Formatting"
-            >
-              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
-                ><b>B</b></button
-              >
-              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
-                ><i>I</i></button
-              >
-            </div>
-            <div id="song-editor" class="max-h-[40vh] min-h-[7rem] overflow-y-auto px-3 py-2"></div>
-          </div>
-        </div>
-        {/* Songs publish on save — no draft lifecycle. Unpublish via the list. */}
-        <input type="hidden" name="status" value="published" />
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Added (year)</span>
-          <input name="year" type="number" required value={thisYear} class="input input-sm input-bordered" />
-        </label>
-        {/* A song is the clearest case §5 has: "a specific song she sent". */}
-        <SharedByField scope="song" people={people} />
+          THREE THINGS WENT WITH IT AND NONE OF THEM CAME BACK:
 
-        {
-          /* Placeholder deliberately not "jazz": a song's subjects here are what it
-          is ABOUT, not what genre it is — and the example is the first thing
-          that teaches which. Same reason the AI button demands the annotation. */
-        }
-        <SubjectsField id="song-subjects">
-          <TagInput name="subjects" label="Subjects" suggestions={subjects} placeholder="longing, memory" />
-        </SubjectsField>
-        <div class="mt-2 flex items-center gap-2">
-          <button type="submit" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
-          <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
-        </div>
-      </form>
+           · "Why this one" — the annotation ADR 0009 gave a song so it would
+             qualify as a fragment. One song in forty-eight used it in seventeen
+             days, and what it said was an observation, not a justification. A
+             song has NOTES now, split by audience: one anyone can open, one
+             nobody but Michael ever will.
+           · Subjects — a subject is what a piece is ABOUT, and a song is not
+             about anything you can paraphrase. The one time this corpus filed
+             one that way it produced `jazz`.
+           · The Spotify lookup — the song sheet's paste bar owns that call now,
+             so there is one lookup path rather than two.
+
+          What this sheet is, therefore, is the QUOTE editor. It kept its
+          filename because renaming it would touch every mount for no gain. */
+      }
     </div>
 
     <div id="sheet-panel-cn" role="tabpanel" data-tabpanel="constellations" hidden class="p-6">

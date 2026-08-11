@@ -1,9 +1,13 @@
-// Plan 02: "Suggest with AI" on all three fragment types.
+// Plan 02: "Suggest with AI" on a quote and on a piece of writing.
 //
-// Two jobs here. The first is the new surface — the button on a song and on a
-// piece of writing, which never existed. The second is REGRESSION: the quote
-// flow was working code that got pulled out into a shared module, and the only
-// honest way to claim that was a safe move is to drive the quote flow too.
+// ⚠ IT COVERED THREE TYPES AND NOW COVERS TWO (ADR 0031) — a song has no
+// subjects, so there is no surface left to drive. See the note where its block
+// used to be.
+//
+// Two jobs here. The first is the surface on a piece of writing, which never
+// existed before plan 02. The second is REGRESSION: the quote flow was working
+// code that got pulled out into a shared module, and the only honest way to
+// claim that was a safe move is to drive the quote flow too.
 //
 // `/_actions/**` is stubbed, so no Anthropic call is paid for and nothing
 // touches the corpus. That leaves the server path unproven by these specs on
@@ -24,9 +28,8 @@ const PROPOSED = { name: 'thresholds', definition: 'The moments between one life
 
 /**
  * Stub the model and capture what was sent. The captured text is the point:
- * it's the only way to check that each type gathers the right thing — a song
- * that forgets its annotation, or writing that sends the title alone, would
- * look identical from the outside.
+ * it's the only way to check that each type gathers the right thing — writing
+ * that sent the title alone would look identical from the outside.
  */
 async function stubSuggest(page: Page, { proposed = true } = {}) {
   const sent: { text: string; kind: string }[] = [];
@@ -46,8 +49,8 @@ async function stubSuggest(page: Page, { proposed = true } = {}) {
  */
 const subjects = (root: ReturnType<Page['locator']>) => root.locator('input[name="subjects"]');
 
-/** Quote and song are behind the list page's Add ▾ menu, not bare buttons. */
-async function openNew(page: Page, type: 'quote' | 'song') {
+/** A quote is behind the list page's Add ▾ menu, not a bare button. */
+async function openNew(page: Page, type: 'quote') {
   await page.goto('/admin/fragments');
   await page.locator('#add-btn').click();
   await page.locator(`#add-menu [data-new="${type}"]`).click();
@@ -125,47 +128,16 @@ test.describe('suggest subjects — writing', () => {
   });
 });
 
-test.describe('suggest subjects — song', () => {
-  async function newSong(page: Page) {
-    await openNew(page, 'song');
-    await expect(page.locator('#song-form')).toBeVisible();
-  }
+/*
+  ⚠ THE SONG BLOCK WAS HERE, AND ADR 0031 DELETED THE SURFACE IT DROVE. It
+  opened the song form, filled title/artist/album, and asserted that the
+  suggester REFUSED to guess without the annotation — that a song's subjects
+  come from why it mattered rather than from its genre.
 
-  test('refuses to guess from title and artist alone', async ({ page }) => {
-    const { sent } = await stubSuggest(page);
-    await newSong(page);
-    await page.locator('#song-form input[name="title"]').fill('So What');
-    await page.locator('#song-form input[name="attribution"]').fill('Miles Davis');
-    await page.locator('#song-form input[name="album"]').fill('Kind of Blue');
-
-    await page.locator('#song-subjects [data-ai-run]').click();
-
-    // The whole point of the song half: metadata alone yields genres, and
-    // genres are not what this taxonomy is for.
-    await expect(page.locator('#sheet-error')).toBeVisible();
-    await expect(page.locator('#sheet-error')).toContainText('Say why this one first');
-    expect(sent, 'no annotation means no call at all').toHaveLength(0);
-  });
-
-  test('with an annotation it sends the words, not the metadata alone', async ({ page }) => {
-    const { sent } = await stubSuggest(page, { proposed: false });
-    await newSong(page);
-    await page.locator('#song-form input[name="title"]').fill('So What');
-    await page.locator('#song-form input[name="attribution"]').fill('Miles Davis');
-    await page.locator('#song-form input[name="album"]').fill('Kind of Blue');
-    await page.locator('#song-editor').click();
-    await page.keyboard.type('Played it the whole winter I lived alone.');
-
-    await page.locator('#song-subjects [data-ai-run]').click();
-
-    await expect(subjects(page.locator('#song-subjects'))).toHaveValue('solitude, attention');
-    expect(sent).toHaveLength(1);
-    expect(sent[0].kind).toBe('song');
-    expect(sent[0].text).toContain('Played it the whole winter');
-    expect(sent[0].text).toContain('So What');
-    expect(sent[0].text).toContain('Miles Davis');
-  });
-});
+  That assertion is now enforced one level up and much harder: a song has no
+  subjects field at all, and `suggestSubjects`' `kind` no longer accepts
+  'song'. The refusal the spec was pinning became an impossibility.
+*/
 
 test.describe('suggest subjects — quote (regression)', () => {
   // Working code that was pulled into the shared module. If the extraction

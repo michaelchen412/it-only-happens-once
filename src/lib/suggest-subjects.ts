@@ -36,7 +36,7 @@ const SYSTEM = (kind: string, list: string) =>
 
 export async function suggestSubjects(
   text: string,
-  kind: 'quote' | 'song' | 'writing',
+  kind: 'quote' | 'writing',
   apiKey: string,
   taxonomy: TaxonomyEntry[],
 ): Promise<SubjectSuggestion> {
