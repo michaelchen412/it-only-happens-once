@@ -1,0 +1,67 @@
+---
+/*
+  404 — the request that matched no route at all (plan 34 · §3).
+
+  ⚠ THIS IS THE THIRD 404 ON THE SITE AND THE OTHER TWO ARE NOT BUGS. Both
+  dynamic routes already answer for themselves, each for a reason written where
+  it applies: `blog/[slug].astro` sets a 404 status and renders "This piece
+  isn’t here" inside the site's own chrome, and `admin/people/[slug].astro` does
+  the same and says in a comment why it chose that over a redirect. What had no
+  owner was the request that reaches no route — a typo, a stale inbound link, a
+  deleted path — which until now fell to Astro's bare framework default:
+  unstyled, unnavigable, and in a different visual universe from every other
+  page here.
+
+  *The alternative that lost:* `Astro.rewrite('/404')` from the dynamic routes,
+  to centralise all three. It would flatten two deliberate and
+  differently-argued behaviours into one, and both of those comments exist
+  because the difference was thought about. Three handlers, three reasons.
+
+  ⚠ AND DO NOT "FIX" `[slug].astro` WHILE YOU ARE HERE. An unknown top-level
+  slug drifts home rather than hard-404ing, and that is a decision with a
+  comment on it. Plan 31's post-build smoke test already had to establish this
+  once: the three deleted lab routes still 302 to `/` and that is correct rather
+  than stale cache, proven by the control — `/blog/<nonsense>` still 404s. A
+  session arriving here and seeing "no 404 page" will reach for that file. It is
+  the wrong file.
+
+  ⚠ NO DATABASE READ, DELIBERATELY. This is the one page a crawler and a bad
+  link generate at volume, and it is the only page on the site with no reason to
+  cost anything. The two 404 handlers above have already paid for their query by
+  the time they know they missed; this one never starts one. That is also why
+  there is no search box (a reader who typed the wrong URL cannot search for
+  what they meant) and no suggestions.
+
+  Two ways out and no more: the Sky, which is where the site actually begins,
+  and the blog, which is what most broken links were pointing into.
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { Icon } from 'astro-icon/components';
+
+// Explicit, because this file is reachable two ways. The adapter renders it
+// with a 404 for an unmatched route, but a direct visit to `/404` would
+// otherwise answer 200 — a page that says "not here" under a status that says
+// "here" is exactly the soft-404 a crawler is entitled to believe.
+Astro.response.status = 404;
+
+// A 404 must never be cached as if it were the page that was asked for.
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<SiteLayout title="Not found" description="That page isn’t here.">
+  <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
+    <p class="text-base-content/70 font-serif text-2xl">That page isn’t here.</p>
+    <p class="text-base-content/45 mt-2 font-sans text-sm">
+      The link may be off by a letter, or it pointed at something that has since moved.
+    </p>
+
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+      <a href="/" class="text-primary inline-flex items-center gap-1 font-sans text-sm hover:underline">
+        <Icon name="ph:caret-left" class="size-3.5" /> The sky
+      </a>
+      <a href="/blog" class="text-primary inline-flex items-center gap-1 font-sans text-sm hover:underline">
+        <Icon name="ph:caret-left" class="size-3.5" /> The blog
+      </a>
+    </div>
+  </div>
+</SiteLayout>
