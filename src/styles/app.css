@@ -203,10 +203,45 @@
    Chroma stays low on purpose. These are stars seen from a porch, not tags in
    a dashboard — and colour never carries meaning alone: the name is always
    there beside it.
+
+   ICE IS THE BLUE-WHITE, AND IT IS NOT A NINTH SLOT. (Retuned 2026-08-10.)
+   Both descriptions of this ramp — here and design.md §13 — say it passes
+   through white, and for a year nothing occupied that position: walking the
+   hues hot→cool gave 305 · 242 · 222 · 98 · 68 · 45 · 25 · 5, every gap 20–30°
+   except a 124° hole between azure and gold. That hole is the A/F white
+   classes — Sirius, Vega, Deneb — and it was the ramp's one real omission.
+
+   A literal `white` slot was the obvious fix and is WRONG, because `--cn` is
+   not only a tint: it is also `--lamp`, the light a whole suite reads under.
+   White light is no light — *not looking away* would stop being lit differently
+   from *conditions, not character*, and the drawn arcs (quiet phrase marks)
+   would come out brighter than the prose they sit beside. It fails a third way
+   out front: brightness is already the MAGNITUDE channel (`--glow`, and §13's
+   "weighted by brightness more than size"), so a white star would read as
+   *big* rather than as its own colour.
+
+   So the white goes into `ice`, which was the ramp's most redundant slot —
+   242 against azure's 222, near-twins at those chromas. It moves three axes at
+   once: lightest on the ramp (84%, above gold's 82% — blue-white IS the
+   brightest class), lowest chroma (0.05, half of what it was), and hue out to
+   248, which widens the azure gap to 26° and rebalances the cool half. Nothing
+   downstream changes: no ninth slot, no `color` check constraint, no touching
+   the three-place seam in lib/constellation-colors.ts.
+
+   It stays a HUE rather than a neutral, and that is what makes it legible: the
+   room is warm on every axis (base-content 78, base-100 62, primary 68), so
+   even 0.05 of chroma at 248 reads as cool-white against warm cream — a
+   different thing from the ink, not a brighter version of it. A true neutral
+   would have had nothing to hold it apart.
+
+   On `paper` it keeps its LIGHTNESS (54%, unchanged) and drops its chroma
+   instead. In an ink theme lightness is contrast and contrast is legibility,
+   so "palest" cannot mean lightest there; the ink-equivalent of white-hot is
+   the same weight carrying the least colour.
    ------------------------------------------------------------------------ */
 [data-theme='dusk'] {
   --cn-violet: oklch(74% 0.095 305);
-  --cn-ice: oklch(78% 0.085 242);
+  --cn-ice: oklch(84% 0.05 248); /* the blue-white — see ICE, below */
   --cn-azure: oklch(72% 0.095 222);
   --cn-gold: oklch(82% 0.105 98);
   --cn-amber: oklch(76% 0.115 68); /* = primary, the lamplight itself */
@@ -216,7 +251,7 @@
 }
 [data-theme='paper'] {
   --cn-violet: oklch(50% 0.11 305);
-  --cn-ice: oklch(54% 0.1 242);
+  --cn-ice: oklch(54% 0.05 248); /* same ink weight, least colour — see ICE */
   --cn-azure: oklch(50% 0.11 222);
   --cn-gold: oklch(58% 0.11 98);
   --cn-amber: oklch(56% 0.11 62); /* = primary */
@@ -227,9 +262,15 @@
 
 /* `--cn` is the constellation's colour; `--lamp` is the light a surface reads
    under. They're set together so a suite lights itself in its own colour, and
-   everything else falls back to the house lamplight. */
+   everything else falls back to the house lamplight.
+
+   `--cn-trace` is how much of `--cn` a sky NAME carries at rest (consumed by
+   `.sky-name` in admin.css). It is a variable, and not the flat 34% it used to
+   be, because 34% is a PERCEPTUAL target rather than a magic number — see the
+   dusk override below. */
 :root {
   --lamp: var(--color-primary);
+  --cn-trace: 34%;
 }
 .cn-violet {
   --cn: var(--cn-violet);
@@ -262,6 +303,26 @@
 .cn-rose {
   --cn: var(--cn-rose);
   --lamp: var(--cn-rose);
+}
+
+/* ⚠ ICE PAYS FOR ITS WHITENESS HERE, and this rule is the reason the retune
+   above is safe. `.sky-name` rests at a TRACE of `--cn` mixed into the prose
+   ink, and that trace is load-bearing: it is the only thing telling a stranger
+   who lands and never moves that the names are links (afford-lab, 2026-08-07).
+   A trace is only as strong as the distance between `--cn` and the ink, and
+   whiteness is exactly a shortage of that distance — measured in oklab, ice's
+   rest state fell from ΔE 0.056 to 0.033, the weakest on the ramp, on the
+   constellation the site is NAMED after.
+
+   58% restores it to 0.056 — the same perceptual distance every other slot
+   gets at 34%, which is the point: the number that should hold constant is
+   what the eye receives, not the percentage that produces it.
+
+   Dusk only. On `paper` the trace is dominated by the ink/paper lightness
+   split (ΔE ~0.09 either way), so the retune costs ~6% there and 58% would
+   overshoot into ice's name reading paler than its neighbours'. */
+[data-theme='dusk'] .cn-ice {
+  --cn-trace: 58%;
 }
 
 /* ---------------------------------------------------------------------------

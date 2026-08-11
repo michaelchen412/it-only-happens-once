@@ -378,7 +378,7 @@ html.reader-open {
    nearest the reading line on a phone — never both. The `:hover` rules below
    are the no-JS floor and are gated, so they cannot double up on touch. */
 .sky-name {
-  color: color-mix(in oklab, var(--cn, var(--color-primary)) 34%, var(--color-base-content));
+  color: color-mix(in oklab, var(--cn, var(--color-primary)) var(--cn-trace, 34%), var(--color-base-content));
   transition: color 0.3s ease;
 }
 .sky-row.is-focus .sky-name,
@@ -1320,11 +1320,33 @@ html.reader-open .sky-return {
 /* The picker itself. `position: fixed` with the offsets written by script —
    the native top layer means viewport coordinates, and `inset: auto` undoes
    the UA's centring default. */
+/* ⚠ IT SIZES TO THE RANK — a `max-width` here is a scrollbar, not a guard.
+   This was `max-width: 15rem`, and eight slots need ~18.4rem (8 × 2.05rem of
+   swatch + 7 × 0.125rem of gap + 1rem of padding), so the picker clipped its
+   own last colours. The scroll came from the UA stylesheet, which gives every
+   `[popover]` `overflow: auto` — nothing here asked for it, which is why the
+   cause read as invisible.
+
+   `max-content` is the honest width for a control whose content is a FIXED
+   rank of eight: it cannot grow unbounded, and a cap on a thing that can't
+   grow only ever amputates it. The viewport clamp stays as the real guard, and
+   its `1rem` is the script's own two 8px edge margins — the same number that
+   keeps `left` on screen in constellations-index.ts, so the two agree by
+   construction rather than by coincidence.
+
+   `overflow` is deliberately left at the UA's `auto`. At ~294px the rank fits
+   the narrowest phone in use (320px less those margins = 304px), so the
+   scrollbar is now unreachable in practice — but if a ninth slot ever lands,
+   scrolling is a far better failure than an eighth colour you cannot reach,
+   and better than wrapping to the 4×2 block that was measured and rejected
+   (it stood three list rows tall and covered the neighbours the picker exists
+   to compare against). */
 .cl-colors {
   position: fixed;
   inset: auto;
   margin: 0;
-  max-width: 15rem;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
 }
 .cl-colors::backdrop {
   background: transparent;
