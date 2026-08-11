@@ -3,6 +3,26 @@
   /constellations — the overview now lives at `/` (home IS the whole sky,
   2026-07). This alias survives as a courtesy redirect for anything that
   learned the old address.
+
+  ⚠ IT IS A HAND-BUILT `Response` SO THE REDIRECT CAN BE CACHED, and the two
+  halves of that are separate facts. A page that RETURNS a `Response`
+  short-circuits the render, so `Astro.response.headers` never reaches the wire
+  — the header has to sit on the object actually being returned, which
+  `Astro.redirect()` builds out of reach. Uncached, every stale bookmark and
+  every crawler still holding the old address costs a function invocation to be
+  told something that is true forever.
+
+  A year is safe here in a way it would not be on the 302s the dev-gated benches
+  return: 301 already claims permanence, and this URL is not coming back.
+  `max-age` is deliberately the shorter of the two — a CDN entry can be purged
+  on a deploy and a reader's browser cannot, so the promise made to the edge can
+  be bolder than the one made to a stranger's disk.
 */
-return Astro.redirect('/', 301);
+return new Response(null, {
+  status: 301,
+  headers: {
+    Location: '/',
+    'Cache-Control': 'public, max-age=3600, s-maxage=31536000',
+  },
+});
 ---

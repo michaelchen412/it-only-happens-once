@@ -46,6 +46,26 @@ import { excerpt } from '../lib/markdown';
  */
 const FEED_SIZE = 20;
 
+/**
+ * How long the edge may answer for the feed.
+ *
+ * ⚠ THIS IS THE ONE PUBLIC ROUTE THAT QUERIES THE DATABASE ON EVERY REQUEST,
+ * and it is the worst one to leave that way — a feed is not visited, it is
+ * POLLED. Every reader who subscribes installs a client that asks for this
+ * document on a schedule, forever, whether or not anything has changed, and
+ * unsubscribing is the only thing that stops it. Every other reader-facing
+ * route already carries `s-maxage` (`/`, `/blog`, `/blog/[slug]`, `/{slug}`,
+ * `/about`, `/sitemap.xml`); this one was simply never given one.
+ *
+ * Ten minutes rather than the sitemap's hour, and the difference is what the
+ * document is FOR: a sitemap is a map a crawler consults, while this is the
+ * channel a new essay actually arrives on. `stale-while-revalidate` means the
+ * ceiling is the same either way — the origin is asked at most once per window
+ * and every other poll is answered from the edge — so the shorter number costs
+ * nothing and buys promptness on the one axis a subscriber can feel.
+ */
+const EDGE_TTL = 600;
+
 export const GET: APIRoute = async (context) => {
   const { data } = await context.locals.supabase
     .from('fragments')
@@ -70,7 +90,7 @@ export const GET: APIRoute = async (context) => {
     .order('occurred_at', { ascending: false })
     .limit(FEED_SIZE);
 
-  return rss({
+  const res = await rss({
     title: 'It Only Happens Once',
     description: 'Essays, gathered into constellations — ways of seeing rather than topics.',
     // Derived from the request, never configured — `astro.config.mjs` sets no
@@ -104,4 +124,21 @@ export const GET: APIRoute = async (context) => {
       description: (p.excerpt ?? '').trim() || excerpt(p.body, 400),
     })),
   });
+
+  /*
+    ⚠ SET ON THE WAY OUT, NOT PASSED IN, because `rss()` builds the `Response`
+    itself and takes no header option. Mutating it is safe — a `Response` from
+    the constructor has a mutable header guard, unlike one handed back by
+    `fetch` — and it is the only seam this helper leaves.
+
+    Safe to mark `public` for exactly the reason `sitemap.xml.ts` spells out at
+    length: the query above filters `status = 'published'` EXPLICITLY rather
+    than leaning on RLS, so Michael's session and a stranger's produce a
+    byte-identical document. There is no per-session variant here for the CDN to
+    hand to the wrong person — which is the property that makes a shared cache
+    entry correct, and the one that would have to be re-checked if a field ever
+    started varying by viewer.
+  */
+  res.headers.set('Cache-Control', `public, s-maxage=${EDGE_TTL}, stale-while-revalidate=86400`);
+  return res;
 };
