@@ -12,6 +12,7 @@
 - **The Sky** = constellation-grouped views over the fragments that have been *placed*.
 - **"Elevation into the Sky" is not a flag** — it is simply *having a row in `fragment_constellations`*. An unplaced fragment lives in the blog forever. (This is the "no placement debt" rule, expressed in the schema.)
 - **Links between constellations are emergent** — two constellations are related whenever a fragment belongs to both. There is deliberately **no** fragment-to-fragment link table.
+- **There are two vocabularies over fragments, and they run in opposite directions.** A **subject** is what a piece is *about*; a **feeling** is what a song *does to you*. Same register, opposite direction — so `feelings` is its own table rather than `subjects` with a `kind` column. The obvious saving is the wrong one: one table would invite exactly the category error this corpus already made once, when a song was filed under the subject `jazz` — a genre, in a taxonomy of words about living, attached to nothing else. Two tables make that impossible to spell. ([plan 33](plans/33-many-words-for-one-song.md) §1; the migration argues it at length.)
 
 ## 2. Entities
 
@@ -21,6 +22,8 @@ erDiagram
   constellations ||--o{ fragment_constellations : "gathers"
   fragments ||--o{ fragment_subjects : "tagged"
   subjects ||--o{ fragment_subjects : "applies to"
+  fragments ||--o{ fragment_feelings : "evokes"
+  feelings ||--o{ fragment_feelings : "filed under"
   fragments ||--o{ fragment_versions : "drafted as"
 
   fragments {
@@ -40,6 +43,12 @@ erDiagram
     timestamptz published_at
     timestamptz created_at
     timestamptz updated_at
+  }
+  feelings {
+    uuid id PK
+    text name UK
+    text slug UK
+    int sort
   }
   constellations {
     uuid id PK
@@ -204,6 +213,27 @@ create table fragment_subjects (
   primary key (fragment_id, subject_id)
 );
 
+-- FEELINGS (added 2026-08-11, plan 33): what a SONG does to you. The opposite
+-- direction from a subject, which is what a piece is about — see §1 for why
+-- these are two tables and not one with a `kind` column.
+create table feelings (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,   -- renameable
+  slug       text not null unique,  -- ⚠ FROZEN at creation; it goes in a public URL
+  sort       int  not null,   -- the spectrum, dark -> light. Data, not decoration.
+  created_at timestamptz not null default now()
+);
+-- `Tender` and `tender` must not both exist: the room prints the word itself.
+create unique index feelings_name_ci on feelings (lower(name));
+
+create table fragment_feelings (
+  fragment_id uuid not null references fragments(id) on delete cascade,
+  feeling_id  uuid not null references feelings(id)  on delete cascade,
+  primary key (fragment_id, feeling_id)
+);
+-- The room only ever reads this backwards: "which songs carry this feeling".
+create index fragment_feelings_feeling_idx on fragment_feelings (feeling_id);
+
 -- PROVENANCE (added 0003): where a fragment comes from. The orthogonal axis to
 -- subjects (what it's ABOUT). Both optional; essays have neither.
 create table authors (
@@ -257,6 +287,9 @@ Kept in JSONB because the type set is small and stable, and these fields are rar
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
 - **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different constellations.
 - **`paired_song_id`** — *the song that goes with this piece* ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). A self-FK from a `writing` row to a `song` row, rendered at the head of the essay. **`ON DELETE SET NULL`** — deleting a song blanks the pairing rather than taking the essay with it. The FK deliberately does *not* enforce `type = 'song'`: a composite FK on `(id, type)` would need a generated column holding the constant, and a generated column cannot be set to null, which is precisely what SET NULL must do — so the check lives in the `songs.pair` action, where the error can be a sentence. **RLS needs no help here:** a PostgREST embed re-applies the fragments policies, so an unpublished paired song simply doesn't come back. The reader that consumes this (`pairedMediaOf`) must therefore treat "id set, embed null" as *no pairing* and never fall through to the legacy `details.media`, which all 48 promoted essays still carry.
+- **`feelings.slug` is FROZEN; `feelings.name` is not**, which is the opposite of every other vocabulary here ([plan 33](plans/33-many-words-for-one-song.md), ruling 6). Subjects, authors and works re-derive their slug from their name on every save. A feeling's slug goes into a public URL people send each other (`/blog?view=music&feeling=regretful`), and plan 32 §1 found that moving a slug hard-404s every link already handed out — so a rename changes the word and leaves the address alone, and the two drift apart permanently. ⚠ **That produces a collision name-uniqueness cannot catch:** rename `regretful` → `remorseful` and a new `regretful` passes the name check while wanting a slug the renamed row still owns. It is **refused, not silently suffixed** — a numbered twin would be a second invisible shelf with the same name on the front, which is the drift the vocabulary exists to prevent. Names are unique **case-insensitively** (`create unique index feelings_name_ci on feelings (lower(name))`), because the room prints the word itself and `Tender` beside `tender` would be one shelf shown twice.
+- **`feelings.sort` is data, not decoration.** The field reads dark → light (`grieving … ecstatic`), which is a claim about the spectrum rather than a display preference — so it is a column and it is editable in the Library, never a hardcoded array in a component. It is also the room's **bit order**: the client's facet index gives each song one integer whose bit *i* is `vocabulary[i]`, which caps the vocabulary at 31 words (JavaScript's bitwise operators are 32-bit **signed**). That ceiling is unreachable by design — §1's whole argument is that the vocabulary stays small.
+- **`fragment_feelings` has no timestamp, and does not need one.** "Most recently tagged" would want one; ruling 1 makes adding and tagging **the same act**, so a song's `created_at` *is* the moment it was sat with. The 48 legacy songs are the only rows where the two come apart, because they arrived as paired media years before the vocabulary existed.
 - **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
 ## 6b. HQ — the private second domain

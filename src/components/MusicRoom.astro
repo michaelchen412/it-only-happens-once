@@ -1,0 +1,300 @@
+---
+/*
+  The music room — `/blog?view=music` (docs/plans/33 §4, §6, §7).
+
+  ⚠ THE WORDS ARE THE PAGE. No rail, no checkboxes, no instruction line. That is
+  what separates this from the two text views next door, and `/blog`'s own rule
+  — *"the rail is the SAME for every view"* — is amended rather than broken:
+  the rail is the same for the two text views; MUSIC IS A THIRD REGISTER, not a
+  third list. Quotes and writing are retrieval over a shared subject taxonomy and
+  share the rail because they are the same kind of room. Music is filtered by a
+  different vocabulary, in a different act.
+
+  ⚠ NO INSTRUCTION LINE, and it was written and deleted. Michael, 2026-08-10:
+  *"'In the top, how does it feel? Choose one or a few.' I feel like that's too
+  much explicit instruction for the user. We should show, not tell."* The
+  affordance is the hover, the size shift, and the fact that the same words sit
+  under every song.
+
+  ⚠ NO COUNT HEADER, same day, same rule: *"stop listing 'x songs' as a header.
+  its pointless."* The room is right there — its size is visible by looking at
+  it. A count earns its place in a machinery register like /blog's rail, where it
+  tells you what a filter WOULD leave before you commit; here it would only
+  report what already happened. Screen readers get the number a different way —
+  see the live region below, which is that same information through the other
+  door.
+*/
+import { embedForUrl } from '../lib/media';
+import type { MusicRoom } from '../lib/blog';
+import { buildIndex, musicHref, toggleFeeling, wordStates, wordWeight } from '../lib/music-room';
+
+interface Props {
+  room: MusicRoom;
+  selected: string[];
+  /**
+   * Where a word's link points. `/blog?view=music` in production; the bench
+   * mounts this component at its own path, and a word linking to `/blog` would
+   * navigate out of the room being tested.
+   */
+  base?: string;
+}
+const { room, selected, base = '/blog?view=music' } = Astro.props;
+
+const index = buildIndex(
+  room.vocabulary,
+  room.songs.map((s) => ({ id: s.id, feelings: s.feelings })),
+);
+if (index.dropped.length) {
+  // Unreachable at any sane vocabulary size, and loud rather than silent if it
+  // ever is not — a song carrying only dropped words would fall out of the room.
+  console.warn(`[music room] vocabulary over ${index.vocabulary.length} words; dropped:`, index.dropped);
+}
+const states = wordStates(index, selected);
+const maxCount = Math.max(1, ...states.map((s) => s.count));
+
+/*
+  ⚠ THE INDEX GOES TO THE CLIENT WHOLE, AND THE CARDS ARE A SEPARATE CONCERN
+  (ruling 3). Sizes, contextual counts and dead ends must be computed over the
+  entire qualifying corpus or they lie — and the palette must never wait on a
+  network, because the collapse is the interaction that beat a filter rail. One
+  integer per song satisfies both: a thousand songs is a few kilobytes, and it
+  does not grow when songs gain more feelings.
+
+  Cards are server-rendered in full today, which is correct and simplest while
+  the corpus is small. Switch to windowed delivery — reusing the feed's
+  `X-Requested-With` partial — when the document passes roughly 1 MB or the
+  qualifying corpus passes ~250 songs, and record the measured number then. The
+  palette will not notice, which is the entire point of this seam.
+*/
+const payload = JSON.stringify({ vocabulary: index.vocabulary, songs: index.songs });
+
+/*
+  Every qualifying song is rendered, and the ones outside the current selection
+  are rendered `hidden`.
+
+  ⚠ THAT IS WHAT LETS A PLAYER SURVIVE A FILTER CHANGE (§5). The card is already
+  in the document, so narrowing and widening is a class and an attribute rather
+  than a re-render — and re-rendering is exactly what must not happen here,
+  because RE-PARENTING AN IFRAME RELOADS IT and would stop the music mid-bar.
+  It also means the no-JS floor is real: with `?feeling=` in the URL the server
+  has already decided which cards are shown, and script only removes the
+  round trip.
+*/
+const cards = room.songs.map((s) => ({
+  ...s,
+  embed: embedForUrl(s.url),
+  inSet: selected.every((slug) => s.feelings.includes(slug)),
+}));
+
+const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.08em] [font-variant:all-small-caps]';
+---
+
+<div class="mx-auto w-full max-w-5xl" data-music-room>
+  {
+    /* THE FIELD. Rendered server-side with its sizes already applied, so it is
+      the right shape before a single byte of script runs — and never
+      re-rendered afterwards: the client mutates font-size, opacity and colour in
+      place, because replacing this markup on every press would destroy the
+      transition it exists to animate.
+
+      Anchors, not buttons, and that is the no-JS floor rather than a
+      preference: every word is a real link to `?feeling=…`, which the server
+      filters. Without script the room still works, one word per navigation.
+      The client intercepts the click and does it without the round trip. */
+  }
+  <div
+    id="feel-field"
+    class="mx-auto flex max-w-3xl flex-wrap items-baseline justify-center gap-x-7 gap-y-4"
+    data-index={payload}
+    data-base={base}
+  >
+    {
+      states.map((w) => (
+        <a
+          href={musicHref(toggleFeeling(selected, w.slug), base)}
+          data-feel={w.slug}
+          aria-pressed={w.selected ? 'true' : 'false'}
+          aria-disabled={w.disabled ? 'true' : undefined}
+          class:list={['feel-word font-display leading-none font-light', w.selected && 'is-on', w.disabled && 'is-out']}
+          style={`font-size:${(1.05 + 1.7 * (w.selected ? 1 : wordWeight(w.count, maxCount))).toFixed(3)}rem;opacity:${
+            w.selected ? 1 : w.disabled ? 0.12 : (0.4 + 0.6 * (w.count / maxCount)).toFixed(3)
+          }`}
+        >
+          {w.name}
+        </a>
+      ))
+    }
+  </div>
+
+  {
+    /* ⚠ THE COUNT, FOR ANYONE NOT WATCHING THE ROOM SHORTEN (ruling 7). A
+      control that silently changes a result set is the textbook case for a
+      polite live region, and it is what the WAI-ARIA authoring practices
+      prescribe for exactly this pattern. Empty on arrival on purpose: announcing
+      the room's size when you get here is noise, and this exists to report a
+      CHANGE the reader caused. The client coalesces, so stacking three words
+      quickly announces the settled result rather than queueing three. */
+  }
+  <p id="feel-live" class="sr-only" role="status" aria-live="polite"></p>
+
+  <div id="feel-results" class="mt-16 sm:mt-20">
+    {
+      cards.length === 0 ? (
+        <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+          <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
+          <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
+            The songs collect here one at a time, as they are listened to.
+          </p>
+        </div>
+      ) : (
+        <ul id="feel-list" class="grid gap-x-8 gap-y-14 md:grid-cols-2">
+          {cards.map((s) => (
+            <li class="song-card" data-song={s.id} data-feelings={s.feelings.join(' ')} hidden={!s.inSet}>
+              {/* ⚠ A PLACEHOLDER, NOT AN IFRAME. Arriving costs zero
+                  third-party frames; the client mounts a player when the card
+                  comes within 600px of the viewport, and never again (§5).
+                  `<noscript>` is the honest floor — with no script there is no
+                  observer to mount anything, so the frames are simply there. */}
+              <div
+                data-embed
+                data-src={s.embed?.src ?? ''}
+                data-height={s.embed ? (s.embed.height === null ? 'video' : String(s.embed.height)) : ''}
+                data-allow={s.embed?.allow ?? ''}
+                data-title={`${s.title}${s.artist ? ` — ${s.artist}` : ''}`}
+              />
+              {s.embed && (
+                <noscript>
+                  <iframe
+                    src={s.embed.src}
+                    title={`${s.title}${s.artist ? ` — ${s.artist}` : ''}`}
+                    allow={s.embed.allow}
+                    loading="lazy"
+                    width="100%"
+                    height={s.embed.height ?? undefined}
+                    class:list={['rounded-box border-0', s.embed.height === null && 'aspect-video h-full w-full']}
+                  />
+                </noscript>
+              )}
+
+              {/* ⚠ NO TITLE, NO ARTIST — the same call as the essay's paired
+                  player (docs/admin.md §6a): the embed prints the track, the
+                  artist and the artwork in larger type than ours, so a line
+                  above it says the same thing twice and says it smaller. What we
+                  know that the player does not is the FEELING, and that is the
+                  only line here. It sits BELOW the player: above, it reads as a
+                  label telling you what to hear before you hear it, which is the
+                  over-explaining ADR 0009's annotation was retired for. Below,
+                  it reads as the response the music left behind. The real title
+                  survives on the iframe's accessible name. */}
+              <p class="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {s.feelings.map((slug) => (
+                  <a
+                    href={musicHref(toggleFeeling(selected, slug), base)}
+                    data-feel={slug}
+                    class:list={[
+                      'song-word text-base-content/45 hover:text-base-content/80 transition-colors',
+                      SMALLCAPS,
+                      selected.includes(slug) && 'is-on',
+                    ]}
+                  >
+                    {index.vocabulary.find((w) => w.slug === slug)?.name ?? slug}
+                  </a>
+                ))}
+              </p>
+
+              {/* THE BRIDGE (§6). Serif italic against the feelings' small caps,
+                  so the two lines read as different KINDS of fact rather than as
+                  a longer list: the words above are what the song did, and are
+                  the room's navigation; this is where it already lives on the
+                  site. Second and quieter, because most songs carry one and a
+                  louder treatment would make the pairing look like the subject
+                  of the page. The music is still the point.
+
+                  "paired with", not "goes with" — Michael's wording, and the
+                  word the schema and both ADRs already use (`paired_song_id`).
+
+                  It opens the READER, not the permalink: `data-read` plus the
+                  href as the no-JS floor, the same contract PostCard uses. This
+                  page ships no reader templates, so the sheet fills from a fetch
+                  — see Reader.astro for why inert templates were not free here. */}
+              {s.paired.length > 0 && (
+                <p class="text-base-content/35 mt-1.5 font-serif text-[0.95rem] italic">
+                  paired with{' '}
+                  {s.paired.map((e, i) => (
+                    <>
+                      {i > 0 && <span class="text-base-content/25"> and </span>}
+                      <a
+                        href={`/blog/${e.slug}`}
+                        data-read={e.slug}
+                        class="text-base-content/55 hover:text-primary cursor-pointer transition-colors"
+                      >
+                        {e.title}
+                      </a>
+                    </>
+                  ))}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    {/* Failing well: named by the client, which knows which word to let go of. */}
+    <div id="feel-empty" hidden class="px-6 py-16 text-center"></div>
+  </div>
+</div>
+
+<style>
+  /* ⚠ THE COLLAPSE IS MOTION, AND SOME READERS HAVE ASKED US NOT TO. The FLIP
+     moves the whole field at once; that is exactly the kind of large-area
+     movement `prefers-reduced-motion` exists for. The information is in the
+     sizes and the colour, not in the travel, so honouring it costs nothing —
+     the field simply arrives at its new shape. */
+  @media (prefers-reduced-motion: reduce) {
+    .feel-word,
+    .song-card {
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* 380ms: faster and the collapse is over before you have seen which words
+     left; slower and choosing a second word feels like waiting. Weighted to
+     settle rather than to arrive. */
+  .feel-word {
+    transition:
+      transform 380ms cubic-bezier(0.2, 0.7, 0.3, 1),
+      opacity 380ms ease,
+      color 240ms ease;
+    transform-origin: left top;
+    color: var(--color-base-content);
+    text-decoration: none;
+    will-change: transform;
+  }
+  .feel-word:not(.is-on):not(.is-out):hover {
+    opacity: 1 !important;
+  }
+  .feel-word.is-on {
+    color: var(--color-primary);
+  }
+  /* A dead end is still readable — it is a word you are being told about, not a
+     word being hidden. `pointer-events` rather than `hidden`, so the shape of
+     the vocabulary stays honest. */
+  .feel-word.is-out {
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  .song-card {
+    transition:
+      opacity 300ms ease,
+      transform 300ms ease;
+  }
+  .song-card.is-out {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  .song-word.is-on {
+    color: var(--color-primary);
+  }
+</style>

@@ -2,8 +2,22 @@
 /*
   /lab/music — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
 
-  THE QUESTION, narrowed 2026-08-10: **the palette is the room — now does it
-  hold up with the music actually in it?** Michael, after driving A/B/C:
+  ⚠ SINCE 2026-08-11 IT RENDERS THE SHIPPED ROOM, NOT A COPY OF IT. This file
+  used to carry its own ~900 lines of palette, cards and client script; it now
+  mounts `components/MusicRoom.astro` and `scripts/music-room.ts` — the real
+  ones — over a hardcoded fixture. Two reasons, and the second is why it was
+  worth doing on the day the room shipped:
+
+    1. A bench that re-implements the thing it is testing stops testing it. The
+       divergence would have started the first time either side was touched.
+    2. The real room is EMPTY until songs are tagged (ruling 2), and tagging is
+       Michael's alone — no import, no AI. So this is the only place the shipped
+       code can be driven at volume, with real embeds, before the corpus exists.
+       It already earned that: driving it here is what found the ClientRouter
+       race that made every press a page load (see `scripts/music-room.ts`).
+
+  THE ORIGINAL QUESTION, narrowed 2026-08-10: **the palette is the room — now
+  does it hold up with the music actually in it?** Michael, after driving A/B/C:
   "Option B is a clear winner here. Can we orient the lab around that only?"
 
   A (the /blog rail, re-pointed) and C (songs shelved by where their arc landed)
@@ -154,10 +168,10 @@
       The corpus grows one song at a time, as a byproduct of listening.
 */
 import SiteLayout from '../../layouts/SiteLayout.astro';
-import PostArticle from '../../components/PostArticle.astro';
 import Reader from '../../components/Reader.astro';
-import { embedForUrl } from '../../lib/media';
-import { getWritingBySlug } from '../../lib/blog';
+import MusicRoom from '../../components/MusicRoom.astro';
+import type { MusicRoom as MusicRoomData } from '../../lib/blog';
+import { parseFeelings } from '../../lib/music-room';
 
 if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
@@ -501,77 +515,42 @@ const PAIRED: Record<string, { title: string; slug: string }[]> = {
 /* `embedForUrl` is the SAME function the published essay uses (src/lib/media.ts)
    — not a lab reimplementation. If a URL stops embedding here it stops
    embedding on /blog too, which is the only way a bench is worth trusting. */
-const SONGS = FIXTURE.map(([title, artist, feelings, url], i) => {
-  const embed = embedForUrl(url);
-  return {
-    i,
+const room: MusicRoomData = {
+  vocabulary: VOCABULARY.map((w) => ({ slug: w, name: w })),
+  songs: FIXTURE.map(([title, artist, feelings, url], i) => ({
+    // Not a uuid: nothing here is a database row, and a fake one that LOOKED
+    // like a real id is how a fixture ends up pasted into a query one day.
+    id: `fixture-${i}`,
     title,
     artist,
     url,
     feelings: feelings.split(' '),
     paired: PAIRED[title] ?? [],
-    embedSrc: embed?.src ?? null,
-    embedHeight: embed?.height ?? null,
-    embedAllow: embed?.allow ?? '',
-  };
-});
+  })),
+};
 
-/* ⚠ THE PAIRED ESSAYS ARE LOADED FOR REAL, so the bridge can open the Reader
-   instead of navigating. Michael, 2026-08-10: "why not just open the reading
-   viewer sheet (don't open the dedicated page by default)?" — which is what the
-   feed already does, and the room had no business behaving differently.
-
-   The pattern is `Reader`'s, unchanged: anything with `data-read="<slug>"`
-   opens the dialog and fills it from `<template data-reader-content="<slug>">`.
-   The `href` stays as the no-JS fallback exactly as PostCard does it, so the
-   permalink is still the floor rather than the default.
-
-   ⚠ AND THIS IS WHERE THE ROOM DIFFERS FROM THE FEED, WHICH THE PLAN NEEDS TO
-   KNOW. /blog paginates, so it ships one template per card for a page of ~7.
-   This room opens with the WHOLE corpus, so it ships one per distinct paired
-   essay — 48 full essays inline. Measured 2026-08-10: **408 KB of templates in
-   a 797 KB document, 51% of the page.** They are inert (template contents never
-   parse into the document) and they cost nothing to render, but they are still
-   bytes on every arrival, and the room's whole premise is that you arrive to
-   everything. The shipped room wants fetch-on-demand instead — same Reader,
-   filled from a request rather than a <template>. Fine for a bench; recorded in
-   plan 33 §6 rather than fixed here, because it is a decision about the room. */
-const PAIRED_SLUGS = [...new Set(Object.values(PAIRED).flatMap((es) => es.map((e) => e.slug)))];
-const ESSAYS = (await Promise.all(PAIRED_SLUGS.map((slug) => getWritingBySlug(Astro.locals.supabase, slug)))).filter(
-  (e): e is NonNullable<typeof e> => e !== null,
-);
-
-const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all-small-caps]';
+/* The bench mounts the room at its own path, so a word's link stays here. */
+const BASE = '/lab/music';
+const selected = parseFeelings(Astro.url.searchParams.get('feeling'), room.vocabulary);
 ---
 
 {
-  /* SiteLayout, not Base — the room is rendered AS IT WOULD ACTUALLY SHIP, in
-    the real chrome, at the real width, with no bordered box around it. Michael,
+  /* SiteLayout, not Base — the room is rendered AS IT WOULD ACTUALLY SHIP,
+    inside the site's real chrome and under the real /blog tab strip. Michael,
     2026-08-10: "can we actually render the page as it would be in reality? not
-    containerized like this." A bench inside a card flatters itself: the card
-    supplies edges the real page does not have, so whitespace that reads as
-    composed at 900px inside a border reads as abandoned at full bleed. The
-    bench controls are exiled to one corner widget below.
-
-    `backToTop={false}` because SiteLayout's own rule is one quiet corner
-    control at a time, and here that corner is the bench strip. */
+    containerized like this." */
 }
-<SiteLayout title="Music" active="blog">
+<SiteLayout title="Music (bench)" active="blog" description="A local bench. Not the site.">
   <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
-    {
-      /* The real /blog axis, reproduced rather than approximated — Music is the
-        third tab, live here and still "soon" in production. */
-    }
-    <h1 class="sr-only">Music</h1>
-    <nav class="border-base-300 mb-16 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
+    <nav class="border-base-300 mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
       <a
         href="/blog"
-        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light transition-colors sm:text-3xl"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
         >Writing</a
       >
       <a
         href="/blog?view=quotes"
-        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light transition-colors sm:text-3xl"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
         >Quotes</a
       >
       <span
@@ -581,129 +560,13 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       >
     </nav>
 
-    {
-      /* ⚠ NO PROMPT LINE. This said "How does it feel? Choose one, or a few."
-        until Michael cut it on 2026-08-10: "that's too much explicit
-        instruction for the user. We should show, not tell." It is the same
-        rule that took the caption off the essay's paired player — the field
-        already shows what is selected, in lamplight and at full size, so the
-        line restated it smaller, and the instruction half taught a reader
-        something the words themselves afford. The affordance is the hover, the
-        size shift, and the fact that the same words sit under every song. */
-    }
-    {
-      /* Rendered server-side and NEVER re-rendered — the JS mutates font-size,
-        opacity and colour in place, because innerHTML on every click would kill
-        the transition it is meant to animate. */
-    }
-    <div id="b-field" class="mx-auto flex max-w-3xl flex-wrap items-baseline justify-center gap-x-7 gap-y-4">
-      {
-        VOCABULARY.map((w) => (
-          <button
-            type="button"
-            data-word={w}
-            class="pal-word font-display leading-none font-light"
-            style="font-size:1.6rem"
-          >
-            {w}
-          </button>
-        ))
-      }
-    </div>
-
-    <div id="b-results" class="mt-20">
-      {
-        /* ⚠ NO COUNT HEADER. It said "48 songs" / "5 songs" until Michael cut
-          it on 2026-08-10: "stop listing 'x songs' as a header. its pointless."
-          He is right, and it is the third thing this page has lost to the same
-          rule. The room is right there — its size is visible by looking at it,
-          so the number was narrating what the reader can already see. A count
-          earns its place in a machinery register like /blog's rail, where it
-          tells you what a filter WOULD leave before you commit to it. Here it
-          only reported what had already happened. */
-      }
-      {
-        /* ⚠ NO TITLE, NO ARTIST — the same call as the essay's paired player
-          (docs/admin.md §6a, 2026-08-10): the embed prints the track, the
-          artist and the artwork in larger type than ours, so a line above it
-          says the same thing twice and says it smaller. What we know that the
-          player doesn't is the FEELING, and that is the only line here.
-
-          It sits BELOW the player, not above. Above, it reads as a label
-          telling you what to hear before you hear it — which is the
-          over-explaining Michael ruled out. Below, it reads as the response
-          the music left behind, which is what it actually is. The real title
-          survives on the iframe's accessible name for screen readers. */
-      }
-      <ul id="b-list" class="grid gap-x-8 gap-y-14 md:grid-cols-2">
-        {
-          SONGS.map((s) => (
-            <li class="song-card is-out" data-song={s.i} data-feelings={s.feelings.join(' ')} hidden>
-              <div
-                data-embed
-                data-src={s.embedSrc}
-                data-height={s.embedHeight === null ? 'video' : String(s.embedHeight)}
-                data-allow={s.embedAllow}
-                data-title={`${s.title} — ${s.artist}`}
-              />
-              <p class="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                {s.feelings.map((f) => (
-                  <button
-                    type="button"
-                    data-word={f}
-                    class={`song-word text-base-content/45 hover:text-base-content/80 transition-colors ${SMALLCAPS}`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </p>
-              {/* THE BRIDGE. Serif italic against the feelings' small caps, so
-                  the two lines read as different KINDS of fact rather than as a
-                  longer list: the words above are what the song did to Michael
-                  and are the room's navigation; this is where it already lives
-                  on the site. Second, quieter, and below — the music is still
-                  the point, and 46 of 48 songs carry one, so a louder treatment
-                  would make the pairing look like the subject of the page. */}
-              {s.paired.length > 0 && (
-                <p class="text-base-content/35 mt-1.5 font-serif text-[0.95rem] italic">
-                  paired with{' '}
-                  {s.paired.map((e, i) => (
-                    <>
-                      {i > 0 && <span class="text-base-content/25"> and </span>}
-                      <a
-                        href={`/blog/${e.slug}`}
-                        data-read={e.slug}
-                        class="text-base-content/55 hover:text-primary cursor-pointer transition-colors"
-                      >
-                        {e.title}
-                      </a>
-                    </>
-                  ))}
-                </p>
-              )}
-            </li>
-          ))
-        }
-      </ul>
-      <div id="b-empty" class="hidden text-center"></div>
-
-      {/* Inert until the Reader clones one. Same contract as PostCard's. */}
-      {
-        ESSAYS.map((essay) => (
-          <template data-reader-content={essay.slug}>
-            <PostArticle item={essay} />
-          </template>
-        ))
-      }
-    </div>
+    <MusicRoom room={room} selected={selected} base={BASE} />
   </div>
 
   <Reader />
 
   {
-    /* ─────  THE BENCH, kept out of the room  ─────
-      Everything that would not ship lives here: the corpus/match switches and
-      the invented-data warning. Collapsed to a single chip so the page above
+    /* Everything that would not ship, collapsed to one chip so the page above
       can be judged as a page. */
   }
   <details
@@ -713,11 +576,6 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       >bench</summary
     >
     <div class="border-base-300 flex flex-col gap-2 border-t px-3 py-3">
-      <div class="flex flex-wrap items-center gap-1.5">
-        <button type="button" id="t-corpus" class="btn btn-xs normal-case">corpus: 48</button>
-        <button type="button" id="t-match" class="btn btn-ghost btn-xs normal-case">match: all</button>
-        <button type="button" id="t-clear" class="btn btn-ghost btn-xs normal-case">clear</button>
-      </div>
       <p class="text-warning max-w-[15rem] leading-relaxed">
         ⚠ Players are real. Every feeling is invented placeholder data — not Michael's readings.
       </p>
@@ -728,423 +586,16 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
   </details>
 
   <style>
-    /* 380ms is a guess, and it is the number most worth arguing about: faster
-       and the collapse is over before you have seen which words left, slower
-       and choosing a second word feels like waiting. The easing is weighted to
-       settle rather than arrive. */
-    /* See the note by <SiteLayout>: at bottom-right this control sits on top of
-       a play button at every width under 1280. Page-local override, one rule. */
+    /* See the note in MusicRoom: at bottom-right this control sits on top of a
+       play button at every width under 1280. Page-local override, one rule. */
     :global(.back-to-top) {
       right: auto;
       left: 1.25rem;
     }
-
-    /* ⚠ THE COLLAPSE IS MOTION, AND SOME READERS HAVE ASKED US NOT TO. The FLIP
-       moves sixteen words across the field at once; that is exactly the kind of
-       large-area movement `prefers-reduced-motion` exists for. The information
-       is in the sizes and the colour, not in the travel, so honouring it costs
-       nothing — the field simply arrives at its new shape. */
-    @media (prefers-reduced-motion: reduce) {
-      .pal-word,
-      .song-card {
-        transition-duration: 0.01ms !important;
-      }
-    }
-
-    .pal-word {
-      transition:
-        transform 380ms cubic-bezier(0.2, 0.7, 0.3, 1),
-        opacity 380ms ease,
-        color 240ms ease;
-      transform-origin: left top;
-      color: var(--color-base-content);
-      will-change: transform;
-    }
-    .pal-word:not(.is-on):not(:disabled):hover {
-      opacity: 1 !important;
-    }
-    .pal-word.is-on {
-      color: var(--color-primary);
-    }
-    .pal-word:disabled {
-      cursor: not-allowed;
-    }
-
-    .song-card {
-      transition:
-        opacity 300ms ease,
-        transform 300ms ease;
-    }
-    .song-card.is-out {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    .song-word.is-on {
-      color: var(--color-primary);
-    }
   </style>
 
   <script>
-    /*
-      One selection, one query, three things to keep in sync: the field's sizes,
-      the cards' visibility, and the empty state. Nothing is ever re-rendered —
-      see the header on why iframes may not be recreated.
-    */
-    const field = document.getElementById('b-field')!;
-    const list = document.getElementById('b-list')!;
-    const emptyEl = document.getElementById('b-empty')!;
-
-    const words = [...field.querySelectorAll<HTMLButtonElement>('.pal-word')];
-    const cards = [...list.querySelectorAll<HTMLLIElement>('.song-card')];
-    const featureOf = new Map(cards.map((c) => [c, new Set(c.dataset.feelings!.split(' '))]));
-
-    const selection = new Set<string>();
-    let matchAll = true;
-    const CORPUS_SIZES = [48, 12];
-    let corpusIdx = 0;
-    const hideTimers = new WeakMap<HTMLElement, number>();
-
-    const eligible = () => cards.slice(0, CORPUS_SIZES[corpusIdx]);
-
-    const holds = (card: HTMLLIElement, wordList: string[]): boolean => {
-      if (!wordList.length) return true;
-      const has = featureOf.get(card)!;
-      return matchAll ? wordList.every((w) => has.has(w)) : wordList.some((w) => has.has(w));
-    };
-
-    const countFor = (extra?: string): number => {
-      const wordList = extra ? [...selection, extra] : [...selection];
-      return eligible().filter((c) => holds(c, wordList)).length;
-    };
-
-    /* Size is a POWER curve, not linear: counts run 1..48 and a linear map
-       leaves the whole middle of the vocabulary looking identical. 0.6 keeps
-       the rare words legible instead of vanishing. */
-    const MIN_REM = 1.05;
-    const MAX_REM = 2.75;
-    const sizeFor = (n: number, max: number): string => {
-      if (n <= 0) return `${MIN_REM}rem`;
-      const t = Math.pow(n / Math.max(max, 1), 0.6);
-      return `${(MIN_REM + (MAX_REM - MIN_REM) * t).toFixed(3)}rem`;
-    };
-
-    /* ⚠ READS AND WRITES ARE SEPARATED, AND THAT IS THE WHOLE FIX FOR THE JANK
-       Michael reported on 2026-08-10 ("erratic movements... everything's
-       recomputing"). The recompute was never the problem — 16 words against 48
-       songs is ~800 set lookups, microseconds. The problem was that the old
-       `show()` interleaved them per card: write `hidden`, READ
-       getBoundingClientRect, write the iframe, READ offsetHeight, write the
-       class — inside a loop over 48 cards. Every read after a write forces the
-       browser to flush layout synchronously, so one click cost up to ~96 full
-       layouts of a tree containing live third-party iframes.
-
-       Now the pass is strictly phased: decide (no DOM), write all the
-       `hidden` flags, force ONE reflow for the whole list, write all the
-       classes. Mounting happens in a later frame, and reads all its rects
-       before it writes any iframe. */
-    const hide = (card: HTMLLIElement) => {
-      if (card.hidden || card.classList.contains('is-out')) return;
-      card.classList.add('is-out');
-      hideTimers.set(
-        card,
-        window.setTimeout(() => {
-          card.hidden = true;
-          hideTimers.delete(card);
-          queueUnmount(card);
-        }, 310),
-      );
-    };
-
-    /* ⚠ LEAVING THE ROOM STOPS THE SOUND, and removing the iframe is the only
-       way to do it — a cross-origin frame cannot be paused from outside. This
-       is the narrow exception to "never destroy a player", and the two rules
-       do not conflict once you say what the original one was actually
-       protecting: NARROWING must not kill music that is still on screen. A
-       song the filter has excluded is not on screen, so its sound has no
-       business continuing. The card is already hidden by the time this runs,
-       so nothing visible is torn down. It re-mounts on approach if the song
-       comes back. */
-    const unmountEmbed = (card: HTMLLIElement) => {
-      if (!card.hidden) return; // it came back before we got to it
-      const slot = card.querySelector<HTMLElement>('[data-embed]');
-      if (!slot || slot.dataset.mounted !== '1') return;
-      slot.replaceChildren();
-      slot.dataset.mounted = '';
-      slot.className = '';
-      slot.style.borderRadius = '';
-      io.observe(card); // eligible to mount again
-    };
-
-    /* ⚠ TEARDOWN IS CHUNKED, and skipping this costs exactly the jank the
-       phasing fix removed. Filtering 48 cards down to 11 destroys 37
-       cross-origin frames; doing that in one pass measured 11 frames over 32ms
-       with a 116ms worst case — worse than anything the original build did. A
-       4ms budget per animation frame keeps each one under the 16.7ms line and
-       still finishes the whole teardown in about a tenth of a second, which is
-       fast enough that the sound stops when you expect it to. */
-    const unmountQueue: HTMLLIElement[] = [];
-    let draining = false;
-    type IdleCb = (d: { timeRemaining: () => number }) => void;
-    /* Read the function off `window` ONCE rather than testing `'x' in window`
-       inline — the `in` narrowing collapses `window` to `never` in the else
-       branch, so the setTimeout fallback stops type-checking. */
-    const ric = (window as unknown as { requestIdleCallback?: (f: IdleCb, o?: object) => void }).requestIdleCallback;
-    const idle = (fn: IdleCb, timeout = 400) => {
-      if (ric) ric.call(window, fn, { timeout });
-      else window.setTimeout(() => fn({ timeRemaining: () => 8 }), 60);
-    };
-
-    const drainUnmounts: IdleCb = (deadline) => {
-      const t0 = performance.now();
-      while (unmountQueue.length && performance.now() - t0 < Math.max(4, deadline.timeRemaining())) {
-        unmountEmbed(unmountQueue.shift()!);
-      }
-      if (unmountQueue.length) idle(drainUnmounts);
-      else draining = false;
-    };
-
-    const queueUnmount = (card: HTMLLIElement) => {
-      unmountQueue.push(card);
-      if (draining) return;
-      draining = true;
-      /* Wait out the 380ms collapse before starting. Teardown used to begin at
-         310ms, i.e. mid-animation, so the browser was destroying frames and
-         interpolating sixteen words in the same frames — which is where the
-         long frames came from, not from the loop. */
-      window.setTimeout(() => idle(drainUnmounts), 220);
-    };
-
-    const applyVisibility = (wanted: boolean[]) => {
-      // write only
-      cards.forEach((card, i) => {
-        if (!wanted[i]) return;
-        const t = hideTimers.get(card);
-        if (t) {
-          clearTimeout(t);
-          hideTimers.delete(card);
-        }
-        card.hidden = false;
-      });
-      // one flush for the batch, so the `is-out` removal below actually
-      // transitions instead of collapsing into the same frame as `display`
-      void list.offsetHeight;
-      // write only
-      cards.forEach((card, i) => {
-        if (wanted[i]) card.classList.remove('is-out');
-        else hide(card);
-      });
-    };
-
-    /* Read every rect, THEN mount every player. Mounting appends an iframe,
-       which invalidates layout — so interleaving would re-thrash the thing
-       the phasing above just fixed. */
-    const mountVisible = () => {
-      const pending: HTMLLIElement[] = [];
-      for (const card of cards) {
-        if (card.hidden) continue;
-        const slot = card.querySelector<HTMLElement>('[data-embed]');
-        if (!slot || slot.dataset.mounted === '1') continue;
-        if (nearViewport(card)) pending.push(card);
-      }
-      for (const card of pending) {
-        mountEmbed(card);
-        io.unobserve(card);
-      }
-    };
-
-    /* ⚠ MOUNT ON APPROACH, NOT ON REVEAL. When the room showed nothing until
-       you chose, "revealed" was a good proxy for "about to be looked at" —
-       you only ever saw a handful. Now that it opens with the whole corpus,
-       that proxy would spawn 48 third-party frames on load. So a card mounts
-       when it comes within 600px of the viewport and is currently in the set,
-       and never again. Scrolling the whole room still ends up mounting
-       everything; what this bounds is the cost of ARRIVING. */
-    const NEAR = 600;
-    const nearViewport = (el: HTMLElement): boolean => {
-      const r = el.getBoundingClientRect();
-      return r.bottom > -NEAR && r.top < window.innerHeight + NEAR;
-    };
-
-    /* The observer catches scrolling; `show()` catches a card that is already
-       on screen when a filter change puts it back in the set — the observer
-       cannot fire for that, because the intersection state never changed. */
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const card = e.target as HTMLLIElement;
-          if (card.hidden) continue; // out of the set — leave it observed
-          mountEmbed(card);
-          io.unobserve(card);
-        }
-      },
-      { rootMargin: `${NEAR}px 0px` },
-    );
-
-    /* The player is built once and then left alone forever. */
-    const mountEmbed = (card: HTMLLIElement) => {
-      const slot = card.querySelector<HTMLElement>('[data-embed]');
-      if (!slot || slot.dataset.mounted === '1') return;
-      const src = slot.dataset.src;
-      if (!src) return;
-      slot.dataset.mounted = '1';
-      const iframe = document.createElement('iframe');
-      iframe.src = src;
-      iframe.loading = 'lazy';
-      iframe.title = slot.dataset.title ?? '';
-      iframe.setAttribute('allow', slot.dataset.allow ?? '');
-      iframe.style.border = '0';
-      if (slot.dataset.height === 'video') {
-        slot.className = 'mt-5 aspect-video overflow-hidden';
-        slot.style.borderRadius = 'var(--radius-box)';
-        iframe.className = 'h-full w-full';
-      } else {
-        iframe.width = '100%';
-        iframe.height = slot.dataset.height!;
-        iframe.style.borderRadius = 'var(--radius-box)';
-      }
-      slot.appendChild(iframe);
-    };
-
-    /* ⚠ THE FIELD MOVES BY TRANSFORM, NOT BY font-size — this is the other half
-       of the jank fix, and the visible half. Animating `font-size` over 380ms
-       means the flex row RE-WRAPS on every frame: a word that ends up on line 2
-       spends the transition migrating there, so stacking a second filter looked
-       like the whole field scrambling rather than settling. Sixteen words each
-       nudging the fifteen others is the "erratic movement".
-
-       FLIP fixes it exactly. Measure where every word IS, apply the new sizes
-       in one synchronous write so layout re-wraps ONCE, measure where every
-       word LANDED, then invert the difference with a transform and let that
-       animate to zero. Transforms do not affect layout, so nothing re-wraps
-       mid-flight — each word travels a straight line from its old place and
-       size to its new one, and the browser can run it off the main thread.
-
-       Measuring `first` AFTER the previous animation may still be running is
-       deliberate: getBoundingClientRect reports the CURRENT transformed box, so
-       an interrupted transition continues from where the eye last saw it
-       instead of snapping back. */
-    const flipField = (apply: () => void) => {
-      const first = words.map((w) => w.getBoundingClientRect());
-      // drop any in-flight transform so `last` is measured untransformed
-      words.forEach((w) => {
-        w.style.transition = 'none';
-        w.style.transform = 'none';
-      });
-      apply();
-      const last = words.map((w) => w.getBoundingClientRect());
-      words.forEach((w, i) => {
-        const f = first[i];
-        const l = last[i];
-        const dx = f.left - l.left;
-        const dy = f.top - l.top;
-        const scale = l.width > 0 ? f.width / l.width : 1;
-        if (!dx && !dy && Math.abs(scale - 1) < 0.001) {
-          w.style.transition = '';
-          return;
-        }
-        w.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-      });
-      requestAnimationFrame(() => {
-        words.forEach((w) => {
-          w.style.transition = ''; // back to the CSS rule
-          w.style.transform = '';
-        });
-      });
-    };
-
-    const render = () => {
-      // ── the field, FLIPped (see flipField)
-      const counts = words.map((b) => {
-        const w = b.dataset.word!;
-        return selection.has(w) ? countFor() : countFor(w);
-      });
-      const max = Math.max(...counts, 1);
-      flipField(() => {
-        words.forEach((b, i) => {
-          const w = b.dataset.word!;
-          const on = selection.has(w);
-          const n = counts[i];
-          const dead = !on && n === 0;
-          b.style.fontSize = on ? `${MAX_REM}rem` : sizeFor(n, max);
-          b.style.opacity = on ? '1' : dead ? '0.12' : String(0.4 + 0.6 * (n / max));
-          b.classList.toggle('is-on', on);
-          b.disabled = dead;
-          b.setAttribute('aria-pressed', String(on));
-        });
-      });
-
-      // ── the cards: decide first, touch the DOM second
-      const wordList = [...selection];
-      const eligibleCards = new Set(eligible());
-      /* No selection means the WHOLE corpus, not an empty room — `holds()`
-         already returns true for an empty word list, so browsing is the
-         default state rather than a special case. */
-      const wanted = cards.map((card) => eligibleCards.has(card) && holds(card, wordList));
-      const hits = wanted.filter(Boolean).length;
-      applyVisibility(wanted);
-      requestAnimationFrame(mountVisible);
-
-      // ── the words inside each visible card
-      for (const card of cards) {
-        card.querySelectorAll<HTMLButtonElement>('.song-word').forEach((b) => {
-          b.classList.toggle('is-on', selection.has(b.dataset.word!));
-        });
-      }
-
-      // ── the empty state
-
-      if (selection.size && !hits) {
-        /* Failing well: name the nearest thing that DOES exist. Rarely seen —
-           every word that would empty the room is disabled before you can
-           click it — but reachable by choosing under `any` and flipping to
-           `all`, which is exactly what a returning reader with a saved URL
-           would hit. */
-        const near = [...selection]
-          .map((w) => {
-            const rest = [...selection].filter((x) => x !== w);
-            return { w, n: eligible().filter((c) => holds(c, rest)).length };
-          })
-          .sort((a, b) => b.n - a.n)[0];
-        emptyEl.innerHTML = `<p class="text-base-content/45 font-serif text-lg italic">Nothing holds all of that at once.</p>
-          <p class="text-base-content/35 mt-3 font-sans text-sm">Let go of
-            <button type="button" data-word="${near.w}" class="text-primary underline underline-offset-4">${near.w}</button>
-            and ${near.n} ${near.n === 1 ? 'song' : 'songs'} remain.</p>`;
-        emptyEl.classList.remove('hidden');
-      } else {
-        emptyEl.classList.add('hidden');
-      }
-    };
-
-    document.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-word]');
-      if (!btn || (btn as HTMLButtonElement).disabled) return;
-      const w = btn.dataset.word!;
-      if (selection.has(w)) selection.delete(w);
-      else selection.add(w);
-      render();
-    });
-
-    const corpusBtn = document.getElementById('t-corpus')!;
-    corpusBtn.addEventListener('click', () => {
-      corpusIdx = (corpusIdx + 1) % CORPUS_SIZES.length;
-      corpusBtn.textContent = `corpus: ${CORPUS_SIZES[corpusIdx]}`;
-      render();
-    });
-
-    const matchBtn = document.getElementById('t-match')!;
-    matchBtn.addEventListener('click', () => {
-      matchAll = !matchAll;
-      matchBtn.textContent = `match: ${matchAll ? 'all' : 'any'}`;
-      render();
-    });
-
-    document.getElementById('t-clear')!.addEventListener('click', () => {
-      selection.clear();
-      render();
-    });
-
-    render();
-    cards.forEach((c) => io.observe(c));
+    import { wireMusicRoom } from '../../scripts/music-room';
+    wireMusicRoom();
   </script>
 </SiteLayout>

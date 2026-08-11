@@ -578,3 +578,119 @@ export async function attachNeighbourhoods(supabase: DB, items: WritingItem[]): 
   for (const item of items) (item as WritingPost).neighbourhood = found.get(item.id) ?? null;
   return items;
 }
+
+// ---------------------------------------------------------------------------
+// The music room (docs/plans/33 §4, §6)
+// ---------------------------------------------------------------------------
+
+/** An essay that points at a song — the pairing, read backwards (§6). */
+export interface PairedEssay {
+  slug: string;
+  title: string;
+}
+
+export interface RoomSong {
+  id: string;
+  title: string;
+  artist: string | null;
+  url: string;
+  /** Feeling slugs, in the vocabulary's own order. */
+  feelings: string[];
+  /** Usually one; two songs in the corpus carry two essays each. */
+  paired: PairedEssay[];
+}
+
+export interface MusicRoom {
+  /** In `feelings.sort` order — dark to light. The palette's bit order. */
+  vocabulary: { slug: string; name: string }[];
+  songs: RoomSong[];
+}
+
+/**
+ * Everything the music room renders, in three reads.
+ *
+ * ⚠ **A SONG WITH NO FEELINGS IS NOT IN THIS ROOM, AND THAT IS A DISPLAY RULE
+ * RATHER THAN A PRIVACY ONE** (plan 33, ruling 2). Michael, 2026-08-10: *"if I
+ * didn't take the time to describe it in any way, I probably don't want to
+ * intentionally share it with anyone anyway. As a note, it's fine if that's
+ * still public data. It's just not worth showing on the page."*
+ *
+ * So it is filtered HERE and must never be filtered in RLS. An untagged song is
+ * not withheld: it still exists, still plays under the essay it is paired to,
+ * and is still returned by anything that asks for it. Putting this in a policy
+ * would silently change what the paired player can read and would be very hard
+ * to unpick later.
+ *
+ * ⚠ **`.eq('status', 'published')` IS EXPLICIT AND MUST STAY.** RLS already
+ * hides unpublished songs from anonymous readers — but not from Michael, who is
+ * the one person who reads this page while signed in, and the only one who could
+ * be shown a draft on a public URL and not notice.
+ *
+ * ⚠ **THE BRIDGE IS READ BACKWARDS FROM `paired_song_id`** and is not a second
+ * relation. `pairedMediaOf` answers "what song goes with this essay"; this is
+ * the same fact from the other end, which the data has always supported and
+ * nothing has ever asked for. Deliberately NOT `pairedMediaOf`'s legacy
+ * `details.media` branch — that path carries no song row, so there is nothing
+ * for a song to be found by.
+ */
+export async function listMusicRoom(supabase: DB): Promise<MusicRoom> {
+  const [{ data: vocab }, { data: songs }, { data: essays }] = await Promise.all([
+    supabase.from('feelings').select('slug, name, sort').order('sort'),
+    supabase
+      .from('fragments')
+      .select('id, title, attribution, source_url, created_at, fragment_feelings(feelings(slug))')
+      .eq('type', 'song')
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      // ⚠ NEWEST ADDED, WHICH IS ALSO NEWEST TAGGED — for everything from now on.
+      // §8 offers "most recently tagged" as an ordering and there is no timestamp
+      // on `fragment_feelings` to sort by. There does not need to be: ruling 1
+      // makes adding and tagging THE SAME ACT, so a song's `created_at` is the
+      // moment it was sat with. The 48 legacy songs are the only rows where the
+      // two come apart, because they arrived as paired media years before the
+      // vocabulary existed. §8's other candidate — shuffled per visit — is still
+      // open and is a change to this one line.
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('fragments')
+      .select('slug, title, paired_song_id')
+      .eq('type', 'writing')
+      .eq('status', 'published')
+      .is('deleted_at', null)
+      .not('paired_song_id', 'is', null),
+  ]);
+
+  const vocabulary = (vocab ?? []).map((f) => ({ slug: f.slug, name: f.name }));
+  const order = new Map(vocabulary.map((f, i) => [f.slug, i]));
+
+  const bySong = new Map<string, PairedEssay[]>();
+  for (const e of essays ?? []) {
+    if (!e.paired_song_id) continue;
+    const list = bySong.get(e.paired_song_id) ?? [];
+    list.push({ slug: e.slug, title: e.title || '(untitled)' });
+    bySong.set(e.paired_song_id, list);
+  }
+
+  const roomSongs: RoomSong[] = [];
+  for (const s of songs ?? []) {
+    const feelings = (s.fragment_feelings ?? [])
+      .map((ff) => ff.feelings?.slug)
+      .filter((slug): slug is string => Boolean(slug) && order.has(slug!))
+      // The vocabulary's order, never the order the rows came back in. The field
+      // above the room reads dark → light, and a card whose words are in a
+      // different sequence reads as a different vocabulary.
+      .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    if (feelings.length === 0) continue; // ruling 2
+    if (!s.source_url) continue; // nothing to play, so nothing to show
+    roomSongs.push({
+      id: s.id,
+      title: s.title || '(untitled)',
+      artist: s.attribution,
+      url: s.source_url,
+      feelings,
+      paired: bySong.get(s.id) ?? [],
+    });
+  }
+
+  return { vocabulary, songs: roomSongs };
+}

@@ -4,11 +4,17 @@
 
   A prominent content-type switch (Writing · Quotes · Music) — the primary axis —
   sits above a sticky left rail (search · subject filters) and the scrolling feed.
-  The rail is the SAME for every view: quotes and songs share the one subject
-  taxonomy, so each view filters and searches within its own type. Writing renders
-  as excerpt cards that open the full essay in an in-context Reader; quotes, being
-  short, render whole. Everything is URL-driven — `?view`, `?subject`, `?q`,
-  `?page` — so any state is shareable.
+  Writing renders as excerpt cards that open the full essay in an in-context
+  Reader; quotes, being short, render whole. Everything is URL-driven — `?view`,
+  `?subject`, `?q`, `?page`, `?feeling` — so any state is shareable.
+
+  ⚠ THE RAIL IS THE SAME FOR THE TWO TEXT VIEWS, AND MUSIC IS A THIRD REGISTER —
+  not a third list (docs/plans/33 §4, ruling 4). This comment used to say "the
+  rail is the SAME for every view", which was true of the two views that existed.
+  Quotes and writing are retrieval over a shared subject taxonomy and share the
+  rail because they are the same KIND of room. Music is filtered by a different
+  vocabulary — feelings, not subjects — in a different act, and the words are the
+  page. So `?view=music` renders `MusicRoom` full width with no rail at all.
 
   Search mirrors the admin (docs/search.md): a debounced fetch-and-swap of
   #blog-feed (see scripts/blog-feed.ts) with match highlighting, gated at
@@ -21,14 +27,58 @@ import Label from '../../components/Label.astro';
 import PostCard from '../../components/PostCard.astro';
 import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
+import MusicRoom from '../../components/MusicRoom.astro';
 import { Icon } from 'astro-icon/components';
-import { attachNeighbourhoods, listWriting, listQuotes, listSubjects } from '../../lib/blog';
+import { attachNeighbourhoods, listMusicRoom, listWriting, listQuotes, listSubjects } from '../../lib/blog';
+import { parseFeelings } from '../../lib/music-room';
 import { MIN_SEARCH } from '../../lib/search-highlight';
 
 const supabase = Astro.locals.supabase;
 const params = Astro.url.searchParams;
-const view = params.get('view') === 'quotes' ? 'quotes' : 'writing';
+const raw = params.get('view');
+const view = raw === 'quotes' ? 'quotes' : raw === 'music' ? 'music' : 'writing';
 const type = view === 'quotes' ? 'quote' : 'writing';
+
+/*
+  ⚠ THE MUSIC ROOM IS BUILT AND THE TAB STILL SAYS "SOON", and that is §9 rather
+  than an unfinished edge. *"The room is only as good as its density. At 30 songs
+  most combinations return nothing, and a spectrum that keeps saying 'nothing
+  holds all of that at once' teaches a visitor that the vocabulary is
+  decoration."* Ruling 2 turned that from a feeling into a number you can query:
+  a song qualifies when it carries at least one feeling.
+
+  So the ROUTE works — `/blog?view=music` renders, and is how the room gets
+  judged — and the TAB stays a plain word until the corpus is worth announcing.
+  Michael's call to change, and it is this one constant.
+*/
+const MUSIC_THRESHOLD = 100;
+
+const room = view === 'music' ? await listMusicRoom(supabase) : null;
+
+/*
+  ⚠ DEDUPED, BECAUSE THE QUESTION IS "HOW MANY SONGS", NOT "HOW MANY LINKS".
+  `count: 'exact'` on `fragment_feelings` would count ROWS — a song wearing five
+  words would be five — and the tab would open at twenty songs instead of a
+  hundred. PostgREST has no `count(distinct)`, so the ids come back and a Set
+  answers it.
+
+  The limit is explicit rather than PostgREST's silent 1000 (see
+  `export.json.ts` for the backup this same default truncated). One `uuid`
+  column, and the number only has to be right in the neighbourhood of the
+  threshold.
+
+  Asked on EVERY view, because the tab is about the corpus rather than about the
+  page you are standing on — and paid for once a minute rather than once a
+  request, since this route already carries `s-maxage=60`.
+*/
+const { data: feelingLinks } = await supabase.from('fragment_feelings').select('fragment_id').limit(4000);
+const qualifying = new Set((feelingLinks ?? []).map((l) => l.fragment_id)).size;
+const musicOpen = qualifying >= MUSIC_THRESHOLD;
+
+// `?feeling=regretful,hopeful` — comma-joined and stacking, exactly as subjects
+// do. Resolved against the vocabulary so a deleted or merged word drops out
+// rather than emptying the room; see `parseFeelings`.
+const selectedFeelings = room ? parseFeelings(params.get('feeling'), room.vocabulary) : [];
 // Subjects STACK (AND). Comma-joined in the URL: ?subject=uncertainty,emotion.
 const selectedSubjects = Array.from(
   new Set(
@@ -53,7 +103,12 @@ const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 
 // The rail's subjects are annotated for the CURRENT filter: a contextual count,
 // which are selected, and which combinations are dead-ends (disabled). The search
 // term feeds in too, so typing re-counts the tags in real time.
-const subjects = await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null });
+//
+// Skipped entirely for music, which has no rail: the room is filtered by
+// feelings, and asking for the subject taxonomy there would be three queries
+// spent on a control that is not on the page.
+const subjects =
+  view === 'music' ? [] : await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null });
 const nameBySlug = new Map(subjects.map((s) => [s.slug, s.name]));
 // slug → GLOBAL count, so the feed's per-card subjects sort busiest-first (they
 // carry no count of their own) in an order that never shifts as you filter.
@@ -77,7 +132,11 @@ const quotes =
   view === 'quotes'
     ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, author: authorSlug, subjectRank })
     : null;
-const feed = writing ?? quotes!;
+// `null` in the music view, which has no feed and no pagination — the room is
+// one page of everything that qualifies (ruling 3: card delivery is a separate,
+// swappable concern, and windowing it is a later decision with a measured
+// trigger).
+const feed = writing ?? quotes;
 
 const noun = view === 'quotes' ? 'quote' : 'essay';
 const nounPlural = view === 'quotes' ? 'quotes' : 'essays';
@@ -129,14 +188,19 @@ const authorName = authorSlug
   ? ((await supabase.from('authors').select('name').eq('slug', authorSlug).maybeSingle()).data?.name ?? authorSlug)
   : null;
 
+// Music joins the switch only once it is open (§9) — OR when you are standing in
+// it, so the room you are looking at is never missing from its own navigation.
 const tabs = [
   { key: 'writing', label: 'Writing', href: '/blog', active: view === 'writing' },
   { key: 'quotes', label: 'Quotes', href: '/blog?view=quotes', active: view === 'quotes' },
-] as const;
+  ...(musicOpen || view === 'music'
+    ? ([{ key: 'music', label: 'Music', href: '/blog?view=music', active: view === 'music' }] as const)
+    : []),
+];
 
 // Infinite scroll: the next page's URL, or null at the end. The client fetches it
 // (X-Requested-With) and appends the items; the manual link is the no-JS fallback.
-const nextUrl = feed.page < feed.pageCount ? buildHref({ page: feed.page + 1 }) : null;
+const nextUrl = feed && feed.page < feed.pageCount ? buildHref({ page: feed.page + 1 }) : null;
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 // The rendered page depends on X-Requested-With (partial page fetches honour
@@ -154,7 +218,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       /* The page heading, for the document outline + screen readers. The visible
         anchor is the Writing/Quotes/Music switch below, so this stays sr-only. */
     }
-    <h1 class="sr-only">Blog — {view === 'quotes' ? 'Quotes' : 'Writing'}</h1>
+    <h1 class="sr-only">Blog — {view === 'quotes' ? 'Quotes' : view === 'music' ? 'Music' : 'Writing'}</h1>
     {/* ─────────  PRIMARY AXIS: content-type switch  ───────── */}
     <nav class="border-base-300 mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
       {
@@ -173,198 +237,218 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
           </a>
         ))
       }
-      <span
-        class="font-display text-base-content/20 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
-      >
-        Music <span class="align-middle font-sans text-xs tracking-wide">soon</span>
-      </span>
+      {
+        /* ⚠ STILL A WORD RATHER THAN A LINK, AND THE ROOM BEHIND IT IS BUILT.
+          That is §9, not an unfinished edge: a room whose combinations mostly
+          return nothing teaches a visitor that the vocabulary is decoration, so
+          it is not announced until the corpus can carry it. `MUSIC_THRESHOLD`
+          above is the one line that changes. */
+      }
+      {
+        !musicOpen && view !== 'music' && (
+          <span class="font-display text-base-content/20 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl">
+            Music <span class="align-middle font-sans text-xs tracking-wide">soon</span>
+          </span>
+        )
+      }
     </nav>
 
-    <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
-      {/* ─────────  THE RAIL: search + subjects (same for every view)  ───────── */}
-      <aside class="md:sticky md:top-20 md:self-start">
-        <form method="get" action="/blog" role="search" id="blog-filters" class="relative">
-          <Icon
-            name="ph:magnifying-glass"
-            class="text-base-content/35 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base"
-          />
-          <input
-            type="search"
-            name="q"
-            value={rawQ}
-            placeholder={`Search ${searchNoun}…`}
-            aria-label={`Search ${searchNoun}`}
-            autocomplete="off"
-            class="rounded-field border-base-300 bg-base-100 placeholder:text-base-content/35 focus:border-base-content/30 w-full border py-2 pr-3 pl-9 font-sans text-sm focus:outline-none"
-          />
-          {
-            /* No-JS fallback: a search submit carries the selected subjects along
-              (comma-joined). With JS, the client reads the live URL instead. */
-          }
-          {selectedSubjects.length > 0 && <input type="hidden" name="subject" value={selectedSubjects.join(',')} />}
-          {
-            /* Same reason as `subject` above: without this, searching inside one
-              author's lines silently widens to the whole corpus with no JS. */
-          }
-          {authorSlug && <input type="hidden" name="author" value={authorSlug} />}
-          {view === 'quotes' && <input type="hidden" name="view" value="quotes" />}
-        </form>
+    {/* ─────────  MUSIC: a third REGISTER, so no rail and no feed  ───────── */}
+    {view === 'music' && room && <MusicRoom room={room} selected={selectedFeelings} />}
 
-        {
-          subjects.length > 0 && (
-            <div class="mt-7" data-subjects>
-              <div class="flex items-baseline justify-between gap-2">
-                <Label variant="chrome">Subjects</Label>
-                {(selectedSubjects.length > 0 || q || authorName) && (
-                  <a
-                    href={clearHref}
-                    data-subject-clear
-                    class="text-base-content/40 hover:text-base-content/70 inline-flex items-center gap-0.5 font-sans text-xs transition-colors"
-                  >
-                    Clear
-                    <Icon name="ph:x" class="size-3" />
-                  </a>
-                )}
-              </div>
-              {/* One list, three states: SELECTED (filled, ✕ to remove),
+    {
+      /* ⚠ NOT `hidden` — NOT RENDERED AT ALL. The rail and the feed are the two
+        text views' machinery, and `feed` is null in the music room, so this
+        whole subtree has nothing to read. Rendering it hidden would also ship a
+        search box and a subject taxonomy to a page that filters by neither. */
+    }
+    {
+      view !== 'music' && feed && (
+        <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
+          {/* ─────────  THE RAIL: search + subjects (the two TEXT views)  ───────── */}
+          <aside class="md:sticky md:top-20 md:self-start">
+            <form method="get" action="/blog" role="search" id="blog-filters" class="relative">
+              <Icon
+                name="ph:magnifying-glass"
+                class="text-base-content/35 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base"
+              />
+              <input
+                type="search"
+                name="q"
+                value={rawQ}
+                placeholder={`Search ${searchNoun}…`}
+                aria-label={`Search ${searchNoun}`}
+                autocomplete="off"
+                class="rounded-field border-base-300 bg-base-100 placeholder:text-base-content/35 focus:border-base-content/30 w-full border py-2 pr-3 pl-9 font-sans text-sm focus:outline-none"
+              />
+              {/* No-JS fallback: a search submit carries the selected subjects along
+              (comma-joined). With JS, the client reads the live URL instead. */}
+              {selectedSubjects.length > 0 && <input type="hidden" name="subject" value={selectedSubjects.join(',')} />}
+              {/* Same reason as `subject` above: without this, searching inside one
+              author's lines silently widens to the whole corpus with no JS. */}
+              {authorSlug && <input type="hidden" name="author" value={authorSlug} />}
+              {view === 'quotes' && <input type="hidden" name="view" value="quotes" />}
+            </form>
+
+            {subjects.length > 0 && (
+              <div class="mt-7" data-subjects>
+                <div class="flex items-baseline justify-between gap-2">
+                  <Label variant="chrome">Subjects</Label>
+                  {(selectedSubjects.length > 0 || q || authorName) && (
+                    <a
+                      href={clearHref}
+                      data-subject-clear
+                      class="text-base-content/40 hover:text-base-content/70 inline-flex items-center gap-0.5 font-sans text-xs transition-colors"
+                    >
+                      Clear
+                      <Icon name="ph:x" class="size-3" />
+                    </a>
+                  )}
+                </div>
+                {/* One list, three states: SELECTED (filled, ✕ to remove),
                   SELECTABLE (its count = what adding it would still yield), or a
                   DEAD-END (muted + inert: nothing combines it with the filter). */}
-              <ul class="mt-3 flex flex-wrap gap-1.5 md:flex-col md:gap-0.5">
-                {subjects.map((s, i) => (
-                  <li class:list={[i >= SUBJECT_CAP && 'subject-extra']}>
-                    {s.disabled ? (
-                      <span
-                        aria-disabled="true"
-                        title="Nothing here combines with your current filter"
-                        class="border-base-300/60 text-base-content/25 md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs"
-                      >
-                        {s.name}
-                        <span class="text-base-content/20">{s.count}</span>
-                      </span>
-                    ) : (
-                      <a
-                        href={toggleHref(s.slug)}
-                        data-subject-link
-                        aria-current={s.selected ? 'true' : undefined}
-                        class:list={[
-                          'md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors',
-                          s.selected
-                            ? 'border-base-content/30 bg-base-200 text-base-content'
-                            : 'border-base-300 text-base-content/55 hover:border-base-content/25 hover:text-base-content',
-                        ]}
-                      >
-                        {s.name}
-                        {s.selected ? (
-                          <Icon name="ph:x" class="text-base-content/50 size-3" aria-hidden="true" />
-                        ) : (
-                          <span class="text-base-content/30">{s.count}</span>
-                        )}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {subjectOverflow > 0 && (
-                <button
-                  type="button"
-                  data-subjects-toggle
-                  data-label-collapsed={`Show all (${subjects.length})`}
-                  aria-expanded="false"
-                  class="text-base-content/45 hover:text-base-content/80 mt-2 font-sans text-xs transition-colors md:hidden"
-                >
-                  Show all ({subjects.length})
-                </button>
-              )}
-            </div>
-          )
-        }
-      </aside>
+                <ul class="mt-3 flex flex-wrap gap-1.5 md:flex-col md:gap-0.5">
+                  {subjects.map((s, i) => (
+                    <li class:list={[i >= SUBJECT_CAP && 'subject-extra']}>
+                      {s.disabled ? (
+                        <span
+                          aria-disabled="true"
+                          title="Nothing here combines with your current filter"
+                          class="border-base-300/60 text-base-content/25 md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs"
+                        >
+                          {s.name}
+                          <span class="text-base-content/20">{s.count}</span>
+                        </span>
+                      ) : (
+                        <a
+                          href={toggleHref(s.slug)}
+                          data-subject-link
+                          aria-current={s.selected ? 'true' : undefined}
+                          class:list={[
+                            'md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors',
+                            s.selected
+                              ? 'border-base-content/30 bg-base-200 text-base-content'
+                              : 'border-base-300 text-base-content/55 hover:border-base-content/25 hover:text-base-content',
+                          ]}
+                        >
+                          {s.name}
+                          {s.selected ? (
+                            <Icon name="ph:x" class="text-base-content/50 size-3" aria-hidden="true" />
+                          ) : (
+                            <span class="text-base-content/30">{s.count}</span>
+                          )}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {subjectOverflow > 0 && (
+                  <button
+                    type="button"
+                    data-subjects-toggle
+                    data-label-collapsed={`Show all (${subjects.length})`}
+                    aria-expanded="false"
+                    class="text-base-content/45 hover:text-base-content/80 mt-2 font-sans text-xs transition-colors md:hidden"
+                  >
+                    Show all ({subjects.length})
+                  </button>
+                )}
+              </div>
+            )}
+          </aside>
 
-      {/* ─────────  THE FEED  ───────── */}
-      <section class="min-w-0">
-        <div id="blog-feed">
-          {
-            (selectedSubjects.length > 0 || q || authorName) && (
-              <p class="text-base-content/55 mb-8 font-serif italic">
-                {feed.total} {feed.total === 1 ? noun : nounPlural}
-                {/* ⚠ "by <Name>" LEADS, before the subjects. Arriving here from a
+          {/* ─────────  THE FEED  ───────── */}
+          <section class="min-w-0">
+            <div id="blog-feed">
+              {(selectedSubjects.length > 0 || q || authorName) && (
+                <p class="text-base-content/55 mb-8 font-serif italic">
+                  {feed.total} {feed.total === 1 ? noun : nounPlural}
+                  {/* ⚠ "by <Name>" LEADS, before the subjects. Arriving here from a
                     quote's attribution, the author is the question you asked and
                     everything else is a narrowing of it — reading "12 quotes on
                     grief by Seneca" puts the answer second. */}
-                {authorName && (
-                  <>
-                    {' '}
-                    by <span class="text-base-content/80 not-italic">{authorName}</span>
-                  </>
-                )}
-                {selectedSubjects.length > 0 && (
-                  <>
-                    {' '}
-                    on{' '}
-                    <span class="text-base-content/80 not-italic">
-                      {selectedSubjects.map((slug) => nameBySlug.get(slug) ?? slug).join(' + ')}
-                    </span>
-                  </>
-                )}
-                {q && (
-                  <>
-                    {' '}
-                    matching <span class="text-base-content/80 not-italic">“{q}”</span>
-                  </>
-                )}
-              </p>
-            )
-          }
-
-          {
-            feed.items.length === 0 ? (
-              <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-                <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
-                <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
-                  {selectedSubjects.length > 0 || q || authorSlug
-                    ? `No ${nounPlural} match this filter.`
-                    : `The ${nounPlural} will collect here.`}
+                  {authorName && (
+                    <>
+                      {' '}
+                      by <span class="text-base-content/80 not-italic">{authorName}</span>
+                    </>
+                  )}
+                  {selectedSubjects.length > 0 && (
+                    <>
+                      {' '}
+                      on{' '}
+                      <span class="text-base-content/80 not-italic">
+                        {selectedSubjects.map((slug) => nameBySlug.get(slug) ?? slug).join(' + ')}
+                      </span>
+                    </>
+                  )}
+                  {q && (
+                    <>
+                      {' '}
+                      matching <span class="text-base-content/80 not-italic">“{q}”</span>
+                    </>
+                  )}
                 </p>
-              </div>
-            ) : view === 'writing' ? (
-              <div id="feed-list" class="divide-base-300 divide-y">
-                {writing!.items.map((item) => (
-                  <PostCard item={item} term={q} />
-                ))}
-              </div>
-            ) : (
-              <div id="feed-list" class="divide-base-300 divide-y">
-                {quotes!.items.map((item) => (
-                  <QuoteCard item={item} term={q} />
-                ))}
-              </div>
-            )
-          }
+              )}
 
-          {
-            nextUrl && (
-              <div id="feed-sentinel" data-next-url={nextUrl} class="feed-sentinel flex justify-center pt-10">
-                <a
-                  href={nextUrl}
-                  data-feed-more
-                  class="feed-more text-base-content/55 hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
-                >
-                  Load older {nounPlural}
-                  <Icon name="ph:caret-down" class="size-3.5" />
-                </a>
-                <span class="feed-spin text-base-content/40 font-sans text-sm">Loading…</span>
-              </div>
-            )
-          }
+              {feed.items.length === 0 ? (
+                <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+                  <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
+                  <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
+                    {selectedSubjects.length > 0 || q || authorSlug
+                      ? `No ${nounPlural} match this filter.`
+                      : `The ${nounPlural} will collect here.`}
+                  </p>
+                </div>
+              ) : view === 'writing' ? (
+                <div id="feed-list" class="divide-base-300 divide-y">
+                  {writing!.items.map((item) => (
+                    <PostCard item={item} term={q} />
+                  ))}
+                </div>
+              ) : (
+                <div id="feed-list" class="divide-base-300 divide-y">
+                  {quotes!.items.map((item) => (
+                    <QuoteCard item={item} term={q} />
+                  ))}
+                </div>
+              )}
+
+              {nextUrl && (
+                <div id="feed-sentinel" data-next-url={nextUrl} class="feed-sentinel flex justify-center pt-10">
+                  <a
+                    href={nextUrl}
+                    data-feed-more
+                    class="feed-more text-base-content/55 hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
+                  >
+                    Load older {nounPlural}
+                    <Icon name="ph:caret-down" class="size-3.5" />
+                  </a>
+                  <span class="feed-spin text-base-content/40 font-sans text-sm">Loading…</span>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
-      </section>
-    </div>
+      )
+    }
   </div>
 
-  {/* The in-context reader (writing view only). */}
-  {view === 'writing' && <Reader />}
+  {
+    /* The in-context reader. The writing view fills it from a `<template>` per
+      card; the music room ships none and lets it fetch the permalink instead —
+      one room of the whole corpus would otherwise inline every essay it mentions
+      (measured at 51% of the document). See Reader.astro. */
+  }
+  {(view === 'writing' || view === 'music') && <Reader />}
 </SiteLayout>
 
 <script>
   import '../../scripts/blog-feed';
+  // The room takes ownership of a field the server already rendered correctly —
+  // it returns immediately on any page without one, so the two text views pay
+  // nothing but the import.
+  import { wireMusicRoom } from '../../scripts/music-room';
+  wireMusicRoom();
 </script>

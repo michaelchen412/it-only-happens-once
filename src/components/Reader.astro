@@ -3,7 +3,8 @@
   Reader — a reusable, in-context reading surface (a native top-layer <dialog>).
 
   Drop <Reader /> once on a page. Anything with `data-read="<slug>"` opens it,
-  filled from the matching `<template data-reader-content="<slug>">` on the page.
+  filled from the matching `<template data-reader-content="<slug>">` on the page
+  — or, if there is no template, FETCHED from the permalink (see `fill` below).
   The feed underneath never moves, so closing drops the reader back exactly where
   the reader was scrolling — the whole point of not navigating away.
 
@@ -67,19 +68,77 @@ import BackToTop from './BackToTop.astro';
     document.documentElement.style.removeProperty('--reader-sbw');
   }
 
-  function open(slug: string): boolean {
-    const d = reader();
-    if (!d) return false;
-    const tpl = document.querySelector(
-      `template[data-reader-content="${CSS.escape(slug)}"]`,
-    ) as HTMLTemplateElement | null;
-    const inner = d.querySelector('.reader-inner');
-    if (!tpl || !inner) return false; // content isn't on this page
-    inner.replaceChildren(tpl.content.cloneNode(true));
+  /**
+   * ⚠ TWO SOURCES, AND THE SECOND ONE EXISTS BECAUSE INERT IS NOT FREE.
+   *
+   * A template is instant and stays the first choice: `/blog` paginates, so it
+   * ships one per card for a page of ~7 and the reader opens with no network at
+   * all. The music room cannot do that — it opens with the whole corpus, so it
+   * would ship one template per distinct paired essay. Measured in the bench:
+   * **408 KB of templates inside a 797 KB document, 51% of the page**, on every
+   * arrival, for content most visitors will never open.
+   *
+   * So a page may ship NO templates and let this fetch the permalink instead.
+   * `/blog/<slug>` renders the same `PostArticle`, which is the whole reason
+   * that component exists as one renderer rather than three.
+   *
+   * The sheet opens FIRST and fills when the answer arrives. Waiting for the
+   * network before showing anything would make a click feel broken on a slow
+   * connection, and the slide-in is the acknowledgement.
+   */
+  let fillSeq = 0;
+
+  function templateFor(slug: string): HTMLTemplateElement | null {
+    return document.querySelector(`template[data-reader-content="${CSS.escape(slug)}"]`);
+  }
+
+  async function fetchArticle(slug: string): Promise<Node | null> {
+    try {
+      const res = await fetch(`/blog/${encodeURIComponent(slug)}`, { headers: { Accept: 'text/html' } });
+      if (!res.ok) return null;
+      // DOMParser rather than innerHTML on a live node: the document it builds is
+      // inert, so nothing in it runs or loads until the one element we choose is
+      // adopted into this page.
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const article = doc.querySelector('article.post-article');
+      return article ? document.importNode(article, true) : null;
+    } catch {
+      return null; // offline, or the route moved — the caller falls back
+    }
+  }
+
+  function show(d: HTMLDialogElement) {
     if (!d.open) d.showModal();
     const scroll = d.querySelector('.reader-scroll');
     if (scroll) scroll.scrollTop = 0;
     lockScroll();
+  }
+
+  async function open(slug: string): Promise<boolean> {
+    const d = reader();
+    const inner = d?.querySelector('.reader-inner');
+    if (!d || !inner) return false;
+
+    const tpl = templateFor(slug);
+    if (tpl) {
+      inner.replaceChildren(tpl.content.cloneNode(true));
+      show(d);
+      return true;
+    }
+
+    const seq = ++fillSeq;
+    const waiting = document.createElement('p');
+    waiting.className = 'text-base-content/40 py-16 text-center font-serif italic';
+    waiting.textContent = 'Opening…';
+    inner.replaceChildren(waiting);
+    show(d);
+
+    const article = await fetchArticle(slug);
+    if (seq !== fillSeq) return true; // a newer open already claimed the sheet
+    if (!article) return false; // caller sends them to the permalink
+    inner.replaceChildren(article);
+    const scroll = d.querySelector('.reader-scroll');
+    if (scroll) scroll.scrollTop = 0;
     return true;
   }
 
@@ -96,12 +155,13 @@ import BackToTop from './BackToTop.astro';
   }
 
   // The URL hash is the single source of truth; reconcile the DOM to it.
-  function sync() {
+  async function sync() {
     const slug = readSlug();
     if (!slug) return close();
-    if (!open(slug)) {
-      // Deep-linked to a post that isn't in this page's feed → send them to the
-      // canonical permalink, which always exists.
+    if (!(await open(slug))) {
+      // No template on this page AND the permalink would not answer — a deleted
+      // post, or a bad hash. Send them to the canonical URL, which will say so
+      // properly rather than leaving an empty sheet open.
       location.replace(`/blog/${slug}`);
     }
   }
@@ -170,15 +230,19 @@ import BackToTop from './BackToTop.astro';
     });
   }
 
-  window.addEventListener('hashchange', sync);
+  // `void`, deliberately: `sync` is async only because filling from a fetch is,
+  // and none of these three callers has anything to do with the answer. An
+  // unhandled rejection is impossible — `fetchArticle` catches its own — so the
+  // marker is here to say the floating promise is intended rather than missed.
+  window.addEventListener('hashchange', () => void sync());
   // Deep links + view-transition navigation: reconcile on arrival.
   document.addEventListener('astro:page-load', () => {
     openedViaTrigger = false;
     bindCancel();
-    sync();
+    void sync();
   });
   // <html> persists across view transitions — never leak the scroll lock.
   document.addEventListener('astro:before-swap', unlockScroll);
   bindCancel();
-  sync(); // first load
+  void sync(); // first load
 </script>
