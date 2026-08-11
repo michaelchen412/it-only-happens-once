@@ -138,6 +138,15 @@ export function spotifyEmbedSrc(ref: SpotifyEmbed): string {
   return `https://open.spotify.com/embed/${ref.kind}/${ref.id}?theme=0`;
 }
 
+/**
+ * The permissions each provider's OWN embed code delegates — copied from
+ * Spotify's oEmbed response and YouTube's share dialog rather than invented.
+ * See `MediaEmbed.allow` for why `autoplay` is load-bearing.
+ */
+const SPOTIFY_ALLOW = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
+const YOUTUBE_ALLOW =
+  'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+
 export interface MediaEmbed {
   src: string;
   /**
@@ -146,7 +155,26 @@ export interface MediaEmbed {
    * the caller should use an aspect-ratio box instead.
    */
   height: number | null;
-  /** `allow` attribute: what the frame is permitted to do. */
+  /**
+   * `allow` attribute: what the frame is permitted to do.
+   *
+   * ⚠ `autoplay` IS NOT OPTIONAL, AND ITS ABSENCE FAILS INTERMITTENTLY.
+   * Chrome's Feature Policy blocks `autoplay` and `encrypted-media` in
+   * cross-origin iframes unless the EMBEDDER delegates them — a user gesture
+   * inside the frame is not enough, because the gesture is the frame's and the
+   * permission is ours. Spotify documents both requirements directly:
+   * removing `encrypted-media` "restricts the player to preview mode only",
+   * and the Web Playback docs name Feature Policy as the thing that blocks
+   * `encrypted-media` and `autoplay` by default.
+   *
+   * We shipped `encrypted-media` alone until 2026-08-10, when Michael hit a
+   * play button that did nothing: "some embeds play button (play button only)
+   * is broken... I can't reproduce it reliably." Unreproducible is the
+   * signature — Chrome also weighs its per-origin Media Engagement Index, so
+   * the same page fails on one profile and works on another, and starts
+   * working on yours once you have played enough. These strings now match what
+   * each provider's own embed code ships.
+   */
   allow: string;
 }
 
@@ -167,7 +195,7 @@ export function embedForUrl(url: string): MediaEmbed | null {
   if (song) return songEmbed(song);
   const sp = parseSpotifyEmbed(url);
   if (sp) {
-    return { src: spotifyEmbedSrc(sp), height: spotifyEmbedHeight(sp.kind), allow: 'encrypted-media' };
+    return { src: spotifyEmbedSrc(sp), height: spotifyEmbedHeight(sp.kind), allow: SPOTIFY_ALLOW };
   }
   return null;
 }
@@ -180,13 +208,13 @@ export function songEmbed(ref: SongRef): MediaEmbed {
       // than throwing the reader out into YouTube's recommendation engine.
       src: `https://www.youtube-nocookie.com/embed/${ref.id}?rel=0`,
       height: null,
-      allow: 'accelerometer; clipboard-write; encrypted-media; picture-in-picture',
+      allow: YOUTUBE_ALLOW,
     };
   }
   return {
     src: spotifyEmbedSrc({ kind: ref.kind, id: ref.id }),
     height: spotifyEmbedHeight(ref.kind),
-    allow: 'encrypted-media',
+    allow: SPOTIFY_ALLOW,
   };
 }
 

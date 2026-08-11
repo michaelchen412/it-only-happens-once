@@ -69,7 +69,7 @@ describe('pairedMediaOf — the legacy path', () => {
     });
   });
 
-  it('gives no title, so the renderer draws no caption', () => {
+  it('gives no title, so the iframe falls back to the generic accessible name', () => {
     const got = pairedMediaOf({ details: LEGACY });
     expect(got?.title).toBe('');
     expect(got?.fragmentId).toBeNull();

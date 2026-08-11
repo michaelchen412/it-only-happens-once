@@ -153,6 +153,40 @@ describe('songEmbed', () => {
 // PostArticle used parseSongRef to decide what to embed, so the two essays
 // paired with a playlist rendered a caption and no player. "What may a song
 // cite" and "what can we embed" are different questions.
+describe('the `allow` attribute — the permissions a play button actually needs', () => {
+  // Regression pin, 2026-08-10. We shipped `allow="encrypted-media"` alone, and
+  // some play buttons did nothing — intermittently, which is the tell: Chrome's
+  // Feature Policy blocks `autoplay` in a cross-origin iframe unless the
+  // EMBEDDER delegates it, and its per-origin Media Engagement Index decides
+  // how strictly, so the same page fails on one profile and works on another.
+  // Spotify's docs are explicit that dropping these restricts the player to
+  // preview mode. Cheap to lose in a refactor, expensive to notice.
+  const grants = (allow: string) => new Set(allow.split(';').map((s) => s.trim()));
+
+  it('delegates autoplay AND encrypted-media for a Spotify track', () => {
+    const g = grants(songEmbed({ provider: 'spotify', kind: 'track', id: 'abc' }).allow);
+    expect(g.has('autoplay')).toBe(true);
+    expect(g.has('encrypted-media')).toBe(true);
+  });
+
+  it('delegates them for a Spotify album too', () => {
+    const g = grants(songEmbed({ provider: 'spotify', kind: 'album', id: 'abc' }).allow);
+    expect(g.has('autoplay')).toBe(true);
+    expect(g.has('encrypted-media')).toBe(true);
+  });
+
+  it('delegates autoplay for YouTube', () => {
+    const g = grants(songEmbed({ provider: 'youtube', kind: 'video', id: 'abcdefghijk' }).allow);
+    expect(g.has('autoplay')).toBe(true);
+  });
+
+  it('covers the legacy playlist path, which no song may cite but two essays still play', () => {
+    const g = grants(embedForUrl('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')!.allow);
+    expect(g.has('autoplay')).toBe(true);
+    expect(g.has('encrypted-media')).toBe(true);
+  });
+});
+
 describe('embedForUrl — wider than parseSongRef, on purpose', () => {
   it('embeds a playlist that parseSongRef refuses', () => {
     const url = 'https://open.spotify.com/playlist/2wQlYWCZpxDvO7UAWEUSY5';

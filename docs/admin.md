@@ -529,6 +529,8 @@ Also priced in, and all survivable: batch endpoints are gone (single `GET /v1/tr
 
 An essay may point at one song fragment through `fragments.paired_song_id` ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). It renders at the **head** of the essay, below the title block and above the prose: *press play, then read* — the same invitation a constellation's score makes above its suite, but this one belongs to the piece.
 
+**The player carries no caption** (2026-08-10). It printed `♪ Title — Artist` above the embed until the embed was looked at properly: it already shows the track, the artist, and the artwork, in larger type than the caption used. The one fact the player doesn't know — *this song goes with this piece* — survives as the iframe's `title`, so a screen reader still hears the pairing; a sighted reader gets it from position alone.
+
 Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog. The tab picks from songs already in the corpus; adding a song is still the Fragment Manager's job, because a second way to write a song fragment is not worth having.
 
 **Two sources, one shape.** `pairedMediaOf` in `src/lib/blog.ts` normalises them and the renderer can't tell which answered:
