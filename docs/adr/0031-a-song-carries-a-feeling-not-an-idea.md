@@ -1,9 +1,10 @@
 # 0031 — A song carries a feeling, not an idea
 
-Status: **Proposed** *(2026-08-11. The four rulings below were taken in
-conversation; nothing is built yet. It becomes Accepted when the work lands —
-this site's habit is to describe what shipped, and the one claim here that could
-still be wrong is what a note actually gets used for.)*
+Status: **Accepted** *(2026-08-11 — written as Proposed in the morning and
+accepted the same day, with the seven commits that make every ruling below true
+in the code. The one claim still unproven is what a **public** note gets used
+for; that is a measurement, not a decision, and the Consequences say what would
+falsify it.)*
 Date: 2026-08-11
 
 Supersedes the **third role** of [ADR 0009](0009-music-three-roles.md) — the
@@ -119,8 +120,10 @@ audience rather than by length.**
   nowhere else. It never leads anything.
 - **A private note** — memory-logging, and the thing that has had no home at all:
   where a song came from, what week it belongs to, what to listen for at 2:41. It
-  lives in a new **`fragment_private_notes`** table, gated on `is_admin()` for
-  every operation, with no `anon` or `authenticated` policy of any kind.
+  lives in a new **`fragment_private_notes`** table: RLS on, **one policy** —
+  `for all to authenticated using is_admin()` — and **no `anon` policy at all**,
+  which is HQ's posture ([ADR 0012](0012-hq-is-a-private-second-domain.md))
+  rather than the corpus's.
 
 **"Why this one" is retired as a name because the name was the bug.** It asked
 for a justification, and a justification is the one thing this site's aesthetic
@@ -133,6 +136,21 @@ backup, so a "private" column on that row is public the moment anyone looks. A
 column-level `GRANT` would work and would make every existing `select *` a
 future outage. **The rule this encodes: a field whose secrecy depends on nobody
 selecting it is not private, and belongs in a table whose policy says so.**
+
+⚠ **AND THE PRIVILEGE LAYER IS REVOKED TOO, WHICH THE FIRST MIGRATION GOT
+WRONG.** It claimed there was "no `anon` grant of any kind"; reading the live
+catalog immediately after applying it showed `anon` holding SELECT, INSERT,
+UPDATE and DELETE — Supabase bootstraps `alter default privileges in schema
+public grant all on tables to anon, authenticated`, so **every new table in
+`public` starts wide open at the privilege layer and RLS is what actually closes
+it.** Verified identical on `goals`, `tasks`, `daily_checkins` and
+`interactions`: every private table this database already had. A second
+migration revokes `anon` here outright — belt to RLS's braces, because a policy
+added later `to public` would otherwise have full privileges standing behind it,
+and this is the one table where that is a disclosure rather than a bug. It also
+**improves the failure**: under RLS alone `anon` gets `200 []`, indistinguishable
+from "there are no notes"; now it is an unambiguous `42501`. Whether the four HQ
+tables want the same treatment is a real question and a separate decision.
 
 **4 · A song's public surface is the music room, and it is filed there by
 feeling.** This is what replaces ADR 0009's third role rather than merely

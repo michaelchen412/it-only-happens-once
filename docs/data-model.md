@@ -13,6 +13,7 @@
 - **"Elevation into the Sky" is not a flag** — it is simply *having a row in `fragment_constellations`*. An unplaced fragment lives in the blog forever. (This is the "no placement debt" rule, expressed in the schema.)
 - **Links between constellations are emergent** — two constellations are related whenever a fragment belongs to both. There is deliberately **no** fragment-to-fragment link table.
 - **There are two vocabularies over fragments, and they run in opposite directions.** A **subject** is what a piece is *about*; a **feeling** is what a song *does to you*. Same register, opposite direction — so `feelings` is its own table rather than `subjects` with a `kind` column. The obvious saving is the wrong one: one table would invite exactly the category error this corpus already made once, when a song was filed under the subject `jazz` — a genre, in a taxonomy of words about living, attached to nothing else. Two tables make that impossible to spell. ([plan 33](plans/33-many-words-for-one-song.md) §1; the migration argues it at length.)
+- **And a song is filed by one of them only.** A song carries **feelings and never subjects** ([ADR 0031](adr/0031-a-song-carries-a-feeling-not-an-idea.md)): a song is not *about* anything you can paraphrase, which is most of why it is worth having. It is also **never a member of a constellation** — music accompanies one as its `score_url` or through an essay's `paired_song_id`, both relations rather than membership. So a song is a fragment in the STORAGE sense that [ADR 0003](adr/0003-fragments-single-table.md) decided, and is not a third kind of reading: it carries a feeling, not an idea, and it is never read at the reader's pace. Zero of 48 songs ever carried a subject or sat in a suite in the three weeks both were offered.
 
 ## 2. Entities
 
@@ -24,6 +25,7 @@ erDiagram
   subjects ||--o{ fragment_subjects : "applies to"
   fragments ||--o{ fragment_feelings : "evokes"
   feelings ||--o{ fragment_feelings : "filed under"
+  fragments ||--o| fragment_private_notes : "noted, privately"
   fragments ||--o{ fragment_versions : "drafted as"
 
   fragments {
@@ -116,7 +118,11 @@ create table fragments (
   slug           text            not null unique,
   title          text,            -- writing/song title; usually null for quotes
   body           text,            -- Markdown: full essay / full quote text /
-                                  -- a song's annotation, the "why" (ADR-0009)
+                                  -- a song's PUBLIC NOTE (ADR-0031). Not the
+                                  -- "why": that field asked for a
+                                  -- justification and was filled once in
+                                  -- seventeen days. Its private twin is a
+                                  -- separate table, §"fragment_private_notes".
   excerpt        text,            -- authored snippet (writing); may be derived if null
   attribution    text,            -- the shown line. song: the artist, typed.
                                   -- quote: DERIVED (see §"the three facts"),
@@ -146,7 +152,14 @@ create table constellations (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,          -- e.g. "conditions, not character"
   slug        text not null unique,
-  description text,
+  description text,             -- Markdown (2026-08-11), bold/italic only in
+                                -- practice: the composer edits it in the same
+                                -- mini rich editor a quote body uses. Rendered
+                                -- with `renderMarkdown` on the home overview and
+                                -- as the suite's epigraph (`.cn-desc` in
+                                -- app.css); flattened with `toPlainText`
+                                -- everywhere it is a clamped line, a `title`, or
+                                -- a <meta> description.
   sort        int  not null default 0, -- manual ordering hint (weight is otherwise derived)
   created_at  timestamptz not null default now(),
   -- The three below arrived in July 2026 and are all load-bearing in the
@@ -233,6 +246,26 @@ create table fragment_feelings (
 );
 -- The room only ever reads this backwards: "which songs carry this feeling".
 create index fragment_feelings_feeling_idx on fragment_feelings (feeling_id);
+
+-- ⚠ THE ONLY THING IN THE CORPUS'S HALF OF THIS SCHEMA A READER MAY NEVER SEE
+-- (ADR-0031). Michael's own notes on a song: where it came from, the week it
+-- belongs to, what to listen for at 2:41. Its PUBLIC twin is `fragments.body`.
+--
+-- A TABLE RATHER THAN A COLUMN, because `fragments` is read with `select *` by
+-- the public site, by /admin/export.json and by the nightly backup — a
+-- "private" column there is public the moment anything selects it, and all
+-- three already do. The rule: a field whose secrecy depends on nobody selecting
+-- it is not private. RLS is HQ's posture here, not the corpus's: ONE policy,
+-- `for all to authenticated` on is_admin(), no anon policy — and `anon` is
+-- revoked at the privilege layer too, which is a deliberate divergence from
+-- `goals`/`tasks`/`daily_checkins`/`interactions` (all of which still carry
+-- Supabase's default anon grants, closed by RLS alone).
+create table fragment_private_notes (
+  fragment_id uuid primary key references fragments(id) on delete cascade,
+  notes       text not null default '',   -- '' rather than null: no third state
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
 
 -- PROVENANCE (added 0003): where a fragment comes from. The orthogonal axis to
 -- subjects (what it's ABOUT). Both optional; essays have neither.
