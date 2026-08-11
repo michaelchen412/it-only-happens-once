@@ -336,7 +336,19 @@ test.describe('the description editor', () => {
 
     await surface(page).click();
     await page.keyboard.press('ControlOrMeta+End');
-    await page.locator('#cc-desc-wrap [data-cmd="bold"]').click();
+    const boldBtn = page.locator('#cc-desc-wrap [data-cmd="bold"]');
+    await boldBtn.click();
+    // ⚠ WAIT FOR THE MARK BEFORE TYPING, and this is a real race rather than
+    // belt and braces. `toggleBold` runs `chain().focus().toggleBold().run()`,
+    // so pressing the button hands focus BACK to the editor asynchronously —
+    // and a keystroke that lands in the gap is swallowed. It cost the first
+    // character exactly once in a hundred runs alone and reliably when this
+    // file ran after another spec had warmed the module graph: the field came
+    // back `**PECSPEC**`, which is bold applied, serialized and stored, failing
+    // only on the S. `aria-pressed` is the toolbar's own report that the mark
+    // is active (rich-editor.ts syncs it on `transaction`), so it is the exact
+    // signal to wait on — a fixed timeout here would be the same race, slower.
+    await expect(boldBtn).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.type('SPECSPEC');
 
     // The hidden field is the only thing the action will ever see.
