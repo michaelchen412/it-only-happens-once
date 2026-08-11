@@ -34,6 +34,7 @@
   It belongs inside `me.body`, arrived at. Removing the field removed a container,
   never the idea.
 */
+import { Image } from 'astro:assets';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
 import ContactForm from '../components/ContactForm.astro';
@@ -96,9 +97,58 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
               <div class="mt-8 flow-root">
                 {portraitUrl && (
                   <figure class="mb-5 sm:float-right sm:mb-2 sm:ml-10 sm:w-56">
-                    <img
+                    {/*
+                      The portrait is the one photograph on the public site, and it
+                      is asked for at two very different sizes: full-bleed inside a
+                      max-w-2xl column on a phone, and a 14rem (224px) float from
+                      `sm:` up. One file cannot serve both without wasting most of
+                      itself at one end — hence `widths` + `sizes` rather than a
+                      plain src. The ladder tops out at 953 because that is the
+                      stored file's own width; asking Vercel for more would upscale.
+
+                      ⚠ `width`/`height` here are the DISPLAYED box's 4:5, not the
+                      file's native 3:4 — the CSS below crops to 4/5 with
+                      object-cover, and these attributes exist so the browser
+                      reserves the shape it will actually paint. Vercel resizes on
+                      width alone and preserves the true ratio, so nothing is
+                      distorted; only the crop decides what you see.
+
+                      `layout` is left at its default (`none`) ON PURPOSE. Any other
+                      value has Astro inject its own sizing styles, and this figure's
+                      geometry comes from the float — `sm:w-56` and the aspect-ratio
+                      rule — which those styles would be fighting for control of.
+
+                      ⚠ EVERY NUMBER IN `widths` MUST APPEAR IN `imagesConfig.sizes`
+                      (astro.config). Vercel filters this array against that
+                      allowlist and silently keeps whatever survives — so a width
+                      that is merely reasonable, rather than configured, vanishes
+                      without a warning. 828 is the top of the ladder on purpose:
+                      the stored portrait is 953px wide, and a phone asking for more
+                      would only be upscaling a file that has no more detail in it.
+
+                      Quality is explicit because the adapter's fallback is 100 —
+                      lossless-ish, and indefensible for a photograph that has
+                      already been downscaled twice. 75 rather than a hand-tuned
+                      number: Vercel can enforce a `qualities` allowlist that the
+                      Astro adapter has no field to declare, and 75 is the value
+                      every such list is documented with. A prettier 72 would look
+                      identical and risks a 400 nobody sees until it is deployed.
+
+                      eager + fetchpriority=high: this is above the fold, and both
+                      defaults are wrong there. `loading` defaults to lazy, which
+                      defers the request until layout; priority defaults to auto,
+                      which queues it behind two preloaded font files.
+                    */}
+                    <Image
                       src={portraitUrl}
                       alt="Portrait of the author"
+                      width={448}
+                      height={560}
+                      widths={[224, 448, 828]}
+                      sizes="(min-width: 640px) 14rem, 100vw"
+                      quality={75}
+                      loading="eager"
+                      fetchpriority="high"
                       class="rounded-box border-base-300 w-full border object-cover"
                       style="aspect-ratio: 4 / 5"
                     />

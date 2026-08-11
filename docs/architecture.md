@@ -28,6 +28,7 @@ All three are the same Astro app, sharing the design system and components. The 
 | Styling | **Tailwind 4 + daisyUI 5** | CSS-first; tokens and themes in `src/styles/app.css`. It imports `admin.css`; **`hq.css` is loaded by `AdminLayout` instead** (see §9) |
 | Fonts | **Astro Fonts API** | self-hosted Newsreader + Atkinson Hyperlegible |
 | Icons | **astro-icon + Phosphor** | only used icons bundled |
+| Images | **Vercel Image Optimization** | `<Image>` over Supabase-hosted originals; AVIF/WebP + per-breakpoint widths. Supabase's own transform endpoint is a paid add-on and is **off** — see the width allowlist and `domains` warnings in `astro.config.mjs` |
 | Database | **Supabase (Postgres)** | single source of truth for all content |
 | Auth | **Supabase Auth** | single admin; **Google OAuth only**; native RLS ([`auth.md`](auth.md)) |
 | Hosting | **Vercel** | adapter provides SSR + on-demand revalidation (ISR) |
