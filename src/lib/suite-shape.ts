@@ -16,6 +16,33 @@
 // and only on a constellation someone had edited without reloading.
 
 /**
+ * What publishing this constellation would actually put in front of a stranger.
+ *
+ * ⚠ THE ONE THING THE COMPOSER COULD NOT SEE. A suite holds drafts — the Read
+ * view shows them on purpose — but `getConstellation` is published-only, so a
+ * six-piece composition with four drafts in it is a two-piece page to everyone
+ * who isn't Michael. /admin/constellations has always known this ("6 placed ·
+ * 3 public"); the room where you actually press publish did not, and the gap
+ * was widest in the case that matters most: every piece a draft, and a live
+ * page with nothing on it.
+ *
+ * Phrased as "a reader WOULD see", not "the public page shows", because this
+ * line has to be true while the constellation is still a draft too — where the
+ * count is a forecast rather than a fact.
+ *
+ * Empty in, empty out: an unplaced constellation has its own empty state
+ * saying so, and a suite with nothing to warn about should say nothing at all.
+ * Instruments, never police — same contract as the hints below.
+ */
+export function publicShapeHint(placed: number, drafts: number): string {
+  if (placed === 0 || drafts === 0) return '';
+  const shown = placed - drafts;
+  return shown === 0
+    ? `Every one of the ${placed} placed is a draft — a reader would find this page empty.`
+    : `${drafts} of the ${placed} placed ${drafts === 1 ? 'is a draft' : 'are drafts'} — a reader would see ${shown}.`;
+}
+
+/**
  * What the suite's size and subject spread are worth noticing, said in words.
  *
  * These are INSTRUMENTS, never police: an empty string means "nothing to say",

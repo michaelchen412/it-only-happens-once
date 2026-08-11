@@ -31,10 +31,10 @@ import Reader from '../../../components/Reader.astro';
 import PostArticle from '../../../components/PostArticle.astro';
 import SuiteStanza from '../../../components/SuiteStanza.astro';
 import { FRAGMENT_TYPES, TYPE_META, type FragmentType } from '../../../lib/fragments-display';
-import { excerpt, readingMinutes } from '../../../lib/markdown';
+import { excerpt, readingMinutes, renderMarkdown, toPlainText } from '../../../lib/markdown';
 import type { SuiteItem } from '../../../lib/constellations';
 import { revealOf } from '../../../lib/provenance';
-import { suiteHints } from '../../../lib/suite-shape';
+import { publicShapeHint, suiteHints } from '../../../lib/suite-shape';
 import type { SubjectRef } from '../../../lib/blog';
 import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
 import { allFragmentPeople } from '../../../lib/hq/links';
@@ -233,8 +233,24 @@ const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
 const mix = { writing: 0, quote: 0, song: 0 } as Record<FragmentType, number>;
 for (const s of suite) mix[s.type]++;
 const { size: sizeHint, spread: spreadHint } = suiteHints(placedCount, subjectSpread);
+// A NOTE COUNTS AS A DRAFT HERE, because the only question this asks is "would
+// a stranger get this one" — and `getConstellation` filters to published, so
+// anything else is invisible out there whatever it is called in the workshop.
+const draftCount = suite.filter((s) => s.status !== 'published').length;
+const publicShape = publicShapeHint(placedCount, draftCount);
 
 const subjectNames = (subjectRows ?? []).map((s) => s.name);
+
+// The two sentences under the visibility switch, defined ONCE and handed to
+// the script through `data-on` / `data-off` on the hint itself. The script has
+// to repaint this line as the switch moves, and a second copy of the wording
+// over there is the same silent drift `lib/suite-shape.ts` exists to prevent —
+// the caption would simply stop agreeing with the control above it, and only
+// after a click.
+const VIS_HINT = {
+  on: 'Live in the sky, and public at its own URL.',
+  off: 'Visible only to you — Preview still opens it.',
+};
 ---
 
 <AdminLayout title={c.name} active="constellations">
@@ -249,6 +265,20 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
         <div slot="title" class:list={['flex items-center gap-3', `cn-${c.color}`]}>
           <span id="cc-star" class="text-xl leading-none" style="color: var(--cn)"><StarMark /></span>
           <input name="name" required value={c.name} aria-label="Constellation name" class="admin-title-input" />
+          {
+            /* The same chip every constellation wears on /admin/constellations,
+              so the two rooms agree about what a draft looks like — and so the
+              answer to "is this one live?" is at the TOP of a page whose
+              settings card can be a scroll away on a narrow screen.
+
+              ⚠ IT MIRRORS THE SWITCH, NOT THE DATABASE. The alternative reading
+              is defensible — chip = what is live now, switch = what you are
+              asking for — and it was rejected because two indicators of one
+              state that legitimately disagree is indistinguishable from a bug
+              at a glance. One state on screen, and the line under the switch is
+              what says the state isn't saved yet. */
+          }
+          <StatusChip status={c.status} class="cc-chip shrink-0" />
         </div>
         <Fragment slot="actions">
           <span id="cc-saved" hidden class="text-success font-sans text-xs">saved</span>
@@ -280,8 +310,83 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
             </div>
             <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
           </div>
+          {
+            /* ⚠ A SWITCH, NOT A SELECT (2026-08-11, Michael's call), AND IT SITS
+              SECOND — beside the URL, because those two are the whole of "how a
+              stranger meets this constellation". The colour hint below is a
+              sentence, not a control, so it is the one that can take the odd
+              cell at the end of the row.
+
+              WHY A SWITCH. The states are two and they are opposites; a select
+              made you open a menu to learn that, and then made publishing cost
+              three interactions (open, read two lines, pick) where the same
+              decision on /admin/constellations costs one click of a button that
+              says Publish. It also put the current state behind the same menu —
+              a closed select reads as a field you might have to fill in, where a
+              switch reads as a state that is already on or off.
+
+              ⚠ THE CHECKBOX *IS* THE FIELD — there is no hidden mirror of it.
+              Unchecked, a checkbox submits NOTHING, and `constellationStatus`
+              (src/actions/_shared.ts) is `.default('draft')`, so an absent
+              `status` means draft by construction. The alternative — a hidden
+              input kept in step by the script — needs code to hold two copies in
+              agreement and can therefore drift; this way the DOM holds one truth
+              and FormData reads it off directly.
+
+              ⚠ AND IT STAYS FORM-BOUND rather than committing on flip like the
+              Publish button on /admin/constellations. In there the click is the
+              entire gesture and there is no Save to disagree with; in here the
+              switch sits in a card with four other fields under one Save, and a
+              control that wrote itself through while its neighbours waited would
+              make "have I saved?" unanswerable by looking at the page. The cost
+              is that the switch can show a state the database doesn't have yet —
+              which is exactly what the line beneath it says, in words, until you
+              press Save (see constellation-composer.ts). */
+          }
           <div>
-            <label class="admin-label">Star colour</label>
+            <label class="admin-label" for="cc-status">Visibility</label>
+            <div class="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="cc-status"
+                name="status"
+                value="published"
+                checked={c.status === 'published'}
+                class="toggle toggle-sm toggle-primary"
+                aria-describedby="cc-status-hint"
+              />
+              <label id="cc-status-word" for="cc-status" class="cursor-pointer font-sans text-sm">
+                {c.status === 'published' ? 'Published' : 'Draft'}
+              </label>
+            </div>
+            <p id="cc-status-hint" class="admin-hint mt-1.5" data-on={VIS_HINT.on} data-off={VIS_HINT.off}>
+              {c.status === 'published' ? VIS_HINT.on : VIS_HINT.off}
+            </p>
+            {
+              /* ⚠ THE PUBLISH PREFLIGHT, AND IT LIVES HERE RATHER THAN WITH THE
+                SUITE (2026-08-11). The arithmetic is the suite's — how many of
+                the placed pieces are drafts — but the DECISION it informs is
+                made at the switch two inches above, and the suite's own hint
+                line is four hundred pixels down the page. A warning you have to
+                scroll to before you can act on it is a warning you meet
+                afterwards.
+
+                It is deliberately NOT also shown down there: one number in two
+                places is one number that can disagree with itself.
+
+                Same contract as every other instrument in this room (see
+                PublishDialog's preflight): a sentence, off-band, never red, and
+                nothing about it can stop you publishing. */
+            }
+            <p id="cc-public-shape" class="admin-hint mt-1" hidden={!publicShape}>{publicShape}</p>
+          </div>
+          <div>
+            {
+              /* A <span>, not a <label>: there is no control in this cell to label
+                (see the note below), and a <label for> nothing is a promise to
+                assistive technology that the markup can't keep. */
+            }
+            <span class="admin-label">Star colour</span>
             {
               /* ⚠ THE CONTROL IS DELIBERATELY NOT HERE (docs/plans/16 · Piece 3).
                 Eight swatches used to sit in this card. They were moved to
@@ -316,35 +421,100 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
               </span>
             </p>
           </div>
-          <div>
-            <label class="admin-label" for="cc-status">Visibility</label>
-            <select id="cc-status" name="status" class="select select-sm select-bordered w-full font-sans">
-              <option value="draft" selected={c.status === 'draft'}>Draft — visible only to you</option>
-              <option value="published" selected={c.status === 'published'}>Published — live in the sky</option>
-            </select>
-          </div>
         </div>
 
+        {
+          /* ⚠ THE DESCRIPTION IS MARKDOWN NOW (2026-08-11, Michael's call:
+            "sometimes important to have bold, italics in there as well"), and
+            this is a `<textarea>` no longer.
+
+            IT IS THE SAME MINI EDITOR the quote body and the song notes use
+            (`mountMiniEditor` — bold and italic, no headings, lists or rules),
+            for the reason that function's own comment gives: that is the
+            register of a sentence or three, and the composer's full toolbar
+            would be noise. Raw Markdown in a textarea was the cheaper option
+            and it loses on precedent — ADR 0006 chose WYSIWYG-storing-Markdown
+            for essays and ADR 0018 retired "plain textarea, ever" for notes.
+            Asking Michael to type asterisks in the one room those two rulings
+            hadn't reached would make this field the odd one out.
+
+            IT COSTS NOTHING TO SHIP. TipTap is already in this page's bundle —
+            FragmentSheet and WritingSheet are both mounted below.
+
+            ⚠ THE VALUE TRAVELS IN A HIDDEN INPUT. A contenteditable is not a
+            form control, so `new FormData(form)` cannot see it; the script
+            writes the serialized Markdown into `#cc-desc-value` on every
+            keystroke, and that is what `constellations.save` receives. The same
+            handler is what arms Save, because a contenteditable fires no
+            `input` event the form can hear either.
+
+            (This is the FOURTH copy of the toolbar+surface markup — SongSheet
+            has two and FragmentSheet one. A `MiniEditor.astro` is the obvious
+            next move and is deliberately not being made in this change: two of
+            those three files were open and unsaved in Michael's editor while
+            this was written.) */
+        }
         <div class="mt-5">
-          <label class="admin-label" for="cc-description">Description</label>
-          <textarea
-            id="cc-description"
-            name="description"
-            rows="3"
-            class="textarea textarea-bordered w-full font-serif leading-relaxed"
-            placeholder="Why this way of seeing exists — what truth it tells, how it relates to who you are."
-            >{c.description}</textarea
-          >
+          <span class="admin-label">Description</span>
+          <div id="cc-desc-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
+            <div
+              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
+              role="toolbar"
+              aria-label="Formatting"
+            >
+              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
+                ><b>B</b></button
+              >
+              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+                ><i>I</i></button
+              >
+            </div>
+            <div id="cc-desc" class="max-h-[30vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
+          </div>
+          <input type="hidden" id="cc-desc-value" name="description" value={c.description ?? ''} />
           <p class="admin-hint mt-1.5">Shown under the name on the home overview, and again as the suite's epigraph.</p>
         </div>
 
         <div class="mt-5">
-          <label class="admin-label" for="cc-score"
-            >The score <span class="normal-case opacity-70">— optional</span></label
-          >
+          <div class="flex items-baseline justify-between gap-3">
+            <label class="admin-label" for="cc-score"
+              >The score <span class="normal-case opacity-70">— optional</span></label
+            >
+            {
+              /* THE ONLY FIELD ON THIS CARD YOU CANNOT CHECK BY READING IT. A
+                name, a slug and a description are their own proof; a playlist
+                URL is 60 characters of opaque id, and the only way to find out
+                it was the wrong playlist used to be to publish the page and
+                press play. One click, no navigation away from the composer.
+
+                It follows the input LIVE rather than the saved value, because
+                the moment you want it is the moment you have just pasted
+                something — and it is `hidden` rather than disabled when empty,
+                since the normal case for this field is nothing at all. */
+            }
+            <a
+              id="cc-score-open"
+              href={c.score_url ?? '#'}
+              target="_blank"
+              rel="noreferrer"
+              hidden={!c.score_url}
+              class="admin-hint hover:text-primary inline-flex items-center gap-1 underline"
+            >
+              Open <Icon name="ph:arrow-up-right" />
+            </a>
+          </div>
+          {
+            /* `type="url"` says the same thing the action says (it runs the value
+              through `new URL()`), one round trip earlier. The two agree on the
+              hard part: both require a scheme, so `open.spotify.com/…` is
+              refused in the browser exactly as it would have been refused on the
+              server, rather than the field being laxer than the thing it feeds. */
+          }
           <input
             id="cc-score"
             name="score_url"
+            type="url"
+            inputmode="url"
             value={c.score_url}
             placeholder="https://open.spotify.com/playlist/…"
             class="input input-sm input-bordered w-full font-sans"
@@ -423,13 +593,18 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
           /* `data-subjects` rides on every row because the subject-spread badge
             is recomputed in the browser after an unplace — the row that leaves
             takes its subjects with it, and the union of what remains can only be
-            read off the rows. Pipe-joined: a subject name may contain a comma. */
+            read off the rows. Pipe-joined: a subject name may contain a comma.
+            `data-status` is there for the same reason and for the preflight line
+            up beside the switch: unplacing the one draft in a suite has to be
+            able to take the sentence about drafts with it. (The chip beside the
+            title only renders for a draft, so it can't be counted instead.) */
           suite.map((s, i) => (
             <li
               class="suite-row group flex items-center gap-3 px-3 py-2.5"
               draggable="true"
               data-fid={s.id}
               data-type={s.type}
+              data-status={s.status}
               data-subjects={s.subjects.join('|')}
               data-fragment={s.editorData}
               data-writing={s.type === 'writing' ? s.id : undefined}
@@ -517,9 +692,13 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
       <div id="suite-read" class:list={['mt-8', `cn-${c.color}`]} hidden>
         {
           c.description && (
-            <p class="prose-measure border-base-300 text-base-content/55 border-l pl-5 text-lg italic">
-              {c.description}
-            </p>
+            /* Verbatim ConstellationSuite's epigraph, Markdown and all — this
+               view exists to show what the reader gets, so the day it renders
+               `**` where the page renders bold is the day it stops doing that. */
+            <div
+              class="cn-desc prose-measure border-base-300 text-base-content/55 border-l pl-5 text-lg italic"
+              set:html={renderMarkdown(c.description)}
+            />
           )
         }
         <div id="suite-read-list" class="mt-10 flex flex-col gap-14">
@@ -589,10 +768,16 @@ const subjectNames = (subjectRows ?? []).map((s) => s.name);
     sharedBy={sharedBy}
   />
   <WritingSheet subjects={subjectNames} constellations={allConstellations ?? []} />
+  {
+    /* Flattened here rather than in the drawer: that header is one clamped line
+      and a `title` tooltip, both of which want words and neither of which can
+      render a mark. (Its live counterpart does the same with `stripMarkdown`,
+      in fragment-browser.ts — the browser-safe half of the same job.) */
+  }
   <FragmentBrowser
     constellation={c.id}
     constellationName={c.name}
-    constellationDescription={c.description}
+    constellationDescription={toPlainText(c.description)}
     constellationColor={c.color}
   />
 </AdminLayout>

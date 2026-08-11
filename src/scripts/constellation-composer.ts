@@ -1,7 +1,7 @@
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
 import { callAction, formatActionError } from './action-error';
-import { suiteHints } from '../lib/suite-shape';
+import { publicShapeHint, suiteHints } from '../lib/suite-shape';
 // ⚠ THE LIST, NOT A SIXTH COPY OF IT (plans/29 · §3, which counted four and
 // missed this one and the composer page's). Iterating `FRAGMENT_TYPES` also
 // retires the `as FragmentType` this loop used to need — the cast existed only
@@ -10,6 +10,7 @@ import { FRAGMENT_TYPES, typeCountLabel } from '../lib/fragments-display';
 import { announceSkyChange } from './sky-changed';
 import { onFragmentsChanged } from './fragments-changed';
 import { wireListReorder } from './list-reorder';
+import { mountMiniEditor } from './rich-editor';
 
 const root = document.getElementById('ccomposer')!;
 const cid = root.dataset.id!;
@@ -47,6 +48,105 @@ const setDirty = () => {
 };
 form.addEventListener('input', setDirty);
 form.addEventListener('change', setDirty);
+// ── visibility: a switch, and a caption that can't lie about it ────
+// The switch saves with the rest of the card rather than on flip (the markup
+// says why), so between the flip and the Save it is showing a state the
+// database does not have. That gap is unavoidable given the shape; what is
+// avoidable is being silent about it, so the line under the switch stops
+// describing the constellation and starts describing what Save would do.
+//
+// Written as ONE painter over `savedStatus` rather than as a `dirty` branch:
+// flipping it back to where it started is the case a naive "changed → warn"
+// gets wrong, and the only thing that can tell you it's back is a comparison
+// against the server's value.
+const statusBox = document.getElementById('cc-status') as HTMLInputElement;
+const statusWord = document.getElementById('cc-status-word')!;
+const statusHint = document.getElementById('cc-status-hint')!;
+const titleChip = document.querySelector<HTMLElement>('.cc-chip')!;
+// The two settled sentences are authored ONCE, in the page, and ride here on
+// the hint's own dataset — a second copy in this file would drift silently and
+// only after a click (the same reason `lib/suite-shape.ts` exists).
+const settledHint = { on: statusHint.dataset.on!, off: statusHint.dataset.off! };
+let savedStatus = statusBox.checked;
+
+function paintStatus() {
+  const on = statusBox.checked;
+  statusWord.textContent = on ? 'Published' : 'Draft';
+  statusHint.textContent =
+    on === savedStatus
+      ? on
+        ? settledHint.on
+        : settledHint.off
+      : on
+        ? 'It joins the sky when you press Save.'
+        : 'It leaves the sky when you press Save.';
+  // The chip beside the page title follows the switch (the markup says why it
+  // isn't allowed to disagree with it). ⚠ Toggle the two variant classes rather
+  // than rewriting `className` — `cc-chip` is how this script finds the element
+  // at all, and `admin-chip` is the whole of its shape.
+  titleChip.textContent = on ? 'published' : 'draft';
+  titleChip.classList.toggle('admin-chip--on', on);
+  titleChip.classList.toggle('admin-chip--off', !on);
+}
+statusBox.addEventListener('change', paintStatus);
+
+// ── the description: rich, and carried by a hidden field ───────────
+// A contenteditable is invisible to `new FormData(form)` and fires no `input`
+// event the form can hear, so the editor owns BOTH jobs on every keystroke:
+// serialize into the field the action reads, and arm Save. Anything less and
+// the page looks perfectly correct while saving the description you had before.
+const descValue = document.getElementById('cc-desc-value') as HTMLInputElement;
+const desc = mountMiniEditor({
+  editorEl: document.getElementById('cc-desc')!,
+  toolbarRoot: document.getElementById('cc-desc-wrap')!,
+  placeholder: 'Why this way of seeing exists — what truth it tells, how it relates to who you are.',
+  ariaLabel: 'Description',
+  onChange: () => {
+    descValue.value = desc.getMarkdown();
+    setDirty();
+  },
+});
+// ⚠ `emitUpdate: false`, the same trap every other editor in this admin names:
+// TipTap v3 fires `update` from `setContent`, which would arm Save and the
+// unload guard on a page nobody has touched yet.
+desc.editor.commands.setContent(descValue.value, { emitUpdate: false });
+
+// ── the score: one click to hear whether it's the right playlist ───
+// Live off the input rather than off the saved value — the moment you want
+// this is the moment you have just pasted something.
+const scoreField = document.getElementById('cc-score') as HTMLInputElement;
+const scoreOpen = document.getElementById('cc-score-open') as HTMLAnchorElement;
+scoreField.addEventListener('input', () => {
+  const v = scoreField.value.trim();
+  // ⚠ http/https ONLY, and this is not paranoia about a field only Michael can
+  // reach. `type="url"` happily accepts `javascript:…`, and this is the one
+  // place on the page where a field's value becomes an `href` you then click —
+  // which would run it in the admin's own origin, session and all.
+  const ok = /^https?:\/\//i.test(v);
+  scoreOpen.hidden = !ok;
+  if (ok) scoreOpen.href = v;
+});
+
+// ── ⌘S / Ctrl+S ────────────────────────────────────────────────────
+// The header does not stick on desktop, so once you are down in the suite the
+// Save button is off-screen and the only way back to it is a scroll. This is
+// the first keyboard save in the admin (capture.ts has ⌘↵ for a different
+// gesture — commit and close), so it is setting a convention rather than
+// following one.
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's' || e.altKey) return;
+  // ⚠ NOT WHILE A SHEET IS OPEN. The fragment and writing editors are <dialog>s
+  // over this page, and they have their own save. Letting ⌘S through would save
+  // the CONSTELLATION BEHIND the piece you are looking at — the right feedback
+  // ("saved") for the wrong document, which is worse than doing nothing.
+  if (document.querySelector('dialog[open]')) return;
+  // Swallowed either way: on an editing surface, the browser's Save-page dialog
+  // is never what ⌘S meant, and offering it on a clean form would teach you to
+  // expect it.
+  e.preventDefault();
+  if (dirty) form.requestSubmit();
+});
+
 window.addEventListener('beforeunload', (e) => {
   if (dirty) {
     // `preventDefault()` alone triggers the prompt; the legacy `returnValue`
@@ -65,6 +165,10 @@ form.addEventListener('submit', async (e) => {
   }
   errBox.hidden = true;
   dirty = false;
+  // The switch is now what the database says, so its caption goes back to
+  // describing the constellation instead of the pending change.
+  savedStatus = statusBox.checked;
+  paintStatus();
   if (data?.slug) {
     root.dataset.slug = data.slug;
     (document.getElementById('cc-slug') as HTMLInputElement).value = data.slug;
@@ -81,7 +185,9 @@ form.addEventListener('submit', async (e) => {
     // No `color` — this form stopped asking for one (docs/plans/16 · Piece 3),
     // so it has nothing to announce about it. `SkyConstellation.color` is
     // optional precisely for this: listeners repaint colour only when told.
-    description: (form.elements.namedItem('description') as HTMLTextAreaElement).value.trim() || null,
+    // Markdown, since 2026-08-11 — `sky:changed` carries the stored value and
+    // each listener decides how to show it (the browser drawer strips it).
+    description: descValue.value.trim() || null,
   });
   savedFlash.hidden = false;
   setTimeout(() => (savedFlash.hidden = true), 1600);
@@ -116,6 +222,9 @@ const statsBar = document.getElementById('suite-stats')!;
 const spreadStat = document.getElementById('suite-spread')!;
 const placedStat = document.getElementById('suite-placed')!;
 const hintLine = document.getElementById('suite-hints')!;
+// Up beside the visibility switch, not down here — but it counts rows, so it
+// is repainted by the same pass that repaints the badges.
+const publicShapeLine = document.getElementById('cc-public-shape')!;
 
 const suiteRows = () => [...rows.querySelectorAll<HTMLElement>('li[data-fid]')];
 
@@ -164,9 +273,14 @@ function refreshSuiteStats() {
 
   const mix: Record<string, number> = { writing: 0, quote: 0, song: 0 };
   const subjects = new Set<string>();
+  let drafts = 0;
   for (const li of items) {
     mix[li.dataset.type ?? ''] = (mix[li.dataset.type ?? ''] ?? 0) + 1;
     for (const s of (li.dataset.subjects ?? '').split('|').filter(Boolean)) subjects.add(s);
+    // Anything not published is invisible to a reader, notes included — the
+    // page frontmatter counts it the same way, and `publicShapeHint` is shared
+    // so the sentence can't drift between the two.
+    if (li.dataset.status !== 'published') drafts++;
   }
 
   for (const t of FRAGMENT_TYPES) {
@@ -186,6 +300,10 @@ function refreshSuiteStats() {
   placedStat.title = size;
   hintLine.textContent = [size, spread].filter(Boolean).join(' · ');
   hintLine.hidden = !(size || spread);
+
+  const shape = publicShapeHint(placed, drafts);
+  publicShapeLine.textContent = shape;
+  publicShapeLine.hidden = !shape;
 
   // An empty suite has no sequence to look at, so the Compose/Read toggle
   // goes with it rather than sitting there offering two views of nothing.
