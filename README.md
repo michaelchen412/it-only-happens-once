@@ -55,3 +55,19 @@ to stop repeating.
 A few documents are referenced from `docs/` and are **not in this repository**
 (`vision.md`, `design.md`, `about-michael.md`). They are personal working files
 and are git-ignored on purpose.
+
+## Licence
+
+Two, because this repository holds two different kinds of work:
+
+- **The software** — `src/`, `scripts/`, `supabase/`, `tests/`, and the root
+  config — is **MIT**. See [`LICENSE`](LICENSE).
+- **The writing** — `docs/` (including every ADR), this file, and the site's
+  written content — is **CC BY-NC-ND 4.0**. See [`LICENSE-docs`](LICENSE-docs).
+
+GitHub shows one licence per repository and it reads `LICENSE`, so the sidebar
+says *MIT* — true of the code, and silent about the prose, which is why the
+split is said out loud here as well.
+
+The essays and quotes themselves live in a database rather than in this
+repository, and are not licensed by either file.

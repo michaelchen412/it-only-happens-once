@@ -1,0 +1,44 @@
+This repository is covered by TWO licences, because it contains two different
+kinds of work.
+
+  * THE SOFTWARE — everything in `src/`, `scripts/`, `supabase/`, `tests/`, and
+    the configuration files at the repository root — is licensed under the MIT
+    License, reproduced in full below.
+
+  * THE WRITING — everything in `docs/`, this repository's `README.md`, and the
+    written content of the site itself — is licensed under Creative Commons
+    Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0).
+    See LICENSE-docs.
+
+GitHub displays only one licence per repository, and it reads this file. "MIT"
+in the sidebar is therefore correct about the code and silent about the prose,
+which is why the split is stated here, at the top, rather than left to be
+discovered.
+
+The essays, quotes and other content published on itonlyhappensonce.blog are not
+stored in this repository; they are held in a database and are not licensed by
+either file. All rights to them are reserved.
+
+================================================================================
+
+MIT License
+
+Copyright (c) 2026 Michael Chen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

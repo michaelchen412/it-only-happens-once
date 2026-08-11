@@ -1,0 +1,59 @@
+Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
+(CC BY-NC-ND 4.0)
+
+Copyright (c) 2026 Michael Chen
+
+WHAT THIS COVERS
+----------------
+
+The written work in this repository:
+
+  * everything in `docs/` — the architecture, data-model, auth, admin, search
+    and backup documents, and every Architecture Decision Record in `docs/adr/`;
+  * this repository's `README.md`;
+  * the written content of the site at itonlyhappensonce.blog.
+
+The SOFTWARE in this repository is licensed separately, under the MIT License.
+See LICENSE.
+
+WHY THIS IS SEPARATE FROM THE CODE
+----------------------------------
+
+The documents above are not API reference. They are argued prose in a particular
+voice — the ADRs record what was considered and rejected, and why — and they are
+the author's writing in the same sense the essays are. Licensing them under MIT
+along with the code would grant anyone the right to modify that reasoning and
+republish it under their own name with the attribution removed. That is not the
+intent, and it would not have been noticed until it happened.
+
+`NoDerivatives` is the load-bearing term here: it permits sharing the work
+whole, with credit, and withholds the right to circulate an altered version of
+it. `NonCommercial` is secondary and is present because there is no upside to
+its absence.
+
+Reading, quoting, linking to and learning from any of it is welcome and always
+was. If you want to do something this licence does not permit, ask.
+
+THE LICENCE
+-----------
+
+The full legal text of CC BY-NC-ND 4.0 is at:
+
+    https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+A plain-language summary is at:
+
+    https://creativecommons.org/licenses/by-nc-nd/4.0/
+
+In summary, you are free to share — copy and redistribute the material in any
+medium or format — provided that:
+
+  * ATTRIBUTION — you give appropriate credit, provide a link to the licence,
+    and indicate if changes were made;
+  * NONCOMMERCIAL — you do not use the material for commercial purposes;
+  * NODERIVATIVES — if you remix, transform, or build upon the material, you
+    may not distribute the modified material.
+
+No warranties are given. The licence may not give you all of the permissions
+necessary for your intended use — for example, other rights such as publicity,
+privacy, or moral rights may limit how you use the material.
