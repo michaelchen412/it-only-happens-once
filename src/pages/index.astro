@@ -67,7 +67,35 @@ const INDENTS = ['', 'sm:pl-16', 'sm:pl-32'];
 const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
 ---
 
-<SiteLayout description="A walkable self-portrait — constellations of writing, quotes, and music." active="home">
+{
+  /* ⚠ THIS SENTENCE IS THE ENTIRE LINK PREVIEW, not just an SEO string. It
+    reaches `<meta name="description">` AND `og:description` (Base → Social), and
+    since this page passes no `image`, Social requests the small `summary` card —
+    so in iMessage or Slack there is no picture to carry any of the meaning.
+
+    ⚠ IT WAS "A walkable self-portrait — constellations of writing, quotes, and
+    music." until 2026-08-11, and the fault was vocabulary: "walkable
+    self-portrait" is vision.md §1's north star, written for the builder. It is
+    the same mistake the sr-only h1 forty lines down already refuses — "Sky" is
+    internal, "Constellations" is public — applied one attribute higher up.
+
+    Two things here are load-bearing and must survive any rewrite. **"an
+    attempt"** is the hedge, and the hedge is the voice: /about says "an attempt
+    to distill…" and "I *hope* would help us make sense", so the confident
+    version of this sentence ("Distilling the human condition") is the same claim
+    with the humility removed, meeting a stranger as someone who thinks he solved
+    it. **"us"** is /about's own instinct — "help *us* make sense", "the world
+    *we* seek to make" — and makes the sentence an invitation, not a pitch.
+
+    The concrete nouns lead because a preview is judged in the half-second before
+    the abstraction is read; the large phrase lands last, where it reframes them.
+    Plain "what it is to be human" over "the human condition" on purpose: the
+    latter is book-jacket register and differentiates from nobody. */
+}
+<SiteLayout
+  description="Writing, quotes, and music, sorted into constellations—an attempt to help us make sense of what it is to be human."
+  active="home"
+>
   <section class="mx-auto flex min-h-[80vh] max-w-4xl flex-col justify-center px-5 py-20 sm:px-8">
     {
       /* The page's name, for a screen reader and a crawler only. This room had
