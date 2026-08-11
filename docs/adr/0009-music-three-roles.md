@@ -1,7 +1,17 @@
 # 0009 — Music in three roles; a song fragment carries its own voice
 
-Status: Accepted
+Status: **Accepted — the third role (the annotated song fragment, and `body` as
+its "why") superseded by
+[ADR 0031](0031-a-song-carries-a-feeling-not-an-idea.md)** *(2026-08-11)*
 Date: 2026-07-25
+
+> ⚠ **Read 0031 before trusting the "Decision" section below.** The **score** and
+> the **paired song** — roles 1 and 2 — stand exactly as written, and so does the
+> external-constraints analysis that produced them. What is superseded is the
+> third role: one song in seventeen days used the voice this ADR gave it, and the
+> sentence it used it for was a *note*, not a *why*. A song is now filed by
+> **feeling**, and the answer to the playlist objection below is placement rather
+> than annotation.
 
 ## Context
 
