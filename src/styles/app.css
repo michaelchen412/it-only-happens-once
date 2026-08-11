@@ -222,6 +222,46 @@
 }
 
 /* ---------------------------------------------------------------------------
+   THE 16px FLOOR — no field on a touch device is ever smaller, and it is not
+   a taste decision.
+
+   WebKit (so Safari AND Chrome on iOS, which is Safari) zooms the page in when
+   you focus a text control whose computed font-size is under 16px, and it only
+   zooms back out when that control BLURS. Every field on this site was under
+   the line — the blog's rail search is `text-sm` (14px), daisyUI's `.input-sm`
+   is 14px, `.input-xs` is 12px — so on a phone, tapping any of them magnified
+   the page. Reported on the blog search, where it is worst: the Search key on
+   the keyboard neither blurs the field nor navigates (the submit is prevented
+   — see `scripts/blog-feed.ts`), so the reader is left staring at a zoomed page
+   with no obvious way back. Raising the floor means the zoom never happens at
+   all, which is the fix; blurring after would only be the apology.
+
+   ⚠ UNLAYERED, AND AT ELEMENT SPECIFICITY — both halves are load-bearing.
+   Unlayered beats every @layer, so this wins over Tailwind's `text-sm` and
+   daisyUI's `.input-*` sizes without an `!important` anywhere. Element
+   specificity (0,0,1) then means any deliberate size written as a CLASS in this
+   file or in admin.css still wins — `.admin-title-input` stays 1.5rem, because
+   a field that is already above the line has nothing to be saved from.
+
+   ⚠ NOT `maximum-scale=1` on the viewport meta, which is the answer the web
+   will give you. It "fixes" this by taking pinch-zoom away from everyone,
+   permanently, on a site whose whole argument is long-form reading. A reader
+   who needs to magnify a paragraph is exactly the reader we would be breaking.
+
+   `max(1rem, 1em)` rather than a flat 16px: `1em` is the PARENT's size, so a
+   control that inherits larger type (a field inside `.reading`) keeps it, and
+   nothing here can ever shrink a control — this rule only raises.
+   ------------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  [contenteditable] {
+    font-size: max(1rem, 1em);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    CONSTELLATION COLOURS — the sky's own ramp.
 
    Each constellation carries a colour so you can tell one from another at a

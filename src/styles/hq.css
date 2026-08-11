@@ -3354,3 +3354,38 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .kindbar__switch:hover {
   color: var(--color-base-content);
 }
+
+/* ---------------------------------------------------------------------------
+   THE 16px FLOOR, the workshop's half — the reasoning lives in app.css, above
+   the site-wide rule. Short version: WebKit magnifies the page when you focus a
+   control under 16px and only lets go on blur, so on a phone every field in
+   here used to zoom the room.
+
+   ⚠ RESTATED SELECTORS, DELIBERATELY, and this is the whole trick. The
+   site-wide floor is written at element specificity (`input`, `textarea`) so
+   that any deliberate size expressed as a CLASS still wins — which is exactly
+   right for `.admin-title-input`, and exactly wrong for the seven rules below,
+   every one of which is class-scoped and UNDER the line. Repeating each
+   selector verbatim ties the specificity and lets source order decide, so no
+   rule here needs `!important` and none of them had to change what they say on
+   a desktop. Add a field rule under 1rem anywhere in this file and it belongs
+   in this list too.
+
+   Flat `1rem` rather than app.css's `max(1rem, 1em)`: these seven are known
+   quantities sitting just below the line, and raising them EXACTLY to it keeps
+   the workshop's proportions. The site-wide rule has to guard controls it has
+   never seen, including ones inside `.reading`, so it can only ever raise.
+   ------------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  .times input,
+  .ck input[type='time'],
+  .ta,
+  .search input,
+  .f input,
+  .f select,
+  .f textarea,
+  .logbox textarea,
+  .pop__date input {
+    font-size: 1rem;
+  }
+}
