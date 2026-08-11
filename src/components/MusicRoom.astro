@@ -25,8 +25,10 @@
   door.
 */
 import { embedForUrl } from '../lib/media';
+import { renderMarkdown } from '../lib/markdown';
 import type { MusicRoom } from '../lib/blog';
 import { buildIndex, musicHref, toggleFeeling, wordStates, wordWeight } from '../lib/music-room';
+import Reveal from './Reveal.astro';
 
 interface Props {
   room: MusicRoom;
@@ -83,6 +85,9 @@ const payload = JSON.stringify({ vocabulary: index.vocabulary, songs: index.song
 const cards = room.songs.map((s) => ({
   ...s,
   embed: embedForUrl(s.url),
+  // Rendered here rather than in the card loop so an empty note is `''` and the
+  // control below is skipped by the same falsy check `Reveal` already makes.
+  noteHtml: s.note.trim() ? renderMarkdown(s.note) : '',
   inSet: selected.every((slug) => s.feelings.includes(slug)),
 }));
 
@@ -200,6 +205,44 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.08em] [font-variant:all
                     {index.vocabulary.find((w) => w.slug === slug)?.name ?? slug}
                   </a>
                 ))}
+                {/* ⚠ A DAGGER, AND IT IS TYPOGRAPHY RATHER THAN ICONOGRAPHY.
+                    `Reveal`'s own register — "the words themselves are the
+                    control, no glyph, nothing added to the line" — is
+                    unavailable here: a card has no prose to underline. The
+                    feelings are NAVIGATION (each one filters the room) and the
+                    pairing below opens the Reader, so hanging a popover off
+                    either would overload a link that already does something.
+
+                    So it needs a mark of its own, and † is the one this site can
+                    make: a footnote mark is exactly what a note on a song IS,
+                    design.md §3 says distinctiveness here is built from
+                    structure and type rather than iconography, and ✦ is
+                    reserved for the constellations so it could never be that.
+                    An ⓘ would have been the generic answer and the only piece
+                    of UI-kit iconography on a public page.
+
+                    AT THE END OF THIS LINE, NOT ON A THIRD ONE. A line of its
+                    own would make a thing that 47 songs in 48 do not have into
+                    the card's most structurally prominent element. The music is
+                    still the point.
+
+                    `wide`, because a note is prose of unknown length: that
+                    variant caps its own height and becomes a bottom sheet below
+                    640px, where a three-paragraph box would otherwise land
+                    across the player. And nothing renders at all when the note
+                    is empty — `Reveal` already does exactly that, which is the
+                    behaviour we want: a control that opens onto an empty box
+                    teaches you to stop pressing it. */}
+                {s.noteHtml && (
+                  <span class={`song-note text-base-content/30 hover:text-base-content/60 ${SMALLCAPS}`}>
+                    <Reveal wide label={`A note on ${s.title}`}>
+                      <span aria-hidden="true">†</span>
+                      <Fragment slot="content">
+                        <div class="reading" set:html={s.noteHtml} />
+                      </Fragment>
+                    </Reveal>
+                  </span>
+                )}
               </p>
 
               {/* THE BRIDGE (§6). Serif italic against the feelings' small caps,

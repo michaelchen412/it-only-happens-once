@@ -699,6 +699,18 @@ export interface RoomSong {
   url: string;
   /** Feeling slugs, in the vocabulary's own order. */
   feelings: string[];
+  /**
+   * The PUBLIC note — Markdown, and usually empty (ADR 0031).
+   *
+   * ⚠ NOT "why this one". That field asked for a justification and got filled
+   * once in seventeen days; a note asks for an observation. It renders behind a
+   * mark on the card and nowhere else — never above the player, which is the
+   * caption this site already removed once for saying what the embed says.
+   *
+   * The song's other note is private and is not in this type, or in this query,
+   * or reachable by the key this page is served with.
+   */
+  note: string;
   /** Usually one; two songs in the corpus carry two essays each. */
   paired: PairedEssay[];
 }
@@ -741,7 +753,7 @@ export async function listMusicRoom(supabase: DB): Promise<MusicRoom> {
     supabase.from('feelings').select('slug, name, sort').order('sort'),
     supabase
       .from('fragments')
-      .select('id, title, attribution, source_url, created_at, fragment_feelings(feelings(slug))')
+      .select('id, title, attribution, source_url, body, created_at, fragment_feelings(feelings(slug))')
       .eq('type', 'song')
       .eq('status', 'published')
       .is('deleted_at', null)
@@ -791,6 +803,7 @@ export async function listMusicRoom(supabase: DB): Promise<MusicRoom> {
       artist: s.attribution,
       url: s.source_url,
       feelings,
+      note: s.body ?? '',
       paired: bySong.get(s.id) ?? [],
     });
   }

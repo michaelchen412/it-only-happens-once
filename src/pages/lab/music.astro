@@ -525,6 +525,25 @@ const room: MusicRoomData = {
     artist,
     url,
     feelings: feelings.split(' '),
+    /*
+      ⚠ A NOTE ON EVERY FIFTH SONG, WHICH IS THE POINT OF PUTTING ONE HERE AT
+      ALL (ADR 0031). The `†` on a card is the one thing in this room whose
+      design question is still open — the mark, and whether the end of the
+      feelings line is where it belongs — and it cannot be judged on a single
+      example. A sparse scatter is also the honest density: the field is
+      expected to be empty on nearly every song, so a bench where every card
+      carries one would flatter a mark that will normally appear alone.
+
+      Two lengths, because they fail differently: a phrase fits under its
+      trigger, and a paragraph is what tests the height cap and the bottom-sheet
+      treatment below 640px.
+    */
+    note:
+      i % 5 !== 0
+        ? ''
+        : i % 10 === 0
+          ? 'The tune keeps arriving at the same four bars and refusing to resolve them.'
+          : 'Recorded in one take, apparently. You can hear the room — somebody shifts in a chair around the second chorus, and nobody stopped.\n\nIt is the take with the mistake in it, and it is the one they kept.',
     paired: PAIRED[title] ?? [],
   })),
 };
