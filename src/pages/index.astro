@@ -15,6 +15,7 @@
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { listConstellations } from '../lib/constellations';
+import { renderMarkdown } from '../lib/markdown';
 import StarBloom from '../components/StarBloom.astro';
 
 const supabase = Astro.locals.supabase;
@@ -136,11 +137,15 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
                   </h2>
                 </div>
                 {/* why this constellation exists — the same words that greet
-                    you as the epigraph inside, so the zoom carries meaning */}
+                    you as the epigraph inside, so the zoom carries meaning.
+                    Markdown since 2026-08-11 (bold/italic only, by what the
+                    composer's editor allows), so this is a <div> of rendered
+                    paragraphs rather than one <p> of text — see `.cn-desc`. */}
                 {c.description && (
-                  <p class="text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed">
-                    {c.description}
-                  </p>
+                  <div
+                    class="cn-desc text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed"
+                    set:html={renderMarkdown(c.description)}
+                  />
                 )}
                 {/* The invitation. It sits on its OWN line, aligned to the
                     description's ml-6, so it lands where your eye finishes

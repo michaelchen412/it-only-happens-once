@@ -187,6 +187,38 @@
   .prose-measure {
     max-width: 68ch;
   }
+
+  /* ── A constellation's description, rendered from Markdown ────────────────
+     It is authored in a bold/italic-only editor (the composer's settings card),
+     and it appears in two registers: 0.95rem on the home overview, italic and
+     text-lg as the suite's epigraph.
+
+     ⚠ IT DELIBERATELY DOES NOT WEAR `.reading`, which is the class every other
+     rendered-Markdown surface on this site wears. That class brings its own
+     font-size (1.15rem) and its own 1.4em paragraph rhythm — an ARTICLE's
+     typography — and it would overwrite both of the registers above with a
+     third one that belongs to neither. What is actually needed here is only
+     what Tailwind's preflight removes and Markdown assumes: space between
+     paragraphs, and a link you can see.
+     ------------------------------------------------------------------------ */
+  .cn-desc > p + p {
+    margin-top: 0.6em;
+  }
+  .cn-desc a {
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-underline-offset: 2px;
+  }
+  .cn-desc strong {
+    font-weight: 600;
+  }
+  /* …and where the whole line is ALREADY italic (the epigraph), emphasis has to
+     turn the other way. `*like this*` inside an italic paragraph is otherwise
+     perfectly invisible — the mark is applied and nothing on screen changes,
+     which reads as a broken editor rather than as a typographic fact. */
+  .cn-desc.italic em {
+    font-style: normal;
+  }
 }
 
 /* ---------------------------------------------------------------------------

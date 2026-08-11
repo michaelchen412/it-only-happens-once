@@ -278,6 +278,7 @@ import Label from '../../components/Label.astro';
 import { Icon } from 'astro-icon/components';
 import { attachNeighbourhoods, listSubjects, listWriting } from '../../lib/blog';
 import { listConstellations } from '../../lib/constellations';
+import { renderMarkdown } from '../../lib/markdown';
 
 if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
@@ -463,10 +464,14 @@ const SUBJECT_CAP = 8;
                     {c.name}
                   </h2>
                 </div>
+                {/* Rendered, not printed — this row exists to be judged against
+                    the real home page, and a bench showing `**` where the site
+                    shows bold is a bench lying about its own subject. */}
                 {c.description && (
-                  <p class="text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed">
-                    {c.description}
-                  </p>
+                  <div
+                    class="cn-desc text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed"
+                    set:html={renderMarkdown(c.description)}
+                  />
                 )}
                 <span class="sky-cta" aria-hidden="true">
                   <span class="sky-cta__word">Explore</span>

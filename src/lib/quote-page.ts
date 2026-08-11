@@ -14,6 +14,7 @@
 import type { createSupabaseServerClient } from './supabase';
 import type { QuoteItem } from './blog';
 import { revealOf } from './provenance';
+import { toPlainText } from './markdown';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -34,6 +35,13 @@ export interface QuoteNeighbour {
 export interface QuoteConstellation {
   name: string;
   slug: string;
+  /**
+   * ⚠ PLAIN WORDS, NOT THE STORED MARKDOWN. The column is Markdown as of
+   * 2026-08-11, and the only thing that reads this is the "where else this
+   * lives" popover, where it is a single truncated line under the name.
+   * Flattened at the source rather than at that call site, so the type says
+   * what it holds and a second reader can't inherit the marks by accident.
+   */
   description: string | null;
   /** The colour SLOT — app.css owns what each one looks like. */
   color: string;
@@ -270,7 +278,12 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
     // a second path to the same fact.
     if (!c || c.status !== 'published') continue;
     const list = byConstellation.get(row.fragment_id) ?? [];
-    list.push({ name: c.name, slug: c.slug, description: c.description, color: c.color ?? 'amber' });
+    list.push({
+      name: c.name,
+      slug: c.slug,
+      description: toPlainText(c.description) || null,
+      color: c.color ?? 'amber',
+    });
     byConstellation.set(row.fragment_id, list);
   }
 

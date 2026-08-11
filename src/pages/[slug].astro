@@ -11,6 +11,7 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import ConstellationSuite from '../components/ConstellationSuite.astro';
 import { getConstellation } from '../lib/constellations';
+import { toPlainText } from '../lib/markdown';
 
 const supabase = Astro.locals.supabase;
 const { slug = '' } = Astro.params;
@@ -46,9 +47,15 @@ if (constellation.status !== 'published') {
 }
 ---
 
+{
+  /* `toPlainText` on the description — it is Markdown (2026-08-11) and it lands
+    in <meta name="description"> and og:description. A search result or a link
+    preview reading "**wayfinding** — for yourself" is the marks outliving the
+    one surface that knows how to render them. */
+}
 <SiteLayout
   title={constellation.name}
-  description={constellation.description ?? undefined}
+  description={toPlainText(constellation.description) || undefined}
   active="home"
   backToTop={false}
 >

@@ -3,6 +3,7 @@ import { wireFragmentPanel, wireAddMenu, type PanelHandle } from './fragment-pan
 import { callAction, formatActionError } from './action-error';
 import './subject-filter'; // the fetched partial's <subject-filter> needs the definition
 import { starMarkHtml } from '../lib/star-mark';
+import { stripMarkdown } from '../lib/markdown-plain';
 import { openEditorFor } from './open-editor';
 import { onSkyChange } from './sky-changed';
 import { notifyFragmentsChanged, onFragmentsChanged } from './fragments-changed';
@@ -30,9 +31,16 @@ onSkyChange((c) => {
   if (c.color) ccolor = c.color;
   document.getElementById('fb-cname')!.textContent = c.name;
   const desc = document.getElementById('fb-cdesc')!;
-  desc.textContent = c.description ?? '';
-  desc.title = c.description ?? '';
-  desc.hidden = !c.description;
+  // ⚠ THE DESCRIPTION IS MARKDOWN (since 2026-08-11 — the composer's field is a
+  // rich editor now), and this header is one clamped line plus a `title`
+  // tooltip. Neither can render a mark, so the marks come off: `stripMarkdown`,
+  // not `lib/markdown.ts`, because that one carries `marked` + `sanitize-html`
+  // and this is a browser bundle. The server does the same at the call site
+  // with `toPlainText`; both arrive at words.
+  const words = stripMarkdown(c.description ?? '');
+  desc.textContent = words;
+  desc.title = words;
+  desc.hidden = !words;
 });
 const panelHost = document.getElementById('fb-panel')!;
 const errBox = document.getElementById('fb-error') as HTMLParagraphElement;

@@ -41,6 +41,8 @@
 
   `scope` namespaces the ids so the two editor sheets can each hold one.
 */
+import { toPlainText } from '../../lib/markdown';
+
 interface Props {
   scope: string;
   constellations: { id: string; name: string; slug: string; description?: string | null }[];
@@ -48,6 +50,18 @@ interface Props {
 }
 const { scope, constellations, class: className = '' } = Astro.props;
 const FILTER_THRESHOLD = 8; // below this, a filter field is just another control
+
+// ⚠ THE DESCRIPTION ARRIVES AS MARKDOWN (2026-08-11) and is flattened here, for
+// the row AND for what the filter searches. Two callers feed this component
+// from two different queries — one of which (`fragment-query.ts`) already
+// flattens, where this costs a function call and changes nothing — so the
+// component is the one place that covers both, and a third caller cannot
+// arrive holding marks. The filter matching the words rather than the marks is
+// the half
+// nobody would have noticed was broken: typing "wayfinding" would still find
+// `**wayfinding**`, but a description whose only mention was inside a link's
+// URL would have matched on characters no one can see.
+const words = new Map(constellations.map((c) => [c.id, toPlainText(c.description)]));
 ---
 
 <div class:list={['cn-picker', className]} data-scope={scope}>
@@ -77,15 +91,15 @@ const FILTER_THRESHOLD = 8; // below this, a filter field is just another contro
           class="cn-row group rounded-field hover:bg-base-200 flex items-start"
           data-id={c.id}
           data-name={c.name}
-          data-search={`${c.name} ${c.description ?? ''}`.toLowerCase()}
+          data-search={`${c.name} ${words.get(c.id) ?? ''}`.toLowerCase()}
         >
           <label class="flex min-w-0 grow cursor-pointer items-start gap-2.5 py-2 pl-2">
             <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
             <span class="min-w-0 grow">
               <span class="block truncate text-sm leading-snug">{c.name}</span>
-              {c.description && (
+              {words.get(c.id) && (
                 <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
-                  {c.description}
+                  {words.get(c.id)}
                 </span>
               )}
             </span>

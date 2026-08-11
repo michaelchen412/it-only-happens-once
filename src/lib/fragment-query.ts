@@ -8,6 +8,7 @@ import type { Database } from './database.types';
 // carried a second one.
 import { FRAGMENT_TYPES, type FragmentType } from './fragments-display';
 import { MIN_SEARCH } from './search-highlight';
+import { toPlainText } from './markdown';
 
 type DB = SupabaseClient<Database>;
 export type FragmentRowT = Database['public']['Tables']['fragments']['Row'];
@@ -99,7 +100,15 @@ export interface ConstellationRefLite {
   slug: string;
   /** The colour SLOT name (app.css owns what it means). */
   color?: string | null;
-  /** Shown wherever a constellation is offered as a target (4-line cap). */
+  /**
+   * Shown wherever a constellation is offered as a target (4-line cap).
+   *
+   * ⚠ PLAIN WORDS — the column has held Markdown since 2026-08-11, and it is
+   * flattened once here rather than at each of the menus and pickers this
+   * feeds. Every one of them is a clamped line or four inside a list; not one
+   * of them can render a mark, and the day a new one appears the words are
+   * what it will get.
+   */
   description?: string | null;
 }
 
@@ -153,17 +162,22 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
 
   // membership filter (`?in=`): a constellation slug, or 'none' for the orphans.
   // Resolved to an id list here, exactly like the subject filter above.
-  const { data: allConstellations } = await supabase
+  const { data: allConstellationRows } = await supabase
     .from('constellations')
     .select('id, name, slug, description, color')
     .order('sort');
+  // Markdown → words, once, for every consumer of `ConstellationRefLite`.
+  const allConstellations = (allConstellationRows ?? []).map((c) => ({
+    ...c,
+    description: toPlainText(c.description) || null,
+  }));
   let membershipFilterIds: string[] | null = null; // whitelist: fragments in the chosen constellation
   let membershipExcludeIds: string[] | null = null; // blacklist: everything placed anywhere ('none')
   if (p.membership === 'none') {
     const { data: links } = await supabase.from('fragment_constellations').select('fragment_id');
     membershipExcludeIds = [...new Set((links ?? []).map((l) => l.fragment_id))];
   } else if (p.membership) {
-    const target = (allConstellations ?? []).find((c) => c.slug === p.membership);
+    const target = allConstellations.find((c) => c.slug === p.membership);
     if (!target) {
       membershipFilterIds = []; // unknown slug → match nothing, don't silently ignore
     } else {
@@ -280,8 +294,8 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // sky's authored order so a row's chips always read in the same sequence.
   const constellationsByFragment: Record<string, ConstellationRefLite[]> = {};
   if (ids.length) {
-    const byId = new Map((allConstellations ?? []).map((c) => [c.id, c]));
-    const order = new Map((allConstellations ?? []).map((c, i) => [c.id, i]));
+    const byId = new Map(allConstellations.map((c) => [c.id, c]));
+    const order = new Map(allConstellations.map((c, i) => [c.id, i]));
     const { data: links } = await supabase
       .from('fragment_constellations')
       .select('fragment_id, constellation_id')
@@ -318,7 +332,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     truncated: rows.length >= LIST_CEILING,
     subjectsByFragment,
     constellationsByFragment,
-    allConstellations: allConstellations ?? [],
+    allConstellations,
     authorNameById,
     workTitleById,
     allAuthors: allAuthors ?? [],

@@ -69,6 +69,7 @@ import Label from './Label.astro';
 import type { Constellation, SuiteItem } from '../lib/constellations';
 import type { WritingItem } from '../lib/blog';
 import { parseSpotifyEmbed, spotifyEmbedSrc } from '../lib/media';
+import { renderMarkdown } from '../lib/markdown';
 import StarBloom from './StarBloom.astro';
 
 interface Props {
@@ -141,9 +142,16 @@ const score = constellation.scoreUrl ? parseSpotifyEmbed(constellation.scoreUrl)
   </div>
   {
     constellation.description && (
-      <p class="prose-measure border-base-300 text-base-content/55 mt-5 border-l pl-5 text-lg italic">
-        {constellation.description}
-      </p>
+      /* The epigraph. Markdown since 2026-08-11 — a <div> rather than a <p>
+         because a rendered description may be more than one paragraph, and
+         `.cn-desc` is what gives those paragraphs their space back (app.css,
+         which also explains why this text does NOT wear `.reading`). The
+         `italic` here is what `.cn-desc.italic em` keys off, so emphasis inside
+         an already-italic epigraph turns upright instead of vanishing. */
+      <div
+        class="cn-desc prose-measure border-base-300 text-base-content/55 mt-5 border-l pl-5 text-lg italic"
+        set:html={renderMarkdown(constellation.description)}
+      />
     )
   }
 
