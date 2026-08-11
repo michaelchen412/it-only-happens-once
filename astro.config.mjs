@@ -77,6 +77,17 @@ export default defineConfig({
       // never be masked by a cached copy. If that bust is ever removed, this number
       // becomes a bug — the two are a pair.
       minimumCacheTTL: 2592000, // 30 days
+      // ⚠ AVIF IS OPT-IN, AND WITHOUT THIS LINE VERCEL SERVES WEBP TO A BROWSER
+      // THAT EXPLICITLY ASKED FOR AVIF. The adapter writes no `formats` key, and
+      // Vercel's own default is WebP alone — so the negotiation silently settles
+      // one format lower than both ends support. Caught by asking production for
+      // `Accept: image/avif` and reading back `content-type: image/webp`.
+      //
+      // Order is preference order: the first entry the browser accepts wins, and
+      // anything older than AVIF still lands on WebP. This matters most on the
+      // phone, which is where the portrait is full-bleed and therefore where the
+      // bytes actually hurt — see the `sizes` note in pages/about.astro.
+      formats: ['image/avif', 'image/webp'],
     },
   }),
   image: {
