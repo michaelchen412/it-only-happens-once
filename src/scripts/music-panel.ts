@@ -7,11 +7,29 @@
 // be the thing that loses a rewrite — and a draft can be paired without going
 // anywhere near the publish dialog.
 //
-// It does NOT create songs. Pairing picks from what's already in the corpus;
-// adding a song is the Fragment Manager's job, and duplicating that flow here
-// would be a second way to write a song fragment.
+// ⚠ IT USED NOT TO CREATE SONGS, AND THE REASON IT GAVE WAS HALF RIGHT. The old
+// note said: *"adding a song is the Fragment Manager's job, and duplicating that
+// flow here would be a second way to write a song fragment."* The instinct was
+// correct and the conclusion was not — and the cost was real (plan 33 §6a,
+// Michael 2026-08-10): *"if I'm trying to pair a song that doesn't already exist
+// in the corpus, then I have to stop what I'm doing, create a new fragment, go
+// back to the piece of writing."*
+//
+// The distinction that resolves it: **a second DOOR is not a second WRITE PATH.**
+// A duplicated form would be one. A control that calls the existing `saveSong`
+// through the shared `createSong` helper is not — the action stays the single
+// owner of the fact, and only the door moves. `entity-combo` set this precedent
+// on the quote sheet, where typing an author who does not exist offers to make
+// one without leaving; this panel was simply the outlier that never got it.
+//
+// So the one field takes a QUERY or a LINK, and `looksLikeLink` decides which
+// round trip to make. It knows nothing about Spotify or YouTube on purpose —
+// "may a song cite this?" is `parseSongRef`'s question and is answered exactly
+// once, on the server.
 import { actions } from 'astro:actions';
+import { looksLikeLink } from '../lib/song-link';
 import { callAction, formatActionError } from './action-error';
+import { type ResolvedSong, createSong } from './song-create';
 
 export interface PairedSong {
   id: string;
@@ -77,14 +95,23 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     markEl.textContent = has ? '·' : '';
   }
 
-  function renderResults(items: SongResult[]) {
+  function renderResults(items: SongResult[], opts: { note?: string } = {}) {
     listEl.replaceChildren();
     if (!items.length) {
-      const li = document.createElement('li');
-      li.className = 'admin-hint italic';
-      li.textContent = 'No songs match.';
-      listEl.append(li);
+      // ⚠ THE EMPTY STATE IS WHERE THE LINK AFFORDANCE LIVES, and that is the
+      // whole of the discovery design for §6a. The field's placeholder cannot
+      // carry it — it is gone the moment you type — and a permanent line of
+      // instruction above the box would be telling rather than showing. "No
+      // songs match" is exactly the moment pasting a link is the answer, so it
+      // is the moment to mention it, and never before.
+      say('No songs match — paste a Spotify or YouTube link to add it.');
       return;
+    }
+    if (opts.note) {
+      const li = document.createElement('li');
+      li.className = 'admin-hint mb-1 italic';
+      li.textContent = opts.note;
+      listEl.append(li);
     }
     for (const s of items) {
       const li = document.createElement('li');
@@ -123,25 +150,141 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     }
   }
 
+  /** One `<li>` of plain italic prose — the list's own way of saying something. */
+  function say(text: string) {
+    listEl.replaceChildren();
+    const li = document.createElement('li');
+    li.className = 'admin-hint italic';
+    li.textContent = text;
+    listEl.append(li);
+  }
+
+  /**
+   * A pasted link (§6a). Three answers, and they are genuinely different things:
+   *
+   *   • **already in the corpus** — the same track under a different URL form.
+   *     Offered as an ordinary result to pair, never as a create. Dedupe is done
+   *     server-side on the PARSED ref, because `?si=` tracking tokens,
+   *     `intl-de/` paths and `spotify:track:` URIs are all one song and a raw
+   *     string comparison would grow a twin for each.
+   *   • **not in the corpus** — a create row previewing what the lookup returned,
+   *     so you confirm rather than trust. It says the artist it found, because
+   *     the oEmbed fallback often knows the title and not the artist and you
+   *     should see that before it becomes a row.
+   *   • **not a link a song may cite, or nobody answered** — two failures, two
+   *     sentences. `lookupSong` distinguishes them and the panel must not
+   *     collapse them: telling somebody their working Spotify link is the wrong
+   *     kind of link, because a network blipped, is the confidently-wrong answer
+   *     this whole flow is written against.
+   */
+  async function resolveLink(url: string) {
+    const seq = ++searchSeq;
+    say('Reading that link…');
+    const { data, error } = await callAction(actions.songs.lookup({ url }));
+    if (seq !== searchSeq) return;
+    if (error) {
+      clearError();
+      // In the LIST, not the alert bar: it is about the text in the field above
+      // it, and it is fixed by pasting something else.
+      return say(formatActionError(error));
+    }
+    clearError();
+    if (!data) return;
+
+    if (data.existing) {
+      renderResults(
+        [{ id: data.existing.id, title: data.existing.title, artist: data.existing.artist, annotated: false }],
+        {
+          note: 'Already in the corpus.',
+        },
+      );
+      return;
+    }
+    renderCreateRow({
+      url: data.url,
+      title: data.title ?? '',
+      artist: data.artist ?? null,
+      album: data.album ?? null,
+      releaseYear: data.releaseYear ?? null,
+      thumbnailUrl: data.thumbnailUrl ?? null,
+      artistIds: data.artistIds ?? [],
+      albumId: data.albumId ?? null,
+    });
+  }
+
+  /** Confirm-before-create, previewing what the lookup found. */
+  function renderCreateRow(song: ResolvedSong) {
+    listEl.replaceChildren();
+    const li = document.createElement('li');
+    li.className =
+      'rounded-field border-primary/30 bg-primary/5 flex flex-wrap items-center gap-x-2 gap-y-1 border px-3 py-2 text-sm';
+
+    const label = document.createElement('span');
+    label.className = 'text-base-content/60 text-xs';
+    label.textContent = 'Not in the corpus yet:';
+    const title = document.createElement('span');
+    title.className = 'font-serif';
+    title.textContent = song.title || '(untitled)';
+    const artist = document.createElement('span');
+    artist.className = 'text-base-content/55 text-sm';
+    // ⚠ Says so rather than showing a gap. An empty artist here is a real state
+    // — the keyless oEmbed tier answers with a title and no artist — and a blank
+    // reads as a bug in the panel rather than as a fact about the lookup.
+    artist.textContent = song.artist || 'artist unknown — you can fix it after';
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'bg-primary/15 text-primary hover:bg-primary/25 ml-auto rounded px-2 py-0.5 text-xs font-medium';
+    add.textContent = 'Add and pair';
+    add.addEventListener('click', () => void addAndPair(song, add));
+
+    li.append(label, title, artist, add);
+    listEl.append(li);
+
+    const note = document.createElement('li');
+    note.className = 'admin-hint mt-2 italic';
+    // Subjects are deliberately absent, and saying so is cheaper than a reader
+    // later wondering whether the panel forgot: songs are not filed by subject
+    // in this corpus, they are filed by feeling (plan 33 §1) — in the Listening
+    // room, with the track playing.
+    note.textContent = 'It will be saved as a song and paired here. Give it its feelings in Listening.';
+    listEl.append(note);
+  }
+
+  async function addAndPair(song: ResolvedSong, btn: HTMLButtonElement) {
+    if (!fragmentId) return;
+    clearError();
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    const { data, error } = await createSong(song);
+    if (error || !data) {
+      btn.disabled = false;
+      btn.textContent = 'Add and pair';
+      return showError(error ? formatActionError(error) : 'That song could not be saved.');
+    }
+    // Straight into the normal paired state — `pair` does its own optimistic
+    // paint and rollback, so there is nothing to duplicate here.
+    queryEl.value = '';
+    await pair({ id: data.id, title: song.title || '(untitled)', artist: song.artist ?? '' });
+  }
+
   async function search() {
     // A piece that has never been saved has no row to point a pairing at —
     // `pair` updates by id. Say so, rather than showing an empty list and a
     // search box that quietly do nothing, which is what this did first.
     if (!fragmentId) {
-      listEl.replaceChildren();
-      const li = document.createElement('li');
-      li.className = 'admin-hint italic';
-      li.textContent = 'Save this piece first — then you can pair a song to it.';
-      listEl.append(li);
+      say('Save this piece first — then you can pair a song to it.');
       queryEl.disabled = true;
       return;
     }
     queryEl.disabled = false;
+    const term = queryEl.value.trim();
+    if (looksLikeLink(term)) return resolveLink(term);
+
     const seq = ++searchSeq;
     // `callAction` rather than a bare await: a dead network throws here, and an
     // unhandled rejection would leave the last results on screen with no
     // indication that the box had stopped answering.
-    const { data, error } = await callAction(actions.songs.search({ q: queryEl.value.trim() }));
+    const { data, error } = await callAction(actions.songs.search({ q: term }));
     if (seq !== searchSeq) return; // a newer search already answered
     if (error) return showError(formatActionError(error));
     clearError();

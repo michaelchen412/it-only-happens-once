@@ -387,18 +387,40 @@ const { subjects, constellations = [] } = Astro.props;
 
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-base-content/70">Find a song</span>
+          {
+            /* ONE FIELD, TWO KINDS OF INPUT (plan 33 §6a). It used to take only a
+              query, so pairing a song that wasn't in the corpus meant leaving for
+              the Fragment Manager, making it, and coming back to a sheet you had
+              lost your place in. Pasting a link now offers to add it here.
+
+              ⚠ `type="search"` is kept even though it also takes URLs. The type
+              buys the clear-field affordance and the right keyboard for the
+              common case, which is still typing a title; a URL pasted into a
+              search field is not a validation problem, because nothing here
+              validates it — `songs.lookup` does, on the server, once. */
+          }
           <input
             id="ws-music-q"
             type="search"
             autocomplete="off"
-            placeholder="Title or artist — blank for the most recent"
+            placeholder="Title or artist — or paste a link"
             class="input input-sm input-bordered"
           />
         </label>
         <ul id="ws-music-results" class="mt-3 space-y-1"></ul>
+        {
+          /* ⚠ THE `{' '}` IS LOAD-BEARING, not a formatting artifact. Astro drops
+            the newline-plus-indent before an inline element at the start of a
+            line, so `the same\n<code>saveSong</code>` renders as
+            "the samesaveSong". Prettier reflows this paragraph on every save and
+            decides where the line breaks fall, so the space has to be written
+            rather than left to the wrapping. */
+        }
         <p class="admin-hint mt-4">
-          Only songs already in the corpus appear here. To pair something new, add it as a song first — the
-          <strong>New song</strong> button in the Fragment Manager.
+          Paste a Spotify or YouTube link and it can be added and paired without leaving this sheet — the same{' '}
+          <code>saveSong</code> the Fragment Manager uses, reached from here. A song already in the corpus under a different
+          form of its link is recognised rather than duplicated. Feelings are given in{' '}
+          <strong>Listening</strong>, with the track playing.
         </p>
       </div>
 

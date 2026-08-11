@@ -531,7 +531,20 @@ An essay may point at one song fragment through `fragments.paired_song_id` ([ADR
 
 **The player carries no caption** (2026-08-10). It printed `♪ Title — Artist` above the embed until the embed was looked at properly: it already shows the track, the artist, and the artwork, in larger type than the caption used. The one fact the player doesn't know — *this song goes with this piece* — survives as the iframe's `title`, so a screen reader still hears the pairing; a sighted reader gets it from position alone.
 
-Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog. The tab picks from songs already in the corpus, so pairing a song you haven't added yet still means leaving for the Fragment Manager and coming back. That is the known rough edge, and the distinction that resolves it is *a second **door**, not a second **write path*** — a control calling the existing `saveSong` leaves that action the single owner of the fact. The Listening room (§6b) is the first place that pattern exists; the Music tab is due the same create row.
+Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog.
+
+**One field, a query or a link** (2026-08-11, plan 33 §6a). It used to take only a query, so pairing a song that wasn't in the corpus meant stopping, leaving for the Fragment Manager, making it, and coming back to a sheet you'd lost your place in. Paste a link now and it is added and paired without leaving.
+
+⚠ **A second *door* is not a second *write path*, and that distinction is the whole of it.** The panel's old comment said adding a song was the Fragment Manager's job because *"duplicating that flow here would be a second way to write a song fragment"* — right instinct, wrong conclusion. A duplicated **form** would be a second write path; a control calling the existing `saveSong` through the shared `createSong` helper is not. `EntityCombo` set the precedent on the quote sheet, where an author who doesn't exist can be made without leaving; this panel was the outlier that never got it.
+
+Four behaviours worth knowing, because three of them are failure modes designed for rather than discovered:
+
+- **A song already in the corpus is recognised, not duplicated.** Dedupe is server-side on the **parsed** `{provider, kind, id}` — `?si=` share tokens, `intl-de/` paths and `spotify:track:` URIs are all one song, and comparing raw strings would grow a twin for each. A twin is the expensive kind of mistake here: it splits one song's feelings across two shelves and neither looks wrong.
+- **A new song shows a create row that previews what the lookup found**, so you confirm rather than trust — including *"artist unknown — you can fix it after"* when the keyless oEmbed tier answered, because a blank artist reads as a bug in the panel rather than as a fact about the lookup.
+- **Two failures, two sentences.** *"Spotify track/album or YouTube video, please"* is fixed by pasting something else; *"couldn't reach Spotify or YouTube just now"* is fixed by waiting. Both appear in the list rather than the alert bar, because both are about the text in the field above them.
+- **Which round trip to make is decided by `looksLikeLink`**, which knows nothing about Spotify or YouTube on purpose. *"May a song cite this?"* is `parseSongRef`'s question and is answered exactly once, on the server. Discovery lives in the empty state — *"No songs match — paste a Spotify or YouTube link to add it"* — which is the moment the affordance is the answer, and not before.
+
+The new song is created with no subjects, which is correct rather than an omission: songs are not filed by subject in this corpus, they are filed by **feeling**, in the Listening room with the track playing (§6b).
 
 **Two sources, one shape.** `pairedMediaOf` in `src/lib/blog.ts` normalises them and the renderer can't tell which answered:
 

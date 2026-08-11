@@ -13,17 +13,19 @@
 // removing it leaves music playing in a room you have left.
 import { actions } from 'astro:actions';
 import { callAction, formatActionError } from './action-error';
+import { type ResolvedSong, createSong } from './song-create';
 
 interface Loaded {
   /** null until the song has a row — a pasted link that nobody has saved yet. */
   id: string | null;
-  url: string;
-  /** Web API extras, carried through to `saveSong` so provenance stays exact. */
-  album: string;
-  thumbnailUrl: string;
-  releaseYear: number | null;
-  artistIds: string[];
-  albumId: string;
+  /**
+   * What the lookup returned, and the only thing a create needs.
+   *
+   * null when the song came off one of the lists below rather than off a paste:
+   * it already has a row, so there is nothing to create and no reason to have
+   * asked Spotify anything.
+   */
+  resolved: ResolvedSong | null;
 }
 
 export function wireListeningBench(): void {
@@ -206,12 +208,16 @@ export function wireListeningBench(): void {
     openBench({
       song: {
         id: existing?.id ?? null,
-        url: data.url,
-        album: data.album ?? '',
-        thumbnailUrl: data.thumbnailUrl ?? '',
-        releaseYear: data.releaseYear ?? null,
-        artistIds: data.artistIds ?? [],
-        albumId: data.albumId ?? '',
+        resolved: {
+          url: data.url,
+          title: data.title ?? '',
+          artist: data.artist ?? null,
+          album: data.album ?? null,
+          releaseYear: data.releaseYear ?? null,
+          thumbnailUrl: data.thumbnailUrl ?? null,
+          artistIds: data.artistIds ?? [],
+          albumId: data.albumId ?? null,
+        },
       },
       title: existing?.title ?? data.title ?? '',
       artist: existing?.artist || (data.artist ?? ''),
@@ -298,29 +304,15 @@ export function wireListeningBench(): void {
     if (!songId) {
       const title = titleEl.value.trim();
       const artist = artistEl.value.trim();
-      if (!title || !artist) {
+      if (!loaded.resolved || !title || !artist) {
         saveBtn.disabled = false;
         statusEl.textContent = '';
         return showError('A song needs a title and an artist before it can be saved.');
       }
-      const fd = new FormData();
-      fd.set('spotify_url', loaded.url);
-      fd.set('title', title);
-      fd.set('attribution', artist);
-      fd.set('album', loaded.album);
-      fd.set('thumbnail_url', loaded.thumbnailUrl);
-      if (loaded.releaseYear) fd.set('release_year', String(loaded.releaseYear));
-      if (loaded.artistIds.length) fd.set('spotify_artist_ids', loaded.artistIds.join(','));
-      if (loaded.albumId) fd.set('spotify_album_id', loaded.albumId);
-      // `occurred_at` on a song means the year you added it, not the release —
-      // the release year rides along in `details`. See `saveSong`.
-      fd.set('year', String(new Date().getFullYear()));
-      // ⚠ PUBLISHED, not the `draft` default. A song has no draft register:
-      // every one of the 48 already here is published, and the paired player
-      // under an essay reads through a policy that requires it. A song saved as
-      // a draft would go silent under its own essay for every reader but Michael.
-      fd.set('status', 'published');
-      const { data, error } = await callAction(actions.fragments.saveSong(fd));
+      // `createSong` is shared with the writing sheet's Music tab (§6a) — one
+      // client-side path to one action, so the two doors cannot drift into two
+      // ways of writing a song fragment.
+      const { data, error } = await createSong(loaded.resolved, { title, artist });
       if (error || !data) {
         saveBtn.disabled = false;
         statusEl.textContent = '';
@@ -366,15 +358,9 @@ export function wireListeningBench(): void {
     clearError();
     urlEl.value = '';
     openBench({
-      song: {
-        id: row.dataset.song!,
-        url: '',
-        album: '',
-        thumbnailUrl: '',
-        releaseYear: null,
-        artistIds: [],
-        albumId: '',
-      },
+      // `resolved: null` — this song already has a row, so there is nothing to
+      // create and no reason to have asked Spotify anything for it.
+      song: { id: row.dataset.song!, resolved: null },
       title: row.dataset.title ?? '',
       artist: row.dataset.artist ?? '',
       feelingIds: (row.dataset.feelings ?? '').split(',').filter(Boolean),
