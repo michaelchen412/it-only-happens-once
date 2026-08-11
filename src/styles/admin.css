@@ -444,6 +444,31 @@ html.reader-open {
     color 0.45s ease,
     filter 0.45s ease;
 }
+/* ⚠⚠ THE GLOW IS DECLARED AT REST WITH NOTHING IN IT, AND IT IS NOT REDUNDANT.
+   Without this the focus rule below transitions `filter` FROM `none`, and `none`
+   interpolates as the identity — `drop-shadow(transparent 0 0 0)` — so the BLUR
+   RADIUS grows along with the colour. Measured on the live page: 0 → 0.79 →
+   3.0 → 5.19 → 6.47 → 7px.
+
+   That is not a fade, it is a bloom, and it reads as something appearing a beat
+   after the hover rather than warming with it: a shadow at 0.79px is an
+   invisible rim, and by ~3px it abruptly becomes a halo. The eye sees nothing,
+   nothing, then a glow — which is exactly the "extra glow that pops in" this
+   fixes.
+
+   Pinning the radius at rest leaves ALPHA as the only thing moving (0 → 0.04 →
+   0.22 → 0.45 → 0.65), so the halo is full-size from the first frame and simply
+   brightens in place. `transparent` is the identity for the colour, so this
+   paints nothing at rest, and 7px must match the focus rule below or the radius
+   starts interpolating again.
+
+   It also means the element is never PROMOTED mid-gesture: gaining a filter
+   costs a compositing layer and a first rasterisation, and that work would land
+   at the exact moment it is asked to animate. Same reasoning as ADR-0029's last
+   section — on these surfaces the cost is the layer, not the value. */
+.sky-cta__arrow {
+  filter: drop-shadow(0 0 7px transparent);
+}
 /* The mark warms a beat first and the word follows — one thing arriving, not
    two switching on. */
 .sky-cta__word {
@@ -919,6 +944,23 @@ html.reader-open .sky-return {
   transition:
     color 0.45s ease,
     filter 0.45s ease;
+}
+/* The rest-state glow, empty — so the focus rules below animate ALPHA only and
+   not the blur radius. Transitioning `filter` from `none` grows the radius 0→7px
+   and reads as a halo blooming in a beat late rather than warming with the
+   hover; see the long note on `.sky-cta__arrow` for the measurements. 7px must
+   match every focus and hover rule that follows.
+
+   ⚠ SCOPED TO THE SUITE, NOT BARE, and the reason is worth the extra class. The
+   feed's `Read →` (`.post-read`) borrows this same type and this same transition
+   — which LISTS `filter` — so a bare `.suite-cta__arrow` looked like the tidy
+   place for this. But the feed's arrow never sets a filter at all: it warms by
+   colour and steps forward with `translateX`. It never had this bug, so mounting
+   a permanent no-op filter on every card in a twenty-card list would be cost
+   with nothing bought. A shared `transition` is not evidence of a shared
+   gesture. */
+.suite-writing .suite-cta__arrow {
+  filter: drop-shadow(0 0 7px transparent);
 }
 .suite-cta__word {
   transition-delay: 0.08s;
