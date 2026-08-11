@@ -12,6 +12,7 @@
 // created person and a sentence rather than a lost form.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { uploadPrivateImage } from './upload';
 import { photoPath } from '../lib/hq/people';
 
@@ -19,6 +20,9 @@ const sheet = document.querySelector<HTMLDialogElement>('#person-sheet');
 const form = document.querySelector<HTMLFormElement>('#person-form');
 
 if (sheet && form) {
+  /** Every gesture that leaves this sheet routes through `requestClose` below. */
+  const dirty = dirtyTracker(sheet);
+
   const errorEl = document.querySelector<HTMLElement>('#person-error');
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]')!;
@@ -39,13 +43,31 @@ if (sheet && form) {
   document.querySelectorAll<HTMLElement>('[data-open-person-sheet]').forEach((btn) =>
     btn.addEventListener('click', () => {
       showError(null);
+      dirty.reset(); // populating is not editing — see dirtyTracker
       sheet.showModal();
       form.querySelector<HTMLInputElement>('input[name="displayName"]')?.focus();
     }),
   );
-  form
-    .querySelectorAll<HTMLElement>('[data-close]')
-    .forEach((btn) => btn.addEventListener('click', () => sheet.close()));
+  /*
+    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
+    sheet answered only the first for its whole life — clicking away did
+    nothing at all, which reads as stuck and sends the reader to the browser's
+    Back button, where far more is lost than the sheet would have cost.
+  
+    It GUARDS because it has something to lose: an explicit-save form holds
+    everything typed into it until the button is pressed. The confirm cannot
+    fire on a sheet nobody edited — the tracker is reset after every populate —
+    so this costs nothing on the common path.
+  */
+  async function requestClose() {
+    if (dirty.get() && !(await confirmDiscard('This profile'))) return;
+    dirty.reset();
+    // `!` because a hoisted `async function` cannot inherit the narrowing
+    // from the `if (sheet && …)` around it — the same reason this file already
+    // writes `sheet!` at its other exits.
+    sheet!.close();
+  }
+  wireSheetDismiss(sheet, requestClose);
 
   // ── the circle segmented control ──────────────────────────────────────────
   form.querySelectorAll<HTMLButtonElement>('[data-circle]').forEach((btn) =>

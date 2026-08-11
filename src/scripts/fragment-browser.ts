@@ -7,7 +7,7 @@ import { stripMarkdown } from '../lib/markdown-plain';
 import { openEditorFor } from './open-editor';
 import { onSkyChange } from './sky-changed';
 import { notifyFragmentsChanged, onFragmentsChanged } from './fragments-changed';
-import { onBackdropDismiss } from './backdrop-close';
+import { wireSheetDismiss } from './sheet-dismiss';
 
 const browser = document.getElementById('fbrowser') as HTMLDialogElement;
 const cid = browser.dataset.constellation!;
@@ -226,13 +226,15 @@ function closeBrowser() {
 document
   .querySelectorAll<HTMLElement>('[data-browse]')
   .forEach((btn) => btn.addEventListener('click', () => openBrowser()));
-browser.querySelector('[data-fb-close]')?.addEventListener('click', () => closeBrowser());
-browser.addEventListener('cancel', (e) => {
-  e.preventDefault(); // Escape → still refresh the suite if we placed things
-  closeBrowser();
-});
-// The press must both start and end on the backdrop — `backdrop-close.ts`.
-onBackdropDismiss(browser, closeBrowser);
+// ✕, Escape and the backdrop, in one call (ADR 0032). This one already
+// answered all three; what it gains is that the answer is now grep-able, which
+// is what `sheet-dismiss.test.ts` checks.
+//
+// ⚠ NO GUARD, AND THAT IS THE RIGHT ANSWER HERE rather than an omission. This
+// drawer holds no pending state: placing writes immediately, and `closeBrowser`
+// exists to REFRESH the suite behind it on the way out, not to protect
+// anything. Escape refreshing too is the whole reason it was intercepted.
+wireSheetDismiss(browser, closeBrowser, '[data-fb-close]');
 
 wireAddMenu(document.getElementById('fb-add-btn')!, document.getElementById('fb-add-menu')!);
 

@@ -25,6 +25,7 @@ import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
+import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 
 /** Everything the sheet needs to open on one song. */
 export interface SongSheetSeed {
@@ -135,6 +136,14 @@ function wire(sheet: HTMLDialogElement) {
   const errorEl = el('sng-error');
 
   const tabs = wireSheetTabs(sheet);
+  /*
+    ⚠ SHARED BY IS IGNORED, because a tick there writes IMMEDIATELY (see
+    SharedByField) — counting it would warn about edits that are already in the
+    database, which is the fastest way to teach someone to click through a
+    confirm without reading it. The feelings are NOT ignored: they look like the
+    same kind of control and are not, because this sheet holds them until Save.
+  */
+  const dirty = dirtyTracker(sheet, '[data-sby="song"]');
   const sharedByRoot = sheet.querySelector<HTMLElement>('[data-sby="song"]');
   const sharedBy = sharedByRoot ? wireSharedBy(sharedByRoot) : null;
   const sharedByMap = JSON.parse(sheet.dataset.sharedBy || '{}') as Record<string, string[]>;
@@ -191,14 +200,19 @@ function wire(sheet: HTMLDialogElement) {
     // two of one thing. `··` says both, `·` says one, nothing says neither.
     notesMarkEl.textContent = (pub.editor.getText().trim() ? '·' : '') + (priv.editor.getText().trim() ? '·' : '');
   }
-  pub.editor.on('update', paintBadges);
-  priv.editor.on('update', paintBadges);
+  // TipTap fires no `input` the tracker can hear, so both editors report
+  // themselves — the same reason the quote sheet's editor does.
+  pub.editor.on('update', () => (paintBadges(), dirty.touch()));
+  priv.editor.on('update', () => (paintBadges(), dirty.touch()));
 
   wordsEl.addEventListener('click', (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLButtonElement>('.sng-word');
     if (!chip) return;
     chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));
     paintBadges();
+    // A word is held until Save, so pressing one IS an unsaved edit — unlike
+    // the constellation picker next door, which writes on the tick.
+    dirty.touch();
   });
 
   // --- the player ----------------------------------------------------------
@@ -255,6 +269,10 @@ function wire(sheet: HTMLDialogElement) {
     deleteBtn.hidden = !seed.id;
     sharedBy?.setFragment(seed.id, seed.id ? (sharedByMap[seed.id] ?? []) : []);
     raisePlayer(seed.embed);
+    // ⚠ LAST, AND AFTER EVERYTHING ABOVE. Populating the fields fires `input`
+    // like any other write, so a sheet nobody has touched would otherwise open
+    // already dirty and guard on the way out.
+    dirty.reset();
   }
   loadSeed = load;
   focusWords = () => chips()[0]?.focus();
@@ -390,7 +408,7 @@ function wire(sheet: HTMLDialogElement) {
     if (!title || !artist) {
       // Send them where the problem is. An error about a field on a tab you
       // cannot see is an error you have to go hunting for.
-      tabs.select('song');
+      tabs.select('facts');
       return showError('A song needs a title and an artist before it can be saved.');
     }
 
@@ -442,6 +460,7 @@ function wire(sheet: HTMLDialogElement) {
     if (noteErr) return stop(`${formatActionError(noteErr)} The song and its words are saved; the notes are not.`);
 
     stop();
+    dirty.reset(); // it is all in the database now
     close();
     document.dispatchEvent(new CustomEvent('song:saved', { detail: { id: songId, title, artist, feelingIds: ids } }));
   }
@@ -477,10 +496,23 @@ function wire(sheet: HTMLDialogElement) {
   function close() {
     sheet.close();
   }
-  sheet.querySelector('[data-sng-close]')?.addEventListener('click', close);
-  // ⚠ ON `close`, NOT ON THE BUTTON. Escape and the backdrop close a native
-  // dialog without going near that handler, and the frame has to go on EVERY
-  // one of those paths — otherwise the song plays on behind a sheet that is no
-  // longer there, and there is no control left anywhere to stop it.
+  /**
+   * ⚠ THIS SHEET HAS THE MOST TO LOSE OF ANY OF THEM (ADR 0032), which is why
+   * it guards rather than dismissing freely: two rich-text notes, a set of
+   * feelings and four metadata fields, none of which are written until Save.
+   * It shipped with no guard AND no backdrop dismiss, and the second of those
+   * was hiding the first.
+   */
+  async function requestClose() {
+    if (dirty.get() && !(await confirmDiscard('This song'))) return;
+    dirty.reset();
+    close();
+  }
+  wireSheetDismiss(sheet, requestClose, '[data-sng-close]');
+  // ⚠ ON `close`, NOT IN `requestClose`. Every path out — the ✕, Escape, the
+  // backdrop, a save, a delete — ends in the native `close` event, and the
+  // frame has to go on ALL of them. Hanging this off one handler is how a song
+  // ends up playing behind a sheet that is no longer there, with no control
+  // left anywhere to stop it.
   sheet.addEventListener('close', () => playerEl.replaceChildren());
 }

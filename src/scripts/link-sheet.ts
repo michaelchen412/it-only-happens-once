@@ -8,6 +8,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
+import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 
 type Mode = 'work' | 'fragment';
 
@@ -37,6 +38,9 @@ const clearError = () => {
 };
 
 if (sheet && personId) {
+  /** Every gesture that leaves this sheet routes through `requestClose` below. */
+  const dirty = dirtyTracker(sheet);
+
   const search = sheet.querySelector<HTMLInputElement>('[data-link-search]')!;
   const noteInput = sheet.querySelector<HTMLInputElement>('[data-link-note]')!;
   const saveBtn = sheet.querySelector<HTMLButtonElement>('[data-link-save]')!;
@@ -113,14 +117,32 @@ if (sheet && personId) {
       search.value = '';
       noteInput.value = '';
       setMode('work');
+      dirty.reset(); // populating is not editing — see dirtyTracker
       sheet.showModal();
       search.focus();
     }),
   );
 
-  sheet
-    .querySelectorAll<HTMLElement>('[data-close]')
-    .forEach((btn) => btn.addEventListener('click', () => sheet.close()));
+  /*
+    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
+    sheet answered only the first for its whole life — clicking away did
+    nothing at all, which reads as stuck and sends the reader to the browser's
+    Back button, where far more is lost than the sheet would have cost.
+  
+    It GUARDS because it has something to lose: an explicit-save form holds
+    everything typed into it until the button is pressed. The confirm cannot
+    fire on a sheet nobody edited — the tracker is reset after every populate —
+    so this costs nothing on the common path.
+  */
+  async function requestClose() {
+    if (dirty.get() && !(await confirmDiscard('This link'))) return;
+    dirty.reset();
+    // `!` because a hoisted `async function` cannot inherit the narrowing
+    // from the `if (sheet && …)` around it — the same reason this file already
+    // writes `sheet!` at its other exits.
+    sheet!.close();
+  }
+  wireSheetDismiss(sheet, requestClose);
 
   saveBtn.addEventListener('click', async () => {
     if (!picked) return;

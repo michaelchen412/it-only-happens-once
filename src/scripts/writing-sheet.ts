@@ -96,7 +96,7 @@ import { wireMusicPanel, type PairedSong } from './music-panel';
 import { wireAddMenu } from './fragment-panel';
 import { wireProofread } from './writing-proofread';
 import { wirePublishDialog } from './writing-publish-dialog';
-import { onBackdropDismiss } from './backdrop-close';
+import { wireSheetDismiss } from './sheet-dismiss';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
 const form = document.getElementById('ws-form') as HTMLFormElement;
@@ -859,15 +859,12 @@ async function requestClose() {
   }
   closeNow();
 }
-sheet.querySelector('[data-ws-close]')?.addEventListener('click', () => requestClose());
-sheet.addEventListener('cancel', (e) => {
-  e.preventDefault(); // Escape → route through the guard
-  requestClose();
-});
-// Backdrop dismiss only when the press STARTED and ENDED on the backdrop
-// (a text selection released outside must not close the sheet) — see
-// `backdrop-close.ts`, which is where that guard lives now.
-onBackdropDismiss(sheet, requestClose);
+// ✕, Escape and the backdrop — one call, so this sheet cannot answer some of
+// them and not others (ADR 0032). `requestClose` here is the most elaborate
+// policy in the codebase: it parks unsaved words in a draft version before it
+// even asks the question, which is precisely why the primitive owns the
+// plumbing and not the decision.
+wireSheetDismiss(sheet, requestClose, '[data-ws-close]');
 
 // ---- publish / details dialog ----
 // A surface of its own (src/scripts/writing-publish-dialog.ts): the preflight,

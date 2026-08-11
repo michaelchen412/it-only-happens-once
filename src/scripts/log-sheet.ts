@@ -13,7 +13,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireEntryMeta } from './entry-meta';
-import { onBackdropDismiss } from './backdrop-close';
+import { wireSheetDismiss } from './sheet-dismiss';
 
 const root = document.querySelector<HTMLElement>('[data-log-sheet]');
 const sheet = document.getElementById('log-sheet') as HTMLDialogElement | null;
@@ -21,7 +21,6 @@ const sheet = document.getElementById('log-sheet') as HTMLDialogElement | null;
 if (root && sheet) {
   const today = root.dataset.today!;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel);
-  const $$ = <T extends HTMLElement>(sel: string) => Array.from(root.querySelectorAll<T>(sel));
 
   const body = $<HTMLTextAreaElement>('[data-log-body]')!;
   const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
@@ -80,12 +79,17 @@ if (root && sheet) {
     $<HTMLElement>('[data-who-open]')?.focus();
   });
 
-  $$('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
   // The press must both start and end on the backdrop: this sheet opens with a
   // dump's words already in the textarea and expects you to edit them, so a
   // selection released past the edge was closing it over a half-made
   // correction. `backdrop-close.ts` (docs/plans/25 · §3).
-  onBackdropDismiss(sheet, () => sheet.close());
+  // ✕, Escape and the backdrop, in one call (ADR 0032).
+  //
+  // ⚠ NO GUARD, and it is worth saying why rather than leaving it to look like
+  // an oversight: this sheet is opened FROM a captured note and files it. The
+  // body it holds is the note's own text, which already exists in the pile and
+  // survives dismissal — so there is nothing here that only lives on screen.
+  wireSheetDismiss(sheet, () => sheet.close());
 
   // ── saving ────────────────────────────────────────────────────────────────
   saveBtn.addEventListener('click', async () => {

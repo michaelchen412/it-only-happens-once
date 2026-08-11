@@ -121,6 +121,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0029](0029-a-writing-stanza-sits-on-a-page.md) | A writing stanza sits on a page and the page has no left edge, so the drawn figure passes through it; quotes and songs stay typeset | Accepted |
 | [0030](0030-the-page-carries-the-masthead.md) | The top bar is a running head with no accent and no hairline, the room's own switch is the masthead, and the footer is an address block rather than an ending | Accepted |
 | [0031](0031-a-song-carries-a-feeling-not-an-idea.md) | A song carries a feeling, not an idea: no subjects, never a suite stanza, filed by feeling, and the annotation becomes a public note and a private one | Accepted |
+| [0032](0032-a-sheet-is-dismissible-and-says-what-that-costs.md) | Every sheet is dismissible by its backdrop and must answer what that costs — nothing (it applies or flushes) or something (so it guards, on all three gestures); a test enforces it | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all

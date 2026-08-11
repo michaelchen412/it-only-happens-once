@@ -11,6 +11,7 @@
 // whole point is that letting go is a visible, dignified move.
 import { actions } from 'astro:actions';
 import { callAction, formatActionError, submitAction } from './action-error';
+import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 
 const sheet = document.querySelector<HTMLDialogElement>('#goal-sheet');
 const form = document.querySelector<HTMLFormElement>('#goal-form');
@@ -24,6 +25,9 @@ const showPageError = (msg: string | null) => {
 };
 
 if (sheet && form) {
+  /** Every gesture that leaves this sheet routes through `requestClose` below. */
+  const dirty = dirtyTracker(sheet);
+
   const errorEl = document.querySelector<HTMLElement>('#goal-sheet-error');
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]')!;
@@ -48,11 +52,31 @@ if (sheet && form) {
   document.querySelectorAll<HTMLElement>('[data-open-goal-sheet], [data-edit-goal]').forEach((btn) =>
     btn.addEventListener('click', () => {
       showError(null);
+      dirty.reset(); // populating is not editing — see dirtyTracker
       sheet.showModal();
       nameInput.focus();
     }),
   );
-  form.querySelectorAll<HTMLElement>('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
+  /*
+    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
+    sheet answered only the first for its whole life — clicking away did
+    nothing at all, which reads as stuck and sends the reader to the browser's
+    Back button, where far more is lost than the sheet would have cost.
+  
+    It GUARDS because it has something to lose: an explicit-save form holds
+    everything typed into it until the button is pressed. The confirm cannot
+    fire on a sheet nobody edited — the tracker is reset after every populate —
+    so this costs nothing on the common path.
+  */
+  async function requestClose() {
+    if (dirty.get() && !(await confirmDiscard('This goal'))) return;
+    dirty.reset();
+    // `!` because a hoisted `async function` cannot inherit the narrowing
+    // from the `if (sheet && …)` around it — the same reason this file already
+    // writes `sheet!` at its other exits.
+    sheet!.close();
+  }
+  wireSheetDismiss(sheet, requestClose);
 
   // The lifecycle — disable, label, format ANY failure, restore — is
   // `submitAction` now (scripts/action-error.ts, docs/plans/25 · §2). Eight

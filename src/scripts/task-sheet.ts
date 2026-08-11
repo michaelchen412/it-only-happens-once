@@ -17,6 +17,7 @@
 // of the form beside the form.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
 import { ordinal } from '../lib/hq/dates';
@@ -27,6 +28,9 @@ const sheet = document.querySelector<HTMLDialogElement>('#task-sheet');
 const form = document.querySelector<HTMLFormElement>('#task-form');
 
 if (sheet && form) {
+  /** Every gesture that leaves this sheet routes through `requestClose` below. */
+  const dirty = dirtyTracker(sheet);
+
   const today = form.dataset.today as Ymd;
   const errorEl = document.querySelector<HTMLElement>('#task-error');
   const heading = document.querySelector<HTMLElement>('#task-sheet-title')!;
@@ -225,6 +229,7 @@ if (sheet && form) {
     if (row) fill(row);
     else reset();
     repaint();
+    dirty.reset(); // populating is not editing — see dirtyTracker
     sheet!.showModal();
     titleInput.focus();
   };
@@ -318,7 +323,26 @@ if (sheet && form) {
     if (raw) open(JSON.parse(raw) as TaskRow);
   });
 
-  form.querySelectorAll<HTMLElement>('[data-close]').forEach((b) => b.addEventListener('click', () => sheet.close()));
+  /*
+    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
+    sheet answered only the first for its whole life — clicking away did
+    nothing at all, which reads as stuck and sends the reader to the browser's
+    Back button, where far more is lost than the sheet would have cost.
+  
+    It guards because it has something to lose: an explicit-save form holds
+    everything typed into it until you press the button. The confirm cannot
+    fire on a sheet nobody edited — `dirtyTracker` is reset after every
+    populate — so the cost of this is zero on the common path.
+  */
+  async function requestClose() {
+    if (dirty.get() && !(await confirmDiscard('This task'))) return;
+    dirty.reset();
+    // `!` because a hoisted `async function` cannot inherit the narrowing
+    // from the `if (sheet && …)` around it — the same reason this file already
+    // writes `sheet!` at its other exits.
+    sheet!.close();
+  }
+  wireSheetDismiss(sheet, requestClose);
   // ⚠ Abandoning the sheet must forget the dump it was opened for. Without
   // this, closing on a note and later saving an unrelated task from the same
   // page would consume a note nobody filed — a thought deleted by a save that

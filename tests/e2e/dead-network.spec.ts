@@ -240,3 +240,46 @@ test.describe('the bulk bar', () => {
     }
   });
 });
+
+/*
+  ⚠ THE RULE, DRIVEN ONCE (ADR 0032). `sheet-dismiss.test.ts` proves every sheet
+  ASKS the question — it matches text, so it cannot prove the answer works. This
+  proves it works, on the sheet that prompted the pass: Michael, 2026-08-11,
+  *"the song sheet doesn't close if I click on the outside of the sheet, whereas
+  the other two do."*
+
+  Both halves matter and they are opposite. A CLEAN sheet must go on an outside
+  click — a modal that ignores you reads as stuck. A DIRTY one must not, or the
+  same gesture silently destroys everything typed into it. Wiring the first
+  without the second is worse than wiring neither.
+*/
+test.describe('a sheet is dismissible, and says what that costs', () => {
+  test('the song sheet closes on an outside press when nothing is at stake', async ({ page }) => {
+    await page.goto('/admin/listening');
+    await hideDevToolbar(page);
+    const sheet = page.locator('#song-sheet');
+    await page.locator('#lst-new').click();
+    await expect(sheet).toBeVisible();
+
+    // Press the backdrop — the dialog element itself, outside its content box.
+    await page.mouse.click(5, 5);
+    await expect(sheet, 'a clean sheet must close on an outside press').toBeHidden();
+  });
+
+  test('…and asks first once there is something to lose', async ({ page }) => {
+    await page.goto('/admin/listening');
+    await hideDevToolbar(page);
+    const sheet = page.locator('#song-sheet');
+    await page.locator('#lst-new').click();
+    await expect(sheet).toBeVisible();
+
+    // One pressed word is unsaved work: the feelings are held until Save.
+    await page.locator('.sng-word').first().click();
+    await page.mouse.click(5, 5);
+
+    // The sheet stays, and the confirm is what stands between the click and the
+    // loss. Dismissing THAT leaves the song exactly where it was.
+    await expect(page.locator('dialog[open] >> text=Discard changes?')).toBeVisible();
+    await expect(sheet, 'a dirty sheet must not vanish behind its own confirm').toBeVisible();
+  });
+});

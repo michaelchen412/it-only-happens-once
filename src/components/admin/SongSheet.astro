@@ -98,8 +98,16 @@ const thisYear = new Date().getUTCFullYear();
           argument for the whole sheet. The loop plan 33 §3 says decides whether
           any of this happens — paste, listen, press the words, save, next — must
           never require visiting a second tab. The metadata arrives already
-          filled from `songs.lookup`, so "The song" is the tab you open when the
-          lookup got something wrong, not the one you pass through. */
+          filled from `songs.lookup`, so Facts is the tab you open when the
+          lookup got something wrong, not the one you pass through.
+
+          ⚠ AND THE NAMES ARE A TRIAD: Feelings / Facts / Notes — what it did to
+          you, what is true about it, what you want to say. "The song" sat here
+          first and said nothing; the word that replaced it states ADR 0031's
+          own claim in the interface, because the distinction the whole record
+          turns on is that A FEELING IS NOT A PROPERTY OF THE SONG AND A FACT
+          IS. It also picks up the quote sheet's vocabulary, where provenance is
+          already "the three facts". */
       }
       <button
         type="button"
@@ -115,12 +123,12 @@ const thisYear = new Date().getUTCFullYear();
         type="button"
         role="tab"
         class="admin-tab"
-        data-tab="song"
+        data-tab="facts"
         aria-selected="false"
         tabindex="-1"
-        aria-controls="sng-panel-song"
+        aria-controls="sng-panel-facts"
       >
-        The song
+        Facts
       </button>
       <button
         type="button"
@@ -184,11 +192,11 @@ const thisYear = new Date().getUTCFullYear();
       </div>
     </div>
 
-    {/* ── THE SONG ─────────────────────────────────────────────────────── */}
+    {/* ── FACTS ────────────────────────────────────────────────────────── */}
     <div
-      id="sng-panel-song"
+      id="sng-panel-facts"
       role="tabpanel"
-      data-tabpanel="song"
+      data-tabpanel="facts"
       hidden
       class="flex flex-col gap-4 px-6 py-5 font-sans"
     >
@@ -331,8 +339,25 @@ const thisYear = new Date().getUTCFullYear();
         The exception is Shared by, which keeps its own immediate contract and
         queues its ticks until a new song has an id — see SharedByField. */
     }
+    {
+      /* ⚠ THE ONLY SHEET IN THE WORKSHOP WITH A STICKY FOOTER, and it is the
+        one that should have one. Every other sheet's primary action sits inline
+        at the end of ITS FORM, because the form is the whole sheet — the quote
+        sheet's second tab applies immediately and has nothing to save. Here one
+        Save commits all THREE tabs, so it belongs to the sheet rather than to
+        any panel: put it at the foot of Feelings and it reads as saving the
+        words only, and it disappears entirely the moment you open Notes.
+
+        Checked against the others during the consistency pass (ADR 0032) rather
+        than assumed — this is drift that earns itself, which is a different
+        thing from drift nobody noticed. */
+    }
     <div class="border-base-300 bg-base-100 sticky bottom-0 mt-auto flex items-center gap-2 border-t px-6 py-4">
-      <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save</button>
+      {
+        /* Named, like "Save quote" and "Add task" beside it — a bare "Save" is
+          the one label that tells you nothing about what you are committing. */
+      }
+      <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
       <button id="sng-delete" type="button" hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
       <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
     </div>

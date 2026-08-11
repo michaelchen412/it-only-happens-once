@@ -15,7 +15,7 @@ import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
 import { slugify } from '../lib/slug';
 import { submitAction } from './action-error';
-import { onBackdropDismiss } from './backdrop-close';
+import { wireSheetDismiss } from './sheet-dismiss';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
@@ -402,17 +402,16 @@ async function requestClose() {
   if (stale) notifyFragmentsChanged(sheet);
 }
 
-document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => requestClose()));
-// Escape → route through the guard instead of the native instant-close.
-sheet.addEventListener('cancel', (e) => {
-  e.preventDefault();
-  requestClose();
-});
-// Backdrop dismiss, but ONLY when the press both STARTED and ENDED on the
-// backdrop — a text selection released outside must not close the sheet. The
-// guard was copy-pasted into three files and missing from four; it is
-// `backdrop-close.ts` now (docs/plans/25 · §3).
-onBackdropDismiss(sheet, requestClose);
+// ✕, Escape and the backdrop are three gestures with one meaning, wired in one
+// call so a sheet cannot answer some of them and not others (ADR 0032).
+//
+// ⚠ AND IT IS SCOPED TO THE DIALOG, WHERE THIS USED TO QUERY THE DOCUMENT.
+// `[data-close]` is rendered by NINE components, so `document.querySelectorAll`
+// bound this sheet's close handler to every other sheet's ✕ that happened to be
+// mounted on the same page. Harmless today only because the pages that mount
+// FragmentSheet mount no other `[data-close]` sheet — which is a fact about the
+// current page composition, not a property anything enforces.
+wireSheetDismiss(sheet, requestClose);
 
 function setField(form: HTMLFormElement, name: string, value: string) {
   const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
