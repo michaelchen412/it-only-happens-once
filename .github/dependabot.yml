@@ -1,0 +1,87 @@
+# Dependency bumps, grouped (plan 34 · §7).
+#
+# ⚠ READ THE `build` JOB IN workflows/verify.yml BEFORE CHANGING THIS FILE.
+# `npm run verify` is NOT the check for a dependency bump — only `npm run build`
+# runs `scripts/check-server-bundle.mjs`, and that script is the one that
+# catches the failure this repo has actually had: on 2026-07-31 every request in
+# production 500'd with `Cannot find module 'htmlparser2'`, because
+# `astro.config.mjs`'s `noExternal` list hardcodes a dependency closure that a
+# transitive bump can silently invalidate. Typecheck, lint, unit tests and
+# `astro preview` were all green throughout.
+#
+# So a Dependabot PR checked only by `verify` would be a green check that does
+# not check the thing dependency bumps break. That is why §7 shipped two files
+# rather than one, and why the second is the point.
+#
+# ⚠ GROUPED, AND UNGROUPED IS HOW PEOPLE END UP TURNING DEPENDABOT OFF. There
+# are 34 direct dependencies here and one maintainer; per-package PRs would open
+# a dozen a week, and by the second week they get ignored wholesale — which is
+# worse than not knowing, because the repo then looks watched and isn't. The
+# weekly `npm audit` job already covers DETECTION; what this adds is the bump.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Etc/UTC
+    # Matches the audit job's cadence in verify.yml — one morning a week where
+    # the repo has something to say, rather than two.
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      # The repo's convention (`chore(deps): …`), so a Dependabot commit reads
+      # like the four hand-written bump commits from plan 31 · §2.
+      prefix: 'chore(deps)'
+
+    groups:
+      # Patch and minor only. A major is never grouped: it is a decision, and
+      # plan 31 · §2 established the house rule that visual and editor-facing
+      # bumps get a real look before they land.
+      production-minor:
+        applies-to: version-updates
+        dependency-type: production
+        update-types: ['minor', 'patch']
+      development-minor:
+        applies-to: version-updates
+        dependency-type: development
+        update-types: ['minor', 'patch']
+
+    ignore:
+      # ⚠ TYPESCRIPT MAJORS ARE BLOCKED UPSTREAM, NOT DEFERRED BY PREFERENCE.
+      # Plan 31 · §2 attempted 6 → 7 and reverted it: `typescript-eslint` throws
+      # `does not support TS 7.0`, and `astro check` fails because the native
+      # compiler "does not ship [the programmatic] API yet". BOTH TOOLS REFUSE
+      # TO RUN, so adopting it would delete two of `verify`'s four checks.
+      #
+      # Without this entry Dependabot reopens that PR every week forever, and
+      # eventually somebody merges it on a Monday. The two unblock conditions
+      # are named in 31 · §2; when both hold, delete these three lines.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+      # ⚠ NOT A BLOCK — a grouping exception. daisyUI owns every colour token in
+      # this repo (plan 31 · §2 moved it across eight minors and the hands item
+      # was "look at both themes at two widths"), and TipTap is the composer, a
+      # surface where "compiling is not verifying" has already been paid for
+      # twice. Both still get PRs; they just get their own, so the look they
+      # need is not attached to thirteen unrelated bumps.
+      - dependency-name: daisyui
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@tiptap/*'
+        update-types: ['version-update:semver-major']
+
+  # The Actions in workflows/verify.yml pin to major tags (`actions/checkout@v4`),
+  # which float — so this is genuinely just the major bumps, a few times a year.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: ci

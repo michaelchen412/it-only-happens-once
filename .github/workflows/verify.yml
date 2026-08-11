@@ -28,6 +28,13 @@ name: verify
 on:
   push:
     branches: [main]
+  # Added 2026-08-10 (plan 34 · §7) FOR DEPENDABOT, which is the only thing that
+  # opens a pull request here — CLAUDE.md's rule is to commit straight to `main`.
+  # Without this trigger a bump PR arrived with no checks at all.
+  #
+  # ⚠ No double runs: `push` above is restricted to `main`, and Dependabot's
+  # branches are not `main`.
+  pull_request:
   schedule:
     # Mondays, 07:00 UTC. The audit job only.
     - cron: '0 7 * * 1'
@@ -57,7 +64,58 @@ jobs:
       # against the artifact VERCEL produces — running it here would either
       # duplicate the deploy or, worse, pass against a differently-built bundle
       # and read as coverage it isn't. Vercel owns that half.
+      #
+      # ⚠ THAT ARGUMENT IS ABOUT `push`, AND THE `build` JOB BELOW IS ITS
+      # EXCEPTION rather than its contradiction. On a push to `main` Vercel
+      # really does build the artifact, so a second build here is duplication.
+      # On a PULL REQUEST it does not, so nothing owns that half — and a
+      # dependency bump is exactly the change that half exists to catch.
       - run: npm run verify
+
+  build:
+    # ── The check that a DEPENDENCY BUMP actually needs (plan 34 · §7) ────────
+    #
+    # ⚠ `npm run verify` IS NOT THAT CHECK, and this job exists because the
+    # difference has already cost a production outage. On 2026-07-31 every
+    # request 500'd with `Cannot find module 'htmlparser2'` — while typecheck,
+    # lint, the whole unit suite and `astro preview` were green. The cause is
+    # `astro.config.mjs`'s `noExternal` list, which hardcodes the dependency
+    # CLOSURE of `sanitize-html`: bundling a package removes it from the graph
+    # Vercel's tracer walks, so it stops being copied into the function, while
+    # Rollup leaves any of its own dependencies that aren't also listed as bare
+    # `require()` calls pointing at packages no longer shipped.
+    #
+    # A transitive bump can invalidate that list, and `verify` cannot see it.
+    # `scripts/check-server-bundle.mjs` can, and only `npm run build` runs it.
+    #
+    # PULL REQUESTS ONLY — see the ⚠ on the verify job above.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+      - run: npm ci
+      # `build`, not `build:unchecked` — the full thing, so the PR is held to
+      # exactly what Vercel will run. `verify` runs twice on a PR as a result
+      # (once here, once in the job above); it costs ~22s and keeps the two jobs
+      # independently readable, which is worth more than the saving.
+      #
+      # ⚠ NO SECRETS, AND THAT WAS CHECKED RATHER THAN ASSUMED. The first draft
+      # of this job passed `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY`,
+      # on the reasoning that `astro build` evaluates every route module and
+      # `lib/supabase.ts` reads both at module scope. It was tested by moving
+      # `.env.local` aside and building with the two unset: **it completes**,
+      # because a bare `import.meta.env.X` is `undefined` at build time and
+      # nothing in a route calls Supabase until a request arrives.
+      #
+      # So this job needs no repository secrets at all — which is the same
+      # answer 31 · §4 reached for the e2e suite, arrived at from the other
+      # direction. If a future config change makes the build genuinely need a
+      # key, that is a decision to write down, not an `env:` block to paste.
+      - run: npm run build
 
   audit:
     runs-on: ubuntu-latest
