@@ -84,8 +84,20 @@ const cnLabel = cnNames.length
 // The primary line. A quote's body is Markdown → strip it to plain text for the row.
 const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
 
+/*
+  ⚠ QUOTES ONLY NOW (ADR 0031). Writing has always opened its own workshop from
+  `data-writing`; a SONG now opens `SongSheet` from `data-song`, the same way and
+  for the same reason — one editor per kind, named by an id rather than by a
+  payload. So this blob, which exists to fill the FragmentSheet's fields without
+  a round trip, has one consumer left.
+
+  A song deliberately does NOT get the same treatment. Its sheet needs the
+  album, the year, both notes and the paired essays, and carrying those on every
+  row would ship every private note in the corpus into the manager's HTML in
+  order to open one of them. `songs.forSheet` is one read on open instead.
+*/
 const editorData =
-  r.type === 'writing'
+  r.type !== 'quote'
     ? ''
     : JSON.stringify({
         id: r.id,
@@ -126,6 +138,7 @@ const editorData =
   data-id={r.id}
   data-type={r.type}
   data-writing={r.type === 'writing' ? r.id : undefined}
+  data-song={r.type === 'song' ? r.id : undefined}
   data-fragment={editorData || undefined}
   data-placed={placed ? '' : undefined}
   data-constellations={constellations.map((c) => c.id).join(',')}

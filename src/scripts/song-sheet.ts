@@ -100,7 +100,17 @@ export async function openSongById(id: string): Promise<void> {
   openSongSheet({ ...data, resolved: null });
 }
 
-if (sheet) wire(sheet);
+if (sheet) {
+  wire(sheet);
+  // The row → editor seam (`scripts/open-editor.ts`). A row says WHICH song it
+  // wants opened and never names a surface, so the Fragment Manager needs no
+  // knowledge of this sheet at all — it dispatches the same way it does for a
+  // quote or a piece of writing.
+  document.addEventListener('song:edit', (e) => {
+    const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+    if (id) void openSongById(id);
+  });
+}
 
 function wire(sheet: HTMLDialogElement) {
   const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

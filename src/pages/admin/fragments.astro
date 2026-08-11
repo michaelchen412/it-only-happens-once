@@ -20,6 +20,7 @@ import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
 import TypeMark from '../../components/admin/TypeMark.astro';
 import StarMark from '../../components/StarMark.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
+import SongSheet from '../../components/admin/SongSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
 import { allFragmentPeople } from '../../lib/hq/links';
@@ -50,9 +51,12 @@ const subjectNames = data.allSubjects.map((s) => s.name);
   rather than 404ing — you came here to write a quote, and the worst outcome of
   a stale link should be an unattributed one, not a dead end.
 */
-const [people, sharedBy] = await Promise.all([
+const [people, sharedBy, feelings] = await Promise.all([
   supabase.from('people').select('id, display_name').order('display_name'),
   allFragmentPeople(supabase),
+  // The vocabulary for the SongSheet mounted below (ADR 0031). Sixteen rows,
+  // and it rides along in a batch this page already makes.
+  supabase.from('feelings').select('id, name').order('sort'),
 ]);
 
 const personSlug = Astro.url.searchParams.get('person');
@@ -142,13 +146,19 @@ const SUBTITLES = {
                   >
                     <TypeMark type="quote" /> Quote
                   </button>
-                  <button
-                    data-new="song"
-                    role="menuitem"
-                    class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-                  >
-                    <TypeMark type="song" /> Song
-                  </button>
+                  {/* ⚠ NO SONG, AND ITS ABSENCE IS THE DECISION (ADR 0031). A
+                      song enters the corpus at /admin/listening, in the same
+                      motion as the listening — plan 33's ruling 1 is that adding
+                      a song and sitting with it are THE SAME ACT, and a "New
+                      song" button on a management table is precisely the split
+                      that ruling refuses: it would make a row first and a
+                      decision about the music later, which is a queue of
+                      obligations where there was an act of attention.
+
+                      The other door is the writing sheet's Music tab, which
+                      creates one from a pasted link. Both go through
+                      `createSong` → `saveSong`, so they are two doors and not
+                      two write paths. */}
                 </div>
               </div>
             </>
@@ -272,6 +282,17 @@ const SUBTITLES = {
     autoNew={autoNew}
   />
   <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
+  {
+    /* ⚠ THE SAME SHEET /admin/listening MOUNTS, not a copy (ADR 0031). A song
+      row here opens THIS, through the `song:edit` seam in open-editor.ts — so
+      the manager keeps LISTING songs, which is what search, trash and bulk
+      publish are for, and stops EDITING them, which is what had two homes.
+
+      That is what the paste bar living inside the sheet bought: a sheet with
+      its own front door is mountable anywhere, where a page-level one would
+      have forced either a second copy or a navigation out of the room. */
+  }
+  <SongSheet feelings={feelings.data ?? []} people={people.data ?? []} sharedBy={sharedBy} />
 
   <script>
     import '../../scripts/admin-list';
