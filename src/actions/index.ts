@@ -15,7 +15,7 @@
 // ============================================================================
 import { fragments, songs } from './fragments';
 import { versions } from './versions';
-import { subjects, authors, works } from './vocabulary';
+import { subjects, authors, works, feelings } from './vocabulary';
 import { constellations } from './constellations';
 import { pages, contact } from './site';
 import { checkin } from './checkin';
@@ -36,6 +36,10 @@ export const server = {
   subjects,
   authors,
   works,
+  // The fourth vocabulary, and the only one whose slug is frozen (plan 33,
+  // ruling 6): it goes in a public URL people send each other, so a rename must
+  // not move the address. It also refuses collisions instead of suffixing.
+  feelings,
   constellations,
   pages,
   contact,

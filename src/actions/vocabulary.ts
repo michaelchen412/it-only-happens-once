@@ -20,9 +20,10 @@
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
+import { duplicateNameMessage, nextSort, slugTakenMessage } from '../lib/feelings';
 import { type DB, fail, requireAdmin, uniqueSlug, optText, optInt } from './_shared';
 
-/** `from` and `into`, the only input any of the three merges takes. */
+/** `from` and `into`, the only input any of the four merges takes. */
 const mergeInput = z.object({ from: z.uuid(), into: z.uuid() });
 
 /**
@@ -36,7 +37,12 @@ const mergeInput = z.object({ from: z.uuid(), into: z.uuid() });
  * the handler guards first, but mapped anyway rather than surfacing as a 500 if
  * that ever stops being true.
  */
-async function merge(sb: DB, fn: 'merge_subjects' | 'merge_authors' | 'merge_works', from: string, into: string) {
+async function merge(
+  sb: DB,
+  fn: 'merge_subjects' | 'merge_authors' | 'merge_works' | 'merge_feelings',
+  from: string,
+  into: string,
+) {
   const { error } = await sb.rpc(fn, { from_id: from, into_id: into });
   if (!error) return { ok: true };
   const code =
@@ -171,6 +177,123 @@ export const works = {
       requireAdmin(ctx);
       if (input.from === input.into) throw fail('Pick two different works', 'BAD_REQUEST');
       return merge(ctx.locals.supabase, 'merge_works', input.from, input.into);
+    },
+  }),
+};
+
+// ============================================================================
+// FEELINGS — the fourth vocabulary, and the one that breaks two of the three
+// habits above (plan 33 §1, ruling 6).
+//
+//   1. **`update` DOES NOT RE-SLUG.** Every other vocabulary here re-derives its
+//      slug from the name on every save, via `uniqueSlug`. A feeling's slug is
+//      FROZEN at creation, because plan 33 §7 puts it in a public URL
+//      (`?feeling=regretful`) — something people send each other — and plan 32
+//      §1 found that moving a slug hard-404s every link already handed out. So a
+//      rename changes the word and leaves the address alone, and the two are
+//      allowed to drift apart forever.
+//   2. **`create` EXISTS AND REFUSES.** Subjects, authors and works are created
+//      as a side effect of saving a fragment, and collisions are resolved by
+//      suffixing. Neither is right here: §1's whole claim is that the vocabulary
+//      is small and shared, so adding a word must be a deliberate act, and a
+//      silent `regretful-2` would be a second invisible shelf with the same name
+//      on the front. See `lib/feelings.ts` for the collision this catches that
+//      name-uniqueness cannot.
+//
+// What is NOT here: anything that decides what a song feels like. Ruling 1 —
+// *"AI can't tell me what I feel"* — and the tagging write itself lives with the
+// song, in `songs.setFeelings`, because it is a relation on a fragment rather
+// than a vocabulary edit.
+// ============================================================================
+
+/** Both constraints are checked ahead of the insert for a better sentence; this is the race backstop. */
+function feelingConflict(message: string): string | null {
+  if (message.includes('feelings_name_ci')) return 'There is already a feeling with that name.';
+  if (message.includes('feelings_slug_key')) return 'Another feeling already owns that link.';
+  return null;
+}
+
+export const feelings = {
+  /**
+   * Add a word to the spectrum — from the Library, or mid-listen from the bench
+   * (plan 33 §6a), which is the case that decides whether §1's "the vocabulary
+   * is discovered by tagging" is true or merely stated.
+   */
+  create: defineAction({
+    accept: 'form',
+    input: z.object({ name: z.string().trim().min(1, 'Type a word first').max(40) }),
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+      const name = input.name.trim();
+      const slug = slugify(name);
+      if (!slug) throw fail('That word needs at least one letter or number.', 'BAD_REQUEST');
+
+      const { data: existing, error: readErr } = await sb.from('feelings').select('id, name, slug, sort');
+      if (readErr) throw fail(readErr.message);
+      const rows = existing ?? [];
+
+      const sameName = rows.find((f) => f.name.toLowerCase() === name.toLowerCase());
+      if (sameName) throw fail(duplicateNameMessage(sameName.name), 'CONFLICT');
+      const sameSlug = rows.find((f) => f.slug === slug);
+      if (sameSlug) throw fail(slugTakenMessage(sameSlug.name, slug), 'CONFLICT');
+
+      const { data, error } = await sb
+        .from('feelings')
+        .insert({ name, slug, sort: nextSort(rows.map((f) => f.sort)) })
+        .select('id, name, slug, sort')
+        .single();
+      if (error)
+        throw fail(feelingConflict(error.message) ?? error.message, error.code === '23505' ? 'CONFLICT' : undefined);
+      return data;
+    },
+  }),
+
+  /**
+   * Rename a word, or move it along the spectrum. ⚠ The slug is not an input and
+   * must not become one — see this section's header.
+   */
+  update: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid(), name: z.string().trim().min(1).max(40), sort: optInt }),
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      const row: { name: string; sort?: number } = { name: input.name.trim() };
+      if (input.sort !== undefined) row.sort = input.sort;
+      const { error } = await ctx.locals.supabase.from('feelings').update(row).eq('id', input.id);
+      if (error)
+        throw fail(feelingConflict(error.message) ?? error.message, error.code === '23505' ? 'CONFLICT' : undefined);
+      return { ok: true };
+    },
+  }),
+
+  /**
+   * Remove a word. `fragment_feelings` cascades, so this un-files every song
+   * carrying it — which is why the Library shows the count beside the button.
+   */
+  remove: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid() }),
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      const { error } = await ctx.locals.supabase.from('feelings').delete().eq('id', input.id);
+      if (error) throw fail(error.message);
+      return { ok: true };
+    },
+  }),
+
+  /**
+   * ⚠ THE ONE THAT KEEPS THE VOCABULARY SMALL, and the only exit from the
+   * frozen-slug collision above. Uniqueness catches `tender` twice; nothing but
+   * this catches `tender` and `gentle`.
+   */
+  merge: defineAction({
+    accept: 'form',
+    input: mergeInput,
+    handler: async (input, ctx) => {
+      requireAdmin(ctx);
+      if (input.from === input.into) throw fail('Pick two different feelings', 'BAD_REQUEST');
+      return merge(ctx.locals.supabase, 'merge_feelings', input.from, input.into);
     },
   }),
 };

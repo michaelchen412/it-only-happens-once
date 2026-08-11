@@ -531,7 +531,7 @@ An essay may point at one song fragment through `fragments.paired_song_id` ([ADR
 
 **The player carries no caption** (2026-08-10). It printed `♪ Title — Artist` above the embed until the embed was looked at properly: it already shows the track, the artist, and the artwork, in larger type than the caption used. The one fact the player doesn't know — *this song goes with this piece* — survives as the iframe's `title`, so a screen reader still hears the pairing; a sighted reader gets it from position alone.
 
-Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog. The tab picks from songs already in the corpus; adding a song is still the Fragment Manager's job, because a second way to write a song fragment is not worth having.
+Set it in the writing sheet's **Music** tab. Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog. The tab picks from songs already in the corpus, so pairing a song you haven't added yet still means leaving for the Fragment Manager and coming back. That is the known rough edge, and the distinction that resolves it is *a second **door**, not a second **write path*** — a control calling the existing `saveSong` leaves that action the single owner of the fact. The Listening room (§6b) is the first place that pattern exists; the Music tab is due the same create row.
 
 **Two sources, one shape.** `pairedMediaOf` in `src/lib/blog.ts` normalises them and the renderer can't tell which answered:
 
@@ -541,6 +541,29 @@ Set it in the writing sheet's **Music** tab. Like constellation membership it ap
 **The branch order is a security property.** If `paired_song_id` is set, the song row is the only truth — if RLS hid it (the song is a draft) or it's in the trash, the answer is *no pairing*, never a fall-through to `details.media`. All 48 promoted essays still carry that legacy column pointing at the same track, so falling through would keep playing a song you had just unpublished.
 
 **Nothing loads in the feed.** Every surface but the permalink renders `PostArticle` inside a `<template>`, and template contents are inert — so a seven-essay page of `/blog` spawns zero third-party frames, and the iframe only starts when the Reader clones it. Measured, not assumed.
+
+## 6b. Listening — where a song enters the corpus, and what it does to you
+
+`/admin/listening`, built 2026-08-11 ([plan 33](plans/33-many-words-for-one-song.md) §3). Paste a Spotify or YouTube link → the player comes up → press the words the track leaves you with → **Save** → next song. The URL field takes focus again on save, so the loop is paste-listen-press-save without reaching for the mouse.
+
+**Adding and tagging are one act, and the room's whole shape follows from that.** The moment you paste the link is the moment you have decided this piece of music deserves consideration, so there is no state where a song is "added but not yet heard" by intent. Splitting the two would invent a queue of obligations where there was an act of attention — a thousand imported rows would be a backlog to burn down; a thousand rows added one at a time, over years, is the record of a practice.
+
+⚠ **No import, and no AI, and the second one is a rule rather than a gap.** Michael, 2026-08-10: *"it's a feature, not a bug, that I have to go through the songs one by one… **AI can't tell me what I feel** and then try to tag it."* The corpus tags **subjects** with a model ([ADR 0007](adr/0007-ai-subject-tagging.md)) and that is fine, because a subject is what a piece is *about* and that is legible from the text. **A feeling is not a property of the song — it is what happened in Michael**, so there is deliberately no `suggestFeelings` beside `suggestSubjects`, and nothing here may propose one: not as a first pass, not as suggestions to accept or reject, not to narrow the chip list.
+
+| The room | What it does |
+|---|---|
+| **Paste bar** | `songs.lookup` fills title/artist/album/year, and reports whether the corpus already holds it. Dedupe is on the **parsed** `{provider, kind, id}`, never the pasted string — the same track arrives as `?si=…`, as `intl-de/`, and as `spotify:track:…`, and a raw comparison grows a twin for each. |
+| **The player** | Built server-side (`songEmbed`), because `lib/media.ts` reaches `astro:env/server` and nothing in `src/scripts/` may import it. Rows carry their embed already resolved, so pulling an existing song onto the bench costs no round trip. |
+| **The words** | `feelings`, ordered dark → light by `sort`. Buttons with `aria-pressed`, not checkboxes: a row of words, not a form. |
+| **+ a word** | Creates a feeling mid-listen (§8) and presses it. Lands at the bright end until the Library places it. |
+| **Save** | New song → `saveSong` (as **published**, not the `draft` default — see below) then `songs.setFeelings`. Existing song → `setFeelings` only. |
+| **Two lists** | *Not yet heard* and *Filed*. A row moves between them on save; neither is a burn-down. |
+
+**`setFeelings` applies immediately and sends the whole set**, like `pair` and the constellation picker and for the same reason: a relation is not a field of the document. A song can be re-heard and re-tagged years after its row was written, and there is nothing else on that screen to save.
+
+⚠ **A song saved here is published, deliberately.** A song has no draft register — all 48 already in the corpus are published — and the paired player under an essay reads `fragment_feelings` through a policy that requires it. A song filed as a draft would go silent under its own essay for every reader but Michael.
+
+**The 48 songs already here are not a head start.** They arrived as *paired media* — chosen because they went with an essay, not because of what they evoke — so they sit in *Not yet heard* and need the same one-by-one attention as anything new.
 
 ## 7. Quotes
 
@@ -575,7 +598,17 @@ Subjects are the orthogonal axis to constellations ([data-model.md](data-model.m
 
 ⚠ **The expensive half is still unbounded and that inversion is known.** Every author and every work is serialized into a `data-options` attribute on every page that mounts a sheet, whether or not you open it. Rendering rows is the cheap half and it was the one with the hard cap. The fix is an endpoint the combo queries on a debounce through its existing `setOptions()` — deferred deliberately, because at 70 authors and 49 works the payload is a few kilobytes and local filtering is instant. The reads that build it now state their PostgREST ceiling explicitly rather than inheriting the silent 1000-row default.
 
-**Library (`/admin/library`)** also carries **Export corpus** — the whole database as one JSON file, for the day you leave Postgres rather than for disaster recovery (which the nightly dump already covers). See [backups.md](backups.md). It grooms the three cross-cutting entities editors create on the fly: **subjects** (with definitions — the taxonomy the AI reads), **authors**, **works**. Each row: edit in place, **merge** a duplicate into another (reassigns links, deletes the loser), or **delete** (FK-safe — `on delete set null`/cascade means a fragment is never orphaned). Usage counts show what's safe to remove.
+**Library (`/admin/library`)** also carries **Export corpus** — the whole database as one JSON file, for the day you leave Postgres rather than for disaster recovery (which the nightly dump already covers). See [backups.md](backups.md). It grooms the four cross-cutting vocabularies: **subjects** (with definitions — the taxonomy the AI reads), **feelings** (below), **authors**, **works**. Each row: edit in place, **merge** a duplicate into another (reassigns links, deletes the loser), or **delete** (FK-safe — `on delete set null`/cascade means a fragment is never orphaned). Usage counts show what's safe to remove.
+
+**Feelings — the fourth vocabulary, and it behaves differently on purpose** (2026-08-11, [plan 33](plans/33-many-words-for-one-song.md) §1). A subject is what a piece is *about*; a **feeling is what a song does to you**. Same register, opposite direction — which is why they are separate tables rather than one with a `kind` column, and why the migration says so at length. Sixteen words to start, ordered **dark → light** rather than alphabetically; that ordering is a claim about the spectrum, which is why `sort` is data and is editable here.
+
+Three ways it departs from the other three, each of which will look like an oversight to somebody later:
+
+- **The slug is frozen; the name is not.** Everything else on this page re-derives its slug from its name on every save. A feeling's slug goes into a public URL people send each other, and moving one hard-404s every link already handed out — so a rename changes the word and leaves the address alone. The Library shows the link in its own column, because that drift is otherwise invisible.
+- **⚠ Which produces a collision name-uniqueness cannot catch.** Rename `regretful` → `remorseful` and nothing is *named* `regretful` any more, so a brand-new `regretful` passes the name check and then wants a slug the renamed row still owns. It is **refused, not silently suffixed to `regretful-2`** — a numbered twin would be a second invisible shelf with the same name on the front. Merge is the way out.
+- **Names are unique case-insensitively.** `Tender` and `tender` would show the same shelf twice in a room built out of these words. Subjects can tolerate that; this cannot. Uniqueness is still nowhere near sufficient — it catches `tender` twice and does nothing about `tender` and `gentle`, which is the drift that actually kills a taxonomy. That is merge's job, which is why merge exists here from day one rather than being deferred.
+
+Adding a word is deliberately a small, plain control — here, and mid-listen in the Listening room (§6b). §1's counterweight is size discipline: a prominent "+ new word" turns sixteen words into sixty by month three.
 
 ⚠ **The delete confirm names what it is about to take, and the shelf is the reason.** "Fragments themselves stay — only this label and its links are removed" was true and still misled: one of a *work's* links is somebody's `person_works` row, and the note written on that shelf goes with it by cascade. The dialog now counts against `fragments` **and** `person_works` first — *"12 fragments cite this work; 2 people have it on a shelf, one with a note"* — and its reassuring tail changes when it stops being the whole truth. Refusing the delete was considered and rejected: a curation tool that will not let you remove a duplicate because somebody once shelved it is a puzzle rather than a tool.
 

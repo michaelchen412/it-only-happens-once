@@ -1,0 +1,18 @@
+-- ============================================================================
+-- Delete the `jazz` subject
+-- Plan: docs/plans/33 · §1
+--
+-- Not an unused row — a row used ONCE, in the wrong direction. `jazz` is a
+-- genre, sitting in a taxonomy of 22 words about living (grief, ambition,
+-- forgiveness), attached to zero essays, zero quotes, and exactly one song. It
+-- is what happens when music gets treated as a thing in itself: the reach is
+-- for Spotify's axis, and Spotify inside our own schema is strictly worse than
+-- Spotify.
+--
+-- Jazz is the corpus, not a facet of it. What that one song actually needed was
+-- a feeling, which as of this migration's predecessor it can now have.
+--
+-- Cascades exactly one `fragment_subjects` row; verified against the database
+-- 2026-08-11 before writing this.
+-- ============================================================================
+delete from public.subjects where slug = 'jazz';

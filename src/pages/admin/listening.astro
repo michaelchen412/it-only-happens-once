@@ -1,0 +1,268 @@
+---
+/*
+  /admin/listening — the bench where a song enters the corpus and is heard
+  (docs/plans/33 §3, §6a).
+
+  ⚠ THIS IS NOT A TAGGING TOOL FOR SONGS YOU ALREADY HAVE, and the distinction
+  decided the shape of the screen. Plan 33's ruling 1: adding a song and sitting
+  with a song are THE SAME ACT. The moment you paste the link is the moment you
+  have decided this piece of music deserves consideration — so separating "get it
+  into the corpus" from "decide what it does to you" would invent a queue of
+  obligations where there was an act of attention. One paste bar, one player, one
+  row of words, and the corpus grows as a byproduct of listening.
+
+  ⚠ AND NOTHING HERE PROPOSES A FEELING. Not as a first pass, not as a
+  suggestion to accept or reject, not to narrow the list. The corpus tags
+  SUBJECTS with a model (ADR-0007) because a subject is what a piece is about and
+  that is legible from the text. A feeling is not a property of the song — it is
+  what happened in Michael — so `songs.setFeelings` has no `suggestFeelings`
+  beside it and this page has no button that would call one. Michael, 2026-08-10:
+  *"AI can't tell me what I feel."*
+
+  The words come from `feelings`, ordered dark → light by `sort`, which is a
+  claim about the spectrum rather than a display preference (see the migration).
+*/
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import PageHeader from '../../components/admin/PageHeader.astro';
+import { embedForUrl } from '../../lib/media';
+
+const supabase = Astro.locals.supabase;
+
+const [{ data: feelings }, { data: songs }] = await Promise.all([
+  supabase.from('feelings').select('id, name, slug, sort').order('sort'),
+  supabase
+    .from('fragments')
+    .select('id, title, attribution, source_url, created_at, fragment_feelings(feeling_id)')
+    .eq('type', 'song')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false }),
+]);
+
+const vocabulary = feelings ?? [];
+
+/*
+  The embed is resolved HERE, once per song, and carried on the row.
+
+  `lib/media.ts` reaches `astro:env/server` and forbids `src/scripts/` from
+  importing it, so the browser cannot parse a provider URL. Pulling an existing
+  song onto the bench would otherwise cost a `songs.lookup` round trip — a call
+  to Spotify — to learn something we already stored. The paste path still calls
+  lookup, because a link nobody has saved yet genuinely is unknown.
+*/
+const rows = (songs ?? []).map((s) => {
+  const embed = s.source_url ? embedForUrl(s.source_url) : null;
+  return {
+    id: s.id,
+    title: s.title ?? '(untitled)',
+    artist: s.attribution ?? '',
+    url: s.source_url ?? '',
+    embedSrc: embed?.src ?? '',
+    embedHeight: embed?.height ?? 0,
+    embedAllow: embed?.allow ?? '',
+    feelingIds: (s.fragment_feelings ?? []).map((f) => f.feeling_id),
+  };
+});
+
+const waiting = rows.filter((r) => r.feelingIds.length === 0);
+const filed = rows.filter((r) => r.feelingIds.length > 0);
+---
+
+<AdminLayout title="Listening" active="listening">
+  <div class="mx-auto max-w-3xl px-6 py-8">
+    <PageHeader
+      title="Listening"
+      subtitle="Paste a link, play it, and press the words it leaves you with. A song enters the corpus here, in the same motion as the listening — there is no backlog to work through and no state where a song is added but not yet heard."
+    />
+    <p id="lst-error" hidden role="alert" class="admin-alert mb-4"></p>
+
+    {
+      /* THE PASTE BAR IS THE ONLY WAY IN, and it is first because it is the
+        first thing you do. `type="url"` rather than `search`: this field takes
+        one specific kind of string, and the keyboard a phone raises for a URL is
+        the one with the slash on it. */
+    }
+    <label class="mb-8 block">
+      <span class="sr-only">Paste a Spotify or YouTube link</span>
+      <input
+        id="lst-url"
+        type="url"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Paste a Spotify or YouTube link…"
+        class="input input-bordered w-full font-sans"
+      />
+    </label>
+
+    {
+      /* THE BENCH — one song at a time. Hidden until there is one, rather than
+        rendered empty with placeholder chrome: an empty player frame and a row
+        of dead words would be a screen apologising for having nothing on it. */
+    }
+    <section id="lst-bench" hidden class="border-base-300 rounded-box mb-10 border p-4">
+      <div id="lst-player" class="mb-4"></div>
+
+      <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        {
+          /* Editable for a song that does not exist yet, because the oEmbed
+            fallback often knows the title and not the artist and a five-artist
+            track joins to a mouthful nobody wants as an attribution. Locked once
+            the row exists — the Fragment Manager owns a saved song's metadata,
+            and a second editor for it here would be a second write path. */
+        }
+        <input
+          id="lst-title"
+          aria-label="Song title"
+          class="input input-sm input-bordered min-w-0 grow font-serif read-only:border-transparent read-only:bg-transparent read-only:px-0"
+        />
+        <input
+          id="lst-artist"
+          aria-label="Artist"
+          class="input input-sm input-bordered min-w-0 grow font-sans read-only:border-transparent read-only:bg-transparent read-only:px-0"
+        />
+        <span id="lst-known" hidden class="admin-hint shrink-0 italic">already in the corpus</span>
+      </div>
+
+      {
+        /* THE WORDS. Buttons, not checkboxes, and pressed rather than checked:
+          `aria-pressed` is the role for a toggle that changes a thing rather than
+          submitting a value, and it keeps the row readable as a row of words
+          instead of a form. The order is `sort` — dark to light — which is the
+          spectrum's claim and not an alphabetisation. */
+      }
+      <div id="lst-words" class="mb-4 flex flex-wrap gap-2">
+        {
+          vocabulary.map((f) => (
+            <button
+              type="button"
+              class="lst-word rounded-field border-base-300 hover:border-base-content/40 border px-2.5 py-1 font-sans text-sm transition-colors"
+              data-feeling={f.id}
+              aria-pressed="false"
+            >
+              {f.name}
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        /* ADDING A WORD MID-LISTEN (§6a). Not a convenience: §1 says the
+          vocabulary is *discovered by tagging, not by drafting*, and that is only
+          true if the word can be added without stopping the track. A bench that
+          made you leave for the Library would fail on exactly the songs that
+          matter most — the ones whose feeling is not in the list yet.
+
+          ⚠ AND IT IS DELIBERATELY PLAIN. §1's counterweight is size discipline:
+          a prominent "+ new word" turns sixteen words into sixty by month three.
+          It types the whole word, it lands at the bright end of the spectrum
+          where it is visibly unplaced, and the Library is where it gets its
+          position. */
+      }
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          id="lst-newword"
+          placeholder="a word that isn't here…"
+          aria-label="Add a word to the vocabulary"
+          class="input input-xs input-bordered w-48 font-sans"
+        />
+        <button id="lst-addword" type="button" class="btn btn-ghost btn-xs normal-case">Add it</button>
+        <span id="lst-wordnote" hidden class="admin-hint italic"></span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="lst-save" type="button" class="btn btn-primary btn-sm normal-case">Save</button>
+        <button id="lst-close" type="button" class="btn btn-ghost btn-sm normal-case">Close</button>
+        <span id="lst-status" class="admin-hint ml-auto" aria-live="polite"></span>
+      </div>
+    </section>
+
+    {
+      /* THE 48 SONGS ALREADY HERE ARE NOT A HEAD START (§3). They arrived as
+        paired media — chosen because they went with an essay, not because of what
+        they evoke — so they need the same one-by-one attention as anything new.
+        Listed rather than counted: a number would make it a backlog, and a
+        backlog is the framing ruling 1 rejected. */
+    }
+    <section class="mb-10">
+      <h2 class="font-display mb-3 text-lg">
+        Not yet heard <span id="lst-waiting-n" class="text-base-content/40 text-sm">({waiting.length})</span>
+      </h2>
+      <ul id="lst-waiting" class="divide-base-300 border-base-300 rounded-box divide-y border">
+        {
+          waiting.map((s) => (
+            <li
+              class="lst-row flex items-baseline gap-3 px-3 py-2"
+              data-song={s.id}
+              data-title={s.title}
+              data-artist={s.artist}
+              data-embed-src={s.embedSrc}
+              data-embed-height={s.embedHeight}
+              data-embed-allow={s.embedAllow}
+              data-feelings={s.feelingIds.join(',')}
+            >
+              <button type="button" class="lst-open min-w-0 grow text-left">
+                <span class="font-serif">{s.title}</span>
+                <span class="text-base-content/50 ml-2 text-sm">{s.artist}</span>
+              </button>
+              <span class="lst-row-words text-base-content/45 shrink-0 font-sans text-xs" />
+            </li>
+          ))
+        }
+        {
+          /* Rendered always, hidden when the list has rows — `refreshCounts` in
+          listening.ts toggles it as rows move between the two lists, which a
+          server-rendered-only line could not do. */
+        }
+        <li class="lst-empty admin-hint px-3 py-2 italic" hidden={waiting.length > 0}>
+          Every song here has been sat with.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="font-display mb-3 text-lg">
+        Filed <span id="lst-filed-n" class="text-base-content/40 text-sm">({filed.length})</span>
+      </h2>
+      <ul id="lst-filed" class="divide-base-300 border-base-300 rounded-box divide-y border">
+        {
+          filed.map((s) => (
+            <li
+              class="lst-row flex items-baseline gap-3 px-3 py-2"
+              data-song={s.id}
+              data-title={s.title}
+              data-artist={s.artist}
+              data-embed-src={s.embedSrc}
+              data-embed-height={s.embedHeight}
+              data-embed-allow={s.embedAllow}
+              data-feelings={s.feelingIds.join(',')}
+            >
+              <button type="button" class="lst-open min-w-0 grow text-left">
+                <span class="font-serif">{s.title}</span>
+                <span class="text-base-content/50 ml-2 text-sm">{s.artist}</span>
+              </button>
+              <span class="lst-row-words text-base-content/45 shrink-0 font-sans text-xs" />
+            </li>
+          ))
+        }
+        <li class="lst-empty admin-hint px-3 py-2 italic" hidden={filed.length > 0}>Nothing filed yet.</li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    import { wireListeningBench } from '../../scripts/listening';
+    wireListeningBench();
+  </script>
+
+  <style>
+    /* The pressed state, and it is the only styling this page adds.
+
+       A border and a weight rather than a fill: the row is a row of WORDS, and a
+       block of coloured chips reads as a form control. `--color-primary` is the
+       same accent the rest of the workshop uses for "this is on". */
+    .lst-word[aria-pressed='true'] {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      font-weight: 500;
+    }
+  </style>
+</AdminLayout>

@@ -9,7 +9,7 @@ import { defineAction } from 'astro:actions';
 import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
-import { MediaUnreachable, lookupSong, parseSongRef, songRefUrl } from '../lib/media';
+import { MediaUnreachable, lookupSong, parseSongRef, songEmbed, songRefUrl } from '../lib/media';
 import { provenanceLine } from '../lib/provenance';
 import type { Database, Json } from '../lib/database.types';
 import {
@@ -827,6 +827,34 @@ export const fragments = {
   }),
 };
 
+/**
+ * The song already in the corpus for a pasted link, if there is one.
+ *
+ * ⚠ MATCHED ON THE PARSED REF, NEVER ON THE PASTED STRING (plans/33 §6a). The
+ * same track arrives as `open.spotify.com/track/ID?si=…` from the share sheet,
+ * as `open.spotify.com/intl-de/track/ID` from a German browser, and as
+ * `spotify:track:ID` from the desktop app. All three are one song, and comparing
+ * raw text would grow a twin for each — which is the failure mode that matters
+ * most here, because a duplicate row splits a song's feelings across two shelves
+ * and neither one is wrong enough to notice.
+ *
+ * `songRefUrl` is the canonical form `saveSong` already stores, so this is an
+ * exact-match lookup rather than a fuzzy one.
+ */
+async function songForRef(sb: DB, url: string) {
+  const ref = parseSongRef(url);
+  if (!ref) return null;
+  const { data } = await sb
+    .from('fragments')
+    .select('id, title, attribution')
+    .eq('type', 'song')
+    .eq('source_url', songRefUrl(ref))
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+  return data ? { id: data.id, title: data.title ?? '(untitled)', artist: data.attribution ?? '' } : null;
+}
+
 export const songs = {
   /**
    * Resolve a pasted track / album / video link to everything we can learn
@@ -853,7 +881,68 @@ export const songs = {
         throw e;
       }
       if (!found) throw fail('Couldn’t read that link — Spotify track/album or YouTube video, please', 'BAD_REQUEST');
-      return found;
+      return {
+        ...found,
+        // ⚠ THE EMBED IS BUILT HERE BECAUSE IT CANNOT BE BUILT THERE.
+        // `lib/media.ts` reaches `astro:env/server` and says in its header that
+        // nothing in `src/scripts/` may import it — so the listening bench,
+        // which has to raise a player for a link pasted a moment ago, would
+        // otherwise have to re-implement provider parsing in the browser. Two
+        // parsers for one question is how the `?si=` and `intl-xx/` forms end up
+        // handled in one place and not the other.
+        embed: songEmbed(found.ref),
+        existing: await songForRef(ctx.locals.supabase, input.url),
+      };
+    },
+  }),
+
+  /**
+   * Replace the feelings on a song (plan 33 §2). The whole set every time, not a
+   * diff — the bench's chips ARE the set, and sending what they say is the only
+   * version with no way to drift out of step with what is on screen.
+   *
+   * Applies IMMEDIATELY, like `pair` above and the constellation picker, and for
+   * the same reason: this is a relation, not a field of the document. It must not
+   * ride along with a save, because a song can be re-heard and re-tagged years
+   * after the row was written and there is nothing else on that screen to save.
+   *
+   * ⚠ NOTHING SUGGESTS THE FEELINGS, AND NOTHING MAY. Plan 33 ruling 1: *"AI
+   * can't tell me what I feel."* The corpus tags SUBJECTS with a model
+   * (ADR-0007) and that is fine, because a subject is what a piece is about and
+   * that is legible from the text. A feeling is not a property of the song; it is
+   * what happened in Michael, and a machine-proposed one would be a
+   * plausible-sounding guess in a field whose only value is that it is true.
+   * There is deliberately no `suggestFeelings` beside `suggestSubjects`.
+   */
+  setFeelings: defineAction({
+    input: z.object({ song_id: z.uuid(), feeling_ids: z.array(z.uuid()).max(40) }),
+    handler: async ({ song_id, feeling_ids }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+      // `.eq('type', 'song')` for the same reason `pair` carries it: the FK
+      // cannot say "only a song", so the sentence lives here instead of a
+      // constraint name. An essay with feelings on it would be a category error
+      // the room would then have to filter out forever.
+      const { data: song } = await sb.from('fragments').select('id, type, deleted_at').eq('id', song_id).maybeSingle();
+      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
+      if (song.type !== 'song') throw fail('Only a song carries feelings.', 'BAD_REQUEST');
+
+      const wanted = [...new Set(feeling_ids)];
+      // Delete-then-insert rather than a diff: the pair is the whole row, so
+      // there is no partial update to express, and both statements are keyed on
+      // the same fragment. ⚠ Not a transaction — if the insert failed after the
+      // delete the song would be left untagged, which is visible on the screen
+      // you are looking at and re-fixable in one click. A plpgsql function
+      // (as the merges use) would be the answer if this ever stops being true.
+      const { error: clearErr } = await sb.from('fragment_feelings').delete().eq('fragment_id', song_id);
+      if (clearErr) throw fail(clearErr.message);
+      if (wanted.length) {
+        const { error } = await sb
+          .from('fragment_feelings')
+          .insert(wanted.map((feeling_id) => ({ fragment_id: song_id, feeling_id })));
+        if (error) throw fail(error.message);
+      }
+      return { ok: true, count: wanted.length };
     },
   }),
 

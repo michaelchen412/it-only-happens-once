@@ -20,7 +20,7 @@
 // layer and the wording is reachable from a test.
 
 export interface DeleteCost {
-  entity: 'subject' | 'author' | 'work';
+  entity: 'subject' | 'author' | 'work' | 'feeling';
   /** Shown in quotes so the dialog names the row you actually clicked. */
   name?: string;
   /** Live fragments tagged with / naming / citing it. */
@@ -44,7 +44,16 @@ export function deleteWarning(c: DeleteCost): string {
         ? `${plural(c.uses, 'fragment is', 'fragments are')} tagged with this`
         : c.entity === 'author'
           ? `${plural(c.uses, 'fragment names', 'fragments name')} this author`
-          : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
+          : // ⚠ A FEELING'S COUNT IS THE ONE THAT CANNOT BE RE-DERIVED. A subject
+            // can be re-tagged from the text and a citation re-read off the page;
+            // what a song did to somebody on a particular evening cannot be
+            // recovered from anything but memory, and plan 33 ruling 1 forbids a
+            // model guessing at it. So the sentence says *filed under* — the
+            // shelf language the room is built in — and merge is the exit that
+            // keeps the links.
+            c.entity === 'feeling'
+            ? `${plural(c.uses, 'song is', 'songs are')} filed under this`
+            : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
     );
   }
 

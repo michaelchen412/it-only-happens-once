@@ -388,6 +388,30 @@ export type Database = {
         }
         Relationships: []
       }
+      feelings: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          sort: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          sort: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          sort?: number
+        }
+        Relationships: []
+      }
       fragment_constellations: {
         Row: {
           constellation_id: string
@@ -417,6 +441,36 @@ export type Database = {
           },
           {
             foreignKeyName: "fragment_constellations_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fragment_feelings: {
+        Row: {
+          feeling_id: string
+          fragment_id: string
+        }
+        Insert: {
+          feeling_id: string
+          fragment_id: string
+        }
+        Update: {
+          feeling_id?: string
+          fragment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fragment_feelings_feeling_id_fkey"
+            columns: ["feeling_id"]
+            isOneToOne: false
+            referencedRelation: "feelings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fragment_feelings_fragment_id_fkey"
             columns: ["fragment_id"]
             isOneToOne: false
             referencedRelation: "fragments"
@@ -1113,6 +1167,7 @@ export type Database = {
     Functions: {
       is_admin: { Args: never; Returns: boolean }
       merge_authors: { Args: { from_id: string; into_id: string }; Returns: undefined }
+      merge_feelings: { Args: { from_id: string; into_id: string }; Returns: undefined }
       merge_subjects: { Args: { from_id: string; into_id: string }; Returns: undefined }
       merge_works: { Args: { from_id: string; into_id: string }; Returns: undefined }
     }

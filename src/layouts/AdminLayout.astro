@@ -8,8 +8,8 @@
 
   ONE BUILDING, PLAIN ROOMS (ADR-0015). "Workshop" named both the whole and one
   of its parts once /admin stopped being the fragment table, so the building is
-  the Observatory and the rooms keep nouns: Today · People · Agenda ·
-  Fragments · Constellations · Library · About.
+  the Observatory and the rooms keep nouns: Today · People · Agenda · Notes ·
+  Fragments · Listening · Constellations · Library · About.
 */
 import { Icon } from 'astro-icon/components';
 import Base from './Base.astro';
@@ -32,7 +32,7 @@ import { attentionLabel, titlePrefix } from '../lib/hq/attention';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'constellations' | 'library' | 'about';
+  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'listening' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -99,6 +99,18 @@ const nav = [
   // is that I have writing fragments and I have brain dumps."*
   { key: 'notes', label: 'Notes', href: '/admin/notes', icon: 'ph:note', hr: false },
   { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
+  // LISTENING sits immediately after Fragments, in the same position Notes holds
+  // in the daily half and for the same reason: it is the FRONT of a pipeline. A
+  // song enters the corpus here, in one motion with the listening (plan 33 §3,
+  // ruling 1) — so this is to music what Notes is to writing, and putting it
+  // after the room its rows end up in would describe the flow backwards.
+  //
+  // ⚠ A NINTH ROW, IN A LIST WHOSE ARGUMENT IS THAT IT IS SHORT. The push
+  // toggle two blocks below is refused a row on exactly that ground, and the
+  // difference is worth stating rather than leaving to be re-litigated: that is
+  // one switch, and this is a place you go and stay — twenty songs in a sitting
+  // is what §3 sizes it for. A room you return to daily is what a nav row is.
+  { key: 'listening', label: 'Listening', href: '/admin/listening', icon: 'ph:music-notes', hr: false },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },
   { key: 'about', label: 'About page', href: '/admin/about', icon: 'ph:user-circle', hr: false },

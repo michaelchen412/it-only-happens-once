@@ -66,6 +66,26 @@ describe('deleteWarning', () => {
     expect(deleteWarning({ ...base, entity: 'work', shelves: 2, shelfNotes: 2 })).toContain('2 with notes');
   });
 
+  it('⚠ a feeling counts SONGS, and says “filed under” rather than “tagged with”', () => {
+    // The fourth vocabulary (plan 33 §1). Two things this pins:
+    //
+    //   1. It must not fall through to the works branch. The three-way ternary
+    //      this replaced ended in `work` as the default, so adding an entity
+    //      without extending it produced "3 fragments cite this work" on a
+    //      Delete Feeling dialog — a confidently wrong sentence, which is the
+    //      exact fault this whole module exists to prevent.
+    //   2. The words are the room's own. A song is FILED UNDER a feeling —
+    //      that is the shelf language plan 33 is built in, and "tagged with"
+    //      would describe it as metadata.
+    const msg = deleteWarning({ ...base, entity: 'feeling', name: 'regretful', uses: 3 });
+    expect(msg).toBe(
+      'Delete “regretful”? 3 songs are filed under this. ' +
+        'Fragments themselves stay — only this label and its links are removed.',
+    );
+    expect(deleteWarning({ ...base, entity: 'feeling', uses: 1 })).toContain('1 song is filed under this');
+    expect(msg).not.toContain('cite this work');
+  });
+
   it('falls back to “this” rather than printing an empty pair of quotes', () => {
     expect(deleteWarning({ ...base, entity: 'work', name: '  ' })).toMatch(/^Delete this\?/);
     expect(deleteWarning({ ...base, entity: 'work' })).toMatch(/^Delete this\?/);
