@@ -99,7 +99,13 @@ const selectedSubjects = Array.from(
 );
 // One author, not a list: "everything by this person" is a single question, and
 // stacking two authors would be an OR where every other filter here is an AND.
-const authorSlug = (params.get('author') ?? '').trim() || null;
+//
+// QUOTES ONLY, and read as nothing anywhere else — only a quote has an author
+// row. Left ungated, `/blog?author=seneca` on the writing view would draw the
+// chip and head the feed "12 essays by Seneca" over an unfiltered list, since
+// `listWriting` has no such facet to apply. A filter that is drawn but not
+// applied is the same lie as a count that ignores one.
+const authorSlug = view === 'quotes' ? (params.get('author') ?? '').trim() || null : null;
 const rawQ = (params.get('q') ?? '').trim();
 const searching = rawQ.length >= MIN_SEARCH; // a 1-char term matches ~everything (docs/search.md §3)
 const q = searching ? rawQ : '';
@@ -110,14 +116,20 @@ const isPartial = Astro.request.headers.get('X-Requested-With') === 'fetch';
 const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1) : 1;
 
 // The rail's subjects are annotated for the CURRENT filter: a contextual count,
-// which are selected, and which combinations are dead-ends (disabled). The search
-// term feeds in too, so typing re-counts the tags in real time.
+// which are selected, and which combinations are dead-ends (disabled).
+//
+// ⚠ EVERY FILTER GOES IN, NOT JUST THE SUBJECTS. The search term re-counts the
+// tags as you type, and the author does the same — arriving from an attribution
+// narrows the corpus to one person, and a rail still counting all 77 quotes
+// would offer thirteen tags that person never used. See `listSubjects`.
 //
 // Skipped entirely for music, which has no rail: the room is filtered by
 // feelings, and asking for the subject taxonomy there would be three queries
 // spent on a control that is not on the page.
 const subjects =
-  view === 'music' ? [] : await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null });
+  view === 'music'
+    ? []
+    : await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null, author: authorSlug });
 const nameBySlug = new Map(subjects.map((s) => [s.slug, s.name]));
 // slug → GLOBAL count, so the feed's per-card subjects sort busiest-first (they
 // carry no count of their own) in an order that never shifts as you filter.
@@ -205,11 +217,6 @@ function toggleHref(slug: string): string {
 
 /** Clears every filter (subjects + search + author) while staying on the view. */
 const clearHref = buildHref({ subjects: [], q: null, page: null, author: null });
-// ⚠ NO PER-FILTER ✕ FOR THE AUTHOR, deliberately. One was written and removed:
-// the rail's "Clear" already drops every filter including this one, and a second
-// dismissal control would be the only ✕ on a page whose subjects, search and
-// view all clear the same way. The summary line names the filter; the rail
-// removes it. One vocabulary.
 
 // The name to SHOW. Resolved from the corpus rather than from the slug, because
 // "marcus-aurelius" un-slugified is a guess and this is a person's name. An
@@ -348,6 +355,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                 <div class="mt-3">
                   <a
                     href={buildHref({ author: null, page: null })}
+                    data-author-chip
                     aria-current="true"
                     class="border-base-content/30 bg-base-200 text-base-content md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors"
                   >

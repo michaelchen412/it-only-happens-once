@@ -518,29 +518,53 @@ export async function getWritingBySlug(
  * with the search term). count === 0 (and not already selected) ⇒ disabled, so
  * the rail can only ever offer combinations that exist. Ordering stays by global
  * `total` so tags don't reshuffle as you filter — only their numbers change.
+ *
+ * ⚠ EVERY FILTER ON THE PAGE NARROWS THE BASE SET, OR THE RAIL LIES. The author
+ * was missing from this for one release, and it made the rail promise
+ * combinations that do not exist: the quote taxonomy is 18 subjects, and
+ * `?author=seneca` leaves 5 of them live — so 13 tags rendered clickable with a
+ * corpus-wide count behind them, and clicking one landed on an empty feed. That
+ * is precisely the dead-end this function exists to prevent; a facet that
+ * ignores a filter is worse than no facet, because the number reads as a promise.
  */
 export async function listSubjects(
   supabase: DB,
   type: FragmentType,
-  opts: { selected?: string[]; q?: string | null } = {},
+  opts: { selected?: string[]; q?: string | null; author?: string | null } = {},
 ): Promise<RailSubject[]> {
   const selected = Array.from(new Set((opts.selected ?? []).filter(Boolean)));
   const q = opts.q ? sanitizeQuery(opts.q) : '';
+  const author = opts.author?.trim() || null;
 
   // Every (fragment, subject) link for published, non-deleted fragments of this
   // type — enough to build the taxonomy AND the per-fragment subject sets below.
+  //
+  // The author's slug rides along on the same round trip rather than being
+  // resolved separately, which also gives the unknown-slug rule for free: a slug
+  // no row carries matches no fragment, so every count falls to 0 and the whole
+  // rail goes inert — the same "matches NOTHING rather than being silently
+  // ignored" that `listQuotes` applies to the feed. One typo, one answer.
   const { data: links } = await supabase
     .from('fragment_subjects')
-    .select('fragment_id, subjects(name, slug), fragments!inner(type, status, deleted_at)')
+    .select('fragment_id, subjects(name, slug), fragments!inner(type, status, deleted_at, authors(slug))')
     .eq('fragments.type', type)
     .eq('fragments.status', 'published')
     .is('fragments.deleted_at', null);
 
   const fragSubs = new Map<string, Set<string>>(); // fragment id → its subject slugs
+  const authorOf = new Map<string, string | null>(); // fragment id → its author's slug
   const meta = new Map<string, { name: string; total: number }>(); // slug → name + global count
   for (const l of links ?? []) {
     const s = (l as { subjects: SubjectRef | null }).subjects;
     if (!s) continue;
+    // Null for the quotes filed with a derived attribution and no author row
+    // behind it: the facet is the fact, so those match no author (ADR-0017).
+    if (!authorOf.has(l.fragment_id)) {
+      authorOf.set(
+        l.fragment_id,
+        (l as { fragments: { authors: { slug: string } | null } | null }).fragments?.authors?.slug ?? null,
+      );
+    }
     let set = fragSubs.get(l.fragment_id);
     if (!set) fragSubs.set(l.fragment_id, (set = new Set()));
     if (set.has(s.slug)) continue; // ignore any duplicate link
@@ -564,10 +588,18 @@ export async function listSubjects(
     matchIds = new Set((data ?? []).map((r) => r.id));
   }
 
-  // Base set B = fragments matching the term AND carrying every selected subject.
-  // For each subject, count how many B-fragments also carry it → its rail count.
+  // Base set B = fragments by this author AND matching the term AND carrying
+  // every selected subject — the three filters AND together, exactly as they do
+  // in the feed. For each subject, count how many B-fragments also carry it →
+  // its rail count.
+  //
+  // `total` deliberately stays GLOBAL: the author changes what each tag counts,
+  // never where it sits or whether it is in the taxonomy at all. A rail that
+  // reordered itself when you followed an attribution would make the reader
+  // re-find every tag, and dead tags are the shape of the corpus — worth seeing.
   const ctx = new Map<string, number>();
   for (const [fid, set] of fragSubs) {
+    if (author && authorOf.get(fid) !== author) continue;
     if (matchIds && !matchIds.has(fid)) continue;
     if (!selected.every((sl) => set.has(sl))) continue;
     for (const sl of set) ctx.set(sl, (ctx.get(sl) ?? 0) + 1);
