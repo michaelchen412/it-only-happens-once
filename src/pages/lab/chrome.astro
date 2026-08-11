@@ -1,0 +1,948 @@
+---
+/*
+  /lab/chrome — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  BOTH ENDS OF THE PUBLIC CHROME, ON ONE BENCH AND ON PURPOSE. It opened as
+  /lab/header and grew the second half within the hour, at Michael's ask: *"can
+  this also be a lab to test site footers at the same time?"* Yes, and the "at
+  the same time" is the whole argument — judged apart you can pick a top and a
+  bottom that contradict each other, and each of the three header proposals
+  below makes a claim the footer can break outright. See THE PAIRINGS.
+
+  THE FIRST QUESTION, Michael 2026-08-11: *"if I look at the main site header
+  for the blog, I feel like it's a little bit generic."*
+
+  He is right, and `design.md` already agreed in writing: §14's last line —
+  "Custom favicon / wordmark" — is the one item there never struck through. The
+  favicon half was answered 2026-07-30 (the drawn star, §8). The wordmark half
+  never was.
+
+  THE DIAGNOSIS THIS BENCH IS BUILT ON, in four parts:
+
+    1. THE SHAPE IS THE STARTER-TEMPLATE SHAPE. A 56px sticky strip, translucent
+       blurred ground, hairline bottom, wordmark left, three links right, a
+       sun/moon at the end. Every piece is defensible alone; the arrangement is
+       the thing §3 bans on sight — it could belong to anyone.
+
+    2. THE WORDMARK IS THE SITE'S BEST ASSET, RENDERED AS A NAV LABEL. "It Only
+       Happens Once" is a whole sentence and the site's whole thesis, set at
+       16/18px, `leading-none`, `whitespace-nowrap`, in the slot where a logo
+       goes. Newsreader carries optical sizing precisely so a display face can
+       behave differently at masthead scale. The header never asks it to.
+
+    3. ON /blog THERE ARE TWO MASTHEADS, STACKED. The bar, then 2rem below it
+       the Writing · Quotes · Music switch at `text-3xl` — and both mark "where
+       you are" the same way, with a `border-primary` underline
+       (`SiteLayout.astro:103`, `blog/index.astro:232`). One idiom, two sizes,
+       one directly above the other. The lower one is the good, editorial,
+       specifically-his element; the bar reads as a weaker echo of the thing it
+       is sitting on. This is most of what "generic" is pointing at, and it is
+       the finding the whole bench is arranged around.
+
+    4. AND THAT UNDERLINE IS ACCENT IN CHROME, which §5 forbids in the sentence
+       that defines it: *"Accent color is for content, never for chrome … it
+       never colors a label, an eyebrow, or a category tag."* An active-state
+       marker is furniture.
+
+  ⚠ WHAT IS NOT ON THE TABLE: THE STAR. §3's reserved-glyph rule keeps ✦ and
+  `StarMark` for the constellations, and dropping one into the chrome is the
+  obvious first idea. Its being banned is USEFUL rather than limiting — it
+  forces every variant here to be made of structure and typography, which is
+  what §3 says distinctiveness is made of anyway.
+
+  ⚠ NOTHING SHIPPED IS TOUCHED — the law page-card set. Every variant is CSS
+  over `SiteLayout`'s REAL header DOM, keyed off a `data-hx` attribute the
+  script sets on <html>. So `current` is not a copy of the header, it IS the
+  header with the stylesheet doing nothing, and there is no drift to police. The
+  theme toggle, the colophon popover and the mobile menu all keep working here,
+  because they are the shipped ones. The whole experiment deletes in one file.
+
+  ⚠ A VARIANT IS A PROPOSITION ABOUT THE PAIR, NOT ABOUT THE BAR. Finding 3 is
+  about the bar AND the page's own masthead together, so two of the three
+  variants restyle the switch as well. Judging the bar on its own is exactly the
+  habit that produced the stack.
+
+  ⚠ THE TWO HALVES OF THIS BENCH ARE NOT BUILT THE SAME WAY, and they cannot
+  be. The header EXISTS, so every variant of it is CSS over the shipped element
+  and `current` is the real control. There is no footer at all, so every variant
+  of it is new markup that exists nowhere else — the bench is the only place it
+  has ever been rendered, and `none` is the real control. Nothing to drift from
+  is the compensation for having nothing to restyle.
+
+  THE FOOTER QUESTION IS NOT "WHAT GOES IN A FOOTER". A footer was removed in
+  `c83c3d3` ("the redundant footer is removed"), and what it held was a hairline
+  plus the wordmark repeated at 12px and 40% opacity — nothing. Deleting it was
+  right and it settled nothing, because the site kept the two jobs a footer does
+  and gave each of them somewhere else to live:
+
+    · THE CLOSE already exists, in exactly ONE room. `ConstellationSuite`'s
+      outro is a rule, `pt-16`, and a `text-4xl` display-face *"← return"*, and
+      §13 states the law behind it: **a suite always resolves upward.** So
+      `invitation` below is not an invention. It asks whether that law is about
+      suites or about the site.
+
+    · THE END MATTER already exists, in a POPOVER. `Colophon` holds the
+      typefaces (with the sentence about why Atkinson), the stack, the no-AI
+      attestation, the source, and — per plan 34 §5 — *the feed's only visible
+      address*. All of it behind a 16px ⌗ in the site's most contested row.
+
+      ⚠ AND THE ⌗ STAYS THERE. It is the one thing on this bench that was
+      settled rather than tested (see the deleted variants below). The division
+      of labour that follows from it is the whole footer design: the POPOVER is
+      a drawer — opened on demand, reachable from every page including short
+      ones, good at detail. The FOOTER is a terminus — reached only by
+      finishing, and therefore good at two things a drawer is bad at: what to do
+      next, and what you want found by someone who read to the end.
+
+  ⚠ THE FOOTER RENDERS INSIDE <main>, one level off from where it would ship.
+  Slot content lands in main and this bench does not get to fork the layout, so
+  the footer is the last child of the slot rather than a sibling of it. Visually
+  identical in both rooms here — main is full-bleed and both rooms overflow the
+  viewport — with ONE thing it therefore cannot show you: on a SHORT page, a
+  real footer is pushed to the bottom by the wrapper's `flex-1` and this one
+  would float up under the content. Judge the footer's design here; judge its
+  behaviour on a short page after it ships.
+
+  THE HEADER IS DECIDED — `runninghead`, and it is now the GROUND rather than a
+  variant. Michael, 2026-08-11, after driving four: *"for top bar definitely want
+  to ditch everything but the runninghead (by far the best)."*
+
+  So the bar recedes: no hairline, no blur, a solid ground, and one uniform
+  typographic register across the whole line — the site's name set in the same
+  serif small-caps as the links beside it, at the same size. The running head of
+  a printed book, where the page you are on is the thing you read and the head
+  above it is a courtesy. The page's own switch keeps its size AND its accent
+  underline, and is the only masthead on screen. There is no radio group for the
+  bar any more; every footer below is judged under this one.
+
+  ⚠ `?v=current` STILL WORKS and is deliberately not in the panel. `current` was
+  never CSS — it is the attribute set to a value no rule matches — so keeping the
+  escape hatch costs one line of nothing and makes "is this actually better"
+  answerable for as long as the shipped bar still exists. `masthead` and `spine`
+  are gone; `git log -- src/pages/lab/chrome.astro` has them.
+
+  THE NAV RENAME, same conversation: **Home → Constellations.**
+
+  This reverses §13's recorded decision (*"The top bar carries an explicit Home
+  item … so the way back to the site's strangest room is never in doubt"*) and it
+  reverses it TOWARD that same section's other sentence: *"Visitors see
+  **constellations**."* The doc has been holding both positions since July —
+  chrome that says Home, prose that says constellations — and the word "Home" was
+  the more generic of the two in the most-seen row on the site. `/constellations`
+  already 301s to `/`, so the site has been calling that room by this name in its
+  routing the whole time. **design.md §13 and §11 need the edit if this ships.**
+
+  ⚠ IT IS RENAMED BY SCRIPT HERE, not in `SiteLayout`. CSS cannot change text,
+  and the bench does not fork the layout — so one line rewrites the shipped
+  link's `textContent`. Watch the width: "Constellations" is roughly 2.5× "Home",
+  in a row that also holds a wordmark, two more links and two utilities.
+
+  THE FOOTER — THE CONTENT IS SETTLED, ONLY THE ARRANGEMENT IS OPEN.
+
+  Michael, same message: *"keep the site footer minimalistic and only has: say
+  hello, rss with icon and Github icon with Github text (shows the same popover
+  as in the top bar) … also want to put site links in the footer as well for good
+  measure. the return button for footer is just bad."*
+
+  So every variant below carries exactly the same five things and differs only in
+  how they sit:
+
+      Constellations · Blog · About        Say hello   ⌁ RSS   ⌗ GitHub
+
+    none    as it ships — nothing. Kept as the control, because "does the page
+            end badly" was never actually judged and it is still the first
+            question. The sky ends on its last constellation; /blog on "Load
+            older essays".
+
+    row     ONE LINE. Site links left, the three utilities right, one register
+            for all six (serif small-caps — the bar's own language, so the two
+            ends of the page speak the same way). The most minimal reading of
+            the brief.
+
+    stack   TWO LINES, FLUSH LEFT. Links, then utilities beneath them. No right
+            edge to fight with, and it degrades to itself on a phone instead of
+            wrapping into one. Differs from `row` in LAYOUT only.
+
+    chrome  ONE LINE, TWO REGISTERS. Same split as `row`, but the utilities drop
+            to §7's chrome register (uppercase, sans, muted) while the links stay
+            serif small-caps. Differs from `row` in REGISTER only — the claim
+            being that destinations and instruments are different KINDS of thing
+            and should not be set alike.
+
+  ⚠ THE ⌗ IN THE FOOTER OPENS THE SHIPPED POPOVER — the same one, not a copy. It
+  is a second `popovertarget="site-colophon"` trigger, which the platform allows
+  natively. **And it exposes a real bug in shipped code, which is the most
+  valuable thing this bench has found:** `Colophon`'s positioning script anchors
+  to `document.querySelector('button[popovertarget="site-colophon"]')` — the
+  FIRST such button in the document, i.e. always the top bar's. Press the footer
+  one and the panel opens 2,000px away, off-screen at the top of the page.
+  The bench repositions it locally so the idea can be judged at all; the shipping
+  fix is one line in `Colophon.astro` — anchor to the button that was PRESSED
+  (`e.target.closest(...)`) rather than to the first one on the page. Nothing
+  here patches shipped code; the note is the deliverable.
+
+  ⚠ AND FOUR FOOTER VARIANTS DIED TO GET HERE, under page-card's rule that a
+  bench is legitimate while its question is live:
+
+    · `invitation`, `provenance`, `addresses`, `reprise` — all four were built on
+      the assumption that a footer's job is to CLOSE. Michael: *"the return
+      button for footer is just bad."* He is right, and the reason is in the
+      bench's own notes from an hour earlier: the suite already closes, and it
+      closes upward. A site-wide "return" duplicates that in the one room where
+      it works and invents a destination in the room where it does not (the sky
+      had to turn its arrow around). A footer is not an ending. It is where the
+      addresses live.
+    · `colophon` (footer holds the end matter, ⌗ leaves the bar) and `machinery`
+      (a bare service row) died earlier the same day — the first because the ⌗ is
+      a credential rather than end matter and stays put, the second because it
+      was the ordinary answer drawn to be rejected. What `machinery` was reaching
+      for survives here: the difference is that the links now have a reason and
+      the ⌗ opens the drawer instead of repeating it.
+    · `provenance`'s idea — a commit SHA, the one credential a website builder
+      cannot fake — is NOT dead, it is unplaced. It did not survive as a footer
+      because it needs prose around it, and the footer Michael wants has no
+      prose in it. If it lands anywhere it is the colophon drawer or a /colophon
+      room. `VERCEL_GIT_COMMIT_SHA` is set on every build and still unread.
+
+  THE TOGGLES (orthogonal — each is one CSS rule)
+
+    sticky off   Does the bar need to follow you at all? `BackToTop` already
+                 exists, and the Sky's return ✦ does this job at depth.
+    align        Bar as a band across the window, or as the top line of the
+                 page's own column. ⚠ THIS TOGGLE IS PARTLY A TRAP, and seeing
+                 that is the point: the blog is `max-w-6xl` and the front door
+                 is `max-w-4xl`, so one "aligned" bar cannot align to both.
+                 Switch rooms with it on.
+
+  WHAT TO JUDGE
+    1. THE RENAME, FIRST AND WITHOUT SCROLLING. "Constellations" is now the
+       longest word in the bar and it sits beside a wordmark that is a whole
+       sentence. Does the row still read as a running head, or as a list?
+    2. THE SAME RENAME AT 900px, where the bar is still horizontal and the
+       space is at its worst. The burger arrives at 768.
+    3. THE BOTTOM ON `none` FIRST. The honest question is not "which footer" but
+       "does the page end badly".
+    4. `row` → `chrome`. One register or two? This is the whole remaining
+       question and it is a §7 question: the footer's links are destinations and
+       its utilities are instruments, which §4 says belong to different rooms —
+       but here they are in the same six inches of page.
+    5. `row` → `stack` at full width, then narrow to a phone. `row` has to wrap
+       somewhere; `stack` is already wrapped. Which one wraps better is decided
+       at about 600px.
+    6. PRESS THE FOOTER'S ⌗. The drawer should open upward, anchored to the
+       button you pressed. Then press the bar's, to confirm they are one drawer
+       and not two.
+    7. BOTH THEMES, from the toggle in the bar (it is the real one).
+    8. ⚠ ON /blog THE FOOTER IS BEHIND EVERY PAGE OF THE FEED. The real route
+       appends pages as you scroll (`scripts/blog-feed.ts`) and only stops at
+       `pageCount`, so on the site's busiest room the footer is reached last or
+       never. This bench renders ONE page of seven, so it is ~2 screenfuls down
+       here and much further there. That is an argument about what belongs in a
+       footer: anything a reader NEEDS cannot only live there.
+    9. THE SKY. It has no masthead of its own and its column is `max-w-4xl`
+       while the footer is `max-w-6xl` — so the footer's rule will overhang the
+       content it is closing. Same trap as the `align` toggle, other end of the
+       page, and it is a real decision: the site has two measures and its chrome
+       has to pick one.
+
+  WHAT THIS BENCH CANNOT ANSWER
+    • /about, the reference implementation (§3). Its first movement hangs a
+      serif numeral in the left margin, and a two-line masthead landing on top
+      of that is a real risk this bench does not show.
+    • A constellation suite, where the landing header and the floating ✦ live
+      under the same bar — AND which already has its own close. A site footer
+      arriving under that outro would be the second ending in a row, and it is
+      the one room where every variant here might simply be wrong.
+    • A SHORT page, per the note above — and `/blog/[slug]` and `/about` both
+      already end in end-matter of their own (an article footer offering the way
+      back into the Index; the authorship attestation). A site footer has to
+      survive landing under those, and neither is a room here.
+    • The wordmark itself — §14's actual open item. Every variant here sets the
+      SAME words in the SAME face and changes only their rank. Whether "It Only
+      Happens Once" should be drawn, lettered, broken across lines or given a
+      mark of its own is the next bench, and this one is upstream of it: rank
+      first, then form.
+
+  ⚠ THE ROOMS ARE THE REAL ROOMS AT REDUCED FURNITURE. The blog room renders
+  real `PostCard`s over the real feed query and the real subject rail; the sky
+  room renders real constellations through app.css's own `.sky-*` classes. What
+  is missing is only what could not be reached without forking a page: the
+  feed's infinite scroll, the sky's focus tracker and its `transition:name`
+  morphs. None of them touch the top 200px, which is the whole subject here.
+*/
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import Reader from '../../components/Reader.astro';
+import StarBloom from '../../components/StarBloom.astro';
+import Label from '../../components/Label.astro';
+import { Icon } from 'astro-icon/components';
+import { attachNeighbourhoods, listSubjects, listWriting } from '../../lib/blog';
+import { listConstellations } from '../../lib/constellations';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+const supabase = Astro.locals.supabase;
+const params = Astro.url.searchParams;
+const room = params.get('room') === 'sky' ? 'sky' : 'blog';
+
+/* Read back so a reload — or a room change, which IS a navigation — keeps the
+   arrangement you were judging. The attributes themselves are set by the inline
+   script below; these only pre-check the controls. There is no list for the bar
+   any more: it is `runninghead` unless the URL says `?v=current`, and that hatch
+   is read straight off `location.search` rather than round-tripped through a
+   control nobody can see. */
+const FOOTERS = [
+  ['none', 'none — as it ships'],
+  ['row', 'row — one line, one register'],
+  ['stack', 'stack — two lines, flush left'],
+  ['chrome', 'chrome — one line, two registers'],
+] as const;
+const footer = (FOOTERS.find(([f]) => f === params.get('f'))?.[0] ?? 'none') as string;
+const unsticky = params.get('sticky') === 'off';
+const measured = params.get('align') === 'measure';
+
+/* Only the room on screen is queried. Both are real reads against the live
+   corpus — a header judged over lorem is a header judged over nothing. */
+const writing = room === 'blog' ? await listWriting(supabase, { page: 1 }) : null;
+if (writing) await attachNeighbourhoods(supabase, writing.items);
+const subjects = room === 'blog' ? await listSubjects(supabase, 'writing', { selected: [], q: null }) : [];
+const refs = room === 'sky' ? await listConstellations(supabase) : [];
+
+/* The site's three destinations, for the FOOTER's copy of them. `Home` is
+   `Constellations` here — see the rename note in the header; the bar's own copy
+   of this link is renamed by script, because that one is shipped markup. */
+const SITE_NAV = [
+  { label: 'Constellations', href: '/', room: 'sky' },
+  { label: 'Blog', href: '/blog', room: 'blog' },
+  { label: 'About', href: '/about', room: '' },
+] as const;
+
+/* The sky's ramp, copied from `index.astro` rather than imported — it is nine
+   lines of local const in a page, not a module. The shipped page stays the
+   source of truth; this is the bench standing under the same type scale so the
+   bar is judged over the real rhythm. */
+const TIERS = [
+  'text-4xl sm:text-5xl',
+  'text-3xl sm:text-4xl',
+  'text-2xl sm:text-3xl',
+  'text-xl sm:text-2xl',
+  'text-lg sm:text-xl',
+];
+const STAR_TIERS = ['text-base', 'text-sm', 'text-sm', 'text-xs', 'text-xs'];
+const GLOW_TIERS = [1, 0.82, 0.66, 0.5, 0.36];
+const distinct = [...new Set(refs.map((r) => r.count))].sort((a, b) => b - a);
+const tierIndex = (count: number) => Math.min(distinct.indexOf(count), TIERS.length - 1);
+const INDENTS = ['', 'sm:pl-16', 'sm:pl-32'];
+const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
+
+const SUBJECT_CAP = 8;
+---
+
+<SiteLayout title="Chrome — bench" active={room === 'sky' ? 'home' : 'blog'} backToTop={false}>
+  {
+    /* ⚠ SYNCHRONOUS AND FIRST, so the variant is on <html> before the browser
+      paints — the header markup is already parsed by the time this runs, and no
+      style has been resolved yet, so there is no flash of the shipped bar. It
+      also hangs the three hooks the stylesheet needs on the SHIPPED elements,
+      which is what lets the bench restyle a header it is not allowed to edit,
+      and performs the one thing CSS cannot do: the Home → Constellations
+      rename. */
+  }
+  <script is:inline>
+    (() => {
+      const p = new URLSearchParams(location.search);
+      const r = document.documentElement;
+      // The bar is decided; `?v=current` is the escape hatch, not the default.
+      r.dataset.hx = p.get('v') ?? 'runninghead';
+      r.dataset.hxF = p.get('f') ?? 'none';
+      if (p.get('sticky') === 'off') r.dataset.hxSticky = 'off';
+      if (p.get('align') === 'measure') r.dataset.hxAlign = 'measure';
+      // The FIRST <header> in document order is SiteLayout's — it opens the
+      // layout, before <main>. Nothing else on the page can be reached first.
+      const bar = document.querySelector('header');
+      bar?.classList.add('hx-bar');
+      bar?.querySelector('a')?.classList.add('hx-name');
+      const menu = document.getElementById('site-menu');
+      menu?.classList.add('hx-nav');
+
+      // Home → Constellations. The ONE thing on this bench that is not CSS:
+      // text is content, and the shipped nav array lives in SiteLayout. The
+      // real change is one string there; this is one string here so the width
+      // it costs can be seen before anyone edits the layout.
+      const home = menu?.querySelector('a[href="/"]');
+      if (home) home.textContent = 'Constellations';
+    })();
+  </script>
+
+  {
+    room === 'blog' && writing && (
+      <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
+        {/* The page's own masthead — /blog's switch, verbatim, plus the nav
+            `spine` relocates into it. */}
+        <nav
+          class="hx-switch border-base-300 mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b"
+          aria-label="Content"
+        >
+          <span
+            aria-current="page"
+            class="font-display border-primary text-base-content -mb-px border-b-2 pb-3 text-2xl leading-none font-light sm:text-3xl"
+          >
+            Writing
+          </span>
+          <a
+            href="/blog?view=quotes"
+            class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
+          >
+            Quotes
+          </a>
+          <span class="font-display text-base-content/20 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl">
+            Music <span class="align-middle font-sans text-xs tracking-wide">soon</span>
+          </span>
+        </nav>
+
+        <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
+          <aside class="md:sticky md:top-20 md:self-start">
+            <div class="relative">
+              <Icon
+                name="ph:magnifying-glass"
+                class="text-base-content/35 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base"
+              />
+              <input
+                type="search"
+                placeholder="Search writing…"
+                aria-label="Search writing (inert on the bench)"
+                autocomplete="off"
+                class="rounded-field border-base-300 bg-base-100 placeholder:text-base-content/35 focus:border-base-content/30 w-full border py-2 pr-3 pl-9 font-sans text-sm focus:outline-none"
+              />
+            </div>
+
+            {subjects.length > 0 && (
+              <div class="mt-7">
+                <Label variant="chrome">Subjects</Label>
+                <ul class="mt-3 flex flex-wrap gap-1.5 md:flex-col md:gap-0.5">
+                  {subjects.slice(0, SUBJECT_CAP).map((s) => (
+                    <li>
+                      <span class="border-base-300 text-base-content/55 md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs">
+                        {s.name}
+                        <span class="text-base-content/30">{s.count}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </aside>
+
+          <section class="min-w-0">
+            <div class="divide-base-300 divide-y">
+              {writing.items.map((item) => (
+                <PostCard item={item} />
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    room === 'sky' && (
+      <section class="mx-auto flex min-h-[80vh] max-w-4xl flex-col justify-center px-5 py-20 sm:px-8">
+        <div class="flex flex-col gap-12 sm:gap-16">
+          {refs.map((c, i) => (
+            <div class={indentOf(i)}>
+              <a href={`/${c.slug}`} class:list={['group sky-row block', `cn-${c.color}`]}>
+                <div class="flex items-baseline gap-3">
+                  <span
+                    class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
+                    style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}`}
+                  >
+                    <StarBloom />
+                  </span>
+                  <h2 class={`${TIERS[tierIndex(c.count)]} sky-name font-display font-light transition-colors`}>
+                    {c.name}
+                  </h2>
+                </div>
+                {c.description && (
+                  <p class="text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed">
+                    {c.description}
+                  </p>
+                )}
+                <span class="sky-cta" aria-hidden="true">
+                  <span class="sky-cta__word">Explore</span>
+                  <span class="sky-cta__arrow">→</span>
+                </span>
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    /* ─────────  THE FOOTER  ─────────
+      ONE set of markup, three arrangements, all in CSS. The content is settled
+      (see the header) so the variants are not different footers — they are the
+      same six things sitting differently, which is the only honest way to ask
+      "which arrangement" without accidentally also changing what is in it.
+
+      ⚠ NO `return`, AND NOTHING THAT RESOLVES. Four variants that closed the
+      page were deleted to get here; a footer is where the addresses live. */
+  }
+  <footer class="hx-foot">
+    <div class="hx-foot__inner">
+      {/* The destinations. Renamed: Home → Constellations. */}
+      <nav class="hx-foot__nav" aria-label="Site">
+        {
+          SITE_NAV.map((n) => (
+            <a href={n.href} data-current={n.room === room ? '' : undefined}>
+              {n.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      {
+        /* The instruments. "Say hello" carries no icon and the other two do —
+          which is the brief, and it also happens to be the honest split: the
+          first is a sentence you read, the other two are marks you recognise.
+          ⚠ THE ⌗ IS A <button>, NOT A LINK, and it targets the SHIPPED popover
+          by id. Same drawer as the bar's, opened from the other end of the
+          page; the anchoring bug that follows from that is in the script at the
+          bottom of this file and in the header notes. */
+      }
+      <div class="hx-foot__util">
+        <a href="/about#mv-hello">Say hello</a>
+        <a href="/rss.xml" class="hx-foot__marked">
+          <Icon name="ph:rss-simple" class="hx-foot__icon" />
+          RSS
+        </a>
+        <button
+          type="button"
+          popovertarget="site-colophon"
+          data-hx-colophon
+          class="hx-foot__marked"
+          aria-label="How this site was built"
+        >
+          <Icon name="simple-icons:github" class="hx-foot__icon" />
+          GitHub
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  {room === 'blog' && <Reader />}
+
+  {
+    /* Bench chrome — fixed, bottom-left, deliberately utilitarian so it can
+      never be mistaken for something the site has.
+
+      ⚠ IT FOLDS, AND IT HAS TO SINCE THE FOOTER ARRIVED. Three fieldsets and a
+      picker is ~480px of fixed panel pinned to the bottom-left, which is
+      exactly where a footer's first column lands — the control was covering the
+      only thing half this bench exists to judge. `<details>` rather than a
+      move: every other corner is spoken for at some width (the ✦ and
+      back-to-top at bottom-right, the theme popover top-right), and folding is
+      the one answer that costs nothing when it is not needed. */
+  }
+  <details class="hx-panel" open>
+    <summary class="hx-panel__summary">bench</summary>
+    <form class="hx-panel__form" data-hx-panel aria-label="Bench controls">
+      {
+        /* No control for the bar — it is decided. `?v=current` is still honoured
+          by the inline script for a last look at the shipped one. */
+      }
+      <fieldset class="hx-panel__set">
+        <legend class="hx-panel__legend">the bar</legend>
+        <label class="hx-panel__row">
+          <input type="checkbox" name="sticky" checked={unsticky} />
+          unpin it <span class="hx-panel__hint">(scroll away)</span>
+        </label>
+        <label class="hx-panel__row">
+          <input type="checkbox" name="align" checked={measured} />
+          align to the measure <span class="hx-panel__hint">(then switch rooms)</span>
+        </label>
+      </fieldset>
+
+      <fieldset class="hx-panel__set">
+        <legend class="hx-panel__legend">the footer</legend>
+        {
+          FOOTERS.map(([value, label]) => (
+            <label class="hx-panel__row">
+              <input type="radio" name="f" value={value} checked={value === footer} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <label class="hx-panel__set">
+        <span class="hx-panel__legend">room</span>
+        <select name="room" data-hx-room>
+          <option value="blog" selected={room === 'blog'}>the blog — two mastheads</option>
+          <option value="sky" selected={room === 'sky'}>the sky — none at all</option>
+        </select>
+      </label>
+    </form>
+  </details>
+</SiteLayout>
+
+{
+  /* is:global because every selector reaches into SiteLayout's DOM, which
+  Astro's scoping cannot see from a page. Safe by construction: this file is the
+  only page that loads this stylesheet, and every rule is gated behind a
+  `data-hx` attribute that only this page's script ever sets. */
+}
+<style is:global>
+  /* ── shared by the three proposals ────────────────────────────────────────
+     The strip stops being a band. Dropping the hairline is the load-bearing
+     move (the page's own rule becomes the only one on screen); dropping the
+     blur is the second, because a translucent frosted strip is itself one of
+     the tells §3 lists. The ground goes SOLID rather than transparent — a
+     sticky header still has to hide what passes under it, and "no background"
+     is a different proposal (an overlay) that nothing here is making. */
+  [data-hx='runninghead'] .hx-bar {
+    border-bottom: 0;
+    background: var(--color-base-100);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* No accent in the bar — §5, and the one rule every deleted variant also
+     agreed on. Ink alone marks the active item; the PAGE's switch keeps the
+     lamplight underline, so "where you are" is said once, loudly, below. */
+  [data-hx='runninghead'] .hx-nav > a[aria-current='page'] {
+    border-bottom-width: 0;
+    padding-bottom: 0;
+    color: var(--color-base-content);
+  }
+
+  /* ── runninghead ──────────────────────────────────────────────────────────
+     One register for the whole line. The site's name is not a logo here, it is
+     the first item of a running head — same face, same size, same small caps as
+     the links beside it, distinguished only by ink. This is the §7 VOICE
+     register (serif, all-small-caps, muted, gently tracked) applied to chrome,
+     which is a claim worth arguing with: §7 assigns voice to the evocative
+     rooms and sans to the machinery ones, and the top bar spans both. It is
+     here because the bar is identity before it is instrument. */
+  [data-hx='runninghead'] .hx-bar {
+    height: 3.25rem;
+  }
+  [data-hx='runninghead'] .hx-name,
+  [data-hx='runninghead'] .hx-nav > a {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    line-height: 1;
+  }
+  [data-hx='runninghead'] .hx-name {
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+  }
+
+  /* ── the two toggles ──────────────────────────────────────────────────────
+     `measure` constrains the STRIP, not an inner wrapper — which is only
+     equivalent because all three variants have already given up their border
+     and their translucency. On `current` it would visibly clip the hairline,
+     and that is a fair thing to see. */
+  [data-hx-sticky='off'] .hx-bar {
+    position: static;
+  }
+  /* ⚠ `width: 100%` IS LOAD-BEARING, and leaving it out is a silent trap worth
+     recording: SiteLayout's wrapper is a COLUMN flex container, so the header is
+     a flex item stretched to full width by `align-items: stretch` — and the
+     moment an inline `auto` margin appears, auto margins win over stretch and
+     the item collapses to its own max-content width. Measured before the fix:
+     630px, centred, so the bar was tracking the length of its own text. */
+  [data-hx-align='measure'] .hx-bar {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  /* ── the footer ───────────────────────────────────────────────────────────
+     ONE set of markup, three arrangements. Hidden wholesale on `none`, then the
+     variant decides how `__nav` and `__util` sit — nothing here changes WHAT is
+     in the footer, which is the point of the current round.
+
+     The measure is `max-w-6xl` in BOTH rooms on purpose: a site footer is one
+     element, and the sky's column is `max-w-4xl`, so the overhang you see there
+     is the same trap the `align` toggle sets at the other end of the page. A
+     finding, not a bug — the site has two measures and its chrome has to pick.
+
+     ⚠ THE RULE GOES ON `__inner`'s PSEUDO, NOT ON `__inner`. `__inner` is the
+     page's container (`max-w-6xl px-5`), so a border on it draws at the
+     container's edge — outside the padding, 20px wider each side than every
+     other rule on the page, all of which sit on elements inside it. A footer
+     whose one line does not line up with the switch's line above it looks
+     bolted on. The pseudo is a grid/flex item at the padded width instead. */
+  .hx-foot {
+    display: none;
+  }
+  [data-hx-f='row'] .hx-foot,
+  [data-hx-f='stack'] .hx-foot,
+  [data-hx-f='chrome'] .hx-foot {
+    display: block;
+  }
+  .hx-foot__inner {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+    margin-top: 6rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.9rem 3rem;
+    padding-bottom: 3rem;
+  }
+  .hx-foot__inner::before {
+    content: '';
+    flex: 1 0 100%;
+    border-top: 1px solid var(--color-base-300);
+    margin-bottom: 2rem;
+  }
+
+  /* Both groups, in the bar's own language by default: serif small-caps, the
+     §7 VOICE register. `chrome` is the variant that disagrees. */
+  .hx-foot__nav,
+  .hx-foot__util {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.6rem;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    line-height: 1;
+  }
+  .hx-foot__nav a,
+  .hx-foot__util a,
+  .hx-foot__util button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    transition: color 150ms;
+    cursor: pointer;
+    /* ⚠ `text-transform: inherit` IS NOT REDUNDANT. Tailwind's preflight gives
+       form elements `font: inherit`, so the button picks up the serif and the
+       small caps — but text-transform is not part of the `font` shorthand, and
+       the UA stylesheet's `button { text-transform: none }` therefore beats
+       inheritance. Under `chrome` that shipped as "SAY HELLO · RSS · GitHub",
+       one control quietly refusing the register its two neighbours took. */
+    text-transform: inherit;
+  }
+  .hx-foot__nav a:hover,
+  .hx-foot__util a:hover,
+  .hx-foot__util button:hover,
+  .hx-foot__nav a[data-current] {
+    color: var(--color-base-content);
+  }
+  /* ⚠ SIZED IN `em`, so one rule serves both registers. At small-caps 1rem the
+     mark reads at 14px; when `chrome` drops the utilities to 0.72rem the icon
+     follows it down instead of towering over its own label. */
+  .hx-foot__icon {
+    width: 1.05em;
+    height: 1.05em;
+    /* Small-caps sit on the baseline with a cap height well under the em box,
+       so an icon centred on the em box floats. This drops it onto the letters. */
+    transform: translateY(0.05em);
+  }
+
+  /* stack — two lines, flush left. The nav takes the full row so the utilities
+     wrap under it; nothing else changes, which is exactly the comparison. */
+  [data-hx-f='stack'] .hx-foot__inner {
+    justify-content: flex-start;
+    gap: 1.1rem 3rem;
+  }
+  [data-hx-f='stack'] .hx-foot__nav {
+    flex: 1 0 100%;
+  }
+
+  /* chrome — the utilities become instruments (§7's chrome register) while the
+     destinations stay voice. The claim under test: a link that GOES somewhere
+     and a control that DOES something should not be set alike. */
+  [data-hx-f='chrome'] .hx-foot__util {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-variant: normal;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    gap: 1.75rem;
+  }
+  [data-hx-f='chrome'] .hx-foot__util a,
+  [data-hx-f='chrome'] .hx-foot__util button {
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  }
+
+  /* ⚠ THERE IS NO RULE HERE THAT TOUCHES THE ⌗, and its absence is a decision.
+     A `[data-hx-f='colophon'] button[popovertarget='site-colophon']{display:none}`
+     stood here for an hour, hiding the colophon trigger whenever the footer took
+     the end matter. Michael settled it: the ⌗ stays in the bar in every variant,
+     because it is not end matter — it is the site saying, at a glance and before
+     anything is opened, that a person built this. Nothing in this stylesheet
+     alters the shipped bar's utilities now. */
+
+  /* ── the panel ─────────────────────────────────────────────────────────── */
+  .hx-panel {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 40;
+    width: 16rem;
+    background: color-mix(in oklab, var(--color-base-200) 92%, transparent);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    backdrop-filter: blur(6px);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
+  }
+  .hx-panel:not([open]) {
+    width: auto;
+  }
+  .hx-panel__summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.95rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    user-select: none;
+  }
+  .hx-panel__summary::-webkit-details-marker {
+    display: none;
+  }
+  .hx-panel__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem 0.95rem 0.85rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+  .hx-panel__set {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 0;
+    padding: 0;
+  }
+  .hx-panel__legend {
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  }
+  .hx-panel__row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    line-height: 1.5;
+  }
+  .hx-panel__hint {
+    color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+  }
+  .hx-panel select {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
+    padding: 0.15rem 0.3rem;
+    color: inherit;
+    font: inherit;
+  }
+</style>
+
+<script>
+  /* Attribute-swapping on <html>, so the page under the bar never re-renders
+     and a variant change moves ONLY the chrome — the same reason page-card
+     swaps one class on one wrapper. The URL is kept in step (replaceState, not
+     a navigation) so a reload, or the room picker below, keeps what you were
+     looking at. */
+  const panel = document.querySelector<HTMLFormElement>('[data-hx-panel]');
+  const root = document.documentElement;
+
+  function apply() {
+    if (!panel) return;
+    const data = new FormData(panel);
+    const f = String(data.get('f') ?? 'none');
+    const unpinned = data.get('sticky') !== null;
+    const measured = data.get('align') !== null;
+
+    root.dataset.hxF = f;
+    if (unpinned) root.dataset.hxSticky = 'off';
+    else delete root.dataset.hxSticky;
+    if (measured) root.dataset.hxAlign = 'measure';
+    else delete root.dataset.hxAlign;
+
+    const p = new URLSearchParams(location.search);
+    p.set('f', f);
+    unpinned ? p.set('sticky', 'off') : p.delete('sticky');
+    measured ? p.set('align', 'measure') : p.delete('align');
+    /* `v` is not written — the bar has no control any more, so whatever the URL
+       carries (nothing, or the `current` escape hatch) survives a panel change
+       instead of being reset by it. */
+    history.replaceState(null, '', `${location.pathname}?${p}`);
+  }
+
+  panel?.addEventListener('change', (e) => {
+    /* The room picker is navigation, not an attribute — the two rooms are two
+       different queries. `apply()` first, so the URL it writes is the one the
+       reload reads back. */
+    if ((e.target as HTMLElement)?.dataset.hxRoom !== undefined) {
+      apply();
+      const p = new URLSearchParams(location.search);
+      p.set('room', String(new FormData(panel).get('room')));
+      location.search = `?${p}`;
+      return;
+    }
+    apply();
+  });
+
+  /* ── the footer's ⌗, and the shipped bug it exposes ─────────────────────────
+     One popover, two triggers — the platform allows that natively, and the
+     drawer does open. What does not work is WHERE: `Colophon.astro`'s
+     positioning script anchors to
+
+         document.querySelector('button[popovertarget="site-colophon"]')
+
+     which is the FIRST such button in the document, always the top bar's. Press
+     the footer's and the panel is placed under a button two thousand pixels
+     above, i.e. off-screen. That is a real defect in shipped code that only a
+     second trigger could ever have revealed, and the fix is one line there:
+     anchor to the button that was PRESSED, not to the first one on the page.
+
+     This re-runs the same maths against the right anchor so the idea can be
+     judged at all. ⚠ A DOUBLE rAF, not one: the shipped handler already queued
+     its own rAF from this same click, and a single one here would race it —
+     two frames out is after it, deterministically, without a timeout's guess. */
+  document.addEventListener('click', (e) => {
+    if (!(e.target as HTMLElement)?.closest?.('[data-hx-colophon]')) return;
+    const btn = (e.target as HTMLElement).closest('[data-hx-colophon]') as HTMLElement;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const pop = document.getElementById('site-colophon');
+        if (!pop || !pop.matches(':popover-open')) return;
+        const r = btn.getBoundingClientRect();
+        const pad = 8;
+        const pw = pop.offsetWidth;
+        const ph = pop.offsetHeight;
+        // Open UPWARD from a footer trigger when there is room, which there
+        // always is at the bottom of a page — the shipped script's own flip.
+        const above = r.top - ph - pad;
+        pop.style.left = `${Math.max(pad, Math.min(r.right - pw, window.innerWidth - pw - pad))}px`;
+        pop.style.top = `${above >= pad ? above : Math.max(pad, r.bottom + pad)}px`;
+        pop.style.right = 'auto';
+        pop.style.bottom = 'auto';
+      }),
+    );
+  });
+</script>
