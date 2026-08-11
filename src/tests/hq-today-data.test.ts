@@ -10,7 +10,7 @@
 // Answering advances `tasks.due_on` immediately, so the row no longer knows
 // which occurrence you ticked — only `task_events.for_due_on` does.
 import { describe, expect, it } from 'vitest';
-import { liveAndAnswered } from '../lib/hq/today-data';
+import { liveAndAnswered, loadToday } from '../lib/hq/today-data';
 import { fakeDb } from './stubs/supabase';
 import { task } from './stubs/task';
 
@@ -216,5 +216,51 @@ describe('liveAndAnswered, windowed', () => {
     const { answeredToday } = await liveAndAnswered(db, TODAY, AUGUST);
 
     expect(answeredToday.get('a')).toBe('skipped');
+  });
+});
+
+// ⚠ THE ROUTINE EXISTS BECAUSE PRACTICE COULD NOT CARRY IT (2026-08-11). A goal
+// reaches the Practice zone only when `observationFor` has something to say, and
+// a routine has no tasks to tick — so the goal that most wants reading every
+// morning is the one that zone will never show. These pin the replacement, and
+// the third is the one worth reading: the "only active" rule lives in the QUERY,
+// where this stub's "fakes the builder, not the database" note means it would
+// otherwise have stopped being tested at the moment it stopped being visible.
+describe('the routine on the Morning card', () => {
+  const goal = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    name: 'Wake up and get moving',
+    slug: 'wake-up-and-get-moving',
+    notes: 'Teeth\nRead the day\nMove',
+    pinned: true,
+    ...over,
+  });
+
+  it('is the pinned goal, with the notes the card renders', async () => {
+    const db = fakeDb({ goals: { data: [goal({ id: 'other', pinned: false }), goal()] } });
+
+    const { routine } = await loadToday(db, TODAY);
+
+    expect(routine?.slug).toBe('wake-up-and-get-moving');
+    expect(routine?.notes).toContain('Teeth');
+  });
+
+  it('is null when nothing is pinned, so the card keeps its own shape', async () => {
+    const db = fakeDb({ goals: { data: [goal({ pinned: false })] } });
+
+    const { routine } = await loadToday(db, TODAY);
+
+    expect(routine).toBeNull();
+  });
+
+  it('asks only for active goals — which is what makes pausing one enough', async () => {
+    // Pausing a goal must quiet the Morning card WITHOUT clearing `pinned`:
+    // throwing the pin away on a status change would mean re-activating lands
+    // you on a card that has forgotten. So the filter is the whole mechanism.
+    const db = fakeDb({ goals: { data: [] } }, { record: true });
+
+    await loadToday(db.client, TODAY);
+
+    expect(db.ops('goals')).toContainEqual({ method: 'eq', args: ['status', 'active'] });
   });
 });

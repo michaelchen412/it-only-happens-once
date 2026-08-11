@@ -119,6 +119,43 @@ export const goals = {
   }),
 
   /**
+   * Keep one goal's notes on the Morning card — or take it off again.
+   *
+   * ⚠ ONE SLOT, SO PINNING **MOVES** THE PIN RATHER THAN REFUSING. This is the
+   * deliberate opposite of the five-active cap above, and the difference is
+   * what the person meant. Creating a sixth goal is not a request to drop one
+   * of the five — they are peers, and silently letting one go would destroy an
+   * intention — so that one is refused in a sentence. "Pin this one" is a
+   * request about a single slot, and it can only mean *put this one there*.
+   * Refusing it would make you go and unpin the other first, for nothing.
+   *
+   * ⚠ AND THE CLEAR COMES FIRST, WHICH IS THE WHOLE REASON `goals_one_pinned`
+   * never fires. Vacate the slot, then fill it: the reverse order asks the
+   * database to hold two pinned rows for the width of one statement, and the
+   * partial unique index would refuse it — correctly, and in a voice that is
+   * not a sentence. Two statements rather than one because a single-user admin
+   * has nobody to race, and the index is what makes the interleaving safe
+   * anyway: the worst a half-finished move can leave behind is nothing pinned.
+   */
+  setPinned: defineAction({
+    accept: 'json',
+    input: z.object({ id: z.uuid(), pinned: z.boolean() }),
+    handler: async (v, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase as DB;
+
+      if (v.pinned) {
+        const { error: clearError } = await sb.from('goals').update({ pinned: false }).eq('pinned', true);
+        if (clearError) throw fail(clearError.message);
+      }
+
+      const { error } = await sb.from('goals').update({ pinned: v.pinned }).eq('id', v.id);
+      if (error) throw fail(error.message);
+      return { id: v.id, pinned: v.pinned };
+    },
+  }),
+
+  /**
    * Delete one outright — for a goal written by mistake, not for one you have
    * finished with. `let_go` is the honest end of a goal you stopped wanting.
    *

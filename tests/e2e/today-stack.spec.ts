@@ -189,3 +189,34 @@ test.describe('the stack', () => {
     expect(scripts.filter((s) => /tiptap|prosemirror/i.test(s))).toHaveLength(0);
   });
 });
+
+// ⚠ THE ROUTINE IS THE ONE THING ON THIS CARD THAT MUST SURVIVE A SKIP
+// (2026-08-11). The pinned goal's notes sit at the foot of Morning so that the
+// dream you just wrote down and what you do about it are adjacent — and the
+// morning that most needs them is the one that taps Skip. `checkin.ts` hides
+// every `[data-panel]` but the current one, so the block stays only as long as
+// it never grows the attribute. That is one careless copy-paste away from
+// silently vanishing on exactly the days it was built for, and no unit test can
+// see it, so it is asserted here on the rendered page.
+test.describe('the routine at the foot of Morning', () => {
+  test('⚠ is outside every panel, so skipping the check-in cannot take it away', async ({ page }) => {
+    await page.goto('/admin');
+    const routine = page.locator('[data-checkin] .rout__k');
+    test.skip((await routine.count()) === 0, 'no goal is pinned to the Morning card');
+
+    const insidePanel = await routine.evaluate((el) => !!el.closest('[data-panel]'));
+    expect(insidePanel).toBe(false);
+  });
+
+  test('offers exactly one verb — the link to the goal — and nothing to tick', async ({ page }) => {
+    await page.goto('/admin');
+    const block = page.locator('[data-checkin] .rout__k').locator('..');
+    test.skip((await block.count()) === 0, 'no goal is pinned to the Morning card');
+
+    // Notes are read, never worked. A checkbox here would be the subtask list
+    // `goals` refuses, arriving on the page rather than in the schema.
+    await expect(block.locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(block.locator('.tick')).toHaveCount(0);
+    await expect(block.locator('a[href*="/admin/agenda/goals/"]')).toHaveCount(1);
+  });
+});

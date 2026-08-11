@@ -156,6 +156,36 @@ test.describe('one goal', () => {
     }
   });
 
+  test('⚠ the four statuses fit their own labels — no "Achie…" for a status', async ({ page }) => {
+    test.skip(!(await open(page)), 'no goals to open');
+    // The header case `pseg--fit` exists for, caught here rather than by eye the
+    // second time. Equal-width segments size to whatever is left in the row, so
+    // adding the pin took 28px and "Achieved" stopped fitting. `aria-pressed` is
+    // just as true of a truncated label, which is why the assertion is a width.
+    const achieved = page.locator('[data-goal] [data-status="achieved"]');
+    const { scrollWidth, clientWidth } = await achieved.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  });
+
+  test('pins to the Morning card in one tap, and the label names where', async ({ page }) => {
+    test.skip(!(await open(page)), 'no goals to open');
+    await stubActions(page, { 'goals.setPinned': () => ({ id: 'x', pinned: true }) });
+
+    const pin = page.locator('[data-goal] [data-pin]');
+    const was = (await pin.getAttribute('aria-pressed')) === 'true';
+    await pin.click();
+    // Moves first, like the status control beside it, and no confirm: pinning
+    // destroys nothing and the same button undoes it.
+    await expect(pin).toHaveAttribute('aria-pressed', String(!was));
+    await expect(page.locator('#confirm-dialog[open]')).toHaveCount(0);
+    // "Pin" alone would not say pinned WHERE, which is the only thing about
+    // this control worth knowing.
+    await expect(pin).toHaveAttribute('aria-label', /Morning card/);
+  });
+
   test('⚠ a status change is one tap, with no confirm in front of it', async ({ page }) => {
     test.skip(!(await open(page)), 'no goals to open');
     await stubActions(page, { 'goals.setStatus': () => ({ id: 'x', status: 'paused' }) });

@@ -596,6 +596,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          pinned: boolean
           slug: string
           status: Database["public"]["Enums"]["goal_status"]
           updated_at: string
@@ -607,6 +608,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          pinned?: boolean
           slug: string
           status?: Database["public"]["Enums"]["goal_status"]
           updated_at?: string
@@ -618,6 +620,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          pinned?: boolean
           slug?: string
           status?: Database["public"]["Enums"]["goal_status"]
           updated_at?: string

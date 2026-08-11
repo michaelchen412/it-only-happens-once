@@ -144,6 +144,16 @@
   background: var(--color-base-200);
   color: var(--color-base-content);
 }
+/* ⚠ A TOGGLE IN THE ACTION SLOT HAS TO LOOK PRESSED. The pin on a goal's header
+   is the first one, and `aria-pressed` on its own changes nothing a sighted
+   reader can see — the state would have lived entirely in the accessibility
+   tree, which is the same bug as a checkbox drawn as a label. Amber explicitly
+   rather than `var(--cn)`: goals are the agenda's hue, and this button sits in a
+   page header that belongs to no zone, so there is no ambient one to inherit. */
+.zone__act[aria-pressed='true'] {
+  background: color-mix(in oklch, var(--cn-amber) 20%, transparent);
+  color: color-mix(in oklch, var(--cn-amber) 68%, var(--color-base-content));
+}
 .zone__cta {
   background: var(--cn);
   color: var(--color-base-100);
@@ -2958,6 +2968,29 @@ a.sig:hover .sig__k {
 }
 .sig--cold .sig__v {
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+}
+
+/* ── the routine's name, at the foot of the Morning card ───────────────────
+   The kicker over a pinned goal's notes. Same 10px uppercase sans as a goal
+   card's horizon line, because it is doing the same job — naming what the prose
+   under it belongs to — and a second treatment for one label would be a new
+   idiom bought for nothing.
+
+   ⚠ IT IS A LINK, AND THAT IS THE ONLY VERB IN THE BLOCK. The notes below it
+   cannot be ticked or counted; the one thing you can do from here is go and
+   change what they say. */
+.rout__k {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-family: var(--font-sans);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+}
+.rout__k:hover {
+  color: color-mix(in oklch, var(--cn-violet) 70%, var(--color-base-content));
 }
 
 /* ── the mirror's one word (13 · Piece 3, ADR-0014) ────────────────────────

@@ -178,6 +178,25 @@ export interface GoalSignal {
   observation: Observation;
 }
 
+/**
+ * The one goal kept on the Morning card, and what it says to do.
+ *
+ * ⚠ THIS EXISTS BECAUSE PRACTICE COULD NOT CARRY IT. A goal reaches the Practice
+ * zone only when `observationFor` has something to say, and a routine has no
+ * tasks to tick — so the goal that most wants to be read every morning is the
+ * one goal that zone will never show. Loosening that guard would have put a bare
+ * navigation link in a zone whose rule is that everything in it is a signal you
+ * read, so the routine goes where the morning already is instead.
+ *
+ * `notes` is raw Markdown: the card renders it, because rendering is a view's
+ * job and this module returns data.
+ */
+export interface Routine {
+  name: string;
+  slug: string;
+  notes: string | null;
+}
+
 /** Everything the five zones on Today render. */
 export interface TodayData {
   dayItems: CalendarItem[];
@@ -189,6 +208,7 @@ export interface TodayData {
   peoplePhotos: Map<string, string>;
   published: Signal | null;
   goalSignals: GoalSignal[];
+  routine: Routine | null;
   stale: Staleness | null;
 }
 
@@ -235,7 +255,12 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     // a capped list would silently stop guarding on a busy evening.
     seenOn(sb, today),
     briefsFor(sb, today),
-    sb.from('goals').select('id, name, slug').eq('status', 'active').order('created_at'),
+    // `notes` and `pinned` ride along on a query that already runs: at a cap of
+    // five active goals this is five short strings, not the `bio` problem the
+    // roster above has. One query answers both the Practice signals and the
+    // Morning card's routine, and a second `.eq('pinned', true)` round trip to
+    // fetch a row already in this result would be a query bought with nothing.
+    sb.from('goals').select('id, name, slug, notes, pinned').eq('status', 'active').order('created_at'),
     sb.from('goal_last_done').select('*'),
     sb.from('task_events').select('tasks!inner(goal_id)').eq('outcome', 'done').gte('occurred_on', since30),
     // ⚠ WRITING ONLY. `published_at` is stamped on every published essay and is
@@ -330,9 +355,27 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     const id = (row.tasks as { goal_id: string | null } | null)?.goal_id;
     if (id) doneIn30.set(id, (doneIn30.get(id) ?? 0) + 1);
   }
+  // ⚠ THE FIELDS ARE NAMED, NOT SPREAD, and the compiler is why: the row now
+  // carries `notes` and `pinned`, and `{ ...g }` widened this past the type
+  // predicate below. Naming them is the better shape anyway — a Practice signal
+  // is a name, a link and one line, and handing that zone a goal's whole routine
+  // would be a payload it has no business being able to render.
   const goalSignals = (goalRows ?? [])
-    .map((g) => ({ ...g, observation: observationFor(doneIn30.get(g.id) ?? 0, lastById.get(g.id) ?? null, today) }))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      slug: g.slug,
+      observation: observationFor(doneIn30.get(g.id) ?? 0, lastById.get(g.id) ?? null, today),
+    }))
     .filter((g): g is GoalSignal => !!g.observation);
+
+  // ⚠ FOUND AMONG THE ACTIVE GOALS, which is what makes pausing one enough. A
+  // paused goal should stop greeting you every morning, and the alternative —
+  // clearing `pinned` when the status changes — would silently throw the pin
+  // away, so re-activating would land you on a card that has forgotten. The pin
+  // survives on the row; only the card goes quiet.
+  const pinned = (goalRows ?? []).find((g) => g.pinned);
+  const routine: Routine | null = pinned ? { name: pinned.name, slug: pinned.slug, notes: pinned.notes } : null;
 
   return {
     dayItems,
@@ -344,6 +387,7 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     peoplePhotos,
     published,
     goalSignals,
+    routine,
     // ⚠ SILENCE WHILE IT IS WORKING (ADR-0014). Today is the page that would be
     // confidently wrong if the mirror went quietly stale, so it is one of the
     // two places that says so — and says nothing at all the rest of the time.

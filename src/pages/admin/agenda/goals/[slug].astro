@@ -146,7 +146,16 @@ const payload = (t: Task) =>
             beside the others, not hidden behind a delete. One tap, no dialog:
             it is reversible and it destroys nothing. */
         }
-        <div class="pseg" role="group" aria-label="Status">
+        {
+          /* ⚠ `pseg--fit`, NOT THE DEFAULT — the header case the calendar hit
+            first. `flex: 1 1 0` gives four equal boxes sized by whatever is
+            left, so "Achieved" is the one that does not fit its own and the
+            page renders `Achie…` for a status. Found in a screenshot when the
+            pin arrived and took 28px off the row, exactly as the calendar's
+            `Mon…` was: the assertions here read `aria-pressed`, which is just
+            as true of a truncated label. */
+        }
+        <div class="pseg pseg--fit" role="group" aria-label="Status">
           {
             STATUSES.map((s) => (
               <button type="button" class="pseg__b" data-status={s.key} aria-pressed={goal.status === s.key}>
@@ -155,6 +164,22 @@ const payload = (t: Task) =>
             ))
           }
         </div>
+        {
+          /* ⚠ ONE TAP, AND PINNING A SECOND GOAL MOVES THE PIN rather than
+            refusing — one slot can only mean "put this one there". The label
+            names the Morning card rather than saying "Pin", because *pinned
+            where* is the only thing about this control worth knowing. */
+        }
+        <button
+          type="button"
+          class="zone__act"
+          data-pin
+          aria-pressed={goal.pinned}
+          aria-label={goal.pinned ? 'Take this off the Morning card' : 'Keep this on the Morning card'}
+          title={goal.pinned ? 'Take this off the Morning card' : 'Keep this on the Morning card'}
+        >
+          <Icon name="ph:push-pin" />
+        </button>
         <button type="button" class="zone__act" data-edit-goal aria-label="Edit this goal">
           <Icon name="ph:pencil-simple" />
         </button>

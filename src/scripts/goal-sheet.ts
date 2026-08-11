@@ -151,4 +151,33 @@ if (header) {
       }
     }),
   );
+
+  // ── the pin, beside it ────────────────────────────────────────────────────
+  // Same shape as the status control and for the same reason: one tap, moves
+  // first, goes back if the server refuses. No confirm — pinning destroys
+  // nothing, and unpinning is the same button again.
+  //
+  // ⚠ IT DOES NOT RELOAD, though pinning a second goal silently unpins another
+  // one somewhere else. Reloading to show that would cost the whole page to
+  // report a change to a row that is not on it, and the honest place for that
+  // fact is the goals room, which already draws the pin on whichever card holds
+  // it. What this page owes you is that ITS button is right, which it is.
+  const pin = header.querySelector<HTMLButtonElement>('[data-pin]');
+  pin?.addEventListener('click', async () => {
+    const next = pin.getAttribute('aria-pressed') !== 'true';
+    showPageError(null);
+    pin.disabled = true;
+    pin.setAttribute('aria-pressed', String(next));
+
+    const { error } = await callAction(actions.goals.setPinned({ id: goalId, pinned: next }));
+    pin.disabled = false;
+    if (error) {
+      pin.setAttribute('aria-pressed', String(!next));
+      showPageError(formatActionError(error));
+      return;
+    }
+    const label = next ? 'Take this off the Morning card' : 'Keep this on the Morning card';
+    pin.setAttribute('aria-label', label);
+    pin.title = label;
+  });
 }

@@ -162,6 +162,10 @@ export default defineConfig({
           'phone',
           'lock-simple',
           'target',
+          // The one goal kept on the Morning card (2026-08-11). A pin, and it is
+          // the same glyph pressed and unpressed — `aria-pressed` carries the
+          // state, so there is no second icon to keep in sync with it.
+          'push-pin',
           // The agenda (13): a recurrence rule, disposition, and the effort meter.
           'arrows-clockwise',
           'dots-three',

@@ -100,6 +100,13 @@ const inactive = all.filter((g) => g.status !== 'active');
                 <a href={`/admin/agenda/goals/${g.slug}`} class="gcard">
                   <span class="gcard__k">
                     <Icon name="ph:target" /> {horizonLabel(g.horizon)}
+                    {/* WHICH ONE IS ON THE MORNING CARD, answered where you can
+                        see all five at once. Pinning happens on a goal's own
+                        page, so this room is the only place the single slot is
+                        legible as a slot — and it is why that page does not
+                        have to announce which goal it displaced. A mark, not a
+                        word: the row is 10px uppercase and already has one. */}
+                    {g.pinned && <Icon name="ph:push-pin" class="ml-auto" title="On the Morning card" />}
                   </span>
                   <span class="gcard__n">{g.name}</span>
                   {/* Nothing here at all when there is nothing to observe. */}
