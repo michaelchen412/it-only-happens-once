@@ -33,6 +33,11 @@
   spectrum can tell you about the person who built it. The field now collapses
   visibly toward what is still reachable as you choose.
 
+  ⚠ "PAIRED WITH", NOT "GOES WITH" — Michael's wording, 2026-08-10. It is the
+  word the schema and both ADRs already use (`paired_song_id`, ADR-0011's title),
+  so the room now says the same thing the rest of the site says. "Goes with"
+  was a description of the relation; "paired with" is its name.
+
   ⚠ EVERY FEELING BELOW IS INVENTED. Titles, artists and Spotify/YouTube URLs
   are real — 48 rows from the live corpus, so the players actually play and long
   jazz titles stress the layout for real. THE FEELINGS ATTACHED TO THEM ARE
@@ -44,54 +49,115 @@
   ⚠ NO DATABASE WORK WAS DONE FOR THIS. No migration, no tables, no schema
   opinion. The fixture is hardcoded and the whole bench is one deletable file.
 
-  ⚠ IFRAMES ARE CREATED ONCE AND NEVER DESTROYED. Every card is rendered
-  server-side but its player is a placeholder until the card is first revealed;
-  after that the iframe stays in the DOM and the card is hidden with `display`,
-  not removed. This is not an optimisation — a re-render on every filter change
-  would RESTART whatever is playing, and a room you cannot narrow without
-  killing the music is not the room. It also means a page-load costs zero
-  third-party frames, the same property `PostArticle` gets from <template>.
+  ⚠ THE ROOM OPENS FULL, NOT EMPTY. It showed nothing until you chose a word,
+  until Michael's call on 2026-08-10: "I still want the user to be able to
+  browse the music that I like, because we still show the words beneath each of
+  the songs. That still gives them affordance to browse based off of those
+  feelings." That is the show-don't-tell argument doing real work — an empty
+  room has to EXPLAIN itself, whereas a full one demonstrates the mechanism,
+  because every song is already wearing the words you would filter by. Browsing
+  and filtering stopped being two states; no selection simply means no
+  narrowing, and `holds()` returns true for an empty word list.
+
+  ⚠ A PLAYER LIVES EXACTLY AS LONG AS ITS SONG IS IN THE ROOM. It mounts when
+  the card comes within 600px of the viewport, survives every filter change that
+  keeps its song in the set, and is destroyed when the song leaves. Say the rule
+  that way and the two halves stop looking contradictory: what "never destroy"
+  was ever protecting is that NARROWING must not kill music still on screen. A
+  song the filter excluded is not on screen, so its sound has no business
+  outliving it. Removing the iframe is also the only pause we have — a
+  cross-origin frame cannot be controlled from outside.
+
+  ⚠ AND THIS REPLACED A STICKY DOCK, deleted 2026-08-10 the same day it was
+  built. Michael: "if the user starts playing a song and then they lose track of
+  where it was, they can't actually stop the song." True, and the first answer
+  was to pin the playing card to the corner with `position: fixed` (never a DOM
+  move — re-parenting an <iframe> reloads it, which would stop the music the
+  dock existed to stop). The mechanism worked; the TRIGGER could not. Nothing
+  cross-origin tells us a frame is playing, so it docked on focus — window blur
+  plus `document.activeElement` — and in a real browser that fired on the wrong
+  frame and then never fired again. It also docked players you had paused,
+  because those are indistinguishable from here.
+
+  The honest version needs Spotify's iFrame API (`createController` →
+  `playback_update`) for real transport state, plus a second integration for
+  YouTube — a dependency and a failure surface, bought for a room whose
+  vocabulary is undecided and whose corpus is untagged. Michael, correctly:
+  "do we do the sensible thing and stop embeds from playing if it disappears
+  from the filters?" That is what the rule above does, and it dissolves three
+  problems at once — you can never lose a player, frames stop accumulating, and
+  fewer live iframes means less to composite. Revisit the API only if a shipped
+  room proves the problem is real. The prototype is in
+  `git log -- src/pages/lab/music.astro`.
 
   WHAT TO JUDGE:
     1. The field at rest. Sizes are total matches, so this is the shape of the
        spectrum. Does the big/small distribution read as true, or as noise?
-    2. Pick one word, then a second. Watch the field collapse. The transition
-       is 380ms on font-size and opacity — too slow and it feels sedated, too
-       fast and the collapse is invisible. That number is a guess; tune it.
+    2. Pick one word, then a second, then a third. Watch the field collapse.
+       380ms is a guess and it is the number most worth arguing about — too
+       slow and it feels sedated, too fast and the collapse is invisible.
+       Measured after the FLIP/phasing fix (dev server, 1280×1000): zero long
+       tasks per click, zero frames over 32ms, worst frame 16.8ms, and the
+       field's LAYOUT settles into exactly ONE arrangement per change instead
+       of re-wrapping every frame. If it still reads as janky, the cause is the
+       curve or the duration, not the machinery.
     3. Start a track, then change the selection while it plays. The player must
        survive as long as its song stays in the set.
     4. A song's own words are filters. Click one from inside a result and judge
        whether "more like this" is the move you actually reach for.
     5. `corpus: 12` — the room at the size it will ACTUALLY open at.
-    6. THE THING UNCONTAINERISING REVEALED, and it only shows at full bleed:
-       at rest on a 1280×1000 desktop the field occupies the top third and the
-       remaining two thirds are empty. Inside the old bordered card that read as
-       composed; on a real page it reads as unfinished. On a 390px phone the
-       same field fills the screen and is the better view of the two. So the
-       desktop rest state wants something — vertical centring until a word is
-       chosen, a larger type ramp, or an admission that the room should open
-       with something in it. Deliberately NOT fixed here: it is the first real
-       design question this bench produced, and it is Michael's to answer.
+    6. The rest state, which is the question uncontainerising asked and
+       browsing answered. At full bleed the old empty room read as unfinished
+       (composed at 1280 inside a border, abandoned without one); the fix was
+       not vertical centring or a bigger type ramp but CONTENT. Judge whether
+       the corpus under the field reads as an invitation or as a wall.
+    7. Arrive and immediately scroll fast. Players mount 600px ahead, so the
+       question is whether that margin is enough on a trackpad flick — too
+       small and you scroll into empty boxes.
+    8. Press play, then filter that song away. The sound stops with it — but
+       measured, not instantly: the fade is 300ms, teardown starts after the
+       380ms collapse so it cannot collide with it, and the last frame is
+       released about 470ms after that. Call it half a second to a second of
+       tail. That delay is the price of the smooth collapse, and it is the
+       right way round only if the tail reads as natural rather than as a bug.
+       Judge that. It is also abrupt at the end by necessity: volume is not
+       ours to fade.
+    9. THE TWO SHAPES OF PLAYER, which only became a problem once the room
+       opened full. A Spotify track is a 152px row; a YouTube video is a 16:9
+       block roughly twice as tall, and three of the 48 are YouTube. In fixture
+       order two of them land first, so the room currently opens on two big
+       video frames and the eye reads them as the feature rather than as two
+       rows that happen to be taller. Not reordered here, because the fix is a
+       real decision and not a fixture tweak: either video gets normalised to
+       the row height everything else uses, or the room needs an order that
+       isn't "whatever the corpus hands back".
 
-  ⚠ AND THAT CHOICE HAS A BILL, measured here 2026-08-10: frames ACCUMULATE.
-  Browse a while and clear, and 33 Spotify iframes are still mounted and hidden
-  — never recreated, but never released either. Fine for a bench and fine for a
-  reader who picks two words; not fine for a long session. The fix is not to
-  unmount on hide (that is the bug this avoids) but to release frames that have
-  been hidden a while AND are not the one playing, which needs Spotify's iFrame
-  API to know what "playing" means. Out of scope until the shape is settled.
-  (Spotify's own frame also logs `compute-pressure is not allowed` — its
-  request, not ours, and not worth widening `allow` in src/lib/media.ts for.)
+  ⚠ NOTE ON MEASUREMENT: every number in this file is from the DEV SERVER.
+  The PROD gate on the first line of the body means this page redirects in a
+  production build, so it cannot be profiled there — which is correct for the
+  gate and a real limit on the numbers. Treat them as upper bounds.
+
+  ⚠ FRAMES NO LONGER ACCUMULATE, which was the bill the old never-destroy rule
+  ran up: browsing and clearing used to leave 33 hidden players mounted. Now the
+  live set is bounded by what the current filter shows and what you have scrolled
+  past, and narrowing actively gives frames back.
+  (Spotify's own frame logs `compute-pressure is not allowed` — its request, not
+  ours, and not worth widening `allow` in src/lib/media.ts for.)
 
   WHAT THIS BENCH STILL CANNOT ANSWER:
     • Whether the vocabulary is the right sixteen. Discovered by tagging, not
       by drafting.
-    • Whether tagging is affordable — 1,000 songs at 7 minutes is ~117 hours,
-      and if a song costs more than its own length to tag, the room never gets
-      stocked. That is the next bench, and it is the one that decides this.
+    • Whether adding-and-tagging a song is affordable. That is the next bench
+      and it is the one that decides this — and per plan 33's ruling 1 it is
+      ONE act, not two: there is no bulk import and no AI pass, because a
+      feeling is not a property of the song, it is what happened in Michael.
+      The corpus grows one song at a time, as a byproduct of listening.
 */
 import SiteLayout from '../../layouts/SiteLayout.astro';
+import PostArticle from '../../components/PostArticle.astro';
+import Reader from '../../components/Reader.astro';
 import { embedForUrl } from '../../lib/media';
+import { getWritingBySlug } from '../../lib/blog';
 
 if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
@@ -360,6 +426,78 @@ const FIXTURE: [title: string, artist: string, feelings: string, url: string][] 
   ],
 ];
 
+/* ⚠ THE PAIRINGS ARE REAL — the only thing on this page that is. Pulled live
+   2026-08-10: 48 rows across 46 songs, every essay published, two songs
+   (Digital Society, Second Nature) carrying two essays each. Unlike the
+   feelings, nothing here is invented, because nothing here needed to be —
+   Michael has been pairing music to writing since Squarespace and the corpus
+   already holds it.
+
+   THIS IS THE PAIRING READ BACKWARDS. On an essay, the song appears under the
+   title: *press play, then read* (ADR-0009's third role). The relation has
+   always been legible in exactly one direction, and the data is symmetric. So
+   the room can say the other half — *this song carries that piece* — for free,
+   with no new column, no new tagging, and no new concept. It is also the one
+   thing here a playlist structurally cannot hold: a playlist has no second
+   column, and no essay to put in it. */
+const PAIRED: Record<string, { title: string; slug: string }[]> = {
+  'All Res': [{ title: 'Natural', slug: 'natural' }],
+  'Anthem for the Earnest': [{ title: 'Authenticity', slug: 'authenticity' }],
+  'Ben Wendel Seasons Band // July': [{ title: 'The Spirit of Jazz', slug: 'the-spirit-of-jazz' }],
+  'Black Sails': [{ title: 'Excessive Study', slug: 'excessive-study' }],
+  'Breathe Out': [{ title: 'Death', slug: 'death' }],
+  Creep: [{ title: 'Color', slug: 'color' }],
+  Deluge: [{ title: 'Ad Hominem', slug: 'ad-hominem' }],
+  'Digital Society': [
+    { title: 'Internet Drama', slug: 'internet-drama' },
+    {
+      title: 'The Problem With Google (or Perhaps Any Internet Research)',
+      slug: 'the-problem-with-google-or-perhaps-any-internet-research',
+    },
+  ],
+  Dusk: [{ title: 'Lessons Learned', slug: 'lessons-learned' }],
+  Felt: [{ title: 'Forgiveness', slug: 'forgiveness' }],
+  'Gold Prisms Incorporated': [{ title: 'On Work', slug: 'on-work' }],
+  'Human Nature (Trio Extension)': [{ title: 'The Cost of a Human Life', slug: 'the-cost-of-a-human-life' }],
+  'In The Sky: Expansion': [{ title: 'Paradoxes of the Human Condition', slug: 'paradoxes-of-the-human-condition' }],
+  'Last Birthday': [{ title: 'On Choosing a Partner', slug: 'on-choosing-a-partner' }],
+  'Like Only You Can': [{ title: 'Unconditional Love', slug: 'unconditional-love' }],
+  'Lines of Oppression': [{ title: 'Oppression', slug: 'oppression' }],
+  'Lost Machines': [{ title: 'Prayer Requests', slug: 'prayer-requests' }],
+  'Lost Of Love': [{ title: 'Love and Circumstance', slug: 'love-and-circumstance' }],
+  Lymaks: [{ title: 'The Job Interview', slug: 'the-job-interview' }],
+  Mantra: [{ title: 'Choice', slug: 'choice' }],
+  "Mark Guiliana's Beat Music: Public Interest": [{ title: 'Public Interest', slug: 'public-interest' }],
+  'Motivations II': [{ title: 'Discipline', slug: 'discipline' }],
+  'No Deal': [{ title: 'Conflict', slug: 'conflict' }],
+  'One Time': [{ title: 'Resolution', slug: 'resolution' }],
+  'Parallel Worlds': [{ title: 'Parallel Worlds', slug: 'parallel-worlds' }],
+  'Pound For Pound': [{ title: 'Soulmate', slug: 'soulmate' }],
+  'Prime Mover': [{ title: 'Naïveté', slug: 'naivete' }],
+  Saturnine: [{ title: 'Nonexistence (The Other Half)', slug: 'nonexistence-the-other-half' }],
+  'Second Nature': [
+    { title: 'A Life Well Lived', slug: 'a-life-well-lived' },
+    { title: 'No, Don\u2019t Ask Me to Vote', slug: 'no-dont-ask-me-to-vote' },
+  ],
+  Shapeless: [{ title: 'A Time for Everything', slug: 'a-time-for-everything' }],
+  'Song for Looking in the Mirror': [{ title: 'Moving On', slug: 'moving-on' }],
+  Stria: [{ title: 'Confidence', slug: 'confidence' }],
+  Stumble: [{ title: 'Rejection', slug: 'rejection' }],
+  Sun: [{ title: 'Games', slug: 'games' }],
+  'The Arrow of Time': [{ title: 'Convenience', slug: 'convenience' }],
+  'The Black and White': [{ title: 'The Heart', slug: 'the-heart' }],
+  'the most important question': [{ title: 'Freedom', slug: 'freedom' }],
+  'The Struggle': [{ title: 'The Fragility of the Church', slug: 'the-fragility-of-the-church' }],
+  'Tigran Hamasyan Quintet - VARDAVAR (Montreux Jazz Fest. 2014)': [{ title: 'Emotions', slug: 'emotions' }],
+  'Towards the Centre of Everything': [{ title: 'Suffering', slug: 'suffering' }],
+  'Two Bars': [{ title: 'Regret', slug: 'regret' }],
+  'Waterfall Dreams': [{ title: 'Everything\u2019s going to be okay.', slug: 'everythings-going-to-be-okay' }],
+  'What Happened?': [{ title: 'Texting', slug: 'texting' }],
+  "What She Didn't Say": [{ title: 'The Fear of Missing Out', slug: 'the-fear-of-missing-out' }],
+  'Wounds Let in the Light': [{ title: 'Insecurity', slug: 'insecurity' }],
+  'You Are': [{ title: 'Criticism', slug: 'criticism' }],
+};
+
 /* `embedForUrl` is the SAME function the published essay uses (src/lib/media.ts)
    — not a lab reimplementation. If a URL stops embedding here it stops
    embedding on /blog too, which is the only way a bench is worth trusting. */
@@ -371,11 +509,37 @@ const SONGS = FIXTURE.map(([title, artist, feelings, url], i) => {
     artist,
     url,
     feelings: feelings.split(' '),
+    paired: PAIRED[title] ?? [],
     embedSrc: embed?.src ?? null,
     embedHeight: embed?.height ?? null,
     embedAllow: embed?.allow ?? '',
   };
 });
+
+/* ⚠ THE PAIRED ESSAYS ARE LOADED FOR REAL, so the bridge can open the Reader
+   instead of navigating. Michael, 2026-08-10: "why not just open the reading
+   viewer sheet (don't open the dedicated page by default)?" — which is what the
+   feed already does, and the room had no business behaving differently.
+
+   The pattern is `Reader`'s, unchanged: anything with `data-read="<slug>"`
+   opens the dialog and fills it from `<template data-reader-content="<slug>">`.
+   The `href` stays as the no-JS fallback exactly as PostCard does it, so the
+   permalink is still the floor rather than the default.
+
+   ⚠ AND THIS IS WHERE THE ROOM DIFFERS FROM THE FEED, WHICH THE PLAN NEEDS TO
+   KNOW. /blog paginates, so it ships one template per card for a page of ~7.
+   This room opens with the WHOLE corpus, so it ships one per distinct paired
+   essay — 48 full essays inline. Measured 2026-08-10: **408 KB of templates in
+   a 797 KB document, 51% of the page.** They are inert (template contents never
+   parse into the document) and they cost nothing to render, but they are still
+   bytes on every arrival, and the room's whole premise is that you arrive to
+   everything. The shipped room wants fetch-on-demand instead — same Reader,
+   filled from a request rather than a <template>. Fine for a bench; recorded in
+   plan 33 §6 rather than fixed here, because it is a decision about the room. */
+const PAIRED_SLUGS = [...new Set(Object.values(PAIRED).flatMap((es) => es.map((e) => e.slug)))];
+const ESSAYS = (await Promise.all(PAIRED_SLUGS.map((slug) => getWritingBySlug(Astro.locals.supabase, slug)))).filter(
+  (e): e is NonNullable<typeof e> => e !== null,
+);
 
 const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all-small-caps]';
 ---
@@ -392,7 +556,7 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
     `backToTop={false}` because SiteLayout's own rule is one quiet corner
     control at a time, and here that corner is the bench strip. */
 }
-<SiteLayout title="Music" active="blog" backToTop={false}>
+<SiteLayout title="Music" active="blog">
   <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
     {
       /* The real /blog axis, reproduced rather than approximated — Music is the
@@ -417,10 +581,16 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       >
     </nav>
 
-    <p id="b-prompt" class="text-base-content/45 mb-14 text-center font-serif text-[1.05rem] italic">
-      How does it feel? Choose one, or a few.
-    </p>
-
+    {
+      /* ⚠ NO PROMPT LINE. This said "How does it feel? Choose one, or a few."
+        until Michael cut it on 2026-08-10: "that's too much explicit
+        instruction for the user. We should show, not tell." It is the same
+        rule that took the caption off the essay's paired player — the field
+        already shows what is selected, in lamplight and at full size, so the
+        line restated it smaller, and the instruction half taught a reader
+        something the words themselves afford. The affordance is the hover, the
+        size shift, and the fact that the same words sit under every song. */
+    }
     {
       /* Rendered server-side and NEVER re-rendered — the JS mutates font-size,
         opacity and colour in place, because innerHTML on every click would kill
@@ -442,7 +612,16 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
     </div>
 
     <div id="b-results" class="mt-20">
-      <p id="b-count" class="text-base-content/30 mb-10 text-center font-sans text-xs tracking-wide uppercase"></p>
+      {
+        /* ⚠ NO COUNT HEADER. It said "48 songs" / "5 songs" until Michael cut
+          it on 2026-08-10: "stop listing 'x songs' as a header. its pointless."
+          He is right, and it is the third thing this page has lost to the same
+          rule. The room is right there — its size is visible by looking at it,
+          so the number was narrating what the reader can already see. A count
+          earns its place in a machinery register like /blog's rail, where it
+          tells you what a filter WOULD leave before you commit to it. Here it
+          only reported what had already happened. */
+      }
       {
         /* ⚠ NO TITLE, NO ARTIST — the same call as the essay's paired player
           (docs/admin.md §6a, 2026-08-10): the embed prints the track, the
@@ -478,13 +657,48 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
                   </button>
                 ))}
               </p>
+              {/* THE BRIDGE. Serif italic against the feelings' small caps, so
+                  the two lines read as different KINDS of fact rather than as a
+                  longer list: the words above are what the song did to Michael
+                  and are the room's navigation; this is where it already lives
+                  on the site. Second, quieter, and below — the music is still
+                  the point, and 46 of 48 songs carry one, so a louder treatment
+                  would make the pairing look like the subject of the page. */}
+              {s.paired.length > 0 && (
+                <p class="text-base-content/35 mt-1.5 font-serif text-[0.95rem] italic">
+                  paired with{' '}
+                  {s.paired.map((e, i) => (
+                    <>
+                      {i > 0 && <span class="text-base-content/25"> and </span>}
+                      <a
+                        href={`/blog/${e.slug}`}
+                        data-read={e.slug}
+                        class="text-base-content/55 hover:text-primary cursor-pointer transition-colors"
+                      >
+                        {e.title}
+                      </a>
+                    </>
+                  ))}
+                </p>
+              )}
             </li>
           ))
         }
       </ul>
       <div id="b-empty" class="hidden text-center"></div>
+
+      {/* Inert until the Reader clones one. Same contract as PostCard's. */}
+      {
+        ESSAYS.map((essay) => (
+          <template data-reader-content={essay.slug}>
+            <PostArticle item={essay} />
+          </template>
+        ))
+      }
     </div>
   </div>
+
+  <Reader />
 
   {
     /* ─────  THE BENCH, kept out of the room  ─────
@@ -493,7 +707,7 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       can be judged as a page. */
   }
   <details
-    class="border-base-300 bg-base-100/90 fixed bottom-4 left-4 z-50 rounded-lg border font-sans text-xs shadow-lg backdrop-blur"
+    class="border-base-300 bg-base-100/90 fixed top-20 right-4 z-50 rounded-lg border font-sans text-xs shadow-lg backdrop-blur"
   >
     <summary class="text-base-content/50 cursor-pointer list-none px-3 py-2 tracking-wide uppercase select-none"
       >bench</summary
@@ -518,12 +732,33 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
        and the collapse is over before you have seen which words left, slower
        and choosing a second word feels like waiting. The easing is weighted to
        settle rather than arrive. */
+    /* See the note by <SiteLayout>: at bottom-right this control sits on top of
+       a play button at every width under 1280. Page-local override, one rule. */
+    :global(.back-to-top) {
+      right: auto;
+      left: 1.25rem;
+    }
+
+    /* ⚠ THE COLLAPSE IS MOTION, AND SOME READERS HAVE ASKED US NOT TO. The FLIP
+       moves sixteen words across the field at once; that is exactly the kind of
+       large-area movement `prefers-reduced-motion` exists for. The information
+       is in the sizes and the colour, not in the travel, so honouring it costs
+       nothing — the field simply arrives at its new shape. */
+    @media (prefers-reduced-motion: reduce) {
+      .pal-word,
+      .song-card {
+        transition-duration: 0.01ms !important;
+      }
+    }
+
     .pal-word {
       transition:
-        font-size 380ms cubic-bezier(0.2, 0.7, 0.3, 1),
+        transform 380ms cubic-bezier(0.2, 0.7, 0.3, 1),
         opacity 380ms ease,
         color 240ms ease;
+      transform-origin: left top;
       color: var(--color-base-content);
+      will-change: transform;
     }
     .pal-word:not(.is-on):not(:disabled):hover {
       opacity: 1 !important;
@@ -557,8 +792,6 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
     */
     const field = document.getElementById('b-field')!;
     const list = document.getElementById('b-list')!;
-    const prompt = document.getElementById('b-prompt')!;
-    const countEl = document.getElementById('b-count')!;
     const emptyEl = document.getElementById('b-empty')!;
 
     const words = [...field.querySelectorAll<HTMLButtonElement>('.pal-word')];
@@ -595,35 +828,160 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       return `${(MIN_REM + (MAX_REM - MIN_REM) * t).toFixed(3)}rem`;
     };
 
-    const show = (card: HTMLLIElement) => {
-      const t = hideTimers.get(card);
-      if (t) {
-        clearTimeout(t);
-        hideTimers.delete(card);
-      }
-      if (!card.hidden && !card.classList.contains('is-out')) return;
-      mountEmbed(card);
-      card.hidden = false;
-      // Force a reflow so the transition runs from the hidden state rather than
-      // being collapsed into the same frame as `display`.
-      void card.offsetHeight;
-      card.classList.remove('is-out');
-    };
+    /* ⚠ READS AND WRITES ARE SEPARATED, AND THAT IS THE WHOLE FIX FOR THE JANK
+       Michael reported on 2026-08-10 ("erratic movements... everything's
+       recomputing"). The recompute was never the problem — 16 words against 48
+       songs is ~800 set lookups, microseconds. The problem was that the old
+       `show()` interleaved them per card: write `hidden`, READ
+       getBoundingClientRect, write the iframe, READ offsetHeight, write the
+       class — inside a loop over 48 cards. Every read after a write forces the
+       browser to flush layout synchronously, so one click cost up to ~96 full
+       layouts of a tree containing live third-party iframes.
 
+       Now the pass is strictly phased: decide (no DOM), write all the
+       `hidden` flags, force ONE reflow for the whole list, write all the
+       classes. Mounting happens in a later frame, and reads all its rects
+       before it writes any iframe. */
     const hide = (card: HTMLLIElement) => {
-      if (card.hidden) return;
-      if (card.classList.contains('is-out')) return;
+      if (card.hidden || card.classList.contains('is-out')) return;
       card.classList.add('is-out');
       hideTimers.set(
         card,
         window.setTimeout(() => {
           card.hidden = true;
           hideTimers.delete(card);
+          queueUnmount(card);
         }, 310),
       );
     };
 
-    /* The player is built on first reveal and then left alone forever. */
+    /* ⚠ LEAVING THE ROOM STOPS THE SOUND, and removing the iframe is the only
+       way to do it — a cross-origin frame cannot be paused from outside. This
+       is the narrow exception to "never destroy a player", and the two rules
+       do not conflict once you say what the original one was actually
+       protecting: NARROWING must not kill music that is still on screen. A
+       song the filter has excluded is not on screen, so its sound has no
+       business continuing. The card is already hidden by the time this runs,
+       so nothing visible is torn down. It re-mounts on approach if the song
+       comes back. */
+    const unmountEmbed = (card: HTMLLIElement) => {
+      if (!card.hidden) return; // it came back before we got to it
+      const slot = card.querySelector<HTMLElement>('[data-embed]');
+      if (!slot || slot.dataset.mounted !== '1') return;
+      slot.replaceChildren();
+      slot.dataset.mounted = '';
+      slot.className = '';
+      slot.style.borderRadius = '';
+      io.observe(card); // eligible to mount again
+    };
+
+    /* ⚠ TEARDOWN IS CHUNKED, and skipping this costs exactly the jank the
+       phasing fix removed. Filtering 48 cards down to 11 destroys 37
+       cross-origin frames; doing that in one pass measured 11 frames over 32ms
+       with a 116ms worst case — worse than anything the original build did. A
+       4ms budget per animation frame keeps each one under the 16.7ms line and
+       still finishes the whole teardown in about a tenth of a second, which is
+       fast enough that the sound stops when you expect it to. */
+    const unmountQueue: HTMLLIElement[] = [];
+    let draining = false;
+    type IdleCb = (d: { timeRemaining: () => number }) => void;
+    /* Read the function off `window` ONCE rather than testing `'x' in window`
+       inline — the `in` narrowing collapses `window` to `never` in the else
+       branch, so the setTimeout fallback stops type-checking. */
+    const ric = (window as unknown as { requestIdleCallback?: (f: IdleCb, o?: object) => void }).requestIdleCallback;
+    const idle = (fn: IdleCb, timeout = 400) => {
+      if (ric) ric.call(window, fn, { timeout });
+      else window.setTimeout(() => fn({ timeRemaining: () => 8 }), 60);
+    };
+
+    const drainUnmounts: IdleCb = (deadline) => {
+      const t0 = performance.now();
+      while (unmountQueue.length && performance.now() - t0 < Math.max(4, deadline.timeRemaining())) {
+        unmountEmbed(unmountQueue.shift()!);
+      }
+      if (unmountQueue.length) idle(drainUnmounts);
+      else draining = false;
+    };
+
+    const queueUnmount = (card: HTMLLIElement) => {
+      unmountQueue.push(card);
+      if (draining) return;
+      draining = true;
+      /* Wait out the 380ms collapse before starting. Teardown used to begin at
+         310ms, i.e. mid-animation, so the browser was destroying frames and
+         interpolating sixteen words in the same frames — which is where the
+         long frames came from, not from the loop. */
+      window.setTimeout(() => idle(drainUnmounts), 220);
+    };
+
+    const applyVisibility = (wanted: boolean[]) => {
+      // write only
+      cards.forEach((card, i) => {
+        if (!wanted[i]) return;
+        const t = hideTimers.get(card);
+        if (t) {
+          clearTimeout(t);
+          hideTimers.delete(card);
+        }
+        card.hidden = false;
+      });
+      // one flush for the batch, so the `is-out` removal below actually
+      // transitions instead of collapsing into the same frame as `display`
+      void list.offsetHeight;
+      // write only
+      cards.forEach((card, i) => {
+        if (wanted[i]) card.classList.remove('is-out');
+        else hide(card);
+      });
+    };
+
+    /* Read every rect, THEN mount every player. Mounting appends an iframe,
+       which invalidates layout — so interleaving would re-thrash the thing
+       the phasing above just fixed. */
+    const mountVisible = () => {
+      const pending: HTMLLIElement[] = [];
+      for (const card of cards) {
+        if (card.hidden) continue;
+        const slot = card.querySelector<HTMLElement>('[data-embed]');
+        if (!slot || slot.dataset.mounted === '1') continue;
+        if (nearViewport(card)) pending.push(card);
+      }
+      for (const card of pending) {
+        mountEmbed(card);
+        io.unobserve(card);
+      }
+    };
+
+    /* ⚠ MOUNT ON APPROACH, NOT ON REVEAL. When the room showed nothing until
+       you chose, "revealed" was a good proxy for "about to be looked at" —
+       you only ever saw a handful. Now that it opens with the whole corpus,
+       that proxy would spawn 48 third-party frames on load. So a card mounts
+       when it comes within 600px of the viewport and is currently in the set,
+       and never again. Scrolling the whole room still ends up mounting
+       everything; what this bounds is the cost of ARRIVING. */
+    const NEAR = 600;
+    const nearViewport = (el: HTMLElement): boolean => {
+      const r = el.getBoundingClientRect();
+      return r.bottom > -NEAR && r.top < window.innerHeight + NEAR;
+    };
+
+    /* The observer catches scrolling; `show()` catches a card that is already
+       on screen when a filter change puts it back in the set — the observer
+       cannot fire for that, because the intersection state never changed. */
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const card = e.target as HTMLLIElement;
+          if (card.hidden) continue; // out of the set — leave it observed
+          mountEmbed(card);
+          io.unobserve(card);
+        }
+      },
+      { rootMargin: `${NEAR}px 0px` },
+    );
+
+    /* The player is built once and then left alone forever. */
     const mountEmbed = (card: HTMLLIElement) => {
       const slot = card.querySelector<HTMLElement>('[data-embed]');
       if (!slot || slot.dataset.mounted === '1') return;
@@ -648,38 +1006,84 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
       slot.appendChild(iframe);
     };
 
+    /* ⚠ THE FIELD MOVES BY TRANSFORM, NOT BY font-size — this is the other half
+       of the jank fix, and the visible half. Animating `font-size` over 380ms
+       means the flex row RE-WRAPS on every frame: a word that ends up on line 2
+       spends the transition migrating there, so stacking a second filter looked
+       like the whole field scrambling rather than settling. Sixteen words each
+       nudging the fifteen others is the "erratic movement".
+
+       FLIP fixes it exactly. Measure where every word IS, apply the new sizes
+       in one synchronous write so layout re-wraps ONCE, measure where every
+       word LANDED, then invert the difference with a transform and let that
+       animate to zero. Transforms do not affect layout, so nothing re-wraps
+       mid-flight — each word travels a straight line from its old place and
+       size to its new one, and the browser can run it off the main thread.
+
+       Measuring `first` AFTER the previous animation may still be running is
+       deliberate: getBoundingClientRect reports the CURRENT transformed box, so
+       an interrupted transition continues from where the eye last saw it
+       instead of snapping back. */
+    const flipField = (apply: () => void) => {
+      const first = words.map((w) => w.getBoundingClientRect());
+      // drop any in-flight transform so `last` is measured untransformed
+      words.forEach((w) => {
+        w.style.transition = 'none';
+        w.style.transform = 'none';
+      });
+      apply();
+      const last = words.map((w) => w.getBoundingClientRect());
+      words.forEach((w, i) => {
+        const f = first[i];
+        const l = last[i];
+        const dx = f.left - l.left;
+        const dy = f.top - l.top;
+        const scale = l.width > 0 ? f.width / l.width : 1;
+        if (!dx && !dy && Math.abs(scale - 1) < 0.001) {
+          w.style.transition = '';
+          return;
+        }
+        w.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+      });
+      requestAnimationFrame(() => {
+        words.forEach((w) => {
+          w.style.transition = ''; // back to the CSS rule
+          w.style.transform = '';
+        });
+      });
+    };
+
     const render = () => {
-      // ── the field
+      // ── the field, FLIPped (see flipField)
       const counts = words.map((b) => {
         const w = b.dataset.word!;
         return selection.has(w) ? countFor() : countFor(w);
       });
       const max = Math.max(...counts, 1);
-      words.forEach((b, i) => {
-        const w = b.dataset.word!;
-        const on = selection.has(w);
-        const n = counts[i];
-        const dead = !on && n === 0;
-        b.style.fontSize = on ? `${MAX_REM}rem` : sizeFor(n, max);
-        b.style.opacity = on ? '1' : dead ? '0.12' : String(0.4 + 0.6 * (n / max));
-        b.classList.toggle('is-on', on);
-        b.disabled = dead;
-        b.setAttribute('aria-pressed', String(on));
+      flipField(() => {
+        words.forEach((b, i) => {
+          const w = b.dataset.word!;
+          const on = selection.has(w);
+          const n = counts[i];
+          const dead = !on && n === 0;
+          b.style.fontSize = on ? `${MAX_REM}rem` : sizeFor(n, max);
+          b.style.opacity = on ? '1' : dead ? '0.12' : String(0.4 + 0.6 * (n / max));
+          b.classList.toggle('is-on', on);
+          b.disabled = dead;
+          b.setAttribute('aria-pressed', String(on));
+        });
       });
 
-      // ── the cards
+      // ── the cards: decide first, touch the DOM second
       const wordList = [...selection];
       const eligibleCards = new Set(eligible());
-      let hits = 0;
-      for (const card of cards) {
-        const visible = selection.size > 0 && eligibleCards.has(card) && holds(card, wordList);
-        if (visible) {
-          hits++;
-          show(card);
-        } else {
-          hide(card);
-        }
-      }
+      /* No selection means the WHOLE corpus, not an empty room — `holds()`
+         already returns true for an empty word list, so browsing is the
+         default state rather than a special case. */
+      const wanted = cards.map((card) => eligibleCards.has(card) && holds(card, wordList));
+      const hits = wanted.filter(Boolean).length;
+      applyVisibility(wanted);
+      requestAnimationFrame(mountVisible);
 
       // ── the words inside each visible card
       for (const card of cards) {
@@ -688,11 +1092,7 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
         });
       }
 
-      // ── prompt, count, empty
-      prompt.textContent = selection.size
-        ? [...selection].join(matchAll ? ', and ' : ', or ')
-        : 'How does it feel? Choose one, or a few.';
-      countEl.textContent = selection.size && hits ? `${hits} ${hits === 1 ? 'song' : 'songs'}` : '';
+      // ── the empty state
 
       if (selection.size && !hits) {
         /* Failing well: name the nearest thing that DOES exist. Rarely seen —
@@ -745,5 +1145,6 @@ const SMALLCAPS = 'font-serif text-[0.95rem] tracking-[0.06em] [font-variant:all
     });
 
     render();
+    cards.forEach((c) => io.observe(c));
   </script>
 </SiteLayout>
