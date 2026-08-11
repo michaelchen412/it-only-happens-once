@@ -301,7 +301,22 @@ const nav = [
         }
         <div class="site-foot__group">
           <a href="/about#mv-hello">Say hello</a>
-          <button type="button" popovertarget="site-colophon" aria-label="How this site was built">
+          {
+            /* ⚠ THE LABEL OPENS WITH THE WORD ON SCREEN, AND THAT IS NOT
+              REDUNDANCE. This button SHOWS "GitHub" and used to be NAMED "How
+              this site was built" — an accessible name that does not contain
+              the visible text (WCAG 2.5.3, Label in Name). The cost is not
+              theoretical and it is not a screen reader's: someone driving the
+              page by voice says "click GitHub", because that is what the page
+              says, and nothing happens. Flagged by Lighthouse 2026-08-11.
+
+              ⚠ THE BAR'S COPY OF THIS BUTTON KEEPS THE BARE SENTENCE (see the
+              CREDENTIAL note above) AND IS CORRECT AS IT STANDS. It renders the
+              mark alone, so there is no visible text for a name to disagree
+              with, and the sentence is the only thing telling anyone what the ⌗
+              does. Two instances, two right answers — do not unify them. */
+          }
+          <button type="button" popovertarget="site-colophon" aria-label="GitHub — how this site was built">
             <Icon name="simple-icons:github" class="site-foot__icon" />
             GitHub
           </button>
