@@ -12,7 +12,12 @@
                 all-small-caps attribution.
     • writing — display title + fading excerpt and NO metadata; the block opens
                 the blog's own Reader (`data-read`), so an essay reads
-                identically everywhere.
+                identically everywhere. It is also the one stanza that sits on a
+                PAGE — a sheet that fades in left to right so the drawn figure
+                passes through it (ADR-0029). The sheet is not here: it is CSS on
+                `.suite-writing > .grow`, which both this component's callers
+                already build, so the public suite and the composer's Read view
+                get it from one definition and neither can drift.
     • song    — the ANNOTATION leads and the embed closes as citation (ADR-0009).
                 A song is Michael's words about a track plus the track itself —
                 structurally what a quote is, inverted: someone else's words plus

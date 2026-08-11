@@ -39,6 +39,15 @@
   the real thing. What stays HERE is this surface's chrome: the margin marks,
   the stanza offsets, the drawn line, the lamplight and the zoom.
 
+  ⚠ A WRITING STANZA SITS ON A PAGE, and the two elements below are what carry
+  it: `.suite-writing` on the article and the `.grow` text column inside it. The
+  sheet is CSS (admin.css "THE PAGE", ADR-0029), keyed on exactly that pair — so
+  it is not this component's to draw, but it IS this component's to keep. Rename
+  either, or move the `Read →` out of `.grow`, and the page silently stops being
+  one. The left edge of that sheet is deliberately absent so the drawn line
+  passes through it rather than being interrupted; the arcs and the paper are
+  therefore no longer independent, and changing `INDENTS` moves both.
+
   The zoom out is navigation: the name itself (popover semantics — the trigger
   that opened it closes it), the ✦ beside it, the floating ✦ once you scroll,
   and Escape all go home — `/` IS the whole sky (the overview) — and the title

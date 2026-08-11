@@ -118,6 +118,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0026](0026-a-multi-row-write-is-one-transaction.md) | A write that must not partly happen is a `plpgsql` function, `SECURITY INVOKER`, so RLS stays the trust boundary | Accepted |
 | [0027](0027-one-lifecycle-for-every-action-call.md) | Every action call goes through `submitAction`/`callAction`, and a per-file allowlist test — not a lint rule — enforces it | Accepted |
 | [0028](0028-the-e2e-suite-is-read-only-against-live.md) | The e2e suite runs against the live project; read-only is a fixture that blocks `/_actions/**` by default, and branching is refused with three named triggers | Accepted |
+| [0029](0029-a-writing-stanza-sits-on-a-page.md) | A writing stanza sits on a page and the page has no left edge, so the drawn figure passes through it; quotes and songs stay typeset | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all

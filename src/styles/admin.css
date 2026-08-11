@@ -590,10 +590,16 @@ html.reader-open .sky-return {
 
 /* ---------------------------------------------------------------------------
    The Sky — the constellation suite (components/ConstellationSuite.astro).
-   Typeset, not carded (decided 2026-07-23, prototyped in the sky-lab bench): each
-   medium in its own register, star-marks in the margin joined by a drawn
-   line, and the fragment nearest the reading line takes a passing lamplight.
-   Lines are currentColor at low opacity; every color is a semantic token.
+   EACH MEDIUM IN ITS OWN REGISTER (2026-07-23, prototyped in the sky-lab bench):
+   star-marks in the margin joined by a drawn line, and the fragment nearest the
+   reading line takes a passing lamplight. Lines are currentColor at low opacity;
+   every color is a semantic token.
+
+   A quote and a song are TYPESET — set whole, no container. Writing sits on a
+   page: see "THE PAGE" below, and ADR-0029 for why that is the same rule rather
+   than an exception to it. (This header read "typeset, not carded" until
+   2026-08-11, which named the technique rather than the principle, and the
+   technique was only ever a consequence of the register.)
    ------------------------------------------------------------------------- */
 .suite {
   position: relative;
@@ -756,6 +762,141 @@ html.reader-open .sky-return {
   .suite-writing:hover .sw-excerpt {
     color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
   }
+}
+
+/* ── THE PAGE — writing stanzas only (ADR-0029) ─────────────────────────────
+   An essay in a suite sits on a sheet; a quote and a song do not. That is not a
+   softening of the rule at the head of this section — it is that rule applied
+   honestly. Each medium in its own register, and the register a
+   fading excerpt belongs to is A PAGE: a quote is set whole and finishes on the
+   screen, an essay here is a title and five lines whose text is somewhere else.
+   The sheet says which of those you are looking at before a word is read.
+
+   ⚠ IT MATERIALISES LEFT TO RIGHT, AND THAT IS WHAT LETS IT EXIST AT ALL. An
+   opaque card here would be an object dropped on the constellation: the arcs bow
+   up to 30px off the marks and stanzas paint ABOVE the drawn line (`.suite-item`
+   z-1, `.suite-line` z-0), so a solid left edge EATS the figure where it crosses.
+   This sheet has no substance on that edge — the drawing passes through it and
+   only becomes paper once it is clear. Michael, 2026-08-11: *"slowly gains
+   opacity from left to right so it blends in better with the constellation lines
+   and is less jarring."*
+
+   ⚠ THE EDGE IS ON A PSEUDO-ELEMENT BECAUSE A BORDER CANNOT FADE. `border-image`
+   with a gradient is the obvious reach and it silently DISCARDS `border-radius` —
+   square corners, every time. So tint, hairline and radius are drawn on one
+   layer and `mask-image` ramps that. Masking the stanza itself would fade the
+   title and the excerpt with it: the writing instead of the paper under it.
+
+   ⚠ AND IT REACHES THE COMPOSER FOR FREE, which is why it is keyed on
+   `.suite-writing > .grow` rather than on anything ConstellationSuite owns. The
+   Read view in `admin/constellations/[id].astro` builds the same two elements on
+   purpose — "the same stanzas the sky sets, verbatim" — so composing keeps
+   showing the real thing rather than a version of it that is one release behind.
+
+   Ramp shapes are EASED, both axes, and neither is decoration:
+     · horizontal — the sheet differs from the ground by ~2% lightness, so a
+       two-stop ramp over ~350px resolves to a handful of 8-bit values held for
+       60-100px each. That is a staircase, not a gradient. Uneven steps read as
+       texture where evenly-spaced ones read as a defect.
+     · vertical — flat through the title's band, then falling. `black 0%, black
+       34%, …` was tried and printed a MACH BAND across the middle of the card:
+       the eye draws an edge wherever a gradient stops being flat, even when
+       every value either side is correct. These stops bend instead of turning.
+   -------------------------------------------------------------------------- */
+.suite-writing > .grow {
+  /* 38rem, not the column — the text measure is 68ch, and a 56rem sheet holding
+     36rem of prose is a banner rather than a page. */
+  --sw-width: 38rem;
+  --sw-pad: 1.6rem;
+  --sw-paper: color-mix(in oklab, var(--color-base-200) 55%, transparent);
+  --sw-edge: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  /* The footer rule is NOT `--sw-edge`. Drawn at the same weight as the sheet's
+     own boundary, a divider inside it makes a quiet card look busy: two lines
+     arguing about which one bounds the page. Furniture goes quieter. */
+  --sw-rule: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+  /* where the sheet has fully arrived, and the one knob for the whole ramp */
+  --sw-reach: 58%;
+  /* Both ramps, authored as stops off `--sw-reach` so the token stays the single
+     knob: move it and the whole eased curve moves with it, still eased. */
+  --sw-ramp-x: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, black 6%, transparent) calc(var(--sw-reach) * 0.3),
+    color-mix(in srgb, black 22%, transparent) calc(var(--sw-reach) * 0.53),
+    color-mix(in srgb, black 50%, transparent) calc(var(--sw-reach) * 0.72),
+    color-mix(in srgb, black 78%, transparent) calc(var(--sw-reach) * 0.88),
+    black calc(var(--sw-reach) * 1.15)
+  );
+  --sw-ramp-y: linear-gradient(
+    to bottom,
+    black 0%,
+    black 30%,
+    color-mix(in srgb, black 96%, transparent) 46%,
+    color-mix(in srgb, black 86%, transparent) 60%,
+    color-mix(in srgb, black 72%, transparent) 74%,
+    color-mix(in srgb, black 56%, transparent) 87%,
+    color-mix(in srgb, black 42%, transparent) 100%
+  );
+  position: relative;
+  max-width: var(--sw-width);
+  padding: var(--sw-pad) var(--sw-pad) calc(var(--sw-pad) * 0.7);
+  border-radius: var(--radius-box);
+}
+@media (min-width: 640px) {
+  .suite-writing > .grow {
+    --sw-pad: 2rem;
+  }
+}
+.suite-writing > .grow::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--sw-paper);
+  border: 1px solid var(--sw-edge);
+  border-radius: var(--radius-box);
+  mask-image: var(--sw-ramp-x);
+}
+/* ⚠ THE TWO RAMPS MUST MULTIPLY, and `add` is the default. Two mask layers
+   composite as a UNION unless told otherwise, which would restore the left edge
+   to full strength wherever the vertical layer is opaque — the fallback does not
+   weaken this effect, it inverts it. So the horizontal-only mask above is the
+   floor, and the second axis is added only where the multiply is real. */
+@supports (mask-composite: intersect) {
+  .suite-writing > .grow::before {
+    mask-image: var(--sw-ramp-x), var(--sw-ramp-y);
+    mask-composite: intersect;
+  }
+}
+
+/* ⚠ FIVE LINES, NOT FOUR, and the container is what asked for it — a page with
+   four lines on it is not a page. It stops at five because `excerpt()` caps the
+   lede at 400 chars (lib/markdown.ts): at six or more, most essays stop being
+   truncated at all and `.excerpt-fade` becomes a mask over text that was never
+   cut, which promises more where there is none. Set here rather than on the
+   element so the number lives beside the sheet that needs it. */
+.suite-writing .sw-excerpt {
+  -webkit-line-clamp: 5;
+}
+
+/* The turn, at the page's outer corner — where a thumb reaches to turn one, and
+   far enough under the excerpt's fade that the two do not read as one block.
+   Space does the separating; the rule only confirms it. */
+.suite-writing > .grow > .suite-cta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.4rem;
+  padding-top: 0.85rem;
+  /* ⚠ A GRADIENT BACKGROUND, NOT A `border-top`. The rule spans the sheet's full
+     inner width, so a border puts a hard 1px stroke across the exact stretch
+     where the paper has been reduced to nothing — a crisp line hanging in empty
+     space, louder than the boundary it sits inside. It cannot be masked either:
+     that would take the word with it. So it fades on the sheet's own ramp, off
+     the same `--sw-reach`, and the two arrive together. */
+  background-image: linear-gradient(to right, transparent 0%, var(--sw-rule) var(--sw-reach));
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: top left;
 }
 
 /* Its own line beneath the excerpt, in the text column — unlike the overview
