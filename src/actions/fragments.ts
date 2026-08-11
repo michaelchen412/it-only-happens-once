@@ -454,6 +454,24 @@ export const fragments = {
       subjects: optText,
       slug: optText,
     }),
+    /*
+      ⚠ `body` AND `subjects` ARE ON THEIR WAY OUT OF THIS INPUT (ADR 0031), and
+      they are still here on purpose until the sheet that sends them is gone.
+
+      `body` becomes the song's PUBLIC NOTE, owned by `songs.setNotes`. Once the
+      quick-editor's song form is deleted, this action must stop writing it —
+      `persist` updates whatever keys the row object carries, so a save of the
+      metadata tab would otherwise blank a note written on the next tab over.
+      `subjects` goes because a song has none: the one time this corpus filed a
+      song by subject it produced `jazz`, deleted 2026-08-11 as a category
+      error, and songs are filed by FEELING instead.
+
+      Removing them BEFORE that form goes would be worse than leaving them:
+      Zod strips unknown keys silently, so the "Why this one" editor would keep
+      rendering, keep accepting typing, and quietly discard it on save. A field
+      that lies is a worse intermediate state than a field that is merely
+      deprecated.
+    */
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
@@ -943,6 +961,86 @@ export const songs = {
         if (error) throw fail(error.message);
       }
       return { ok: true, count: wanted.length };
+    },
+  }),
+
+  /**
+   * Both notes on a song, in one call (ADR 0031).
+   *
+   * ⚠ THIS REPLACES "WHY THIS ONE", AND THE RENAME IS THE WHOLE POINT. ADR 0009
+   * gave a song `body` as an annotation — Michael's sentence on *why this song*
+   * — and in seventeen days one song in forty-eight used it. The sentence it
+   * used it for was *"I love Janek's playing in the beginning; it really sets
+   * the tone for the whole piece"*: an observation, not a justification. The
+   * field was mislabelled from the hour it was created, and the label is what
+   * kept it empty. Michael, 2026-08-11: *"I don't need to tell you why the music
+   * is good… I want to show and not tell."*
+   *
+   * TWO NOTES, SPLIT BY AUDIENCE RATHER THAN BY LENGTH:
+   *
+   *  · `public_notes` → `fragments.body`, still meaning *the words of this
+   *    fragment*. It renders in the music room behind a popover on the card,
+   *    and nowhere else — never above a player, which is the caption this site
+   *    already removed once for saying what the embed says.
+   *  · `private_notes` → `fragment_private_notes`, admin-only in RLS and
+   *    revoked from `anon` at the privilege layer. Where a song came from, what
+   *    week it belongs to, what to listen for at 2:41.
+   *
+   * Applies IMMEDIATELY and sends BOTH every time, exactly like `setFeelings`
+   * above and for the same reason: a note is written while listening, often
+   * years after the row was, and it must not have to ride along with a save of
+   * the metadata beside it. Sending both halves is what stops the pair drifting
+   * out of step with the two editors on screen.
+   *
+   * ⚠ AND `saveSong` NO LONGER WRITES `body` AT ALL — see its handler. If it
+   * did, saving the metadata tab would blank a note written on the next tab.
+   */
+  setNotes: defineAction({
+    input: z.object({
+      song_id: z.uuid(),
+      /** Markdown, both of them — same editor, same pipeline as a quote body. */
+      public_notes: z.string(),
+      private_notes: z.string(),
+    }),
+    handler: async ({ song_id, public_notes, private_notes }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+      // Same type gate as `setFeelings`, for the same reason: the FK cannot say
+      // "only a song", so the refusal is a sentence here rather than a
+      // constraint name. `fragment_private_notes` is keyed on `fragment_id` and
+      // would happily take an essay.
+      const { data: song } = await sb.from('fragments').select('id, type, deleted_at').eq('id', song_id).maybeSingle();
+      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
+      if (song.type !== 'song') throw fail('Only a song carries notes.', 'BAD_REQUEST');
+
+      const pub = public_notes.trim();
+      const priv = private_notes.trim();
+
+      const { error: bodyErr } = await sb
+        .from('fragments')
+        .update({ body: pub || null })
+        .eq('id', song_id);
+      if (bodyErr) throw fail(bodyErr.message);
+
+      // ⚠ EMPTY DELETES THE ROW rather than storing ''. The column defaults to
+      // '' and would take it happily — but then "has a private note" becomes a
+      // question about a string instead of about a row, and every reader has to
+      // remember which. This way the table IS the set of songs with a note.
+      if (priv) {
+        const { error } = await sb
+          .from('fragment_private_notes')
+          .upsert({ fragment_id: song_id, notes: priv }, { onConflict: 'fragment_id' });
+        if (error) throw fail(error.message);
+      } else {
+        const { error } = await sb.from('fragment_private_notes').delete().eq('fragment_id', song_id);
+        if (error) throw fail(error.message);
+      }
+
+      // ⚠ NOT A TRANSACTION, same call as `setFeelings` makes. A half-applied
+      // pair leaves one note saved and one not, on the screen you are looking
+      // at, re-fixable by pressing save again. `merge_feelings` is the pattern
+      // to reach for if that ever stops being true.
+      return { ok: true, hasPublic: !!pub, hasPrivate: !!priv };
     },
   }),
 
