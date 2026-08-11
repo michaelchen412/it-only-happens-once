@@ -161,9 +161,14 @@
     html {
       scroll-behavior: auto;
     }
+    /* ::backdrop is NOT covered by `*` — it isn't an element, and it's the one
+       pseudo the dialogs animate. Without it named here, a reader who asked for
+       no motion still got a 0.25s dim fading in behind a sheet that had already
+       arrived: the sheet honoured the preference, its backdrop did not. */
     *,
     *::before,
-    *::after {
+    *::after,
+    *::backdrop {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }

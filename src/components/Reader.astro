@@ -32,6 +32,8 @@ import BackToTop from './BackToTop.astro';
 </dialog>
 
 <script>
+  import { navigate } from 'astro:transitions/client';
+
   const PREFIX = 'read=';
 
   const reader = () => document.getElementById('site-reader') as HTMLDialogElement | null;
@@ -107,8 +109,13 @@ import BackToTop from './BackToTop.astro';
     }
   }
 
-  function show(d: HTMLDialogElement) {
+  function show(d: HTMLDialogElement, slug: string) {
     if (!d.open) d.showModal();
+    // Which slug this sheet is currently showing. On the ELEMENT, not in a
+    // module variable: this script is not re-executed across view transitions,
+    // but the dialog node is replaced — so a fresh node correctly reports
+    // "showing nothing" instead of inheriting the old page's answer.
+    d.dataset.readerSlug = slug;
     const scroll = d.querySelector('.reader-scroll');
     if (scroll) scroll.scrollTop = 0;
     lockScroll();
@@ -118,11 +125,12 @@ import BackToTop from './BackToTop.astro';
     const d = reader();
     const inner = d?.querySelector('.reader-inner');
     if (!d || !inner) return false;
+    if (d.open && d.dataset.readerSlug === slug) return true; // already showing it
 
     const tpl = templateFor(slug);
     if (tpl) {
       inner.replaceChildren(tpl.content.cloneNode(true));
-      show(d);
+      show(d, slug);
       return true;
     }
 
@@ -131,7 +139,7 @@ import BackToTop from './BackToTop.astro';
     waiting.className = 'text-base-content/40 py-16 text-center font-serif italic';
     waiting.textContent = 'Opening…';
     inner.replaceChildren(waiting);
-    show(d);
+    show(d, slug);
 
     const article = await fetchArticle(slug);
     if (seq !== fillSeq) return true; // a newer open already claimed the sheet
@@ -145,6 +153,7 @@ import BackToTop from './BackToTop.astro';
   function close() {
     const d = reader();
     if (!d || !d.open) return unlockScroll();
+    delete d.dataset.readerSlug;
     d.close(); // begins the slide-out (translate + backdrop fade)
     // Hold the scroll-lock until the slide-out finishes. Drop it now and the
     // frozen feed regains its scrollbar and reflows sideways *behind* the
@@ -164,6 +173,39 @@ import BackToTop from './BackToTop.astro';
       // properly rather than leaving an empty sheet open.
       location.replace(`/blog/${slug}`);
     }
+  }
+
+  /**
+   * ⚠ OPEN THROUGH THE ROUTER — `location.hash = …` LOOKS EQUIVALENT AND IS NOT.
+   *
+   * The ClientRouter keeps its own idea of where we are (`originalLocation`),
+   * and only updates it for navigations that go through `navigate()`. Setting
+   * the hash directly moves the URL behind its back, so the entry we pushed is
+   * one the router never saw.
+   *
+   * That does nothing visible until the reader closes. `history.back()` fires
+   * `popstate`, the router compares the entry it remembers (`/blog`, no hash)
+   * with where we landed (`/blog`, no hash), concludes this was NOT a
+   * hash-only move — and does a full page navigation: refetch `/blog`, swap
+   * the whole document. Measured: the swap landed **73ms into the 280ms
+   * slide-out**, replacing the dialog node mid-animation. The sheet started to
+   * leave and then vanished, and `astro:before-swap` dropped the scroll-lock
+   * early on the way past. That was the close-jank — not the animation, which
+   * was correct all along.
+   *
+   * Routing the open through `navigate()` teaches the router the hash entry is
+   * its own, so the matching `history.back()` takes its same-page short circuit
+   * (no fetch, no swap, scroll restored) and leaves the slide-out alone.
+   *
+   * It also means NO `hashchange`: the router pushes the URL with
+   * `history.pushState`, which fires nothing. So reconcile by hand afterwards.
+   * If the router isn't on the page at all, `navigate()` falls back to a real
+   * fragment navigation, `hashchange` DOES fire, and `sync()` runs twice —
+   * harmless, because `open()` no-ops when the sheet already shows that slug.
+   */
+  async function goTo(slug: string) {
+    await navigate(`#${PREFIX}${encodeURIComponent(slug)}`);
+    await sync();
   }
 
   // Every close intent collapses to "leave the reader hash". Prefer history.back()
@@ -198,7 +240,7 @@ import BackToTop from './BackToTop.astro';
         const slug = trigger.getAttribute('data-read');
         if (slug) {
           openedViaTrigger = true;
-          location.hash = PREFIX + encodeURIComponent(slug); // → hashchange → sync()
+          void goTo(slug);
         }
         return;
       }
