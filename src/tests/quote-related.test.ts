@@ -84,3 +84,56 @@ describe('rankByOverlap', () => {
     expect(MIN_OVERLAP).toBe(2);
   });
 });
+
+// ── "More on x · y →" ───────────────────────────────────────────────────────
+//
+// The strip's last row links to the feed's subject filter, which STACKS (AND).
+// ⚠ For 57 of 131 published fragments — 44% — that combination is unique, so
+// the link landed on a page holding exactly one thing: the piece you were just
+// reading. Michael, 2026-08-10: *"can it not say 'more on tag x tag x tag' if
+// there isnt actually any other posts with that combo? … often times the exact
+// combination of tags results in only one result — the exact thing we were just
+// reading."*
+//
+// THIRD INSTANCE OF ONE SHAPE, which is why it is worth a named test rather than
+// a conditional: the author door (`others > 0`), "Appears in" minus the
+// constellation you are standing in, and this. A door back to where you already
+// are is not a door — and each one read as a feature until its count was checked.
+describe('the whole-signature count', () => {
+  /** What `getQuoteNeighbourhoods` computes: rows carrying EVERY subject. */
+  const whole = (rows: { fragment_id: string }[], selfId: string, subjectCount: number) => {
+    const tally = new Map<string, number>();
+    for (const r of rows) if (r.fragment_id !== selfId) tally.set(r.fragment_id, (tally.get(r.fragment_id) ?? 0) + 1);
+    return [...tally.values()].filter((n) => n === subjectCount).length;
+  };
+
+  it('is ZERO when nobody else carries the whole combination', () => {
+    // `partial` shares two of three subjects — it is kin, and it is NOT what
+    // `?subject=a,b,c` returns. The link must not render.
+    expect(whole(rows([['partial', 2]]), 'self', 3)).toBe(0);
+  });
+
+  it('counts only fragments carrying EVERY subject, not the most', () => {
+    expect(
+      whole(
+        rows([
+          ['all', 3],
+          ['most', 2],
+          ['one', 1],
+        ]),
+        'self',
+        3,
+      ),
+    ).toBe(1);
+  });
+
+  it('never counts the fragment being read — it is always its own perfect match', () => {
+    // Without the guard this is 1 for everything, and the link never hides.
+    expect(whole(rows([['self', 3]]), 'self', 3)).toBe(0);
+  });
+
+  it('a single-subject fragment still needs someone else to share it', () => {
+    expect(whole(rows([['other', 1]]), 'self', 1)).toBe(1);
+    expect(whole(rows([['self', 1]]), 'self', 1)).toBe(0);
+  });
+});

@@ -71,7 +71,23 @@ piece is elsewhere, and a reader who does not click has not read it, so it gets
 something already finished, so it gets nothing. The same test put `Read →` on the
 blog's feed cards, which had argued the opposite for most of their life.
 
-**4 · The header keeps only what a reader needs BEFORE committing** — the date
+**4 · No control renders when its destination is where you already are.** Three
+of them were built before this was stated as a rule, and each looked like a
+feature until its count was checked:
+
+| Control | Suppressed when | How often that is |
+|---|---|---|
+| *"N more lines from …"* | the author has no other quotes | **29 of 35 authors** |
+| *"Appears in"* | the only constellation is the one you are standing in | — |
+| *"More on x · y →"* | nobody else carries that whole subject combination | **57 of 131 fragments — 44%** |
+
+The last was found by Michael, 2026-08-10: *"can it not say 'more on tag x tag x
+tag' if there isnt actually any other posts with that combo? … often times the
+exact combination of tags results in only one result — the exact thing we were
+just reading."* **A door back to where you already are is not a door**, and a
+count that includes the thing being read is the way each of these got shipped.
+
+**5 · The header keeps only what a reader needs BEFORE committing** — the date
 and the read time. Everything else moved down.
 
 ## Consequences

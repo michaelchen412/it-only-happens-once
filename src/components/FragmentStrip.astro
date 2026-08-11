@@ -28,6 +28,17 @@ import type { SubjectRef } from '../lib/blog';
 import type { QuoteConstellation, QuoteNeighbour } from '../lib/quote-page';
 
 interface Props {
+  /**
+   * Other published fragments carrying EVERY one of these subjects — the real
+   * size of the "More on …" link's destination, minus this fragment.
+   *
+   * ⚠ 0 IS COMMON, NOT AN EDGE CASE: 57 of 131 published fragments (44%) have a
+   * combination nobody else carries. Michael, 2026-08-10: *"can it not say 'more
+   * on tag x tag x tag' if there isnt actually any other posts with that combo?
+   * … often times the exact combination of tags results in only one result — the
+   * exact thing we were just reading."*
+   */
+  sharesWholeSignature?: number;
   /** The fragment's own address — what the share mark hands over. */
   slug: string;
   subjects: SubjectRef[];
@@ -55,6 +66,7 @@ const {
   occurredAt,
   precision,
   shareLabel,
+  sharesWholeSignature = 0,
   dateKind = 'posted',
   datePrefix,
   subjectView = 'writing',
@@ -75,8 +87,18 @@ const phaseOf = (s: string) => -(([...s].reduce((a, ch) => a + ch.charCodeAt(0),
 // blog/index.astro). So it lands on everything carrying this fragment's WHOLE
 // signature: a stricter kind of kin, not a longer version of the list. Naming
 // the subjects says that out loud and costs nothing.
+//
+// ⚠ AND ONLY WHEN SOMETHING IS THERE. The filter STACKS, so for a fragment whose
+// combination is unique it returns exactly one row — this one. Nearly half of
+// them are in that case (see `sharesWholeSignature`), so for nearly half of the
+// site this link promised more of something and delivered the page you were
+// already on. Third instance of one shape: the author door, "Appears in" minus
+// the room you are in, and this. A door back to where you already are is not a
+// door, and each one read as a feature until its count was checked.
 const allSubjectsHref =
-  subjects.length > 0 ? `/blog?${subjectQ}subject=${subjects.map((s) => s.slug).join(',')}` : null;
+  subjects.length > 0 && sharesWholeSignature > 0
+    ? `/blog?${subjectQ}subject=${subjects.map((s) => s.slug).join(',')}`
+    : null;
 ---
 
 {

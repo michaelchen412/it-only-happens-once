@@ -12,7 +12,7 @@
 // Every query here re-states `status`/`deleted_at` anyway, because the
 // neighbourhood is assembled from join tables that carry no status of their own.
 import type { createSupabaseServerClient } from './supabase';
-import type { QuoteItem, SubjectRef } from './blog';
+import type { QuoteItem } from './blog';
 import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
@@ -55,6 +55,22 @@ export interface QuotePage {
   related: QuoteNeighbour[];
   /** How many there really are — what the strip's label says. */
   relatedTotal: number;
+  /**
+   * Other published fragments carrying EVERY one of this fragment's subjects.
+   *
+   * ⚠ ZERO IS THE ANSWER THAT MATTERS, and it is the common case: measured
+   * 2026-08-10, **57 of 131 published fragments — 44% — have a subject
+   * combination nobody else carries.** The strip's "More on x · y →" link goes
+   * to the feed's AND-stacked filter, so for nearly half of everything it
+   * landed on a page holding exactly one thing: the piece you were just
+   * reading. The caller renders nothing at 0.
+   *
+   * Third instance of one bug shape, and worth naming as a shape: the author
+   * door (`others > 0`), "Appears in" minus the constellation you are standing
+   * in, and now this. **A door back to where you already are is not a door** —
+   * and each one looked like a feature until the count was checked.
+   */
+  sharesWholeSignature: number;
   author: QuoteAuthor | null;
 }
 
@@ -89,57 +105,45 @@ export async function getQuotePage(
   if (!r) return null;
 
   const subjectRows = (r.fragment_subjects ?? []) as SubjectRow[];
-  const subjects: SubjectRef[] = subjectRows
-    .map((s) => ({ name: s.subjects?.name ?? '', slug: s.subjects?.slug ?? '' }))
-    .filter((s) => s.slug);
-  const subjectIds = subjectRows.map((s) => s.subject_id);
 
-  // Three independent questions, so they go together rather than in a queue —
-  // plan 24's finding about serial round trips applies to a reader-facing page
-  // more than to any admin one.
-  const [constellations, kin, others] = await Promise.all([
-    constellationsOf(supabase, r.id),
-    relatedTo(supabase, r.id, subjectIds),
-    siblingCount(supabase, r.id, r.author_id),
-  ]);
+  /*
+    ⚠ ONE QUOTE, THROUGH THE BATCH, AND THAT IS THE POINT. This used to own three
+    private helpers — `constellationsOf`, `relatedTo`, `siblingCount` — that did
+    set-wise what `getQuoteNeighbourhoods` does for many. They agreed on the day
+    they were written and had already begun to disagree: the batch learned to
+    count the whole-signature set (`sharesWholeSignature`) and this path did not,
+    so the same quote answered differently depending on whether you reached it by
+    its own URL or through a constellation.
 
-  return {
-    quote: {
+    That is exactly the drift ADR-0023 argues against for the RENDERER, applied
+    to the query layer, and the fix is the same one: not two implementations kept
+    in step, but one. A batch of one is a few object allocations; a second
+    definition of "related" is a bug with a six-month fuse.
+  */
+  const found = await getQuoteNeighbourhoods(supabase, [
+    {
       id: r.id,
-      slug: r.slug,
-      body: r.body ?? '',
-      attribution: r.attribution ?? null,
-      reveal: revealOf(r),
-      sourceUrl: r.source_url ?? null,
-      occurredAt: r.occurred_at,
-      precision: r.date_precision,
-      subjects,
+      status: r.status,
+      quote: {
+        id: r.id,
+        slug: r.slug,
+        body: r.body ?? '',
+        attribution: r.attribution ?? null,
+        reveal: revealOf(r),
+        sourceUrl: r.source_url ?? null,
+        occurredAt: r.occurred_at,
+        precision: r.date_precision,
+        subjects: subjectRows
+          .map((x) => ({ name: x.subjects?.name ?? '', slug: x.subjects?.slug ?? '' }))
+          .filter((x) => x.slug),
+      },
+      authorId: r.author_id,
+      authorName: r.authors?.name ?? null,
+      authorSlug: r.authors?.slug ?? null,
+      subjectIds: subjectRows.map((x) => x.subject_id),
     },
-    status: r.status,
-    constellations,
-    related: kin.shown,
-    relatedTotal: kin.total,
-    author: r.authors?.slug ? { name: r.authors.name, slug: r.authors.slug, others } : null,
-  };
-}
-
-/** The constellations this line was placed in, in authored order. */
-async function constellationsOf(supabase: DB, id: string): Promise<QuoteConstellation[]> {
-  const { data } = await supabase
-    .from('fragment_constellations')
-    .select('position, constellations(name, slug, description, color, status)')
-    .eq('fragment_id', id)
-    .order('position');
-  return (
-    (data ?? [])
-      .map((row) => row.constellations)
-      .filter((c): c is NonNullable<typeof c> => Boolean(c))
-      // ⚠ A DRAFT CONSTELLATION IS NOT A PLACE TO SEND ANYONE. RLS hides it from
-      // anon, but the admin previewing a quote would otherwise be offered a door
-      // that only exists for them — and would have no way to tell.
-      .filter((c) => c.status === 'published')
-      .map((c) => ({ name: c.name, slug: c.slug, description: c.description, color: c.color ?? 'amber' }))
-  );
+  ]);
+  return found.get(r.id) ?? null;
 }
 
 /**
@@ -179,66 +183,6 @@ export function rankByOverlap(siblingRows: { fragment_id: string }[], selfId: st
     .map(([fid]) => fid);
 }
 
-async function relatedTo(
-  supabase: DB,
-  id: string,
-  subjectIds: string[],
-): Promise<{ shown: QuoteNeighbour[]; total: number }> {
-  if (subjectIds.length === 0) return { shown: [], total: 0 };
-
-  const { data: siblings } = await supabase
-    .from('fragment_subjects')
-    .select('fragment_id')
-    .in('subject_id', subjectIds);
-
-  const ranked = rankByOverlap(siblings ?? [], id, subjectIds.length);
-  if (ranked.length === 0) return { shown: [], total: 0 };
-
-  // ⚠ THE STATUS FILTER IS WHAT MAKES THE COUNT PUBLISHABLE, and it cannot be
-  // done on the tally: `fragment_subjects` carries drafts and trashed rows too,
-  // so `overlap.size` would advertise lines a reader cannot open.
-  const { data: rows } = await supabase
-    .from('fragments')
-    .select('id, slug, type, title, body, attribution')
-    .in('id', ranked)
-    .eq('status', 'published')
-    .is('deleted_at', null);
-
-  const rank = new Map(ranked.map((fid, i) => [fid, i]));
-  const ordered = (rows ?? []).sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
-  return {
-    total: ordered.length,
-    shown: ordered.slice(0, RELATED_SHOWN).map((f) => ({
-      slug: f.slug,
-      type: f.type,
-      title: f.title,
-      body: f.body ?? '',
-      attribution: f.attribution,
-    })),
-  };
-}
-
-/**
- * How many OTHER published quotes this author has.
- *
- * ⚠ Zero is the answer that matters. 29 of 35 authors in the corpus have
- * exactly one quote, so "more from this author" would, for 40% of quotes, open
- * onto a page containing only the quote you are already reading. The caller
- * renders nothing at 0 rather than a door to here.
- */
-async function siblingCount(supabase: DB, id: string, authorId: string | null): Promise<number> {
-  if (!authorId) return 0;
-  const { count } = await supabase
-    .from('fragments')
-    .select('id', { count: 'exact', head: true })
-    .eq('type', 'quote')
-    .eq('status', 'published')
-    .is('deleted_at', null)
-    .eq('author_id', authorId)
-    .neq('id', id);
-  return count ?? 0;
-}
-
 // ── The batched form, for a suite ────────────────────────────────────────────
 
 /**
@@ -252,6 +196,9 @@ async function siblingCount(supabase: DB, id: string, authorId: string | null): 
  */
 export interface QuoteSeed {
   id: string;
+  /** A suite only carries published fragments, so this defaults — but the
+   *  permalink serves a DRAFT to its admin, and must say so. */
+  status?: 'note' | 'draft' | 'published';
   /** Absent for an essay: nothing downstream of the strip needs the quote body. */
   quote?: QuoteItem;
   authorId?: string | null;
@@ -333,11 +280,21 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
   }
 
   const rankedPerQuote = new Map<string, string[]>();
+  /** Ids whose overlap is TOTAL — the AND-filter's actual result set. */
+  const wholePerQuote = new Map<string, Set<string>>();
   const wanted = new Set<string>();
   for (const seed of seeds) {
     const rows = seed.subjectIds.flatMap((sid) => (bySubject.get(sid) ?? []).map((fid) => ({ fragment_id: fid })));
     const ranked = rankByOverlap(rows, seed.id, seed.subjectIds.length);
     rankedPerQuote.set(seed.id, ranked);
+    // Carrying EVERY subject means an overlap equal to the count of them, which
+    // is what `?subject=a,b` returns — the same arithmetic the feed does in SQL.
+    const tally = new Map<string, number>();
+    for (const r of rows) if (r.fragment_id !== seed.id) tally.set(r.fragment_id, (tally.get(r.fragment_id) ?? 0) + 1);
+    wholePerQuote.set(
+      seed.id,
+      new Set([...tally.entries()].filter(([, n]) => n === seed.subjectIds.length).map(([fid]) => fid)),
+    );
     for (const fid of ranked) wanted.add(fid);
   }
 
@@ -366,12 +323,18 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
   for (const seed of seeds) {
     const ranked = (rankedPerQuote.get(seed.id) ?? []).filter((fid) => neighbours.has(fid));
     const others = seed.authorId ? Math.max(0, (perAuthor.get(seed.authorId) ?? 0) - 1) : 0;
+    // ⚠ Counted against PUBLISHED rows only, like everything else here — the
+    // whole-signature set comes off `fragment_subjects`, which carries drafts
+    // and trashed rows, so an unfiltered count would keep the link alive
+    // pointing at a feed that shows nothing.
+    const whole = [...(wholePerQuote.get(seed.id) ?? [])].filter((fid) => neighbours.has(fid)).length;
     out.set(seed.id, {
       quote: seed.quote as QuoteItem,
-      status: 'published', // a suite only ever carries published fragments
+      status: seed.status ?? 'published',
       constellations: byConstellation.get(seed.id) ?? [],
       related: ranked.slice(0, RELATED_SHOWN).map((fid) => neighbours.get(fid)!),
       relatedTotal: ranked.length,
+      sharesWholeSignature: whole,
       author: seed.authorSlug && seed.authorName ? { name: seed.authorName, slug: seed.authorSlug, others } : null,
     });
   }
