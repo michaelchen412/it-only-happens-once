@@ -478,6 +478,35 @@ export type Database = {
           },
         ]
       }
+      fragment_private_notes: {
+        Row: {
+          created_at: string
+          fragment_id: string
+          notes: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fragment_id: string
+          notes?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fragment_id?: string
+          notes?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fragment_private_notes_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: true
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fragment_subjects: {
         Row: {
           fragment_id: string

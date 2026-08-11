@@ -67,6 +67,13 @@ export const TABLES = [
   'fragment_feelings',
   'fragment_constellations',
   'fragment_versions',
+  // ⚠ PRIVATE, AND THE ONLY THING IN THE CORPUS'S HALF THAT IS (ADR 0031).
+  // Michael's own notes on a song — where it came from, what week it belongs
+  // to — admin-only in RLS and revoked from `anon` at the privilege layer, so
+  // it is never rendered anywhere. It belongs in the export for exactly that
+  // reason: this file and the nightly dump are its ONLY other copy, and an
+  // unpublished thing that is lost is lost completely.
+  'fragment_private_notes',
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
   'daily_checkins',

@@ -48,6 +48,7 @@ const ALL: Record<keyof Database['public']['Tables'], true> = {
   feelings: true,
   fragment_constellations: true,
   fragment_feelings: true,
+  fragment_private_notes: true,
   fragment_subjects: true,
   fragment_versions: true,
   fragments: true,

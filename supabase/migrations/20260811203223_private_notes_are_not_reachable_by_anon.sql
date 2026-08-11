@@ -1,0 +1,34 @@
+-- ============================================================================
+-- The private notes are not reachable by `anon`, at the privilege layer too
+-- Plan: docs/plans/37 · §1 · ADR 0031. Rider to the migration immediately before.
+--
+-- ⚠ THIS IS BELT AND BRACES, AND THE BRACES WERE ALREADY HOLDING. RLS is on
+-- `fragment_private_notes` and no policy matches `anon`, so an anonymous
+-- reader already got zero rows. What was NOT true is the previous migration's
+-- claim that there was "no anon grant of any kind": Supabase bootstraps
+--
+--     alter default privileges in schema public grant all on tables to anon, authenticated
+--
+-- so every new table in `public` starts with `anon` holding SELECT, INSERT,
+-- UPDATE and DELETE, and the `grant … to authenticated` written there withheld
+-- nothing. Verified against the live catalog straight after applying it.
+--
+-- WHY BOTHER, given RLS already closes it. Because the failure this defends
+-- against is a FUTURE one, and it is a plausible one: a policy added later with
+-- `to public` or `to anon` — the shape the corpus's own tables legitimately
+-- use, one file away — would silently have full privileges standing behind it.
+-- On a table of subjects that costs nothing; on the one table in this schema
+-- holding things written to be read by nobody, it is the difference between a
+-- mistake and a disclosure. The privilege layer is the one that does not depend
+-- on getting a policy right.
+--
+-- ⚠ THIS DELIBERATELY DIVERGES FROM `goals`, `tasks`, `daily_checkins` AND
+-- `interactions`, WHICH ALL STILL CARRY THE DEFAULT `anon` GRANTS — so do not
+-- "align" this back to match them. The house rule about matching peers
+-- (`constellations_select_matches_its_peers`, 2026-08-08) exists because drift
+-- in the UNSAFE direction produced a real bug; this is drift in the other one.
+-- Whether the four HQ tables should get the same treatment is a real question
+-- and a separate call, not something to smuggle in under a music plan.
+-- ============================================================================
+
+revoke all on public.fragment_private_notes from anon;
