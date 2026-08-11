@@ -2,8 +2,10 @@
 /*
   One row of the fragment table (<tr>), shared by the Fragment Manager and the
   composer's browser sheet (mode="pick"). The TITLE is the real, focusable
-  control — a <button> for every type: quote/song rows open the FragmentSheet,
-  writing rows open the WritingSheet (`data-writing`). A click anywhere else on
+  control — a <button> for every type, and each type names its own surface
+  through `scripts/open-editor.ts`: quotes carry `data-fragment` and open the
+  FragmentSheet, writing carries `data-writing` and opens the WritingSheet,
+  songs carry `data-song` and open the SongSheet (ADR 0031). A click anywhere else on
   the row is a mouse-only convenience that triggers the same thing
   (src/scripts/fragment-panel.ts). In trash view the row isn't an edit target
   and shows Restore / Delete-forever actions.
@@ -235,28 +237,41 @@ const editorData =
 
       The cell is `data-noedit` so its dead space does NOTHING rather than
       falling through to "open this fragment" — one region, one answer. */
-    !trash && (
-      <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
-        <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
-          <span class="cn-cell__chips">
-            {constellations.length === 0 ? (
-              <span class="admin-chip admin-chip--none">none</span>
-            ) : (
-              constellations.map((c) => (
-                <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
-                  <StarMark class="mr-1" />
-                  {c.name}
-                </span>
-              ))
-            )}
-          </span>
-          {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
-          <span class="cn-cell__mark" aria-hidden="true">
-            ＋
-          </span>
-        </button>
-      </td>
-    )
+    !trash &&
+      /* ⚠ A SONG GETS THE COLUMN BUT NOT THE CONTROL (ADR 0031). A song is
+        never a member of a constellation — `constellations.place` and
+        `setMembership` both refuse one — so the ＋ here would be an invitation
+        the action declines, and pressing it would open the song sheet, which
+        has no Constellations tab to land on. Silently doing something other
+        than what a control promises is worse than not offering it.
+
+        The `<td>` still renders, empty: the table's columns are shared by every
+        row, and dropping the cell on one type would shift the two dates beside
+        it out of line with the rows above and below. */
+      (r.type === 'song' ? (
+        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit />
+      ) : (
+        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
+          <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
+            <span class="cn-cell__chips">
+              {constellations.length === 0 ? (
+                <span class="admin-chip admin-chip--none">none</span>
+              ) : (
+                constellations.map((c) => (
+                  <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
+                    <StarMark class="mr-1" />
+                    {c.name}
+                  </span>
+                ))
+              )}
+            </span>
+            {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
+            <span class="cn-cell__mark" aria-hidden="true">
+              ＋
+            </span>
+          </button>
+        </td>
+      ))
   }
   <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
     <StatusChip status={r.status} />

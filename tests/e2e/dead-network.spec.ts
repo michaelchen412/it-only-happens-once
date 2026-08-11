@@ -67,24 +67,48 @@ test.describe('the quote sheet — the audit’s one HIGH', () => {
     await expect(error).not.toContainText('Failed to fetch');
     await expect(error).not.toContainText('undefined');
   });
+});
 
-  test('the song lookup stops saying "Looking up…" forever', async ({ page }) => {
+/*
+  ⚠ THIS MOVED ROOMS RATHER THAN GOING AWAY (ADR 0031). The claim used to be
+  driven against the quote sheet's song form, which no longer exists — a song
+  has its own sheet now, and the paste bar in it owns the `songs.lookup` call.
+  The BEHAVIOUR is the reason the spec survives the move: a lookup that throws
+  must clear "Looking it up…" and say something, and it is exactly the class
+  this file exists for, because a stuck status line has a clean typecheck.
+*/
+test.describe('the song sheet — the lookup that never answers', () => {
+  test('a dead lookup stops saying "Looking it up…" and says what happened', async ({ page }) => {
+    // No handler for anything → every action aborts, which is what a dead
+    // network looks like from the browser's side.
     await stubActions(page, {});
-    await openManager(page);
-    await page.locator('#add-btn').click();
-    await page.locator('#add-menu [data-new="song"]').click();
-    await expect(page.locator('#sheet')).toBeVisible();
+    await page.goto('/admin/listening');
+    await hideDevToolbar(page);
+    await page.locator('#lst-new').click();
+    await expect(page.locator('#song-sheet')).toBeVisible();
 
-    await page.locator('#song-form [name="spotify_url"]').fill('https://open.spotify.com/track/abc');
-    await page.locator('#song-form [name="spotify_url"]').dispatchEvent('change');
+    // `input`, not `change`: the paste bar debounces on input (350ms) so the
+    // lookup fires while you are still typing rather than when you leave.
+    await page.locator('#sng-url').fill('https://open.spotify.com/track/abc');
 
-    const note = page.locator('#song-lookup');
-    await expect(note).not.toHaveText('Looking up…');
-    await expect(note).not.toBeEmpty();
-    // A dead network is not a bad link, and the note has to know the difference
-    // — sending you off to re-check a URL that was fine is the wrong
-    // instruction, and it was the only one this note could give.
-    await expect(note).not.toContainText('paste a Spotify track');
+    const status = page.locator('#sng-status');
+    const error = page.locator('#sng-error');
+    // The status line clears rather than sitting on "Looking it up…" forever,
+    // and the sentence lands in the sheet's own alert.
+    await expect(error).toBeVisible();
+    await expect(error).not.toBeEmpty();
+    await expect(status).not.toHaveText('Looking it up…');
+
+    // ⚠ AND THE SENTENCE IS A SENTENCE. `TypeError` extends `Error`, so the
+    // hand-rolled `err instanceof Error ? err.message : '…'` idiom prints the
+    // raw fetch failure at a human in precisely the case its friendly fallback
+    // was written for. `formatActionError` is what keeps that string out.
+    await expect(error).not.toContainText('Failed to fetch');
+    await expect(error).not.toContainText('undefined');
+    // A dead network is not a bad link, and the sentence has to know the
+    // difference — sending you off to re-check a URL that was fine is the
+    // wrong instruction.
+    await expect(error).not.toContainText('Spotify track');
   });
 });
 

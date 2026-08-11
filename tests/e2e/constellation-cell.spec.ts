@@ -51,12 +51,15 @@ async function openManager(page: Page) {
 }
 
 test.describe('the membership cell', () => {
-  test('opens a quote or song already on its Constellations tab', async ({ page }) => {
+  test('opens a quote already on its Constellations tab', async ({ page }) => {
     const blocked = await readsOnly(page);
     await openManager(page);
 
     const row = page.locator('tr.fragment-row[data-fragment]').first();
-    test.skip((await row.count()) === 0, 'needs a quote or song row');
+    // `[data-fragment]` is QUOTES ONLY since ADR 0031 — a song carries
+    // `data-song`, opens its own sheet, and has no membership cell at all,
+    // because a song is never in a constellation.
+    test.skip((await row.count()) === 0, 'needs a quote row');
     await row.locator('.cn-cell').click();
 
     await expect(page.locator('#sheet')).toBeVisible();
@@ -95,7 +98,10 @@ test.describe('the membership cell', () => {
     await openManager(page);
 
     const row = page.locator('tr.fragment-row[data-fragment]').first();
-    test.skip((await row.count()) === 0, 'needs a quote or song row');
+    // `[data-fragment]` is QUOTES ONLY since ADR 0031 — a song carries
+    // `data-song`, opens its own sheet, and has no membership cell at all,
+    // because a song is never in a constellation.
+    test.skip((await row.count()) === 0, 'needs a quote row');
     await row.locator('.row-open').click();
 
     await expect(page.locator('#sheet')).toBeVisible();
