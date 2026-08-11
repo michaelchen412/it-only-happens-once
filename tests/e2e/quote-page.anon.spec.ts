@@ -105,6 +105,29 @@ test.describe('the strip', () => {
     expect(pop.y, 'the popover opened over the quote').toBeGreaterThan(quote.y + quote.height);
   });
 
+  test('⚠ THE POPOVER STAYS ON SCREEN — the other half of the 0×0 bug', async ({ page }) => {
+    // §4a fixed two corrections that were both reading a `display: none` box as
+    // 0×0. The flip-above half has a spec above; THIS is the clamp half, and it
+    // is the one that actually ran a box off the edge. It never fired in the
+    // shipped component because its only trigger sat at the left of the measure
+    // — the strip's controls are right-aligned, so they are what exposes it.
+    //
+    // Real numbers at 1280: the trigger sits near x≈1150 and the box is 416
+    // wide, so an unclamped `left = r.left - 8` puts its right edge at ~1558.
+    // ⚠ THE RIGHT-MOST control, whichever it is, not a named one. The clamp's
+    // worst case is the trigger nearest the edge, and which control that is
+    // depends on what this quote happens to have — the first version asked for
+    // "related lines" and skipped on a fixture that only had a constellation.
+    const controls = page.locator('.qp-ctl');
+    const n = await controls.count();
+    expect(n, 'this quote has no strip controls at all').toBeGreaterThan(0);
+    await controls.nth(n - 1).click();
+    const box = (await page.locator('.rv__pop:popover-open').boundingBox())!;
+    const vw = page.viewportSize()!.width;
+    expect(box.x, 'the popover ran off the left edge').toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, 'the popover ran off the right edge').toBeLessThanOrEqual(vw);
+  });
+
   test('the attribution opens even when the citation is empty — the author is the second door', async ({ page }) => {
     // §5. Before this, an attribution with no citation behind it was inert, so a
     // plainly-quoted person was a dead end.
