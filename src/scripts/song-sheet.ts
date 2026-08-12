@@ -93,9 +93,22 @@ export function openSongSheet(seed: Partial<SongSheetSeed> = {}): void {
 export async function openSongById(id: string): Promise<void> {
   const { data, error } = await callAction(actions.songs.forSheet({ id }));
   if (error || !data) {
-    // Nothing is on screen to attach this to yet, so the host page's own alert
-    // is the wrong target and a silent failure is worse than a blunt one.
-    alert(error ? formatActionError(error) : 'That song could not be opened.');
+    /* ⚠ THIS WAS THE LAST NATIVE `alert()` IN THE TREE, and the comment that
+       stood here justified it — "nothing is on screen to attach this to yet".
+       That was not true: `#sng-error` is in this sheet's own markup, and the
+       sheet is the thing that failed to open. So the sheet opens EMPTY with the
+       sentence in its own error line, which is also the only version that
+       cannot be dismissed by a stray Return before it has been read.
+
+       A blocking `alert()` is the one dialog in a browser that steals focus
+       from the page and cannot be styled, on the one failure most likely to be
+       a dead network. (plan 38 · §6.3) */
+    openSongSheet();
+    const box = document.getElementById('sng-error');
+    if (box) {
+      box.textContent = error ? formatActionError(error) : 'That song could not be opened.';
+      box.hidden = false;
+    }
     return;
   }
   openSongSheet({ ...data, resolved: null });

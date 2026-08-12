@@ -153,7 +153,15 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
       </label>
     </div>
 
-    <footer class="border-base-300 flex shrink-0 justify-end gap-2 border-t px-6 py-4">
+    {
+      /* ⚠ `bg-base-200` AND `py-3`, MATCHING THE OTHER FIVE (plan 38 · §6.3). It
+        was `py-4` with no ground, so it was the one footer that did not visually
+        detach from the body scrolling behind it. Nothing ever stated why, which
+        is what separates it from `SongSheet`'s — that one is `bg-base-100` and
+        sticky ON PURPOSE, argued in place during the ADR 0032 pass, and must not
+        be swept into this shape by a later grep for `py-4`. */
+    }
+    <footer class="border-base-300 bg-base-200 flex shrink-0 justify-end gap-2 border-t px-6 py-3">
       <button type="button" class="btn btn-ghost btn-sm font-sans" data-close>Cancel</button>
       <button type="button" class="btn btn-sm zone__cta cn-gold font-sans" data-link-save disabled>Link</button>
     </footer>

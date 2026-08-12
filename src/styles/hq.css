@@ -453,25 +453,12 @@ a.row__t:hover {
   color: var(--color-primary-content);
 }
 
-/* ── global capture (wired by the capture piece) ─────────────────────────── */
-.fab {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 20;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-size: 1.25rem;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
-  box-shadow: 0 6px 20px var(--shadow-color, oklch(0% 0 0 / 0.28));
-}
-.fab:hover {
-  filter: brightness(1.06);
-}
+/* ⚠ `.fab` WAS HERE AND IS DELETED (plan 38 · §6.3, 2026-08-12). Nothing has
+   rendered `class="fab"` for months — the live control is `.cap-fab` further
+   down, at different dimensions and a different z-index. It was a trap rather
+   than dead weight: it sat in the TRAP 4 cursor list two rules below, which is
+   the list that says "anything new in HQ must join this", so the next reader
+   took it for live and would have styled against the wrong one. */
 
 /* TRAP 4: Tailwind 4's preflight sets `button { cursor: default }`, so every
    custom control needs the pointer put back or the page feels inert under the
@@ -480,8 +467,7 @@ a.row__t:hover {
 .datebar summary,
 .zone__act,
 .row__tick,
-.stamp,
-.fab {
+.stamp {
   cursor: pointer;
 }
 
