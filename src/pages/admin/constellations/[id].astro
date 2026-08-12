@@ -23,6 +23,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import TypeMark from '../../../components/admin/TypeMark.astro';
 import TypeCount from '../../../components/admin/TypeCount.astro';
+import MiniEditor from '../../../components/admin/MiniEditor.astro';
 import StatusChip from '../../../components/admin/StatusChip.astro';
 import FragmentSheet from '../../../components/admin/FragmentSheet.astro';
 import WritingSheet from '../../../components/admin/WritingSheet.astro';
@@ -448,29 +449,15 @@ const VIS_HINT = {
             handler is what arms Save, because a contenteditable fires no
             `input` event the form can hear either.
 
-            (This is the FOURTH copy of the toolbar+surface markup — SongSheet
-            has two and FragmentSheet one. A `MiniEditor.astro` is the obvious
-            next move and is deliberately not being made in this change: two of
-            those three files were open and unsaved in Michael's editor while
-            this was written.) */
+            (It WAS the fourth copy of the toolbar+surface markup, and this
+            note used to say so — deferring `MiniEditor.astro` because two of
+            the three files were open and unsaved in Michael's editor at the
+            time. That reason expired; the component exists and all four copies
+            are it. Plan 38 · §4.1.) */
         }
         <div class="mt-5">
           <span class="f__k">Description</span>
-          <div id="cc-desc-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
-            <div
-              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
-              role="toolbar"
-              aria-label="Formatting"
-            >
-              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
-                ><b>B</b></button
-              >
-              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
-                ><i>I</i></button
-              >
-            </div>
-            <div id="cc-desc" class="max-h-[30vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
-          </div>
+          <MiniEditor id="cc-desc" wrapId="cc-desc-wrap" size="max-h-[30vh] min-h-[5rem]" />
           <input type="hidden" id="cc-desc-value" name="description" value={c.description ?? ''} />
           <p class="admin-hint mt-1.5">Shown under the name on the home overview, and again as the suite's epigraph.</p>
         </div>
@@ -576,7 +563,7 @@ const VIS_HINT = {
         class="rounded-box border-base-300 mt-4 border border-dashed px-6 py-12 text-center"
         hidden={placedCount > 0}
       >
-        <p class="font-display text-base-content/60 text-lg">Nothing placed yet.</p>
+        <p class="font-serif text-lg">Nothing placed yet.</p>
         <p class="admin-hint mt-1">
           Press <b>Add</b> to browse everything you've written, quoted, or heard — or make something new inside it.
         </p>

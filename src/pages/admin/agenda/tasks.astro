@@ -26,6 +26,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import DispositionChips from '../../../components/admin/DispositionChips.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
+import EmptyState from '../../../components/admin/EmptyState.astro';
 import TaskSheet from '../../../components/admin/TaskSheet.astro';
 import Tick from '../../../components/admin/Tick.astro';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
@@ -121,12 +122,11 @@ const payload = (t: Task) =>
       rows.length === 0 ? (
         /* The room on day one. One line and one button — not a scold, and not an
            onboarding checklist. */
-        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
-          <p class="font-serif text-lg">Nothing to do.</p>
+        <EmptyState title="Nothing to do.">
           <button type="button" data-open-task-sheet class="btn btn-sm zone__cta cn-amber mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Add the first
           </button>
-        </div>
+        </EmptyState>
       ) : (
         <div data-task-list>
           {grouped.map((group) => {

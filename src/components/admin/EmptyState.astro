@@ -1,0 +1,53 @@
+---
+/*
+  EmptyState — the dashed box a room shows when it holds nothing yet.
+
+  SIX COPIES BECAME ONE (plan 38 · §4.2). They had drifted into two registers and
+  two paddings: the HQ rooms said it in `font-serif text-lg` at full opacity
+  inside `py-12`, the corpus rooms in `font-display text-base-content/60` at
+  `text-xl` (or `text-lg`) inside `py-16`. Nobody chose that; the two halves were
+  written months apart.
+
+  ⚠ AN EMPTY ROOM IS WHERE SOMEONE IS MOST LOST, which is the argument for
+  fixing it at all. It is the wrong place for the building to speak in two
+  voices, and the wrong place for half the rooms to withhold the door.
+
+  ⚠ THE HQ REGISTER WON, AND ONE HALF OF THAT WAS NOT TASTE. `text-base-content/60`
+  at 20px is not "large text" under WCAG — that exemption starts at 24px regular
+  or 18.66px bold — so the corpus register was being held to 4.5:1 and missing
+  it, the same failure ADR 0033 measured across the field labels. Full opacity
+  passes by construction. The serif half IS taste: an empty room should read as a
+  sentence somebody wrote, not as a system state, and `font-display` at `text-xl`
+  announces the absence like a headline.
+*/
+interface Props {
+  /** The sentence. Written as prose — "Nobody here yet.", not "No results". */
+  title: string;
+  /**
+   * The second line, when the emptiness needs explaining rather than just
+   * naming. Optional on purpose: "Trash is empty." needs no elaboration, and a
+   * hint under every box is a hint nobody reads.
+   */
+  hint?: string;
+  /** Extra classes for the box — spacing against whatever it sits under. */
+  class?: string;
+}
+const { title, hint, class: className } = Astro.props;
+---
+
+{
+  /* ⚠ THE DOOR IS A SLOT, NOT A PROP, and that is the decision this component
+    encodes. Three rooms offered a create button here and three did not, and
+    "add a button prop" would have flattened a real difference: the composer's
+    empty state NAMES a visible Add sitting 40px away, so a second one inside the
+    box duplicates a live control rather than supplying a missing one. A slot
+    lets a room answer "there is no door here" by passing nothing, which is a
+    legitimate answer — and it keeps the button's own colour with the room that
+    owns it, since the CTA hue is a domain axis (docs/admin.md §1) and this
+    component has no business choosing it. */
+}
+<div class:list={['rounded-box border-base-300 border border-dashed px-6 py-12 text-center', className]}>
+  <p class="font-serif text-lg">{title}</p>
+  {hint && <p class="admin-hint mt-1">{hint}</p>}
+  <slot />
+</div>

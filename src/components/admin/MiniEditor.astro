@@ -1,0 +1,63 @@
+---
+/*
+  MiniEditor — the bordered box a short rich-text field lives in: a bold/italic
+  toolbar over a scrolling surface, wired by `mountMiniEditor` (scripts/rich-editor).
+
+  FOUR COPIES BECAME ONE (plan 38 · §4.1), and the code had already asked for
+  this in writing. `constellations/[id].astro` carried the note:
+
+    "This is the FOURTH copy of the toolbar+surface markup — SongSheet has two
+     and FragmentSheet one. A `MiniEditor.astro` is the obvious next move and is
+     deliberately not being made in this change: two of those three files were
+     open and unsaved in Michael's editor while this was written."
+
+  The stated reason for deferring expired; the files are committed and quiet.
+
+  ⚠ IT IS THE BOX, NOT THE EDITOR. TipTap is still mounted by the caller, which
+  passes the same two ids it always did — `mountMiniEditor({ editorEl,
+  toolbarRoot })`. This component owns markup and nothing else, so it cannot
+  drift away from the script the way a component that also mounted would: there
+  is no lifecycle here to get out of step with `rich-editor.ts`.
+
+  ⚠ NOT THE BIG COMPOSER. `WritingSheet` and `/admin/about` use the FIXED
+  `EditorToolbar` (a full Google-Docs row: headings, lists, quote, link, image)
+  over a full-page surface. That is a different instrument for a different job —
+  a document you sit inside versus a field you fill in — and collapsing the two
+  would need a prop for every difference, which is the shape ADR 0032 rejected
+  when it declined a `<Sheet>` component.
+*/
+interface Props {
+  /** The id `mountMiniEditor` mounts TipTap into. */
+  id: string;
+  /**
+   * The id of the wrapper, when a script needs to reach it. The toolbar buttons
+   * are found by walking this element, so `mountMiniEditor`'s `toolbarRoot`
+   * wants it — FragmentSheet, SongSheet and the composer all pass one today.
+   */
+  wrapId?: string;
+  /**
+   * How tall the surface may grow before it scrolls, as a Tailwind class pair.
+   * Not a prop-per-difference: the three call sites genuinely want three
+   * heights — a quote is the whole point of its sheet (`45vh`), a song's two
+   * notes are a line or two beside a player (`28vh`), and the composer's
+   * description sits under a settings grid (`30vh`) — and the number is the
+   * only thing that varies between them.
+   */
+  size?: string;
+}
+const { id, wrapId, size = 'max-h-[30vh] min-h-[5rem]' } = Astro.props;
+---
+
+<div id={wrapId} class="rounded-field border-base-300 focus-within:border-primary border">
+  {
+    /* `role="toolbar"` with a name, because the two buttons are a group and a
+      screen reader announcing "button, B" twice with no context is the reason
+      this markup was worth keeping identical across four copies in the first
+      place. */
+  }
+  <div class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1" role="toolbar" aria-label="Formatting">
+    <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
+    <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+  </div>
+  <div id={id} class:list={['overflow-y-auto px-3 py-2', size]}></div>
+</div>

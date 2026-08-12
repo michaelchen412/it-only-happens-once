@@ -33,6 +33,7 @@ import EntityCombo from './EntityCombo.astro';
 import ConstellationPicker from './ConstellationPicker.astro';
 import SharedByField from './SharedByField.astro';
 import BackToTop from '../BackToTop.astro';
+import MiniEditor from './MiniEditor.astro';
 
 interface Props {
   subjects: string[];
@@ -144,21 +145,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               settles on: real text, in the label, readable by everything. */
           }
           <span class="f__k">Quote <em>required</em></span>
-          <div id="quote-editor-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
-            <div
-              class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
-              role="toolbar"
-              aria-label="Formatting"
-            >
-              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
-                ><b>B</b></button
-              >
-              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
-                ><i>I</i></button
-              >
-            </div>
-            <div id="quote-editor" class="max-h-[45vh] min-h-[10rem] overflow-y-auto px-3 py-2"></div>
-          </div>
+          <MiniEditor id="quote-editor" wrapId="quote-editor-wrap" size="max-h-[45vh] min-h-[10rem]" />
         </div>
         {
           /* ═══ THE THREE FACTS (docs/plans/17a-quote-matrix.md) ═══════════════

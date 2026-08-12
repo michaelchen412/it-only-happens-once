@@ -8,6 +8,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import FragmentRow from './FragmentRow.astro';
+import EmptyState from './EmptyState.astro';
 import SubjectFilter from './SubjectFilter.astro';
 import type { FragmentListData, FragmentListParams } from '../../lib/fragment-query';
 // The vocabulary, not a fourth copy of it (plans/29 · §3). The type filter this
@@ -134,14 +135,44 @@ const COLUMNS = [
   <div class="fpanel-list mt-4">
     {
       data.rows.length === 0 ? (
-        <div class="rounded-box border-base-300 mt-6 border border-dashed px-6 py-16 text-center">
-          <p class="font-display text-base-content/60 text-xl">
-            {p.filtered ? 'Nothing matches.' : view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}
-          </p>
-          {view === 'list' && !p.filtered && (
-            <p class="text-base-content/50 mt-2 text-sm">Add a piece of writing, a quote, or a song to begin.</p>
+        <EmptyState
+          class="mt-6"
+          title={p.filtered ? 'Nothing matches.' : view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}
+          hint={
+            view === 'list' && !p.filtered && mode === 'manage'
+              ? 'A song enters at Listening, in one motion with the hearing.'
+              : undefined
+          }
+        >
+          {/* ⚠ THE DOOR, AND THIS IS THE ROOM THAT MOST NEEDED ONE (plan 38 ·
+              §4.2). The old copy said "Add a piece of writing, a quote, or a
+              song to begin" while the only control that does any of that was
+              folded inside the header's `Add ▾` menu — so an empty room named an
+              action and then hid it behind a disclosure. Of the six empty states
+              this was the one describing a door you could not see.
+
+              ⚠ AND THE OLD SENTENCE PROMISED A SONG THIS MENU HAS NOT OFFERED
+              SINCE ADR 0031. A song enters at /admin/listening, in one motion
+              with the listening; the menu above dropped it and this line was
+              never updated. The hint says where songs actually go rather than
+              implying a third button that is not here.
+
+              Same `[data-new-writing]` / `[data-new]` hooks the menu items
+              carry: both scripts bind with `querySelectorAll`, so these are the
+              SAME control in a second place rather than a second write path.
+              Manage mode only — the composer's picker sheet borrows this panel,
+              and "write something new" is not what you are there to do. */}
+          {view === 'list' && !p.filtered && mode === 'manage' && (
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+              <button type="button" data-new-writing class="btn btn-sm zone__cta cn-gold gap-1 font-sans">
+                <Icon name="ph:plus" /> Write something
+              </button>
+              <button type="button" data-new="quote" class="btn btn-sm zone__cta cn-gold gap-1 font-sans">
+                <Icon name="ph:plus" /> Add a quote
+              </button>
+            </div>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <div class="rounded-box border-base-300 overflow-x-auto border">
           <table class="w-full text-sm">

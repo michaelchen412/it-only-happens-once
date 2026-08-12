@@ -9,6 +9,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
 import StatusChip from '../../../components/admin/StatusChip.astro';
+import EmptyState from '../../../components/admin/EmptyState.astro';
 import StarMark from '../../../components/StarMark.astro';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
 
@@ -38,7 +39,7 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
       subtitle="The sky's authored order — the sequence the home page reads top to bottom. A draft never reaches the public sky, so start one as a pile and compose when you're ready."
     >
       <Fragment slot="actions">
-        <button id="cl-new-btn" class="btn btn-primary btn-sm gap-1 font-sans normal-case">
+        <button id="cl-new-btn" data-cl-new class="btn btn-primary btn-sm gap-1 font-sans normal-case">
           <Icon name="ph:plus" /> New constellation
         </button>
       </Fragment>
@@ -70,10 +71,21 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
 
     {
       rows.length === 0 ? (
-        <div class="rounded-box border-base-300 border border-dashed px-6 py-16 text-center">
-          <p class="font-display text-base-content/60 text-xl">No constellations yet.</p>
-          <p class="admin-hint mt-1">Name the first way of seeing, and the sky begins.</p>
-        </div>
+        <EmptyState title="No constellations yet." hint="Name the first way of seeing, and the sky begins.">
+          {/* ⚠ THE SAME BUTTON AS THE HEADER'S, NOT A SECOND ONE (plan 38 ·
+              §4.2). The form it opens is `hidden` until asked for, so an empty
+              room described a door — "name the first way of seeing" — whose only
+              control was a header button folded over a collapsed form.
+
+              `data-cl-new` rather than a second id: `constellations-index.ts`
+              binds the toggle across every element carrying it, so this is one
+              control in two places and there is no second code path to keep in
+              step. An `id` cannot be in two places, which is exactly why the
+              script had to change shape for this. */}
+          <button type="button" data-cl-new class="btn btn-sm zone__cta cn-gold mt-4 gap-1 font-sans">
+            <Icon name="ph:plus" /> Name the first
+          </button>
+        </EmptyState>
       ) : (
         <ul id="cl-list" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 divide-y border">
           {rows.map((c) => (

@@ -22,6 +22,7 @@
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
+import EmptyState from '../../components/admin/EmptyState.astro';
 import PersonSheet from '../../components/admin/PersonSheet.astro';
 import { dmd } from '../../lib/hq/dates';
 import {
@@ -146,12 +147,11 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
         /* The room on day one. One line, one button — no grid of skeletons, no
            "0 people", no setup checklist. A roster is designed on the day it is
            full and lived in on the day it is empty. */
-        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
-          <p class="font-serif text-lg">Nobody here yet.</p>
+        <EmptyState title="Nobody here yet.">
           <button type="button" data-open-person-sheet class="btn btn-sm zone__cta cn-azure mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Add the first
           </button>
-        </div>
+        </EmptyState>
       ) : (
         <>
           {soon.length > 0 && (

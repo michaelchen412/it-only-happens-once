@@ -30,6 +30,7 @@
 */
 import SharedByField from './SharedByField.astro';
 import BackToTop from '../BackToTop.astro';
+import MiniEditor from './MiniEditor.astro';
 
 interface Props {
   /** The vocabulary, in `sort` order — dark to light. That order is a claim. */
@@ -306,20 +307,7 @@ const thisYear = new Date().getUTCFullYear();
       }
       <div class="f">
         <span class="f__k">A note <span>— anyone can open this</span></span>
-        <div id="sng-pub-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
-          <div
-            class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
-            role="toolbar"
-            aria-label="Formatting"
-          >
-            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button
-            >
-            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
-              ><i>I</i></button
-            >
-          </div>
-          <div id="sng-pub" class="max-h-[28vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
-        </div>
+        <MiniEditor id="sng-pub" wrapId="sng-pub-wrap" size="max-h-[28vh] min-h-[5rem]" />
         <span class="text-base-content/45 text-xs">
           Opens from a small mark beside the song in the music room. Leave it empty and there is no mark — which is the
           normal case.
@@ -328,20 +316,7 @@ const thisYear = new Date().getUTCFullYear();
 
       <div class="f">
         <span class="f__k">For you <span>— nobody else, ever</span></span>
-        <div id="sng-priv-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
-          <div
-            class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
-            role="toolbar"
-            aria-label="Formatting"
-          >
-            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button
-            >
-            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
-              ><i>I</i></button
-            >
-          </div>
-          <div id="sng-priv" class="max-h-[28vh] min-h-[5rem] overflow-y-auto px-3 py-2"></div>
-        </div>
+        <MiniEditor id="sng-priv" wrapId="sng-priv-wrap" size="max-h-[28vh] min-h-[5rem]" />
         <span class="text-base-content/45 text-xs">
           Where it came from, the week it belongs to, what to listen for. Stored in its own table, admin-only, and
           revoked from the public key — it is never rendered anywhere.

@@ -35,10 +35,15 @@ function fieldForm(id: string, field: string, value: string): FormData {
 // create — the form stays folded away until asked for
 const newForm = document.getElementById('new-constellation') as HTMLFormElement;
 const newName = document.getElementById('cl-new-name') as HTMLInputElement;
-document.getElementById('cl-new-btn')?.addEventListener('click', () => {
-  newForm.hidden = !newForm.hidden;
-  if (!newForm.hidden) newName.focus();
-});
+// `[data-cl-new]`, not the id: the empty state offers this same control a second
+// time (plan 38 · §4.2), and an id cannot be in two places. Every trigger runs
+// one handler, so there is no second path to the create form to keep in step.
+document.querySelectorAll<HTMLElement>('[data-cl-new]').forEach((btn) =>
+  btn.addEventListener('click', () => {
+    newForm.hidden = !newForm.hidden;
+    if (!newForm.hidden) newName.focus();
+  }),
+);
 document.getElementById('cl-new-cancel')?.addEventListener('click', () => {
   newForm.hidden = true;
   newName.value = '';

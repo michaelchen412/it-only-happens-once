@@ -23,6 +23,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../components/admin/AgendaTabs.astro';
 import PageHeader from '../../../components/admin/PageHeader.astro';
+import EmptyState from '../../../components/admin/EmptyState.astro';
 import GoalSheet from '../../../components/admin/GoalSheet.astro';
 import { shiftYmd } from '../../../lib/hq/time';
 import { ACTIVE_CAP, OBSERVATION_DAYS, horizonLabel, observationFor, statusLabel } from '../../../lib/hq/goals';
@@ -85,12 +86,11 @@ const inactive = all.filter((g) => g.status !== 'active');
 
     {
       all.length === 0 ? (
-        <div class="rounded-box border-base-300 border border-dashed px-6 py-12 text-center">
-          <p class="font-serif text-lg">Nothing you’re working toward yet.</p>
+        <EmptyState title="Nothing you’re working toward yet.">
           <button type="button" data-open-goal-sheet class="btn btn-sm zone__cta cn-amber mt-4 gap-1 font-sans">
             <Icon name="ph:plus" /> Name the first
           </button>
-        </div>
+        </EmptyState>
       ) : (
         <>
           <div class="ggrid">
