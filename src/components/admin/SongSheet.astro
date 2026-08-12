@@ -78,7 +78,7 @@ const thisYear = new Date().getUTCFullYear();
           autocomplete="off"
           spellcheck="false"
           placeholder="Paste a Spotify or YouTube link…"
-          class="input input-sm input-bordered w-full font-sans"
+          class="w-full font-sans"
         />
       </label>
       {
@@ -205,23 +205,21 @@ const thisYear = new Date().getUTCFullYear();
           "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans", which is
           a credit list rather than an attribution. */
       }
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Title</span>
-        <input id="sng-song-title" class="input input-sm input-bordered font-serif" />
+      <label class="f">
+        <span class="f__k">Title</span>
+        <input id="sng-song-title" class="font-serif" />
       </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Artist</span>
-        <input id="sng-artist" class="input input-sm input-bordered" placeholder="Miles Davis" />
+      <label class="f">
+        <span class="f__k">Artist</span>
+        <input id="sng-artist" placeholder="Miles Davis" />
       </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Album</span>
-        <input id="sng-album" class="input input-sm input-bordered" placeholder="Kind of Blue" />
+      <label class="f">
+        <span class="f__k">Album</span>
+        <input id="sng-album" placeholder="Kind of Blue" />
       </label>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70"
-          >Added <span class="text-base-content/40">— the year it entered the corpus</span></span
-        >
-        <input id="sng-year" type="number" value={thisYear} class="input input-sm input-bordered" />
+      <label class="f">
+        <span class="f__k">Added <span>— the year it entered the corpus</span></span>
+        <input id="sng-year" type="number" value={thisYear} />
       </label>
 
       {
@@ -237,8 +235,8 @@ const thisYear = new Date().getUTCFullYear();
           the pairing would then have two homes that could disagree about which
           essay a song belongs to. */
       }
-      <div id="sng-paired-wrap" hidden class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">Paired with</span>
+      <div id="sng-paired-wrap" hidden class="f">
+        <span class="f__k">Paired with</span>
         <p id="sng-paired" class="text-base-content/60 font-serif"></p>
         <span class="admin-hint">Set from the essay’s own Music tab.</span>
       </div>
@@ -306,9 +304,8 @@ const thisYear = new Date().getUTCFullYear();
           existed nowhere in the old form, and its absence WAS the bug: nothing
           said who would read what you were typing. */
       }
-      <div class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">A note <span class="text-base-content/40">— anyone can open this</span></span
-        >
+      <div class="f">
+        <span class="f__k">A note <span>— anyone can open this</span></span>
         <div id="sng-pub-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
           <div
             class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
@@ -329,8 +326,8 @@ const thisYear = new Date().getUTCFullYear();
         </span>
       </div>
 
-      <div class="flex flex-col gap-1 text-sm">
-        <span class="text-base-content/70">For you <span class="text-base-content/40">— nobody else, ever</span></span>
+      <div class="f">
+        <span class="f__k">For you <span>— nobody else, ever</span></span>
         <div id="sng-priv-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
           <div
             class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"

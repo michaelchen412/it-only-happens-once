@@ -119,32 +119,46 @@ carry this without inventing an API.
 
 ## Consequences
 
-**Done** — `.f__k` and `.f__h` retuned in `hq.css`. 42 sites, no markup, and the
-HQ half stops failing AA immediately.
+**All of it is done, 2026-08-12**, in two commits — the CSS (42 sites, no
+markup) and then the migration (10 files). What the migration turned up, since
+none of it was visible from the decision:
 
-**Not done, and named so it is not lost:**
+- ⚠ **`.admin-label` was TWO THINGS wearing one class, and only one was a field
+  label.** Seven uses were fields (the composer, the constellations index,
+  `ConstellationPicker`) and **five were section headings** — `<h2>` on
+  `/admin/people` and `/admin/agenda/goals`, a `<summary>`, and two menu headings
+  in the fragment manager's bulk bar. The seven converted; **the five did not**,
+  and `.admin-label` survives as a heading-only class. **This is most of why it
+  looked like a competing field primitive: half its uses were never fields.**
+  ⚠ **It still needs a name and an ink** — at 50% it fails AA like everything
+  else did, and "admin-label" now describes none of what it does. Open.
+- ⚠ **There was a FIFTH register, not four.** `PublishDialog` labels at
+  `text-base-content/80` where the other corpus sheets use `/70`. Nobody counted
+  it because nobody was looking at that dialog.
+- ⚠ **The corpus half fused its hints INTO its labels**, and the migration is
+  what made the reason obvious: it had no hint primitive, so eight labels carry a
+  parenthetical — *"Source link — optional"*, *"Added — the year it entered the
+  corpus"*. Uppercasing those produces long uppercase runs, which is the one
+  thing uppercase micro-type is worst at. **`.f__k span` was added for them**: a
+  qualifier that opts out of the uppercase and sits at the 65% floor, sentence
+  case, subordinate. Not `.f__h`, which renders *below* the control — "optional"
+  is something you need while your eye is still on the label.
+  ⚠ **This is also the one defect the migration shipped and had to fix by
+  looking**: `about.astro`'s parentheticals were bare text rather than spans, so
+  the first pass rendered `PHOTO CAPTION (OPTIONAL — A PLACE, A DATE, A MOMENT)`.
+  Green checks throughout; caught by a screenshot.
+- **`.f input`'s padding moved to daisyUI's `input-sm` metrics** (`0.375rem
+  0.625rem` → `0.3125rem 0.75rem`), because that is the chrome the approved
+  column was shown in. The daisyUI classes came **off** the migrated fields
+  rather than being layered over `.f` — two systems styling one `<input>` is how
+  you get a border that answers to whichever stylesheet loaded last.
 
-- **32 markup sites convert to `.f__k` / `.f__h`** — the corpus sheets' 14 inline
-  spans, `about.astro`'s 6 (deleting its `input` / `fieldLabel` / `groupLabel`
-  constants), and 7 of `.admin-label`'s uses.
-- ⚠ **`.admin-label` is TWO THINGS wearing one class, and only one of them is a
-  field label.** Seven uses are fields (the composer, the constellations index,
-  `ConstellationPicker`); **five are section headings** — `<h2>` on `/admin/people`
-  and `/admin/agenda/goals`, a `<summary>`, and two menu headings in the fragment
-  manager's bulk bar. Those five must **not** become `.f__k`. They want `.fs__k`
-  or a name of their own, and deciding which is a separate question this record
-  does not answer. This is most of why `.admin-label` looked like a competing
-  field primitive: half of its uses were never fields.
-- **`FragmentSheet`'s required marker is a bug, not a variant.** It is
-  `<span class="text-error" title="required" aria-hidden="true">*</span>` — the
-  `aria-hidden` takes it out of the accessibility tree and `title` is a
-  desktop-hover tooltip, so **on a phone and to a screen reader the quote sheet's
-  only required field is marked as nothing at all.** `<em>required</em>` replaces
-  it.
-- **`.admin-hint` is out of scope and stays.** 71 uses across 29 files, most of
-  them general small print rather than field hints, and at 45% it fails AA
-  everywhere. That is [plan 19 · Piece 5](../../docs/plans/19-one-chair.md)'s ink
-  ramp, not this decision.
+**Deliberately still out of scope:**
+
+- **`.admin-hint` stays.** 71 uses across 29 files, most of them general small
+  print rather than field hints, and at 45% it fails AA everywhere. That is
+  [plan 19 · Piece 5](../../docs/plans/19-one-chair.md)'s ink ramp, not this
+  decision.
 
 **What would falsify this.** If a form appears whose labels genuinely need to be
 read rather than glanced — a long questionnaire, something a second person fills

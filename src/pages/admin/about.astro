@@ -45,10 +45,18 @@ const portraitUrl = portraitPath ? `${SUPABASE_URL}/storage/v1/object/public/sit
 
 const aboutInit = { meBody: me.body ?? '', siteBody: site.body ?? '' };
 
-const input =
-  'w-full rounded-field border border-base-300 bg-base-100 px-3 py-2 font-sans text-sm outline-none focus:border-primary/60';
-const fieldLabel = 'font-sans text-sm text-base-content/70';
-const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
+/* ⚠ THREE PAGE-LOCAL STYLE CONSTANTS USED TO LIVE HERE — `input`, `fieldLabel`
+   and `groupLabel` — and they were a whole fourth form system, declared in one
+   page, matching neither of the two the admin already had. ADR 0033 deleted
+   them: the fields are `.f` / `.f__k` and the movement headings are `.fs__k`,
+   like every other form in the building.
+
+   Worth knowing WHY they appeared, because it is the argument for having one
+   grammar rather than a note about tidiness: this page was written when the
+   admin offered two precedents and no rule, so picking either was a coin-flip
+   and inventing a third was the cheapest way to stop thinking about it. That is
+   also how `SongSheet` grew a fifth. A single answer is what stops the next
+   page doing it again. */
 ---
 
 <AdminLayout title="About page" active="about">
@@ -86,14 +94,14 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
       {/* ─────────────  MOVEMENT I — WHO I AM  ───────────── */}
       <section class="space-y-6">
         <div>
-          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> Who I am</p>
+          <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> Who I am</p>
           <p class="text-base-content/45 mt-1 font-sans text-xs">
             The person. Weave your heritage and origin into the prose — no facts row.
           </p>
         </div>
 
         <div class="space-y-2">
-          <span class={fieldLabel}>Portrait — one photo (optional)</span>
+          <span class="f__k">Portrait <span>— one photo (optional)</span></span>
           <div class="flex items-center gap-4">
             <div
               class="rounded-box border-base-300 bg-base-200 flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden border"
@@ -128,20 +136,20 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
           <input type="hidden" id="portrait-path" value={portraitPath} />
         </div>
 
-        <div class="space-y-1">
-          <label for="f-portrait-caption" class={fieldLabel}>Photo caption (optional — a place, a date, a moment)</label
+        <div class="f">
+          <label for="f-portrait-caption" class="f__k"
+            >Photo caption <span>(optional — a place, a date, a moment)</span></label
           >
           <input
             id="f-portrait-caption"
             type="text"
             placeholder="New York City · 2024"
-            class={input}
             value={me.portrait_caption ?? ''}
           />
         </div>
 
-        <div class="space-y-1">
-          <label class={fieldLabel}>Your story (the main identity prose)</label>
+        <div class="f">
+          <label class="f__k">Your story <span>(the main identity prose)</span></label>
           <div class="rounded-box border-base-300 border" data-editor="me">
             <EditorToolbar class="border-base-300 border-b px-3 py-1.5" />
             {
@@ -159,14 +167,14 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
       {/* ─────────────  MOVEMENT II — WHAT THIS IS  ───────────── */}
       <section class="space-y-6">
         <div>
-          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> About the Blog</p>
+          <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> About the Blog</p>
           <p class="text-base-content/45 mt-1 font-sans text-xs">
             The site and its ethos — why you write, and where the name came from.
           </p>
         </div>
 
-        <div class="space-y-1">
-          <label class={fieldLabel}>Why I write here (the ethos prose)</label>
+        <div class="f">
+          <label class="f__k">Why I write here <span>(the ethos prose)</span></label>
           <div class="rounded-box border-base-300 border" data-editor="site">
             <EditorToolbar class="border-base-300 border-b px-3 py-1.5" />
             <div id="site-editor" class="reading min-h-96 px-4 py-4"></div>
@@ -174,19 +182,18 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
         </div>
 
         <p class="text-base-content/45 pt-2 font-sans text-xs tracking-widest uppercase">About the Name</p>
-        <div class="space-y-1">
-          <label for="f-blurb" class={fieldLabel}
-            >Where the name came from (Markdown — *italics* for the album title)</label
+        <div class="f">
+          <label for="f-blurb" class="f__k"
+            >Where the name came from <span>(Markdown — *italics* for the album title)</span></label
           >
-          <textarea id="f-blurb" rows="4" class={input}>{siteName.blurb ?? ''}</textarea>
+          <textarea id="f-blurb" rows="4">{siteName.blurb ?? ''}</textarea>
         </div>
-        <div class="space-y-1">
-          <label for="f-spotify" class={fieldLabel}>Spotify link (album or track — we render the embed)</label>
+        <div class="f">
+          <label for="f-spotify" class="f__k">Spotify link <span>(album or track — we render the embed)</span></label>
           <input
             id="f-spotify"
             type="url"
             placeholder="https://open.spotify.com/album/…"
-            class={input}
             value={siteName.spotify_url ?? ''}
           />
         </div>
@@ -197,19 +204,18 @@ const groupLabel = 'inline-flex items-center gap-2 font-display text-xl';
       {/* ─────────────  SAY HELLO  ───────────── */}
       <section class="space-y-4">
         <div>
-          <p class={groupLabel}><span class="text-primary" aria-hidden="true">✦</span> Say hello</p>
+          <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> Say hello</p>
           <p class="text-base-content/45 mt-1 font-sans text-xs">
             The public About page closes with a contact form (name · email · message), guarded against spam. Set an
             optional line of copy to sit above it.
           </p>
         </div>
-        <div class="space-y-1">
-          <label for="f-contact-intro" class={fieldLabel}>Intro line (optional — shown above the form)</label>
+        <div class="f">
+          <label for="f-contact-intro" class="f__k">Intro line <span>(optional — shown above the form)</span></label>
           <textarea
             id="f-contact-intro"
             rows="2"
-            placeholder="Have a thought, a question, or a hello? I read everything."
-            class={input}>{contact.intro ?? ''}</textarea
+            placeholder="Have a thought, a question, or a hello? I read everything.">{contact.intro ?? ''}</textarea
           >
         </div>
       </section>

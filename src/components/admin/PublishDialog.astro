@@ -31,8 +31,8 @@ const { formId, subjectNames } = Astro.props;
     <div class="flex flex-col gap-2 text-sm">
       <label class="flex items-center gap-2">
         <input type="checkbox" id="date-toggle" class="checkbox checkbox-xs" />
-        <span class="text-base-content/80">Set a custom posted date</span>
-        <span class="text-base-content/40">— for backdating older posts</span>
+        <span class="f__k">Set a custom posted date</span>
+        <span>— for backdating older posts</span>
       </label>
       <input
         type="datetime-local"
@@ -40,34 +40,21 @@ const { formId, subjectNames } = Astro.props;
         id="occurred-field"
         form={formId}
         disabled
-        class="input input-sm input-bordered w-full disabled:opacity-40"
+        class="w-full disabled:opacity-40"
       />
       <p id="date-auto-note" class="text-base-content/55 text-xs">
         Otherwise the posted date is set automatically when you publish.
       </p>
     </div>
 
-    <label class="flex flex-col gap-1 text-sm">
-      <span class="text-base-content/80">Slug <span class="text-base-content/40">— the URL</span></span>
-      <input
-        name="slug"
-        id="slug-field"
-        form={formId}
-        class="input input-sm input-bordered"
-        placeholder="auto-from-title"
-      />
+    <label class="f">
+      <span class="f__k">Slug <span>— the URL</span></span>
+      <input name="slug" id="slug-field" form={formId} placeholder="auto-from-title" />
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      <span class="text-base-content/80"
-        >Excerpt <span class="text-base-content/40">— the card blurb (optional)</span></span
-      >
-      <textarea
-        name="excerpt"
-        id="excerpt-field"
-        form={formId}
-        rows="2"
-        class="textarea textarea-bordered font-serif text-base"></textarea>
+    <label class="f">
+      <span class="f__k">Excerpt <span>— the card blurb (optional)</span></span>
+      <textarea name="excerpt" id="excerpt-field" form={formId} rows="2" class="font-serif text-base"></textarea>
     </label>
 
     {
@@ -76,7 +63,7 @@ const { formId, subjectNames } = Astro.props;
         thing that says "no subjects — it won't appear under any of them". The
         complaint and its fix now sit in the same dialog. */
     }
-    <SubjectsField id="ws-subjects" labelClass="text-base-content/80">
+    <SubjectsField id="ws-subjects" labelClass="f__k">
       <TagInput
         name="subjects"
         label="Subjects"

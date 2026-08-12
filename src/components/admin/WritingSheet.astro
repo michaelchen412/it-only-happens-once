@@ -385,8 +385,8 @@ const { subjects, constellations = [] } = Astro.props;
           </button>
         </div>
 
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Find a song</span>
+        <label class="f">
+          <span class="f__k">Find a song</span>
           {
             /* ONE FIELD, TWO KINDS OF INPUT (plan 33 §6a). It used to take only a
               query, so pairing a song that wasn't in the corpus meant leaving for
@@ -399,13 +399,7 @@ const { subjects, constellations = [] } = Astro.props;
               search field is not a validation problem, because nothing here
               validates it — `songs.lookup` does, on the server, once. */
           }
-          <input
-            id="ws-music-q"
-            type="search"
-            autocomplete="off"
-            placeholder="Title or artist — or paste a link"
-            class="input input-sm input-bordered"
-          />
+          <input id="ws-music-q" type="search" autocomplete="off" placeholder="Title or artist — or paste a link" />
         </label>
         <ul id="ws-music-results" class="mt-3 space-y-1"></ul>
         {

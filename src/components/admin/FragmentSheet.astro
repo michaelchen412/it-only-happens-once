@@ -132,10 +132,18 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
         <input type="hidden" name="body" id="quote-body" />
 
         {/* — required — */}
-        <div class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70 flex items-center gap-1"
-            >Quote <span class="text-error" title="required" aria-hidden="true">*</span></span
-          >
+        <div class="f">
+          {
+            /* ⚠ THIS WAS A RED `*` CARRYING `aria-hidden` AND A `title`, AND IT
+              MARKED NOTHING AT ALL. `aria-hidden` takes it out of the
+              accessibility tree, and `title` is a desktop-hover tooltip — so to
+              a screen reader, and on any phone, the quote sheet's ONE required
+              field announced as optional. Three ways of saying "required" were
+              live in this admin and this was the only one that did not work.
+              `<em>required</em>` is the word the other sheets use and ADR 0033
+              settles on: real text, in the label, readable by everything. */
+          }
+          <span class="f__k">Quote <em>required</em></span>
           <div id="quote-editor-wrap" class="rounded-field border-base-300 focus-within:border-primary border">
             <div
               class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1"
@@ -177,8 +185,8 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
           for filing. ══════════════════════════════════════════════════════════ */
         }
         <div class="flex flex-col gap-3">
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Who said it</span>
+          <label class="f">
+            <span class="f__k">Who said it</span>
             <EntityCombo
               id="quote-author"
               name="author_name"
@@ -200,8 +208,8 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               the page, and the workshop tells them apart.</span
             >
           </label>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">From what</span>
+          <label class="f">
+            <span class="f__k">From what</span>
             <EntityCombo
               id="quote-work"
               name="work_name"
@@ -231,14 +239,9 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
             friendlier hat, and the moment it guesses wrong you are deleting its
             guess before typing yours. */
           }
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-base-content/70">Where in it</span>
-            <input
-              name="citation"
-              id="quote-where"
-              class="input input-sm input-bordered"
-              placeholder="Book 2:2 · John 3:16 · Letter 24:19–20 · p. 41"
-            />
+          <label class="f">
+            <span class="f__k">Where in it</span>
+            <input name="citation" id="quote-where" placeholder="Book 2:2 · John 3:16 · Letter 24:19–20 · p. 41" />
             <span class="text-base-content/45 text-xs">The reference, exactly as you’d say it out loud.</span>
           </label>
         </div>
@@ -290,7 +293,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
           essentially forever, and the day it isn't is the day the rule met a
           case the matrix is missing. */
         }
-        <label id="quote-attr-override" hidden class="flex flex-col gap-1 text-sm">
+        <label id="quote-attr-override" hidden class="f">
           <span class="text-base-content/70 flex items-center gap-2">
             Shown instead
             <button
@@ -300,13 +303,13 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               >use the derived line</button
             >
           </span>
-          <input name="attribution" class="input input-sm input-bordered" placeholder="Matthew 5:43–48" />
+          <input name="attribution" placeholder="Matthew 5:43–48" />
           <span class="text-base-content/45 text-xs">Only when the line above is wrong for this one quote.</span>
         </label>
 
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Source link <span class="text-base-content/40">— optional</span></span>
-          <input name="source_url" type="url" class="input input-sm input-bordered" placeholder="https://…" />
+        <label class="f">
+          <span class="f__k">Source link <span>— optional</span></span>
+          <input name="source_url" type="url" placeholder="https://…" />
         </label>
 
         {
@@ -325,18 +328,12 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
         <div class="flex flex-col gap-2 text-sm">
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" id="quote-date-toggle" class="checkbox checkbox-xs" />
-            <span class="text-base-content/70">Set a specific date</span>
+            <span class="f__k">Set a specific date</span>
           </label>
           <p id="quote-date-note" class="text-base-content/45 text-xs">
             Dated today automatically — enable only to backdate a legacy quote.
           </p>
-          <input
-            type="datetime-local"
-            name="occurred_at"
-            id="quote-occurred"
-            disabled
-            class="input input-sm input-bordered"
-          />
+          <input type="datetime-local" name="occurred_at" id="quote-occurred" disabled />
         </div>
 
         {
@@ -356,9 +353,9 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
             in it — the writing sheet's `slugTouched` rule, same behaviour in
             the second room. Editing is an override, not the normal path. */
         }
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-base-content/70">Address <span class="text-base-content/40">— the URL</span></span>
-          <span class="input input-sm input-bordered flex items-center gap-0 pr-2 pl-3">
+        <label class="f">
+          <span class="f__k">Address <span>— the URL</span></span>
+          <span class="flex items-center gap-0 pr-2 pl-3">
             <span class="text-base-content/35 shrink-0 select-none">/blog/</span>
             <input
               name="slug"
