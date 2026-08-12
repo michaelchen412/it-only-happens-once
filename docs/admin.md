@@ -139,6 +139,25 @@ form / JS ──▶ Astro Action (server) ──▶ context.locals.supabase  (us
 - Actions **validate input with Zod** at the boundary (the other half of type-safety, since the DB types can't guard runtime shape).
 - Redirect-after-write: on success an action redirects back to the list (or stays on the composer), so a refresh never re-submits.
 
+### 4a. When a change commits — the rule for the whole Observatory
+
+Ten surfaces commit ten slightly different ways, and until 2026-08-12 nothing on screen or on paper predicted which one you were standing in. The differences are mostly *argued* — what was missing was the sentence they are arguing against:
+
+> **A relation applies on touch. A document autosaves. A record takes a Save.**
+
+- A **relation** is a row in a join table — a constellation membership, a pairing, a "Shared by" tick. It is instantly reversible, so it never waits, and it never rides along with a compare-and-set save that could lose a rewrite. (That is why the picker and `pair` write immediately from *inside* the writing sheet, which has exactly such a save.)
+- A **document** is prose you sit inside — an essay, a note. Leaving must not lose it, so it autosaves and says when it last did.
+- A **record** is a set of fields that mean something only together — a task, a goal, a person, a quote, a song, the About page. It commits once, deliberately, on a named Save.
+
+**Read it as a predictor, not a description.** The value of the rule is that a surface which does not yet exist has an answer before anyone argues about it; a surface that *contradicts* it should either change or write down why in the file.
+
+⚠ **Two of the ten do not fit, and both are open**, recorded here rather than reworded into compliance:
+
+- **The quote sheet** commits like a record and then says nothing at all — no timestamp, no chip, no sentence. Every other record surface confirms.
+- **The Library** commits **per row** where every other record surface commits per object. It is a hundred records on one page, and a per-row Save is why saving one row could discard edits in the others (guarded since 2026-08-12; see `library.astro`).
+
+⚠ **This is a `docs/` paragraph and not an ADR on purpose.** It describes what the app does; it does not yet refuse anything. **The day it turns down a proposed surface, it has become a decision and belongs in `adr/`** — that is the test in [`plans/GROUND-RULES.md`](../docs/plans/GROUND-RULES.md), and this line is the marker for when it flips.
+
 ## 5. The writing sheet
 
 The deep end. A near-fullscreen `<dialog>` drawer ([`WritingSheet`](../src/components/admin/WritingSheet.astro)): command row, fixed formatting toolbar, then the document (title + body) centered. No sidebar of metadata fields; the "last-mile" details live in the publish dialog (below).
