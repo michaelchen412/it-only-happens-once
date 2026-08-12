@@ -10,6 +10,25 @@
  * these live in their own table, and why nothing in this file is shared with
  * `subjects`. The argument is in full at
  * `supabase/migrations/20260811154707_feelings_are_not_subjects.sql`.
+ *
+ * ⚠ NEAR-SYNONYMS ARE NOT DRIFT. TWO WORDS THAT ALMOST MEAN THE SAME THING
+ * CARRY DIFFERENT EMOTIONAL WEIGHT, AND THAT DIFFERENCE IS THE WHOLE POINT.
+ * `detached` and `unperturbed` name one withdrawal at two weights; so do
+ * `tender`/`gentle` and `reminiscent`/`wistful`. Keep both. Music divides the
+ * same way — one record lands detached and the next lands unperturbed — and a
+ * field that cannot tell neighbouring shades apart cannot file either of them.
+ *
+ * This overturns the caution in the starting-sixteen migration that kept
+ * `wistful` out for "splitting a shelf" with `reminiscent`. That migration is
+ * applied history and stays as written; THIS is the live rule.
+ *
+ * Ruling (Michael, 2026-08-12): propose the close word. Do not raise the
+ * overlap as an objection — the placement in the spectrum is the answer to it,
+ * and it is his call, not a thing to be litigated each time a word is added.
+ *
+ * ⚠ WHAT THIS DOES NOT LICENSE is two shelves wearing the SAME name. Distinct
+ * words at distinct weights are the design; an invisible twin reachable by one
+ * name is still the failure `slugTakenMessage` below exists to refuse.
  */
 
 /**
