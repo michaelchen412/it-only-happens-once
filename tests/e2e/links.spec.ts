@@ -110,7 +110,7 @@ test.describe('the link sheet', () => {
 
   test('starts on works and switches lists without leaving the other one on screen', async ({ page }) => {
     await openSheet(page);
-    await expect(page.locator('[data-mode="work"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-mode="work"]')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('[data-list="work"]')).toBeVisible();
     await expect(page.locator('[data-list="fragment"]')).toBeHidden();
 

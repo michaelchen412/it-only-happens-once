@@ -61,14 +61,15 @@ const editing = !!goal;
 
       <div class="f mt-4">
         <span class="f__k">Horizon</span>
-        <div class="pseg" role="group" aria-label="Horizon">
+        <div class="pseg" role="radiogroup" aria-label="Horizon">
           {
             HORIZONS.map((h) => (
               <button
                 type="button"
                 class="pseg__b"
+                role="radio"
                 data-horizon={h.key}
-                aria-pressed={(goal?.horizon ?? 'this_year') === h.key}
+                aria-checked={(goal?.horizon ?? 'this_year') === h.key}
               >
                 {h.label}
               </button>
@@ -106,9 +107,15 @@ const editing = !!goal;
         editing && (
           <div class="f mt-4">
             <span class="f__k">Status</span>
-            <div class="pseg" role="group" aria-label="Status">
+            <div class="pseg" role="radiogroup" aria-label="Status">
               {STATUSES.map((s) => (
-                <button type="button" class="pseg__b" data-goal-status={s.key} aria-pressed={goal!.status === s.key}>
+                <button
+                  type="button"
+                  class="pseg__b"
+                  role="radio"
+                  data-goal-status={s.key}
+                  aria-checked={goal!.status === s.key}
+                >
                   {s.label}
                 </button>
               ))}

@@ -10,6 +10,7 @@
 // Greying out `Active` would say "no" without saying why, on a control whose
 // whole point is that letting go is a visible, dignified move.
 import { actions } from 'astro:actions';
+import { wireRadioGroups } from './radio-group';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
@@ -48,9 +49,9 @@ if (sheet && form) {
 
   const group = (attr: string) => Array.from(form.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`));
   const pick = (attr: string, value: string) =>
-    group(attr).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
+    group(attr).forEach((b) => b.setAttribute('aria-checked', String(b.dataset[attr] === value)));
   const picked = (attr: string, fallback: string) =>
-    group(attr).find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset[attr] ?? fallback;
+    group(attr).find((b) => b.getAttribute('aria-checked') === 'true')?.dataset[attr] ?? fallback;
 
   group('horizon').forEach((b) => b.addEventListener('click', () => pick('horizon', b.dataset.horizon!)));
   group('goalStatus').forEach((b) => b.addEventListener('click', () => pick('goalStatus', b.dataset.goalStatus!)));
@@ -158,31 +159,38 @@ if (header) {
   buttons.forEach((btn) =>
     btn.addEventListener('click', async () => {
       const status = btn.dataset.status as 'active' | 'paused' | 'achieved' | 'let_go';
-      if (btn.getAttribute('aria-pressed') === 'true') return;
+      if (btn.getAttribute('aria-checked') === 'true') return;
       showPageError(null);
 
-      const previous = buttons.find((b) => b.getAttribute('aria-pressed') === 'true');
+      const previous = buttons.find((b) => b.getAttribute('aria-checked') === 'true');
       buttons.forEach((b) => (b.disabled = true));
       // Move first: the whole point of a segmented control is that it answers
       // instantly. It goes back if the server refuses.
-      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      buttons.forEach((b) => b.setAttribute('aria-checked', String(b === btn)));
 
       // ⚠ NOT `submitAction`: the control here is a GROUP of four buttons that
       // go down and come back together, and the state being restored is
-      // `aria-pressed` rather than a label. `callAction` is the half that
+      // `aria-checked` rather than a label. `callAction` is the half that
       // transfers — it puts a thrown dead network and a returned refusal on the
       // same line, so the cap's sentence and "you're offline" arrive the same
       // way.
       const { error } = await callAction(actions.goals.setStatus({ id: goalId, status }));
       buttons.forEach((b) => (b.disabled = false));
       if (error) {
-        buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === previous)));
+        buttons.forEach((b) => b.setAttribute('aria-checked', String(b === previous)));
         showPageError(formatActionError(error));
       }
     }),
   );
 
   // ── the pin, beside it ────────────────────────────────────────────────────
+  // ⚠ IT KEEPS `aria-pressed` WHILE THE STATUS GROUP ABOVE MOVED TO
+  // `aria-checked` (plan 38 · §6.3), and the difference is the whole distinction
+  // that change was about: status is a CHOICE between four exclusive options, and
+  // the pin is one switch that is either on or off. Sweeping this to
+  // `aria-checked` for symmetry would announce a lone checkbox as a radio with
+  // no group.
+  //
   // Same shape as the status control and for the same reason: one tap, moves
   // first, goes back if the server refuses. No confirm — pinning destroys
   // nothing, and unpinning is the same button again.
@@ -211,3 +219,7 @@ if (header) {
     pin.title = label;
   });
 }
+
+// The role promises arrow keys and one tab stop; this is what keeps it
+// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+wireRadioGroups();

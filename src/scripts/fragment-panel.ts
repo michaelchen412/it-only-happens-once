@@ -5,6 +5,7 @@
 // onOpen, per-row action buttons (restore/purge/place) → onAction, and
 // checkbox selection (with shift-range) → onSelectionChange.
 import { MIN_SEARCH } from '../lib/search-highlight';
+import { wireRadioGroups } from './radio-group';
 import { onSkyChange } from './sky-changed';
 
 const PARTIAL = '/admin/fragments-panel';
@@ -377,3 +378,12 @@ export function wireAddMenu(btn: HTMLElement, menu: HTMLElement) {
   // — an open menu whose trigger has vanished is unclosable by outside-click.
   return { close: closeMenu };
 }
+
+// ⚠ THE ONE CONTROL THAT ALREADY HAD THE ROLE AND STILL DID NOT KEEP ITS
+// PROMISE. `.seg` here has been `role="radiogroup"` + `aria-checked` since it
+// was written — it is the precedent plan 38 · §6.3 cites for converting the HQ
+// half — and it had four tab stops and no arrow keys, because the role was
+// added as a LABEL rather than as a contract. Found by the ratchet written for
+// the nine controls being converted, on the one that was supposedly already
+// right. Same wiring as the rest now.
+wireRadioGroups();

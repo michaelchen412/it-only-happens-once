@@ -57,11 +57,11 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
           phone. TRAP 6 is handled in `.pseg__b` — the selected segment keeps
           its fill under the cursor. */
       }
-      <div class="pseg mb-4" role="group" aria-label="What to link">
-        <button type="button" class="pseg__b cn-gold" data-mode="work" aria-pressed={true}>
+      <div class="pseg mb-4" role="radiogroup" aria-label="What to link">
+        <button type="button" role="radio" class="pseg__b cn-gold" data-mode="work" aria-checked={true}>
           <Icon name="ph:book-open" /> A work
         </button>
-        <button type="button" class="pseg__b cn-gold" data-mode="fragment" aria-pressed={false}>
+        <button type="button" role="radio" class="pseg__b cn-gold" data-mode="fragment" aria-checked={false}>
           <Icon name="ph:quotes" /> One piece
         </button>
       </div>

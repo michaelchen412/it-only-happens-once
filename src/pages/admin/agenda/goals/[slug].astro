@@ -155,10 +155,16 @@ const payload = (t: Task) =>
             `Mon…` was: the assertions here read `aria-pressed`, which is just
             as true of a truncated label. */
         }
-        <div class="pseg pseg--fit" role="group" aria-label="Status">
+        <div class="pseg pseg--fit" role="radiogroup" aria-label="Status">
           {
             STATUSES.map((s) => (
-              <button type="button" class="pseg__b" data-status={s.key} aria-pressed={goal.status === s.key}>
+              <button
+                type="button"
+                class="pseg__b"
+                role="radio"
+                data-status={s.key}
+                aria-checked={goal.status === s.key}
+              >
                 {s.label}
               </button>
             ))

@@ -6,6 +6,7 @@
 // resolution of a work's fragments, and re-deriving any of that in the browser
 // is how the saved shape and the shown shape start to disagree.
 import { actions } from 'astro:actions';
+import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
@@ -89,7 +90,7 @@ if (sheet && personId) {
     mode = next;
     sheet!
       .querySelectorAll<HTMLButtonElement>('[data-mode]')
-      .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === next)));
+      .forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === next)));
     for (const [key, el] of Object.entries(lists)) if (el) el.hidden = key !== next;
     // "Add a quote from them" belongs to the fragment mode only — a work is
     // created by the quote's own Work field, so offering it here would point
@@ -209,3 +210,7 @@ zone?.querySelectorAll<HTMLButtonElement>('[data-unlink]').forEach((btn) =>
     location.reload();
   }),
 );
+
+// The role promises arrow keys and one tab stop; this is what keeps it
+// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+wireRadioGroups();

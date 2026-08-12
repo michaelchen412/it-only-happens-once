@@ -1,7 +1,7 @@
 // Client logic for PersonSheet.astro — the add sheet and the edit sheet.
 //
 // The DOM is the state, as everywhere else in HQ: the circle lives in
-// `aria-pressed` and its hidden input, the photo lives in the file input. There
+// `aria-checked` and its hidden input, the photo lives in the file input. There
 // is no JavaScript copy of the form beside the form.
 //
 // THE PHOTO IS UPLOADED AFTER THE ROW EXISTS, and that ordering is forced: the
@@ -11,6 +11,7 @@
 // each one can fail on its own, which is why a failed upload leaves you with a
 // created person and a sentence rather than a lost form.
 import { actions } from 'astro:actions';
+import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
@@ -80,7 +81,7 @@ if (sheet && form) {
     btn.addEventListener('click', () => {
       form
         .querySelectorAll<HTMLButtonElement>('[data-circle]')
-        .forEach((o) => o.setAttribute('aria-pressed', String(o === btn)));
+        .forEach((o) => o.setAttribute('aria-checked', String(o === btn)));
       circleValue.value = btn.dataset.circle!;
     }),
   );
@@ -180,3 +181,7 @@ if (sheet && form) {
     location.reload();
   });
 }
+
+// The role promises arrow keys and one tab stop; this is what keeps it
+// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+wireRadioGroups();

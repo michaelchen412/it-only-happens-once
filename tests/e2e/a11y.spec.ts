@@ -240,6 +240,45 @@ test.describe('the ✚ does not sit on the last row', () => {
   }
 });
 
+test.describe('an exclusive choice announces as one', () => {
+  // ⚠ THE ROLE IS A PROMISE ABOUT BEHAVIOUR, NOT JUST A LABEL (plan 38 · §6.3).
+  // Nine segmented controls were `role="group"` + `aria-pressed` — three
+  // independent toggles that happen to look like one control, announcing no
+  // position, no set size and no relationship. They are radio groups now, and a
+  // radio group that does not answer arrow keys is worse than the honest
+  // `role="group"` it replaced: it tells a screen-reader user to reach for a
+  // key that does nothing.
+  //
+  // So this checks the whole contract rather than the attribute: every group has
+  // radios, every radio says whether it is checked, and the group has exactly
+  // ONE tab stop — which is the observable half of `scripts/radio-group.ts`
+  // being wired at all.
+  for (const route of ROOMS) {
+    test(route, async ({ page }) => {
+      await settle(page, route);
+      const bad = await page.evaluate(() => {
+        const out: string[] = [];
+        for (const g of document.querySelectorAll<HTMLElement>('[role="radiogroup"]')) {
+          const name = g.getAttribute('aria-label') ?? g.id ?? '(unnamed)';
+          const radios = [...g.querySelectorAll<HTMLElement>('[role="radio"]')];
+          if (radios.length === 0) {
+            out.push(`${name}: a radiogroup with no radios in it`);
+            continue;
+          }
+          const unstated = radios.filter((r) => r.getAttribute('aria-checked') === null);
+          if (unstated.length) out.push(`${name}: ${unstated.length} radio(s) with no aria-checked`);
+          // A radio group is ONE tab stop. More means the roving tabindex never
+          // ran; none means the group cannot be reached by keyboard at all.
+          const stops = radios.filter((r) => r.tabIndex === 0).length;
+          if (stops !== 1) out.push(`${name}: ${stops} tab stops, expected exactly 1`);
+        }
+        return out;
+      });
+      expect(bad, `radiogroups not keeping the promise the role makes: ${JSON.stringify(bad)}`).toEqual([]);
+    });
+  }
+});
+
 test.describe('every control says what it is', () => {
   // A button whose only content is an icon reads as "button" and nothing else.
   // The workshop is icon-dense by design, so this is the check that keeps that

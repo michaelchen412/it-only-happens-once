@@ -389,9 +389,11 @@ const VIS_HINT = {
             few bytes of hidden markup on an empty constellation. */
         }
         <div class="flex items-center gap-2">
-          <div id="suite-viewseg" class="seg" role="group" aria-label="Suite view" hidden={placedCount === 0}>
-            <button type="button" class="type-badge is-active" data-view="compose" aria-pressed="true">Compose</button>
-            <button type="button" class="type-badge" data-view="read" aria-pressed="false">Read</button>
+          <div id="suite-viewseg" class="seg" role="radiogroup" aria-label="Suite view" hidden={placedCount === 0}>
+            <button type="button" role="radio" class="type-badge is-active" data-view="compose" aria-checked="true"
+              >Compose</button
+            >
+            <button type="button" role="radio" class="type-badge" data-view="read" aria-checked="false">Read</button>
           </div>
           <button type="button" data-browse class="btn btn-primary btn-sm gap-1 font-sans normal-case">
             <Icon name="ph:plus" /> Add

@@ -13,9 +13,10 @@
 // is unverifiable by eye.
 //
 // The DOM is the state, as everywhere else in HQ: the selected segment lives in
-// `aria-pressed`, the date lives in the date input. There is no JavaScript copy
+// `aria-checked`, the date lives in the date input. There is no JavaScript copy
 // of the form beside the form.
 import { actions } from 'astro:actions';
+import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
@@ -105,9 +106,9 @@ if (sheet && form) {
   // ── segmented controls ────────────────────────────────────────────────────
   const group = (attr: string) => Array.from(form.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`));
   const pick = (attr: string, value: string) =>
-    group(attr).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
+    group(attr).forEach((b) => b.setAttribute('aria-checked', String(b.dataset[attr] === value)));
   const picked = (attr: string, fallback: string) =>
-    group(attr).find((b) => b.getAttribute('aria-pressed') === 'true')?.dataset[attr] ?? fallback;
+    group(attr).find((b) => b.getAttribute('aria-checked') === 'true')?.dataset[attr] ?? fallback;
 
   // ── the two live mechanics ────────────────────────────────────────────────
 
@@ -457,3 +458,7 @@ if (sheet && form) {
     location.reload();
   });
 }
+
+// The role promises arrow keys and one tab stop; this is what keeps it
+// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+wireRadioGroups();

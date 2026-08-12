@@ -129,12 +129,12 @@ test.describe('the add sheet', () => {
     const friends = page.locator('[data-circle="friends"]');
     const hidden = page.locator('[data-circle-value]');
 
-    await expect(friends).toHaveAttribute('aria-pressed', 'true');
+    await expect(friends).toHaveAttribute('aria-checked', 'true');
     await expect(hidden).toHaveValue('friends');
 
     await family.click();
-    await expect(family).toHaveAttribute('aria-pressed', 'true');
-    await expect(friends).toHaveAttribute('aria-pressed', 'false');
+    await expect(family).toHaveAttribute('aria-checked', 'true');
+    await expect(friends).toHaveAttribute('aria-checked', 'false');
     await expect(hidden).toHaveValue('family');
   });
 

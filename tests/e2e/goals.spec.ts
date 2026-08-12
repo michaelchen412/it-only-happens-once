@@ -89,8 +89,13 @@ test.describe('the goal sheet', () => {
     // say "March 3rd"; a text input could.
     await expect(page.locator('[data-horizon]')).toHaveCount(3);
     await expect(page.locator('#goal-form input[type="date"]')).toHaveCount(0);
+    // ⚠ `radio`, NOT `button` (plan 38 · §6.3). The horizon is an exclusive
+    // choice and announced as three unrelated toggles until 2026-08-12; it is a
+    // radio group now, so the role a spec asks for is part of what changed. That
+    // this locator had to move is the assertion in miniature — a screen reader
+    // was being told the same wrong thing.
     for (const label of ['this season', 'this year', 'the next few years']) {
-      await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
+      await expect(page.getByRole('radio', { name: label, exact: true })).toBeVisible();
     }
   });
 
@@ -194,7 +199,7 @@ test.describe('one goal', () => {
     await paused.click();
     // It answers instantly — a segmented control that waits for a round trip
     // before moving reads as broken.
-    await expect(paused).toHaveAttribute('aria-pressed', 'true');
+    await expect(paused).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#confirm-dialog[open]')).toHaveCount(0);
   });
 
@@ -203,13 +208,13 @@ test.describe('one goal', () => {
     await stubActions(page, {});
     const before = await page
       .locator('[data-goal] [data-status]')
-      .evaluateAll((els) => els.find((e) => e.getAttribute('aria-pressed') === 'true')?.getAttribute('data-status'));
+      .evaluateAll((els) => els.find((e) => e.getAttribute('aria-checked') === 'true')?.getAttribute('data-status'));
 
     await page.locator('[data-goal] [data-status="achieved"]').click();
     await expect(page.locator('[data-goal-error]')).toBeVisible();
     // The cap arrives as a sentence; the control must not be left claiming a
     // state the database refused.
-    await expect(page.locator(`[data-goal] [data-status="${before}"]`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator(`[data-goal] [data-status="${before}"]`)).toHaveAttribute('aria-checked', 'true');
   });
 
   test('separates scheduled from not-scheduled-yet, and offers a date on the second', async ({ page }) => {

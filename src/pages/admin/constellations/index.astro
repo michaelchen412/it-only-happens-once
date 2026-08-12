@@ -225,10 +225,10 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
         what a single line of eight is for. */
     }
     <div id="cl-colors" popover class="cl-colors rounded-box border-base-300 bg-base-100 border px-2 py-1.5 shadow-lg">
-      <div class="flex items-end gap-0.5" role="group" aria-labelledby="cl-colors-label">
+      <div class="flex items-end gap-0.5" role="radiogroup" aria-labelledby="cl-colors-label">
         {
           COLOR_SLOTS.map((slot) => (
-            <button type="button" class="cn-slot" data-slot={slot} aria-pressed="false">
+            <button type="button" role="radio" class="cn-slot" data-slot={slot} aria-checked="false">
               <span class:list={['cn-swatch', `cn-${slot}`]}>
                 <StarMark />
               </span>

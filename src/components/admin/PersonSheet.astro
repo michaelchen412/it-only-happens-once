@@ -91,10 +91,16 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
           }
           <div class="f">
             <span class="f__k">Circle <em>required</em></span>
-            <div class="pseg" role="group" aria-label="Circle">
+            <div class="pseg" role="radiogroup" aria-label="Circle">
               {
                 CIRCLES.map((c) => (
-                  <button type="button" class="pseg__b" data-circle={c.key} aria-pressed={c.key === circle}>
+                  <button
+                    type="button"
+                    class="pseg__b"
+                    role="radio"
+                    data-circle={c.key}
+                    aria-checked={c.key === circle}
+                  >
                     {c.label}
                   </button>
                 ))

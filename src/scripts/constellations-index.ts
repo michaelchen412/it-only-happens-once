@@ -1,5 +1,6 @@
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
+import { wireRadioGroups } from './radio-group';
 import { callAction, formatActionError } from './action-error';
 import { wireListReorder } from './list-reorder';
 import { announceSkyChange } from './sky-changed';
@@ -142,7 +143,9 @@ function openColors(trigger: HTMLButtonElement, row: HTMLElement) {
     const slot = b.dataset.slot!;
     const used = counts[slot] ?? 0;
     const mine = row.dataset.color === slot;
-    b.setAttribute('aria-pressed', String(mine));
+    // A constellation has ONE colour, so these are a choice and not eight
+    // switches (plan 38 · §6.3).
+    b.setAttribute('aria-checked', String(mine));
     b.classList.toggle('is-active', mine);
     b.querySelector<HTMLElement>('[data-count]')!.textContent = used ? String(used) : '';
     b.title = mine ? `${slot} — this one` : used ? `${slot} — ${used} already wearing it` : `${slot} — free`;
@@ -217,3 +220,5 @@ async function chooseSlot(slot: string) {
 }
 
 for (const b of slots) b.addEventListener('click', () => void chooseSlot(b.dataset.slot!));
+
+wireRadioGroups();

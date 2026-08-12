@@ -725,7 +725,7 @@ test.describe('the parser (14 · Piece 3)', () => {
     await expect(s.locator('textarea[name="notes"]')).toHaveValue('bring a gift every single time');
     await expect(s.locator('[data-due]')).toHaveValue('2026-08-06');
     await expect(s.locator('[data-time]')).toHaveValue('16:00');
-    await expect(s.locator('[data-prio][aria-pressed="true"]')).toHaveAttribute('data-prio', 'high');
+    await expect(s.locator('[data-prio][aria-checked="true"]')).toHaveAttribute('data-prio', 'high');
 
     // ⚠ THE PAIR. The lead override is a checkbox AND a count; filling only the
     // number sends `leadDays` blank and effort's default (3 days) silently
@@ -735,7 +735,7 @@ test.describe('the parser (14 · Piece 3)', () => {
     await expect(s.locator('[data-override-n]')).toHaveValue('1');
 
     // A preset, never a rule string — 13 · Piece 1's contract.
-    await expect(s.locator('[data-rep][aria-pressed="true"]')).toHaveAttribute('data-rep', 'fixed');
+    await expect(s.locator('[data-rep][aria-checked="true"]')).toHaveAttribute('data-rep', 'fixed');
     await expect(s.locator('[data-preset]')).toHaveValue('weekly');
 
     // §6.3: which words produced the date. A date alone cannot be judged.

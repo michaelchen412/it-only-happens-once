@@ -102,15 +102,16 @@ const { today, goals = [] } = Astro.props;
         <div class="flex flex-wrap gap-x-6 gap-y-3">
           <div class="min-w-0 flex-1">
             <p class="f__k">Effort</p>
-            <div class="pseg" role="group" aria-label="Effort">
+            <div class="pseg" role="radiogroup" aria-label="Effort">
               {
                 EFFORTS.map((e) => (
                   <button
                     type="button"
                     class="pseg__b"
+                    role="radio"
                     data-effort={e.key}
                     title={e.hint}
-                    aria-pressed={e.key === 'sitting'}
+                    aria-checked={e.key === 'sitting'}
                   >
                     {e.label}
                   </button>
@@ -120,10 +121,16 @@ const { today, goals = [] } = Astro.props;
           </div>
           <div class="min-w-0 flex-1">
             <p class="f__k">Priority</p>
-            <div class="pseg" role="group" aria-label="Priority">
+            <div class="pseg" role="radiogroup" aria-label="Priority">
               {
                 PRIORITIES.map((p) => (
-                  <button type="button" class="pseg__b" data-prio={p.key} aria-pressed={p.key === 'normal'}>
+                  <button
+                    type="button"
+                    class="pseg__b"
+                    role="radio"
+                    data-prio={p.key}
+                    aria-checked={p.key === 'normal'}
+                  >
                     {p.label}
                   </button>
                 ))
@@ -158,20 +165,22 @@ const { today, goals = [] } = Astro.props;
 
       <fieldset class="fs" data-dated hidden>
         <legend class="fs__k">Repeats</legend>
-        <div class="pseg pseg--wrap" role="group" aria-label="Repeats">
-          <button type="button" class="pseg__b" data-rep="none" aria-pressed="true">Doesn’t repeat</button>
-          <button type="button" class="pseg__b" data-rep="after" aria-pressed="false">After I do it</button>
-          <button type="button" class="pseg__b" data-rep="fixed" aria-pressed="false">On a schedule</button>
+        <div class="pseg pseg--wrap" role="radiogroup" aria-label="Repeats">
+          <button type="button" class="pseg__b" role="radio" data-rep="none" aria-checked="true">Doesn’t repeat</button>
+          <button type="button" class="pseg__b" role="radio" data-rep="after" aria-checked="false">After I do it</button
+          >
+          <button type="button" class="pseg__b" role="radio" data-rep="fixed" aria-checked="false">On a schedule</button
+          >
         </div>
 
         <div class="mt-3" data-rep-panel="after" hidden>
           <div class="flex flex-wrap items-center gap-2">
             <span class="admin-hint text-xs">Every</span>
             <input type="text" inputmode="numeric" class="f--n" value="2" data-every aria-label="How many" />
-            <div class="pseg" role="group" aria-label="Unit">
-              <button type="button" class="pseg__b" data-unit="days" aria-pressed="false">days</button>
-              <button type="button" class="pseg__b" data-unit="weeks" aria-pressed="true">weeks</button>
-              <button type="button" class="pseg__b" data-unit="months" aria-pressed="false">months</button>
+            <div class="pseg" role="radiogroup" aria-label="Unit">
+              <button type="button" class="pseg__b" role="radio" data-unit="days" aria-checked="false">days</button>
+              <button type="button" class="pseg__b" role="radio" data-unit="weeks" aria-checked="true">weeks</button>
+              <button type="button" class="pseg__b" role="radio" data-unit="months" aria-checked="false">months</button>
             </div>
             <span class="admin-hint text-xs">after I finish</span>
           </div>

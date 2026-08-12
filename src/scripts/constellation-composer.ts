@@ -1,5 +1,6 @@
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
+import { wireRadioGroups } from './radio-group';
 import { callAction, formatActionError } from './action-error';
 import { publicShapeHint, suiteHints } from '../lib/suite-shape';
 // ⚠ THE LIST, NOT A SIXTH COPY OF IT (plans/29 · §3, which counted four and
@@ -461,7 +462,10 @@ function paintView() {
   for (const b of viewBtns) {
     const on = b.dataset.view === view;
     b.classList.toggle('is-active', on);
-    b.setAttribute('aria-pressed', String(on));
+    // `aria-checked` — Compose/Read is an exclusive choice, and `.seg` in the
+    // fragment panel has announced itself as a radio group since it was written
+    // (plan 38 · §6.3). This one was the odd `.seg` out.
+    b.setAttribute('aria-checked', String(on));
   }
 }
 
@@ -487,3 +491,7 @@ readPanel.addEventListener('click', (e) => {
     return void document.dispatchEvent(new CustomEvent('writing:edit', { detail: art.dataset.writing }));
   if (art?.dataset.fragment) document.dispatchEvent(new CustomEvent('fragment:edit', { detail: art.dataset.fragment }));
 });
+
+// The role promises arrow keys and one tab stop; this is what keeps it
+// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+wireRadioGroups();
