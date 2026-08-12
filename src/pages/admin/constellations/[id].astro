@@ -31,13 +31,10 @@ import FragmentBrowser from '../../../components/admin/FragmentBrowser.astro';
 import Reader from '../../../components/Reader.astro';
 import PostArticle from '../../../components/PostArticle.astro';
 import SuiteStanza from '../../../components/SuiteStanza.astro';
-import { FRAGMENT_TYPES, TYPE_META, type FragmentType } from '../../../lib/fragments-display';
-import { excerpt, readingMinutes, renderMarkdown, toPlainText } from '../../../lib/markdown';
-import type { SuiteItem } from '../../../lib/constellations';
-import { revealOf } from '../../../lib/provenance';
-import { publicShapeHint, suiteHints } from '../../../lib/suite-shape';
-import type { SubjectRef } from '../../../lib/blog';
-import { PAIRED_SELECT, pairedMediaOf } from '../../../lib/blog';
+import { FRAGMENT_TYPES, TYPE_META } from '../../../lib/fragments-display';
+import { renderMarkdown, toPlainText } from '../../../lib/markdown';
+import { buildSuite, suiteStats } from '../../../lib/composer-suite';
+import { PAIRED_SELECT } from '../../../lib/blog';
 import { allFragmentPeople } from '../../../lib/hq/links';
 import StarMark from '../../../components/StarMark.astro';
 
@@ -86,159 +83,18 @@ const [
 // `fragment_id -> person_id[]`, so opening a sheet needs no round trip.
 const sharedBy = await allFragmentPeople(sb);
 
-const snip = (s: string | null | undefined, max = 110) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+/* ⚠ THE SHAPING MOVED TO `lib/composer-suite.ts` (plan 38 · §6.2). It was ~145
+   lines of frontmatter above this point: the per-row editor payload, the Read
+   view's SuiteItem, the ✦×n counts and the three instruments. The page already
+   argued for the move against itself — the thresholds live in lib "because the
+   script below recomputes all of this and the two must not drift", and the
+   shaping had the same property with none of the protection.
 
-// how many OTHER constellations each fragment lives in (the ✦×n hint)
-const elsewhere = new Map<string, number>();
-for (const l of allLinks ?? []) {
-  if (l.constellation_id === c.id) continue;
-  elsewhere.set(l.fragment_id, (elsewhere.get(l.fragment_id) ?? 0) + 1);
-}
-
-const suite = (placements ?? []).map((p) => {
-  const f = p.fragments as unknown as {
-    id: string;
-    type: FragmentType;
-    slug: string;
-    title: string | null;
-    body: string | null;
-    excerpt: string | null;
-    attribution: string | null;
-    source_url: string | null;
-    status: string;
-    occurred_at: string;
-    updated_at: string | null;
-    date_precision: 'day' | 'year';
-    details: Record<string, unknown> | null;
-    author_id: string | null;
-    work_id: string | null;
-    authors: { name: string; slug: string } | null;
-    works: { title: string } | null;
-    fragment_subjects: { subjects: SubjectRef | null }[] | null;
-  };
-  const subjects = (f.fragment_subjects ?? [])
-    .map((fs) => fs.subjects?.name)
-    .filter(Boolean)
-    .join(', ');
-  // the FragmentSheet edit payload (same shape FragmentRow emits)
-  const editorData =
-    f.type === 'writing'
-      ? null
-      : JSON.stringify({
-          id: f.id,
-          type: f.type,
-          title: f.title,
-          body: f.body,
-          attribution: f.attribution,
-          source_url: f.source_url,
-          status: f.status,
-          year: (f.details as { year?: number } | null)?.year ?? null,
-          occurredIso: f.occurred_at,
-          datePrecision: f.date_precision,
-          authorId: f.author_id,
-          authorName: f.authors?.name ?? '',
-          workId: f.work_id,
-          workName: f.works?.title ?? '',
-          subjects,
-          details: f.details ?? {},
-          constellationIds: (allLinks ?? []).filter((l) => l.fragment_id === f.id).map((l) => l.constellation_id),
-        });
-  // The Read view's stanza — the SAME SuiteItem shape the public sky renders,
-  // built from this admin query so DRAFT fragments are included (the public
-  // `getConstellation` stays published-only, deliberately).
-  const authored = (f.excerpt ?? '').trim();
-  const lede = authored || excerpt(f.body, 400);
-  const read: SuiteItem =
-    f.type === 'quote'
-      ? {
-          kind: 'quote',
-          quote: {
-            id: f.id,
-            slug: f.slug,
-            body: f.body ?? '',
-            attribution: f.attribution,
-            reveal: revealOf(f),
-            sourceUrl: f.source_url,
-            occurredAt: f.occurred_at,
-            precision: f.date_precision,
-            author: f.authors?.slug ? { name: f.authors.name, slug: f.authors.slug } : null,
-            authorSiblings: 0,
-            // ⚠ NOT the `subjects` const above — that one is comma-joined for
-            // the sheet's TagInput, and this wants the {name, slug} pairs the
-            // public renderer links with.
-            subjects: (f.fragment_subjects ?? [])
-              .map((fs) => fs.subjects)
-              .filter((x): x is { name: string; slug: string } => !!x)
-              .sort((a, b) => a.name.localeCompare(b.name)),
-          },
-        }
-      : /* ⚠ NO `song` ARM, AND ANYTHING NOT A QUOTE FALLS TO `writing` (ADR
-           0031). A song is never a suite stanza, and `constellations.place`
-           refuses one — so a song reaching this line means a row that predates
-           the rule, and rendering it as an untitled writing stanza is a visible
-           oddity in the composer rather than a crash on the page you would use
-           to remove it. */
-        {
-          kind: 'writing',
-          item: {
-            id: f.id,
-            slug: f.slug,
-            title: f.title || '(untitled)',
-            bodyMarkdown: f.body ?? '',
-            excerpt: lede,
-            hasMore: (f.body ?? '').trim().length > lede.length,
-            occurredAt: f.occurred_at,
-            updatedAt: f.updated_at,
-            precision: f.date_precision,
-            readMinutes: readingMinutes(f.body),
-            subjects: (f.fragment_subjects ?? [])
-              .map((fs) => fs.subjects)
-              .filter((s): s is SubjectRef => !!s)
-              .sort((a, b) => a.name.localeCompare(b.name)),
-            // Same PostArticle as the public Reader, so the pairing has to
-            // travel here too — this is the construction site plan 04's
-            // Piece 1 missed, and it is still the easy one to forget.
-            paired: pairedMediaOf(f),
-          },
-        };
-
-  return {
-    id: f.id,
-    type: f.type,
-    status: f.status,
-    editorData,
-    read,
-    summary:
-      f.type === 'quote'
-        ? snip(f.body)
-        : f.type === 'song'
-          ? `${f.title ?? ''} — ${f.attribution ?? ''}`
-          : (f.title ?? '(untitled)'),
-    attribution: f.type === 'quote' ? (f.attribution ?? '') : '',
-    subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
-    others: elsewhere.get(f.id) ?? 0,
-  };
-});
-
-// the writings placed here — their full text rides along for the Reader
-const readerWritings = suite
-  .map((s) => s.read)
-  .filter((r): r is Extract<SuiteItem, { kind: 'writing' }> => r.kind === 'writing')
-  .map((r) => r.item);
-
-// The three tests, as instruments — never police. Hints appear only off-band.
-// The thresholds themselves live in lib/constellations.ts, because the script
-// below recomputes all of this after an unplace and the two must not drift.
-const placedCount = suite.length;
-const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
-const mix = { writing: 0, quote: 0, song: 0 } as Record<FragmentType, number>;
-for (const s of suite) mix[s.type]++;
-const { size: sizeHint, spread: spreadHint } = suiteHints(placedCount, subjectSpread);
-// A NOTE COUNTS AS A DRAFT HERE, because the only question this asks is "would
-// a stranger get this one" — and `getConstellation` filters to published, so
-// anything else is invisible out there whatever it is called in the workshop.
-const draftCount = suite.filter((s) => s.status !== 'published').length;
-const publicShape = publicShapeHint(placedCount, draftCount);
+   The real gain is that a page template is not reachable from a test and a lib
+   module is: `buildSuite` decides the editor payload for every row and what
+   counts as a draft, and neither was assertable without a browser. */
+const suite = buildSuite(placements, allLinks, c.id);
+const { readerWritings, placedCount, subjectSpread, mix, sizeHint, spreadHint, publicShape } = suiteStats(suite);
 
 const subjectNames = (subjectRows ?? []).map((s) => s.name);
 
