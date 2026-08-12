@@ -16,6 +16,7 @@ import { deriveProvenance, mergePage } from '../lib/provenance';
 import { slugify } from '../lib/slug';
 import { submitAction } from './action-error';
 import { wireSheetDismiss } from './sheet-dismiss';
+import { sheetError as sheetErrorOf } from './sheet-error';
 import { confirmDialog } from './confirm-dialog';
 import { notifyFragmentsChanged } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
@@ -27,7 +28,8 @@ import { wireSubjectSuggest } from './subject-suggest';
 
 const sheet = document.getElementById('sheet') as HTMLDialogElement;
 const sheetTitle = document.getElementById('sheet-title')!;
-const sheetError = document.getElementById('sheet-error') as HTMLParagraphElement;
+// By role rather than by `#sheet-error` — see `sheet-error.ts`.
+const sheetError = sheetErrorOf(sheet) as HTMLParagraphElement;
 const quoteForm = document.getElementById('quote-form') as HTMLFormElement;
 
 // --- quote body: the shared short-form editor (bold/italic; breaks preserved) ---

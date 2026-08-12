@@ -1,0 +1,62 @@
+---
+/*
+  SheetHeader — the title row every admin sheet opens with: a heading, a ✕, and
+  the rule under them.
+
+  ⚠ THIS IS [29 · §6](docs/plans/archive/29-one-owner-per-fact.md), BUILT — the
+  piece that plan named "the sheet skeleton" and left for last because it has the
+  largest blast radius. Its shape was decided 2026-08-09 and this keeps it: the
+  header, the close button and the `aria-labelledby` wiring, dropped INSIDE each
+  existing `<form>` so implicit submit survives. It does not touch footers — only
+  four of those ever matched, `FragmentSheet` and `LogSheet` have none at all,
+  and hoisting one out of a form would break `type="submit"` in seven places.
+
+  ⚠ IT IS TWO COMPONENTS AND 29 SPECIFIED ONE, AND THAT IS A DEVIATION WITH A
+  REASON. 29 said "header + error line", assuming they are adjacent. In the tree
+  they are adjacent in five sheets and separated in three — `FragmentSheet` and
+  `SongSheet` put a tab strip between them, `TagSheet` a paragraph. A single
+  shell rendering both would fight three of eight, and 29's own escape hatch
+  ("if the slot contract fights any one sheet, leave that sheet out … a forced
+  abstraction beats nothing at being worse") would leave the shell serving five.
+  Two small components serve all eight and constrain nothing about what sits
+  between them. See `SheetError.astro` for the other half.
+
+  ⚠ THE VERSION THAT WON IS `SongSheet`'s, WHICH WAS THE DIVERGENT ONE. Plan 38 ·
+  §3 found it copied its neighbour on 2026-08-11 and then drifted twice — and
+  both drifts were improvements: `truncate` on the title and `shrink-0` on the ✕
+  make it **the only sheet that survives a long title**. Everywhere else, a long
+  heading pushed the ✕ off the edge of the dialog. So the shell takes the
+  outlier's shape and every sheet gets the fix, which is the opposite of what
+  a consistency sweep usually does and is the whole reason to look at drift
+  before flattening it.
+
+  ⚠ LOGSHEET IS DELIBERATELY NOT A CONSUMER, as 29 decided. Its header is
+  `px-5 py-3.5` with a `text-lg` title inside a `modal-dialog` rather than a
+  drawer — a smaller box for one line of prose, not a drawer for a record — and
+  forcing it to `px-6 py-4`/`text-xl` would grow the one sheet whose point is
+  that it is quick. Seven owners beats eight.
+*/
+interface Props {
+  /**
+   * The `<h2>`'s id. The caller wires its own `<dialog aria-labelledby>` to it —
+   * the dialog element is the caller's, so the id has to be too.
+   */
+  titleId: string;
+  /** The heading, when it is a plain string. Otherwise use the default slot. */
+  title?: string;
+}
+const { titleId, title } = Astro.props;
+---
+
+<header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
+  <h2 id={titleId} class="font-display truncate text-xl">{title}<slot /></h2>
+  {
+    /* `data-close` is the contract `wireSheetDismiss` binds by default, so every
+      sheet's ✕ routes through the same exit as Escape and the backdrop (ADR
+      0032). SongSheet used to spell it `data-sng-close` and pass the selector in
+      by hand — a second name for the one thing the ADR made uniform. */
+  }
+  <button type="button" data-close class="text-base-content/50 hover:text-base-content shrink-0" aria-label="Close"
+    >✕</button
+  >
+</header>

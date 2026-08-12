@@ -30,6 +30,8 @@ import { EFFORTS, PRIORITIES } from '../../lib/hq/tasks';
 import { PRESETS, presetLabel } from '../../lib/hq/recurrence';
 import type { Ymd } from '../../lib/hq/time';
 import type { Tables } from '../../lib/database.types';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   /** Today in the configured home zone — the lead sentence measures against it. */
@@ -47,13 +49,9 @@ const { today, goals = [] } = Astro.props;
 
 <dialog id="task-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="task-sheet-title">
   <form id="task-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
-    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h2 id="task-sheet-title" class="font-display text-xl">New task</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
-      >
-    </header>
+    <SheetHeader titleId="task-sheet-title" title="New task" />
 
-    <p id="task-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+    <SheetError id="task-error" />
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
       {

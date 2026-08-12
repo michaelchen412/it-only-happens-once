@@ -26,6 +26,7 @@ import { wireSheetTabs } from './sheet-tabs';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 
 /** Everything the sheet needs to open on one song. */
 export interface SongSheetSeed {
@@ -104,7 +105,7 @@ export async function openSongById(id: string): Promise<void> {
        from the page and cannot be styled, on the one failure most likely to be
        a dead network. (plan 38 · §6.3) */
     openSongSheet();
-    const box = document.getElementById('sng-error');
+    const box = sheet && sheetError(sheet);
     if (box) {
       box.textContent = error ? formatActionError(error) : 'That song could not be opened.';
       box.hidden = false;
@@ -150,7 +151,9 @@ function wire(sheet: HTMLDialogElement) {
   // it. Hiding the button alone would strand both under a brand-new song.
   const deleteZone = el('sng-delete-zone');
   const statusEl = el('sng-status');
-  const errorEl = el('sng-error');
+  // By role — see `sheet-error.ts`. `sng-error` was one of twenty names for
+  // this element across the admin (plan 29 · §6 + plan 38 · §3).
+  const errorEl = sheetError(sheet)!;
 
   const tabs = wireSheetTabs(sheet);
   /*
@@ -525,7 +528,11 @@ function wire(sheet: HTMLDialogElement) {
     dirty.reset();
     close();
   }
-  wireSheetDismiss(sheet, requestClose, '[data-sng-close]');
+  // `data-close`, the default — SongSheet used to spell its ✕ `data-sng-close`
+  // and pass the selector in by hand, which is a second name for the one thing
+  // ADR 0032 made uniform. `SheetHeader` emits the standard attribute now
+  // (plan 29 · §6), so this argument is gone with it.
+  wireSheetDismiss(sheet, requestClose);
   // ⚠ ON `close`, NOT IN `requestClose`. Every path out — the ✕, Escape, the
   // backdrop, a save, a delete — ends in the native `close` event, and the
   // frame has to go on ALL of them. Hanging this off one handler is how a song

@@ -36,6 +36,8 @@
 import { Icon } from 'astro-icon/components';
 import { HORIZONS, STATUSES } from '../../lib/hq/goals';
 import type { Tables } from '../../lib/database.types';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   /** Omitted = the New sheet. Present = the edit sheet for that goal. */
@@ -47,13 +49,9 @@ const editing = !!goal;
 
 <dialog id="goal-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="goal-sheet-title">
   <form id="goal-form" class="flex h-full flex-col overflow-hidden font-sans" data-id={goal?.id}>
-    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h2 id="goal-sheet-title" class="font-display text-xl">{editing ? 'Edit goal' : 'New goal'}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
-      >
-    </header>
+    <SheetHeader titleId="goal-sheet-title">{editing ? 'Edit goal' : 'New goal'}</SheetHeader>
 
-    <p id="goal-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+    <SheetError id="goal-sheet-error" />
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
       <label class="f">

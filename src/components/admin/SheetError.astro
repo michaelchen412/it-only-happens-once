@@ -1,0 +1,43 @@
+---
+/*
+  SheetError — the one line a sheet says "that didn't work" on.
+
+  The other half of [29 · §6](docs/plans/archive/29-one-owner-per-fact.md); see
+  `SheetHeader.astro` for why it is two components rather than one.
+
+  ⚠ THE ERROR CHANNEL IS THE SAME DRIFT AT FOUR TIMES THE SCALE AND HAD NO SEAM
+  AT ALL. 29 counted 7 `admin-alert` lines; plan 38 · §3 counted **35 across 28
+  files** and — the number that matters — **20 distinct element ids** invented
+  for the same job: `sheet-error`, `person-error`, `task-error`,
+  `goal-sheet-error`, `event-sheet-error`, `tag-sheet-error`, `link-error`,
+  `lst-error`, `lib-error`, `cc-error`, `cl-error`, `sng-error`, `about-error`,
+  `bulk-error`, `dialog-error`, `fb-error`, `push-error`, `ws-error`,
+  `ws-music-error`, `ws-ver-error`.
+
+  ⚠ SO IT CARRIES `data-sheet-error` AS WELL AS ITS ID, AND THAT PAIR IS THE
+  POINT. 38 · §3 is explicit: put the error line in the shell and pair it with an
+  accessor that finds the element BY ROLE rather than by an invented id, "or the
+  shell owns the markup while fifteen scripts go on inventing names for it." The
+  id stays optional and every existing script and spec keeps working; anything
+  new reaches for `sheetError(root)` (`scripts/sheet-error.ts`) and never needs a
+  name at all. A twenty-first id is now a thing you have to go out of your way to
+  invent.
+*/
+interface Props {
+  /**
+   * The element id, for the scripts and specs that already query one. Optional
+   * on purpose — a new sheet should not need to mint a name, and `sheetError()`
+   * finds this element without one.
+   */
+  id?: string;
+  /** Spacing, for the sheets whose error line does not sit at the default inset. */
+  class?: string;
+}
+const { id, class: className } = Astro.props;
+---
+
+{
+  /* `role="alert"` is what makes this announce when it is unhidden — the whole
+    reason a failure needs its own element rather than a `title` or a toast. */
+}
+<p id={id} data-sheet-error hidden role="alert" class:list={['admin-alert mx-6 mt-4', className]}></p>

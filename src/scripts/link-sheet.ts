@@ -9,6 +9,7 @@ import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 
 type Mode = 'work' | 'fragment';
 
@@ -24,7 +25,16 @@ const personId = zone?.dataset.personId;
  * closed. A silent failure that leaves the row on screen reads as "it didn't
  * take", which is exactly the swallowed-save class of bug the check-in shipped.
  */
-const sheetError = document.querySelector<HTMLElement>('#link-error');
+// By role rather than by `#link-error` — see `sheet-error.ts`.
+//
+// ⚠ `sheet`, NOT `document`, AND THE FIRST DRAFT GOT THAT WRONG. Passing
+// `document` returns the FIRST error line in the page, and on a profile
+// `PersonSheet` renders before this one — so every link failure was written
+// into a hidden element belonging to another sheet and nothing appeared. That
+// is the whole reason this function takes a root: an id was globally unique and
+// a role is not, so the scope has to come from the caller. Caught by
+// `links.spec.ts`, which asserts the sentence actually shows.
+const sheetErrorEl = sheet ? sheetError(sheet) : null;
 const zoneError = document.querySelector<HTMLElement>('[data-shared-error]');
 
 const show = (el: HTMLElement | null, msg: string) => {
@@ -33,7 +43,7 @@ const show = (el: HTMLElement | null, msg: string) => {
   el.hidden = false;
 };
 const clearError = () => {
-  if (sheetError) sheetError.hidden = true;
+  if (sheetErrorEl) sheetErrorEl.hidden = true;
   if (zoneError) zoneError.hidden = true;
 };
 
@@ -161,7 +171,7 @@ if (sheet && personId) {
         mode === 'work'
           ? actions.links.work({ personId, workId: target.id, note })
           : actions.links.fragment({ personId, fragmentId: target.id, note }),
-      { button: saveBtn, busy: 'Linking…', onError: (m) => show(sheetError, m) },
+      { button: saveBtn, busy: 'Linking…', onError: (m) => show(sheetErrorEl, m) },
     );
     if (!res.ok) return;
     location.reload();

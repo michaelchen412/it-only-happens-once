@@ -13,6 +13,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 import { uploadPrivateImage } from './upload';
 import { photoPath } from '../lib/hq/people';
 
@@ -23,7 +24,12 @@ if (sheet && form) {
   /** Every gesture that leaves this sheet routes through `requestClose` below. */
   const dirty = dirtyTracker(sheet);
 
-  const errorEl = document.querySelector<HTMLElement>('#person-error');
+  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
+  // Twenty distinct element ids existed for this one job across the admin, which
+  // is the reason there were 35 copies of the markup — every new sheet had to
+  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
+  // without needing to know what it is called.
+  const errorEl = sheetError(sheet);
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]')!;
   const photoPreview = form.querySelector<HTMLImageElement>('[data-photo-preview]')!;

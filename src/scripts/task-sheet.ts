@@ -18,6 +18,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
 import { ordinal } from '../lib/hq/dates';
@@ -32,7 +33,12 @@ if (sheet && form) {
   const dirty = dirtyTracker(sheet);
 
   const today = form.dataset.today as Ymd;
-  const errorEl = document.querySelector<HTMLElement>('#task-error');
+  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
+  // Twenty distinct element ids existed for this one job across the admin, which
+  // is the reason there were 35 copies of the markup — every new sheet had to
+  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
+  // without needing to know what it is called.
+  const errorEl = sheetError(sheet);
   const heading = document.querySelector<HTMLElement>('#task-sheet-title')!;
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const deleteBtn = form.querySelector<HTMLButtonElement>('[data-delete]')!;

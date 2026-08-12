@@ -11,6 +11,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
@@ -20,7 +21,12 @@ if (sheet && form) {
   /** Every gesture that leaves this sheet routes through `requestClose` below. */
   const dirty = dirtyTracker(sheet);
 
-  const errorEl = document.querySelector<HTMLElement>('#event-sheet-error');
+  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
+  // Twenty distinct element ids existed for this one job across the admin, which
+  // is the reason there were 35 copies of the markup — every new sheet had to
+  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
+  // without needing to know what it is called.
+  const errorEl = sheetError(sheet);
   const pageError = document.querySelector<HTMLElement>('[data-event-error]');
   const heading = document.querySelector<HTMLElement>('#event-sheet-title')!;
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;

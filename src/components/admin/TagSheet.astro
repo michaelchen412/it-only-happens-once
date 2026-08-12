@@ -24,6 +24,8 @@
 */
 import { Icon } from 'astro-icon/components';
 import { hueFor, monogram } from '../../lib/hq/people';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   people: { id: string; display_name: string }[];
@@ -36,21 +38,14 @@ const FILTER_THRESHOLD = 8;
   people.length > 0 && (
     <dialog id="tag-sheet" class="drawer-dialog w-full max-w-sm" aria-labelledby="tag-sheet-title">
       <form id="tag-form" class="flex h-full flex-col overflow-hidden font-sans">
-        <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
-          <h2 id="tag-sheet-title" class="font-display text-xl">
-            Who’s there
-          </h2>
-          <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">
-            ✕
-          </button>
-        </header>
+        <SheetHeader titleId="tag-sheet-title" title="Who’s there" />
 
         {/* The event's own name, so you can see what you are tagging. It is
             read-only text rather than a field: nothing about a mirrored row is
             editable here, and a disabled input would say the opposite. */}
         <p class="text-base-content/70 shrink-0 px-6 pt-4 font-serif text-sm" data-tag-title />
 
-        <p id="tag-sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4" />
+        <SheetError id="tag-sheet-error" />
 
         <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
           {people.length > FILTER_THRESHOLD && (

@@ -25,6 +25,8 @@
 */
 import { Icon } from 'astro-icon/components';
 import type { FragmentOption, WorkOption } from '../../lib/hq/links';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   personName: string;
@@ -44,13 +46,9 @@ const TYPE_LABEL = { quote: 'quote', song: 'song', writing: 'writing' } as const
 
 <dialog id="link-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="link-sheet-title">
   <div class="flex h-full flex-col overflow-hidden font-sans">
-    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h2 id="link-sheet-title" class="font-display text-xl">Shared by {personName}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
-      >
-    </header>
+    <SheetHeader titleId="link-sheet-title">Shared by {personName}</SheetHeader>
 
-    <p id="link-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+    <SheetError id="link-error" />
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
       {

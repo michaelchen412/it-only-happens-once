@@ -11,6 +11,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { sheetError } from './sheet-error';
 
 const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
 const form = document.querySelector<HTMLFormElement>('#tag-form');
@@ -19,7 +20,12 @@ if (sheet && form) {
   /** Every gesture that leaves this sheet routes through `requestClose` below. */
   const dirty = dirtyTracker(sheet);
 
-  const errorEl = document.querySelector<HTMLElement>('#tag-sheet-error');
+  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
+  // Twenty distinct element ids existed for this one job across the admin, which
+  // is the reason there were 35 copies of the markup — every new sheet had to
+  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
+  // without needing to know what it is called.
+  const errorEl = sheetError(sheet);
   const titleEl = form.querySelector<HTMLElement>('[data-tag-title]')!;
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.tag-check'));

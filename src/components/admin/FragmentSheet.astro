@@ -34,6 +34,8 @@ import ConstellationPicker from './ConstellationPicker.astro';
 import SharedByField from './SharedByField.astro';
 import BackToTop from '../BackToTop.astro';
 import MiniEditor from './MiniEditor.astro';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   subjects: string[];
@@ -89,11 +91,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
   data-auto-new={autoNew ?? undefined}
 >
   <div class="flex h-full flex-col overflow-y-auto overscroll-contain">
-    <header class="border-base-300 flex items-center justify-between border-b px-6 py-4">
-      <h2 id="sheet-title" class="font-display text-xl">New quote</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
-      >
-    </header>
+    <SheetHeader titleId="sheet-title" title="New quote" />
 
     <div class="admin-tabs px-6" role="tablist" aria-label="Editor sections">
       <button
@@ -119,7 +117,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
       </button>
     </div>
 
-    <p id="sheet-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+    <SheetError id="sheet-error" />
 
     <div id="sheet-panel-fields" role="tabpanel" data-tabpanel="fields">
       {/* QUOTE */}

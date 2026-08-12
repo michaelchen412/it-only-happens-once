@@ -25,6 +25,8 @@
 */
 import { Icon } from 'astro-icon/components';
 import { CIRCLES, MONTHS, daysToMonths, type Person } from '../../lib/hq/people';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
 
 interface Props {
   /** Omitted = the add sheet. Present = the edit sheet for that person. */
@@ -48,13 +50,9 @@ const cadenceMonths = daysToMonths(person?.cadence_days ?? 365);
     data-mode={editing ? 'edit' : 'add'}
     data-id={person?.id}
   >
-    <header class="border-base-300 flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h2 id="person-sheet-title" class="font-display text-xl">{title}</h2>
-      <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close">✕</button
-      >
-    </header>
+    <SheetHeader titleId="person-sheet-title">{title}</SheetHeader>
 
-    <p id="person-error" hidden role="alert" class="admin-alert mx-6 mt-4"></p>
+    <SheetError id="person-error" />
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
       <div class="flex items-start gap-4">
