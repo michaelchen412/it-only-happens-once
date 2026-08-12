@@ -421,7 +421,11 @@ function setSubjects(form: HTMLFormElement, value: string) {
   (form.querySelector('tag-input') as HTMLElement & { setTags?: (v: string) => void })?.setTags?.(value);
 }
 function toggleDelete(form: HTMLFormElement, show: boolean) {
-  (form.querySelector('[data-delete]') as HTMLElement).hidden = !show;
+  // The ZONE, not the button: Delete moved out of the action row to the foot of
+  // the form (plan 38 · §1.4) and took an explanatory line with it. Hiding the
+  // button alone would leave that sentence — and its rule — floating under a
+  // brand-new quote that has nothing to delete.
+  (form.querySelector('[data-delete-zone]') as HTMLElement).hidden = !show;
 }
 
 // --- New quote (the button lives in the list page) ---

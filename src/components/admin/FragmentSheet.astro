@@ -380,7 +380,38 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
 
         <div class="mt-2 flex items-center gap-2">
           <button type="submit" id="quote-save" class="btn btn-primary btn-sm flex-1 normal-case">Save quote</button>
-          <button type="button" data-delete hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+        </div>
+
+        {
+          /* DELETE LEFT THE ACTION ROW, and the sentence it is answering to was
+            written one file over, in `WritingSheet.astro`: *"a destructive
+            action does not belong in a row of benign ones, one keystroke from
+            Unpublish."* This sheet had it sitting flush beside **Save quote**,
+            and — because both are `hidden` until you open an EXISTING quote —
+            it appeared next to Save exactly when there was something to lose.
+
+            Same treatment as the writing sheet and the constellation composer:
+            apart, below a rule, at the END of the thing it destroys, with a
+            line saying what it takes and what it leaves. Three sheets, one
+            rule; before this, three treatments of it.
+
+            ⚠ IT STAYS INSIDE THE `<form>`. `fragment-sheet.ts`'s `toggleDelete`
+            reaches for it with `form.querySelector`, and a Delete moved below
+            `</form>` for tidiness would be invisible to that lookup — the
+            button would simply never appear. The zone carries the `hidden`
+            now; the button keeps `data-delete` because the click handler binds
+            on that attribute document-wide. */
+        }
+        <div
+          data-delete-zone
+          hidden
+          class="border-base-300 mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
+        >
+          <p class="admin-hint">
+            Deleting removes this quote and its links. The constellations it sits in keep their shape, and the author
+            and work stay in the library.
+          </p>
+          <button type="button" data-delete class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
         </div>
       </form>
 

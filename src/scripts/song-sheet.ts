@@ -132,6 +132,10 @@ function wire(sheet: HTMLDialogElement) {
   const wordNoteEl = el('sng-wordnote');
   const saveBtn = el<HTMLButtonElement>('sng-save');
   const deleteBtn = el<HTMLButtonElement>('sng-delete');
+  // The zone, not the button: Delete left the sticky footer for the foot of the
+  // Facts panel (plan 38 · §1.4) and took an explanatory line and a rule with
+  // it. Hiding the button alone would strand both under a brand-new song.
+  const deleteZone = el('sng-delete-zone');
   const statusEl = el('sng-status');
   const errorEl = el('sng-error');
 
@@ -266,7 +270,7 @@ function wire(sheet: HTMLDialogElement) {
     pairedWrap.hidden = seed.paired.length === 0;
     pairedEl.textContent = seed.paired.join(' · ');
 
-    deleteBtn.hidden = !seed.id;
+    deleteZone.hidden = !seed.id;
     sharedBy?.setFragment(seed.id, seed.id ? (sharedByMap[seed.id] ?? []) : []);
     raisePlayer(seed.embed);
     // ⚠ LAST, AND AFTER EVERYTHING ABOVE. Populating the fields fires `input`

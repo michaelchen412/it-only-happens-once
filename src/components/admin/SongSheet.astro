@@ -244,6 +244,40 @@ const thisYear = new Date().getUTCFullYear();
       </div>
 
       <SharedByField scope="song" people={people} />
+
+      {
+        /* DELETE LEFT THE STICKY FOOTER (plan 38 · §1.4), for the reason
+          `WritingSheet.astro` states about its own: *"a destructive action does
+          not belong in a row of benign ones, one keystroke from Unpublish."*
+          Here it was worse than in the quote sheet — the footer FOLLOWS YOU
+          DOWN THE PAGE, so Delete sat a thumb's width from **Save song** on
+          every screen of every tab, and both are `hidden` until you open an
+          existing song, i.e. it appeared beside Save exactly when there was
+          something to lose.
+
+          ⚠ THE FOOT OF *FACTS*, NOT OF FEELINGS, and the tab is the decision.
+          Feelings is the fast loop this sheet was built for — paste, listen,
+          press the words, Save — and a delete control at the end of it is in
+          the path you take twenty times a week. Facts is where the song's
+          identity lives (title, artist, album, the pairing), so it is the end
+          of the thing being destroyed, and reaching it costs one deliberate tab
+          press. That cost is the feature.
+
+          The alternative that lost: the foot of Notes, because Notes is last.
+          Last is not the same as "the end of the object" — a private note is
+          the one part of a song you would keep if you could. */
+      }
+      <div
+        id="sng-delete-zone"
+        hidden
+        class="border-base-300 mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
+      >
+        <p class="admin-hint">
+          Deleting removes this song, its feelings and its notes. The feeling vocabulary itself is untouched, and any
+          essay it was paired with keeps its own text.
+        </p>
+        <button id="sng-delete" type="button" class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+      </div>
     </div>
 
     {/* ── NOTES ────────────────────────────────────────────────────────── */}
@@ -358,7 +392,6 @@ const thisYear = new Date().getUTCFullYear();
           the one label that tells you nothing about what you are committing. */
       }
       <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
-      <button id="sng-delete" type="button" hidden class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
       <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
     </div>
   </div>
