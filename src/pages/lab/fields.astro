@@ -1,0 +1,633 @@
+---
+/*
+  /lab/fields — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  ONE QUESTION, AND IT IS THE ONLY BLOCKING ONE IN PLAN 38: does the Observatory
+  have one field grammar or two? Michael, 2026-08-12: *"yeah lets do the lab, and
+  I can decide whats best that way."*
+
+  WHY IT NEEDED A BENCH RATHER THAN A PARAGRAPH. The plan can tell you that an HQ
+  label is 10px uppercase at 48% and a quote sheet's is 14px sentence-case at
+  70%; it cannot tell you which one is right at a desk, and the plan's own hands
+  item says so — *"this is the one that could reverse the decision, and it can
+  only be answered by looking."* Same reason 36 was decided at /lab/chrome and 33
+  at /lab/music rather than on paper.
+
+  ⚠ THE FRAMING IN §0's TABLE IS WRONG AND THIS BENCH IS ARRANGED AROUND THE
+  CORRECTION. The plan reads the split as "two stylesheets, `hq.css` vs
+  `admin.css`". Measured, the two NAMED primitives are on the same side:
+
+      .f__k          10px   UPPER   .06em   48%    25 uses
+      .admin-label   11.2px UPPER   .08em   50%    12 uses
+      inline span    14px   sentence  —     70%    14 uses  ← the actual outlier
+
+  So merging `.admin-label` into `.f__k` is a FACT — 1.2px and 2% apart, nobody
+  would argue to keep both. The decision is only whether the corpus sheets keep
+  the third row. That is ~20 sites, not 60, and it is a question about REGISTER,
+  not about which file a rule lives in.
+
+  ⚠ AND ONE VARIANT IS HERE BECAUSE OF CONTRAST, NOT TASTE. Plan 19 derived the
+  ink ramp by measurement: dusk crosses 4.5:1 at 55% opacity, paper not until
+  65%. `.f__k` sits at 48% and `.f__h` at 42% — BOTH BELOW THE FLOOR THIS REPO
+  DERIVED FOR ITSELF — and 19 · Piece 5, the 362-site migration that fixes that,
+  is still unbuilt. So "migrate the corpus to `.f`" as written would move 14
+  labels that currently PASS onto a primitive that fails, and hand Piece 5 more
+  work. `ramp` below is `.f`'s geometry at the floor, and if `.f` wins it should
+  win in that costume rather than today's.
+
+  ⚠ ONE SOURCE, FOUR RENDERS — the chrome bench's rule, for its reason. The form
+  markup below is written ONCE and mapped over the four registers; every
+  difference is CSS keyed off `[data-fx]` on the section. So `hq` is not a copy
+  of the shipped `.f` — it IS `.f` with this file's stylesheet doing nothing, and
+  there is no drift to police. The whole experiment deletes in one file.
+
+  ⚠ WHAT THIS BENCH DOES NOT DECIDE, deliberately, so the question stays one
+  question: not sheet widths, not button hues (`cn-amber` stays amber — a real
+  domain axis `admin.md` §1 argues for), not the sheet shell (29 · §6 owns it).
+  Label geometry, hint geometry, required marking and input chrome. Nothing else.
+*/
+import Base from '../../layouts/Base.astro';
+// The admin's own primitives, exactly as an admin page gets them: `hq.css` from
+// the layout, `admin.css` inlined by `app.css` (which `Base` brings). Both sets
+// are already loaded on every admin page, which is the finding that makes the
+// migration markup-only — no rule moves between files whichever way this goes.
+import '../../styles/hq.css';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+/**
+ * The four propositions.
+ *
+ * `hq` and `corpus` are the two that exist in the tree today and are what a
+ * migration would choose between. `admin` is here to be DISMISSED on sight —
+ * it is the third primitive, and seeing how little separates it from `hq` is
+ * most of the argument for deleting it. `ramp` is `hq` at the contrast floor.
+ */
+const REGISTERS = [
+  {
+    key: 'hq',
+    name: 'HQ — .f',
+    note: '10px · UPPERCASE · 48% — 25 uses. Task, Goal, Event, Person, Tag, Link.',
+    verdict: 'Ships today in the seven HQ sheets.',
+  },
+  {
+    key: 'admin',
+    name: 'Workshop — .admin-label',
+    note: '11.2px · UPPERCASE · 50% — 12 uses. The composer, the picker.',
+    verdict: 'The third primitive. 1.2px and 2% from the first.',
+  },
+  {
+    key: 'corpus',
+    name: 'Corpus sheets — inline',
+    note: '14px · sentence case · 70% — 14 uses. Quote, Song, the fragment panel.',
+    verdict: 'Never a class. Copied span to span, and about.astro named it.',
+  },
+  {
+    key: 'ramp',
+    name: 'HQ at the ink floor',
+    note: "10px · UPPERCASE · 80/65% — doesn't exist yet. Plan 19's derived floor.",
+    verdict: 'What .f would have to become to pass 4.5:1 in both themes.',
+  },
+  /* ── ADDED 2026-08-12, AFTER MICHAEL PICKED `admin` ────────────────────────
+     *"Workshop — .admin-label definitely the best option here."*
+
+     ⚠ THE PICK AND THE FAILURE ARE ON DIFFERENT AXES, WHICH THE FIRST FOUR
+     COLUMNS HID. He chose a REGISTER — 11.2px, uppercase, .08em. What fails
+     4.5:1 is the INK — 50% on the label, 45% on the hint. Those are
+     independent, and the bench happened to offer its only passing ink attached
+     to the OTHER geometry, so "the register I want, legible" was not on screen
+     to be chosen.
+
+     This column is that: his pick, unchanged in size, case and tracking, with
+     the opacity raised to the floor that passes in both themes. It exists
+     because raising ink is not neutral — it makes a label heavier and more
+     present, and he chose partly on how quiet it was. If he prefers `admin` at
+     50% AFTER seeing this, that is a decision about contrast made with the
+     number in view, which is a different thing from one made without it. */
+  {
+    key: 'adminramp',
+    name: 'Workshop at the ink floor',
+    note: '11.2px · UPPERCASE · 80/65% — the pick, at a legible ink.',
+    verdict: 'Same register. Only the opacity moved.',
+  },
+] as const;
+
+const MONTHS = ['—', 'January', 'February', 'March'];
+---
+
+<Base title="Fields — bench">
+  <div class="lab">
+    <header class="lab__head">
+      <h1>One building, two grammars — the field question</h1>
+      <p>
+        Plan 38 · §2. The same form in four registers, one source. Judge the <strong>label</strong>, the <strong
+          >hint</strong
+        >, the <strong>required</strong> mark and the <strong>input chrome</strong> — nothing else on this page is being proposed.
+      </p>
+      <div class="lab__ctl">
+        <button type="button" data-view="grid" aria-pressed="true">Side by side</button>
+        <button type="button" data-view="solo" aria-pressed="false">One at a time</button>
+        <span class="lab__sep" aria-hidden="true"></span>
+        <button type="button" data-w="wide" aria-pressed="true">Desk</button>
+        <button type="button" data-w="phone" aria-pressed="false">390px</button>
+        <span class="lab__sep" aria-hidden="true"></span>
+        <button type="button" data-theme-flip>Flip theme</button>
+      </div>
+      <p class="lab__q">
+        <b>The question to hold while you look:</b> a field label is scaffolding you read once, and the VALUE is the interesting
+        thing — which argues quiet. But some of these labels carry a question you have to think about (“Where in it”, “Known
+        since”), and those earn their size. Both kinds are on this page.
+      </p>
+    </header>
+
+    <div class="lab__grid">
+      {
+        REGISTERS.map((r) => (
+          <section class="fx" data-fx={r.key}>
+            <div class="fx__head">
+              <h2>{r.name}</h2>
+              <p class="fx__note">{r.note}</p>
+              <p class="fx__verdict">{r.verdict}</p>
+              {/* Filled by the script — measured in THIS theme, on every flip. */}
+              <p class="fx__ratio" data-ratio />
+            </div>
+
+            {/* ── THE FORM. Written once; every register renders this exact DOM. ──
+                The fields are real ones, taken from both halves on purpose: Name
+                and Circle are PersonSheet's, Title and Album are SongSheet's,
+                "Where in it" is FragmentSheet's, and the group heading is `.fs__k`
+                from the HQ sheets. A register that only looks right on its own
+                half is not a candidate. */}
+            <form class="fs" onsubmit="return false">
+              <p class="fs__k">Who said it</p>
+
+              <label class="f">
+                <span class="f__k">
+                  Name <em>required</em>
+                </span>
+                <input type="text" value="Miles Davis" />
+              </label>
+
+              <label class="f">
+                <span class="f__k">Where in it</span>
+                <input type="text" placeholder="ch. 4, or a timestamp" />
+                <span class="f__h">Shown after the attribution, in the reader's own line.</span>
+              </label>
+
+              <div class="f">
+                <span class="f__k">
+                  Circle <em>required</em>
+                </span>
+                <div class="pseg" role="group" aria-label="Circle">
+                  <button type="button" class="pseg__b" aria-pressed="true">
+                    Inner
+                  </button>
+                  <button type="button" class="pseg__b" aria-pressed="false">
+                    Close
+                  </button>
+                  <button type="button" class="pseg__b" aria-pressed="false">
+                    Wider
+                  </button>
+                </div>
+              </div>
+
+              <label class="f">
+                <span class="f__k">Known since</span>
+                <select>
+                  {MONTHS.map((m) => (
+                    <option>{m}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label class="f">
+                <span class="f__k">The words themselves</span>
+                <textarea rows="3">Sometimes it takes you a long time to sound like yourself.</textarea>
+                <span class="f__h">Poetry line breaks survive; the body stores Markdown.</span>
+              </label>
+            </form>
+          </section>
+        ))
+      }
+    </div>
+
+    <footer class="lab__foot">
+      <p>
+        <b>What each answer costs.</b> Picking <code>corpus</code> means the seven HQ sheets move — 25 `.f__k` sites plus
+        their hints. Picking <code>hq</code> or <code>ramp</code> means the corpus sheets move — 14 inline spans plus about.astro's
+        6. Either way <code>admin</code>'s 12 sites are deleted, because nothing argues for a third. <b
+          >Nothing here is a migration yet</b
+        >; this page is thrown away either way.
+      </p>
+    </footer>
+  </div>
+</Base>
+
+<style is:global>
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE BENCH'S OWN CHROME. Deliberately plain and deliberately NOT using any
+     primitive under test — a lab that dresses itself in the thing it is judging
+     is a lab that has already voted.
+     ═══════════════════════════════════════════════════════════════════════ */
+  .lab {
+    max-width: 96rem;
+    margin-inline: auto;
+    padding: 2rem 1.5rem 6rem;
+    font-family: var(--font-sans);
+  }
+  .lab__head h1 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+  }
+  .lab__head > p {
+    margin-top: 0.5rem;
+    max-width: 60ch;
+    color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+    font-size: 0.9375rem;
+  }
+  .lab__q {
+    margin-top: 1rem;
+    max-width: 68ch;
+    border-left: 2px solid var(--color-primary);
+    padding-left: 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  .lab__ctl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+  .lab__ctl button {
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.5rem;
+    background: var(--color-base-100);
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .lab__ctl button[aria-pressed='true'] {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+  }
+  .lab__sep {
+    width: 1px;
+    height: 1.25rem;
+    background: var(--color-base-300);
+  }
+  .lab__grid {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  }
+  /* Solo: one column, so a register is judged at a real form's width rather
+     than in a 19rem gutter. The grid is for spotting differences; solo is for
+     deciding whether one of them is actually good. */
+  .lab[data-view='solo'] .lab__grid {
+    grid-template-columns: 1fr;
+    max-width: 34rem;
+  }
+  /* 390px, because `.f` is a phone-first grammar and that claim is half of the
+     case against converging on it. A register that only works at a desk loses
+     here, visibly, rather than in an argument. */
+  .lab[data-w='phone'] .fx {
+    max-width: 390px;
+  }
+  .lab[data-w='phone'] .lab__grid {
+    grid-template-columns: repeat(auto-fit, minmax(390px, 390px));
+  }
+
+  .fx {
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.75rem;
+    background: var(--color-base-100);
+    padding: 1.25rem;
+  }
+  .fx__head {
+    border-bottom: 1px solid var(--color-base-300);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .fx__head h2 {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+  }
+  .fx__note {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  }
+  .fx__verdict {
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    font-style: italic;
+    color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+  }
+  .fx__ratio {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.6rem;
+  }
+  .fx__ratio b {
+    font-weight: 600;
+  }
+  .fx__ratio .pass {
+    color: var(--color-success, #4a8);
+  }
+  .fx__ratio .fail {
+    color: var(--color-error);
+  }
+  .fx .f + .f,
+  .fx .f + .fs,
+  .fx .fs__k + .f {
+    margin-top: 0.875rem;
+  }
+
+  .lab__foot {
+    margin-top: 3rem;
+    border-top: 1px solid var(--color-base-300);
+    padding-top: 1rem;
+    max-width: 72ch;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
+  }
+  .lab__foot code {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8125em;
+    background: var(--color-base-200);
+    padding: 0.05em 0.3em;
+    border-radius: 0.25rem;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE FOUR REGISTERS.
+
+     `hq` HAS NO BLOCK AT ALL, and that is the point — it is `.f` as shipped,
+     with this stylesheet silent. Anything that appears below is a PROPOSAL,
+     which keeps the honest baseline honest.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* ── admin: `.admin-label` / `.admin-hint`, the third primitive ─────────── */
+  [data-fx='admin'] .f__k {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    margin-bottom: 0.3rem;
+  }
+  [data-fx='admin'] .f__h {
+    font-size: 0.75rem;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  }
+  /* `.admin-label` never appears beside a `.f input` in the tree — it co-occurs
+     with daisyUI's `input input-sm input-bordered`, because it belongs to the
+     half that was built on daisyUI. Reproduced here so this column is the real
+     thing and not a straw man; it is meant to be dismissed on the LABEL, which
+     is a fair fight only if everything else matches. */
+  [data-fx='admin'] .f input,
+  [data-fx='admin'] .f select,
+  [data-fx='admin'] .f textarea {
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    padding: 0.3125rem 0.75rem;
+  }
+  [data-fx='admin'] .f textarea {
+    line-height: 1.5;
+  }
+
+  /* ── corpus: what the quote and song sheets actually do ────────────────────
+     `flex flex-col gap-1 text-sm` + `span.text-base-content/70`, and daisyUI's
+     `input input-sm input-bordered` rather than `.f`'s descendant selector.
+     The required `<em>` is hidden because the corpus half HAS no word for
+     required — FragmentSheet marks it with a red `*` carrying `aria-hidden`,
+     which is why plan 38 · §2's finding F says the quote sheet's only required
+     field is marked as nothing at all to a screen reader and on a phone. The
+     asterisk is reproduced here so the comparison is fair rather than flattering. */
+  [data-fx='corpus'] .f__k {
+    font-size: 0.875rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+    margin-bottom: 0.25rem;
+  }
+  [data-fx='corpus'] .f__k em {
+    font-size: 0;
+    margin-left: 0.15rem;
+  }
+  [data-fx='corpus'] .f__k em::after {
+    content: '*';
+    font-size: 0.875rem;
+    color: var(--color-error);
+  }
+  [data-fx='corpus'] .f__h {
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  }
+  [data-fx='corpus'] .f input,
+  [data-fx='corpus'] .f select,
+  [data-fx='corpus'] .f textarea {
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    padding: 0.3125rem 0.75rem;
+    border-radius: var(--radius-field, 0.5rem);
+  }
+  [data-fx='corpus'] .f textarea {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  /* ── ramp: `.f`'s geometry at plan 19's derived contrast floor ─────────────
+     Dusk crosses 4.5:1 at 55% and paper at 65%, so 65% is the FLOOR that passes
+     in both themes — which is the whole reason 19 pairs its steps by ratio
+     rather than by the opacity they share. Nothing about the type moves: same
+     10px, same uppercase, same tracking. If the only thing wrong with `.f` is
+     that it is too faint, this column is the answer and the migration is
+     unblocked.
+
+     ⚠ THE HINT SAT AT 55% FOR ONE DRAFT AND STILL FAILED PAPER AT 3.42:1 —
+     caught by the readout above, not by reasoning, because 55% is the DUSK
+     threshold and I had reached for it out of the same sentence that names
+     both. The correction has a consequence worth stating: once 65% is the
+     floor, a hint CANNOT be quieter than a label by opacity, because there is
+     no room left underneath. So the hierarchy has to be carried by size and
+     case — which `.f` already does (10px uppercase key over 10px sentence
+     hint) — and the ink stops being where that distinction lives. That is a
+     real change to how this system expresses rank, and it is the strongest
+     argument on this page for the third answer: keep `.f`'s geometry, take the
+     corpus's ink. */
+  [data-fx='ramp'] .f__k {
+    color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
+  }
+  [data-fx='ramp'] .f__h {
+    color: color-mix(in oklch, var(--color-base-content) 65%, transparent);
+  }
+  [data-fx='ramp'] .fs__k {
+    color: color-mix(in oklch, var(--cn) 72%, var(--color-base-content));
+  }
+
+  /* ── adminramp: THE PICK, at the floor ────────────────────────────────────
+     Everything from `admin` above — 11.2px, .08em, daisyUI input chrome — with
+     only the two opacities moved. Written as its own block rather than by
+     stacking selectors so that deleting the `admin` column later does not
+     silently take this one's geometry with it. */
+  [data-fx='adminramp'] .f__k {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.3rem;
+    color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
+  }
+  [data-fx='adminramp'] .f__h {
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 65%, transparent);
+  }
+  [data-fx='adminramp'] .f input,
+  [data-fx='adminramp'] .f select,
+  [data-fx='adminramp'] .f textarea {
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    padding: 0.3125rem 0.75rem;
+  }
+  [data-fx='adminramp'] .f textarea {
+    line-height: 1.5;
+  }
+</style>
+
+<script>
+  // The bench's controls. Written plainly and kept in this file — a lab that
+  // reaches into `src/scripts/` leaves something behind when it is deleted.
+  const lab = document.querySelector('.lab') as HTMLElement;
+
+  function group(attr: string, value: string) {
+    document.querySelectorAll<HTMLButtonElement>(`[${attr}]`).forEach((b) => {
+      const on = b.getAttribute(attr) === value;
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  lab.dataset.view = 'grid';
+  lab.dataset.w = 'wide';
+
+  document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((b) =>
+    b.addEventListener('click', () => {
+      lab.dataset.view = b.dataset.view!;
+      group('data-view', b.dataset.view!);
+    }),
+  );
+  document.querySelectorAll<HTMLButtonElement>('[data-w]').forEach((b) =>
+    b.addEventListener('click', () => {
+      lab.dataset.w = b.dataset.w!;
+      group('data-w', b.dataset.w!);
+    }),
+  );
+
+  /* ── THE MEASUREMENT ──────────────────────────────────────────────────────
+     ⚠ HALF OF THIS DECISION IS NOT A MATTER OF TASTE AND SHOULD NOT BE PUT TO
+     THE EYE. Plan 19 derived the ink ramp by measuring: dusk crosses 4.5:1 at
+     55% opacity and paper not until 65%, which is why its five steps are paired
+     by RATIO rather than by the opacity they share. `.f__k` sits at 48% and
+     `.f__h` at 42%, so the numbers below are the reason the `ramp` column
+     exists at all.
+
+     Computed live rather than quoted, because a quoted number goes stale the
+     first time a token moves, and because these are `color-mix(… transparent)`
+     values — the opacity is composited against whatever ground the card
+     happens to have, so the ratio is not something you can read off the
+     stylesheet. Same argument as measuring the header's x-coordinate in 16
+     rather than asserting it didn't move. */
+  /* ⚠ THE BROWSER DOES THE COLOUR CONVERSION, VIA A 1×1 CANVAS, AND THE FIRST
+     VERSION OF THIS DID NOT — which is why it is worth the six extra lines.
+     Every ink in this codebase is `color-mix(in oklch|oklab, …)`, so
+     `getComputedStyle().color` hands back `oklab(0.9 0.02 0.01 / 0.48)`, not
+     `rgb()`. Scraping numbers out of that string and feeding them to an sRGB
+     luminance formula reports every register at ~1.03:1 — a number that says
+     the text is invisible, on a page where you can plainly read it. It rendered
+     and looked confident and was nonsense.
+
+     Painting the ground and then the ink on top of it removes BOTH problems at
+     once: the browser converts whatever colour space to sRGB, and the alpha
+     composite happens in the pixel rather than in arithmetic I would have to
+     get right. What comes back is the colour the eye actually receives. */
+  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+  function paint(...layers: string[]): [number, number, number] {
+    ctx.clearRect(0, 0, 1, 1);
+    for (const c of layers) {
+      ctx.fillStyle = c;
+      ctx.fillRect(0, 0, 1, 1);
+    }
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+  }
+  /** sRGB → relative luminance (WCAG 2.x). */
+  const lum = ([r, g, b]: number[]) =>
+    [r, g, b]
+      .map((v) => v / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ratio = (fg: string, bg: string) => {
+    const [a, b] = [lum(paint(bg, fg)), lum(paint(bg))].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  };
+
+  /** The ground an element actually sits on — walk up past transparent parents. */
+  function ground(el: Element): string {
+    let node: Element | null = el;
+    while (node) {
+      const c = getComputedStyle(node).backgroundColor;
+      // Any non-zero alpha ends the walk. `rgba(0, 0, 0, 0)` is the only value
+      // a browser reports for "no background", in every colour space.
+      if (c && !/,\s*0\s*\)$/.test(c) && c !== 'transparent') return c;
+      node = node.parentElement;
+    }
+    return getComputedStyle(document.body).backgroundColor;
+  }
+
+  function measure() {
+    document.querySelectorAll<HTMLElement>('.fx').forEach((fx) => {
+      const out = fx.querySelector<HTMLElement>('[data-ratio]');
+      const label = fx.querySelector<HTMLElement>('.f__k');
+      const hint = fx.querySelector<HTMLElement>('.f__h');
+      if (!out || !label || !hint) return;
+      const bg = ground(fx);
+      const cell = (name: string, el: HTMLElement) => {
+        const r = ratio(getComputedStyle(el).color, bg);
+        // 4.5:1 is the Level AA floor for body-size text. Every label here is
+        // under 18.66px, so none of them qualifies for the 3:1 large-text
+        // exemption — which is itself part of the finding.
+        const ok = r >= 4.5;
+        return `<span class="${ok ? 'pass' : 'fail'}">${name} <b>${r.toFixed(2)}:1</b> ${ok ? '✓' : '✕'}</span>`;
+      };
+      out.innerHTML = cell('label', label) + cell('hint', hint);
+    });
+  }
+
+  // Both themes, because half of plan 19's finding was that paper is dusk
+  // inverted and the shared opacity ramp did not survive the trip. A register
+  // judged in one theme is judged in half the building — and the ratios below
+  // move when you flip, which is the single most useful thing on this page.
+  document.querySelector('[data-theme-flip]')?.addEventListener('click', () => {
+    const root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === 'paper' ? 'dusk' : 'paper';
+    measure();
+  });
+
+  measure();
+
+  // The segmented control is real markup, so make it behave — a dead control
+  // reads as disabled and would score `.pseg__b` unfairly against a plain input.
+  document.querySelectorAll<HTMLElement>('.pseg').forEach((seg) => {
+    seg.querySelectorAll<HTMLButtonElement>('.pseg__b').forEach((b) =>
+      b.addEventListener('click', () => {
+        seg.querySelectorAll('.pseg__b').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      }),
+    );
+  });
+</script>

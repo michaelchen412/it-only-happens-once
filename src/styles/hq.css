@@ -1332,26 +1332,65 @@ a.row__t:hover {
 .f {
   display: block;
 }
+/* ⚠ THE OBSERVATORY'S ONE FIELD LABEL. Decided 2026-08-12 at `/lab/fields`, by
+   looking rather than by argument — ADR 0033, plan 38 · §2. Every admin form,
+   both halves of the building.
+
+   THE VALUES ARE `.admin-label`'S AND THE CLASS NAME IS THIS ONE, and the split
+   is deliberate: Michael picked the workshop's register (11.2px, .08em) over
+   HQ's (10px, .06em) with both on screen, and `.f__k` has 25 uses to
+   `.admin-label`'s 12 — so the register that won is expressed in the class that
+   costs least to keep. `.admin-label` is being retired into this rule, not
+   beside it.
+
+   ⚠ THE INK IS 80% AND WAS 48%, AND THAT HALF WAS NOT A TASTE DECISION. Both
+   candidates FAILED WCAG AA as they shipped — measured live at the bench, over
+   each card's real ground: `.f__k` 3.99:1 in dusk and **2.82:1 in paper**,
+   `.admin-label` 4.28:1 and 2.97:1, against a 4.5:1 floor that applies here
+   because every one of these labels is under 18.66px and none qualifies for the
+   3:1 large-text exemption. At 80% this reads 9.14:1 and 7.30:1. Plan 19 is
+   where the thresholds come from — dusk crosses 4.5:1 at 55% opacity and paper
+   not until 65% — which is also why the number is one number: 19 pairs its
+   steps by the RATIO they hit rather than by the opacity they share, and 65% is
+   the floor that clears both themes. 80% buys the room to stay above `.f__h`.
+
+   THE ALTERNATIVE THAT LOST is the corpus sheets' 14px sentence-case span, and
+   it lost on the look, not on the numbers — it was the only shipped register
+   that PASSED (7.26:1 / 5.38:1). Judged side by side it read as a web form
+   rather than as an instrument. Worth knowing before anyone "restores" it. */
 .f__k {
   display: block;
   font-family: var(--font-sans);
-  font-size: 0.625rem;
-  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in oklch, var(--color-base-content) 48%, transparent);
-  margin-bottom: 0.25rem;
+  color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
+  margin-bottom: 0.3rem;
 }
 .f__k em {
   font-style: normal;
   color: color-mix(in oklch, var(--color-error) 80%, transparent);
   margin-left: 0.25rem;
 }
+/* The field hint, moved with its label (ADR 0033). 12px at 65%, was 10px at 42%
+   — the worst-scoring ink in the building at **2.43:1 in paper**, on the text
+   that exists to explain a control someone did not understand.
+
+   ⚠ 65% IS A FLOOR AND NOT A CHOICE, and it has a consequence worth stating
+   because it changes how this system expresses rank. Paper does not clear 4.5:1
+   until 65%, so nothing legible can sit below it — a hint therefore CANNOT be
+   quieter than its label by ink any more. The hierarchy is carried by size and
+   case instead (11.2px uppercase key over 12px sentence hint), which is what
+   `.f` was always doing anyway; the opacity gap was decoration that happened to
+   be doing the work illegibly. Found at the bench, by a live contrast readout,
+   after a first draft set this to 55% — the DUSK threshold — and still failed
+   paper at 3.42:1. */
 .f__h {
   display: block;
   margin-top: 0.25rem;
   font-family: var(--font-sans);
-  font-size: 0.625rem;
-  color: color-mix(in oklch, var(--color-base-content) 42%, transparent);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 65%, transparent);
 }
 .f input,
 .f select,
