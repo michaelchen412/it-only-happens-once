@@ -1,0 +1,77 @@
+---
+/*
+  VocabTable — the section shell around one of the Library's four vocabularies:
+  a heading with its count, and a bordered, horizontally-scrolling table with a
+  header row.
+
+  WRITTEN OUT FOUR TIMES BEFORE THIS (plan 38 · §4.3) — roughly 250 lines, and
+  the four differed only in their columns and their entity key.
+
+  ⚠ THE ROWS STAY IN THE PAGE, AND THAT IS THE SEAM RATHER THAN A SHORTFALL.
+  Astro has no per-row slot, so a component that also rendered the cells would
+  need a column DESCRIPTOR — a list of `{ header, width, render }` — and
+  `render` cannot be markup in a prop. That trade is the one ADR 0032 refused
+  when it rejected a `<Sheet>` with "a prop for every difference": you would be
+  writing a small template language to avoid writing four `<td>`s. The shell and
+  the action cluster are the parts that were genuinely identical, and those are
+  the parts that moved.
+
+  ⚠ THE HOOKS `library.spec.ts` PINS ARE PART OF THIS COMPONENT'S CONTRACT and
+  are listed so a future refactor knows what it may not rename:
+  `.lib-row[data-entity][data-id]`, `.lib-save`, `.lib-delete`, `[data-field]`
+  and `#lib-error`. The first is emitted by the caller's rows; the rest by
+  VocabActions and the page.
+*/
+interface Props {
+  /** "Subjects", "Feelings" — the plural, as a reader would say it. */
+  title: string;
+  /** How many rows, shown beside the title. */
+  count: number;
+  /**
+   * The header cells, in order. `w` is a Tailwind width for the columns that
+   * need pinning — the count and action columns, which otherwise expand and
+   * push the editable fields narrow.
+   */
+  columns: { label: string; w?: string; right?: boolean }[];
+}
+const { title, count, columns } = Astro.props;
+---
+
+<section class="mb-12">
+  <h2 class="font-display mb-3 text-lg">
+    {title}
+    <span class="text-base-content/40 text-sm">({count})</span>
+  </h2>
+  {
+    /* Whatever a vocabulary needs to say before its table. Only Feelings uses
+      it — a paragraph on keeping the list short, and the one create control on
+      this page — and it is a slot rather than a prop because that content is
+      markup with a live control in it, not a sentence. */
+  }
+  <slot name="lede" />
+  {
+    /* `overflow-x-auto` on the wrapper, not the page: plan 19 found this room is
+      the one that never got a phone, and a table that scrolls inside its own box
+      is what keeps the page itself from scrolling sideways at 320px. */
+  }
+  <div class="rounded-box border-base-300 overflow-x-auto border">
+    <table class="w-full font-sans text-sm">
+      <thead>
+        <tr
+          class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
+        >
+          {
+            columns.map((c) => (
+              <th scope="col" class:list={['px-3 py-2 font-normal', c.w, c.right && 'text-right']}>
+                {c.label}
+              </th>
+            ))
+          }
+        </tr>
+      </thead>
+      <tbody>
+        <slot />
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -42,6 +42,22 @@ const row = (page: import('@playwright/test').Page, entity: string, id: string) 
 const dialog = (page: import('@playwright/test').Page) => page.locator('#confirm-dialog');
 
 /**
+ * Merge `from` into the target NAMED `intoName`, through the picker.
+ *
+ * ⚠ THE CONTROL CHANGED SHAPE AND THIS IS WHERE THAT SHOWS (plan 38 · §1.2). It
+ * was a per-row `<select>` driven by `selectOption`, and it fired the merge on
+ * `change` — so arrow-keying it proposed to hard-delete the row you were
+ * standing on. It is a button opening a shared picker now, so a target is
+ * chosen BY NAME rather than by id: the dialog lists words, which is also what
+ * makes the confirm able to say which one it is about.
+ */
+async function pickMerge(page: import('@playwright/test').Page, entity: string, id: string, intoName: string) {
+  await page.locator(`.lib-row[data-entity="${entity}"][data-id="${id}"] [data-lib-merge]`).click();
+  await expect(page.locator('#merge-dialog')).toBeVisible();
+  await page.locator('#merge-list button', { hasText: intoName }).first().click();
+}
+
+/**
  * Any two works already in the Library, for the stubbed tests.
  *
  * Discovered, never created — the stubbed half of this file obeys the standing
@@ -62,22 +78,28 @@ test.describe('the Library — what the controls send', () => {
     const [from, into] = works!;
 
     const seen = await stubActions(page, {});
-    await row(page, 'work', from).locator('.lib-merge').selectOption(into);
+    const intoName = await row(page, 'work', into).locator('[data-field="title"]').inputValue();
+    await pickMerge(page, 'work', from, intoName);
 
-    // The dialog is the only thing standing between an arrow-key and a deleted
+    // The dialog is the only thing standing between a stray click and a deleted
     // row, so it must be up before anything is sent.
     await expect(dialog(page)).toBeVisible();
     await expect(page.locator('#confirm-ok')).toHaveText('Merge');
     expect(seen(), 'a merge was sent before the confirm was answered').toEqual([]);
 
+    // ⚠ AND IT NAMES BOTH SIDES, which the `<select>` version could not: the
+    // value came straight off the control and no name was ever in hand, so the
+    // one irreversible action on this page asked about "the target".
+    await expect(page.locator('#confirm-message')).toContainText(intoName);
+
     await page.locator('#confirm-cancel').click();
     await expect(dialog(page)).toBeHidden();
     expect(seen(), 'cancelling still sent something').toEqual([]);
 
-    // ⚠ AND THE SELECT GOES BACK TO ITS PROMPT. A cancelled merge that leaves
-    // the target selected is a control lying about its state: the next arrow
-    // key would re-fire `change` from a row that looks armed.
-    await expect(row(page, 'work', from).locator('.lib-merge')).toHaveValue('');
+    // ⚠ AND NOTHING IS LEFT ARMED. The old select kept the chosen target after a
+    // cancel, so the next arrow key re-fired `change` from a row that looked
+    // ready; the picker closes on choosing and holds no state between openings.
+    await expect(page.locator('#merge-dialog')).toBeHidden();
   });
 
   test('confirming sends works.merge with the two ids, and nothing else', async ({ page }) => {
@@ -94,7 +116,8 @@ test.describe('the Library — what the controls send', () => {
       },
     });
 
-    await row(page, 'work', from).locator('.lib-merge').selectOption(into);
+    const intoName = await row(page, 'work', into).locator('[data-field="title"]').inputValue();
+    await pickMerge(page, 'work', from, intoName);
     await page.locator('#confirm-ok').click();
 
     await expect.poll(() => seen()).toEqual(['works.merge']);
@@ -199,7 +222,7 @@ test.describe('the Library — a real merge keeps the shelf link', () => {
     await expect(row(page, 'work', from.id)).toBeVisible();
 
     await allowActions(page); // ⚠ from here, calls reach the live project
-    await row(page, 'work', from.id).locator('.lib-merge').selectOption(into.id);
+    await pickMerge(page, 'work', from.id, into.title);
     await page.locator('#confirm-ok').click();
 
     // The page reloads on success; the merged-from row is gone and the survivor

@@ -8,6 +8,9 @@
 */
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
+import VocabTable from '../../components/admin/VocabTable.astro';
+import VocabActions from '../../components/admin/VocabActions.astro';
+import MergeDialog from '../../components/admin/MergeDialog.astro';
 import { Icon } from 'astro-icon/components';
 
 const supabase = Astro.locals.supabase;
@@ -55,6 +58,16 @@ for (const row of shelved ?? []) {
   shelfCount[row.work_id] = (shelfCount[row.work_id] || 0) + 1;
   if (row.note?.trim()) shelfNotes[row.work_id] = (shelfNotes[row.work_id] || 0) + 1;
 }
+
+/* The merge picker's whole option set, built once. This is what replaces 11,309
+   per-row `<option>` elements (plan 38 · §1.2): four arrays instead of one list
+   per row, serialized into a single <script type="application/json">. */
+const mergeOptions = {
+  subject: (subjects ?? []).map((r) => ({ id: r.id, name: r.name })),
+  feeling: (feelings ?? []).map((r) => ({ id: r.id, name: r.name })),
+  author: (authors ?? []).map((r) => ({ id: r.id, name: r.name })),
+  work: (works ?? []).map((r) => ({ id: r.id, name: r.title })),
+};
 ---
 
 <AdminLayout title="Library" active="library">
@@ -86,70 +99,49 @@ for (const row of shelved ?? []) {
     <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
 
     {/* SUBJECTS */}
-    <section class="mb-12">
-      <h2 class="font-display mb-3 text-lg">
-        Subjects <span class="text-base-content/40 text-sm">({(subjects ?? []).length})</span>
-      </h2>
-      <div class="rounded-box border-base-300 overflow-x-auto border">
-        <table class="w-full font-sans text-sm">
-          <thead>
-            <tr
-              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
-            >
-              <th scope="col" class="px-3 py-2 font-normal">Name</th>
-              <th scope="col" class="px-3 py-2 font-normal">Definition</th>
-              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              (subjects ?? []).map((s) => (
-                <tr
-                  class="lib-row border-base-300 border-b align-top last:border-0"
-                  data-entity="subject"
-                  data-id={s.id}
-                  data-name={s.name}
-                  data-uses={subjCount[s.id] ?? 0}
-                >
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="name"
-                      value={s.name}
-                      aria-label="Subject name"
-                      class="input input-xs input-bordered w-36"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="definition"
-                      value={s.definition ?? ''}
-                      placeholder="one-line meaning…"
-                      class="input input-xs input-bordered w-full"
-                    />
-                  </td>
-                  <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
-                  <td class="px-3 py-2">
-                    <div class="flex items-center gap-2">
-                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                        <option value="">Merge into…</option>
-                        {(subjects ?? [])
-                          .filter((o) => o.id !== s.id)
-                          .map((o) => (
-                            <option value={o.id}>{o.name}</option>
-                          ))}
-                      </select>
-                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <VocabTable
+      title="Subjects"
+      count={(subjects ?? []).length}
+      columns={[
+        { label: 'Name' },
+        { label: 'Definition' },
+        { label: 'Used', w: 'w-14', right: true },
+        { label: 'Actions', w: 'w-64' },
+      ]}
+    >
+      {
+        (subjects ?? []).map((s) => (
+          <tr
+            class="lib-row border-base-300 border-b align-top last:border-0"
+            data-entity="subject"
+            data-id={s.id}
+            data-name={s.name}
+            data-uses={subjCount[s.id] ?? 0}
+          >
+            <td class="px-3 py-2">
+              <input
+                data-field="name"
+                value={s.name}
+                aria-label="Subject name"
+                class="input input-xs input-bordered w-36"
+              />
+            </td>
+            <td class="px-3 py-2">
+              <input
+                data-field="definition"
+                value={s.definition ?? ''}
+                placeholder="one-line meaning…"
+                class="input input-xs input-bordered w-full"
+              />
+            </td>
+            <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
+            <td class="px-3 py-2">
+              <VocabActions entity="subject" id={s.id} name={s.name} />
+            </td>
+          </tr>
+        ))
+      }
+    </VocabTable>
 
     {
       /* FEELINGS (plan 33 §1) — the fourth vocabulary, and the one whose rows
@@ -170,461 +162,181 @@ for (const row of shelved ?? []) {
         unique index can catch. Merge is the tool for that, and the only exit
         when a new word collides with a link a renamed feeling still owns. */
     }
-    <section class="mb-12">
-      <h2 class="font-display mb-3 text-lg">
-        Feelings <span class="text-base-content/40 text-sm">({(feelings ?? []).length})</span>
-      </h2>
-      <p class="text-base-content/50 mb-3 max-w-2xl font-sans text-sm">
-        The words a song is filed under, in the order the room reads them — dark to light. Keep it short: two words for
-        one shelf is how a vocabulary stops meaning anything.
-      </p>
+    <VocabTable
+      title="Feelings"
+      count={(feelings ?? []).length}
+      columns={[
+        { label: 'Word' },
+        { label: 'Order', w: 'w-20' },
+        { label: 'Link' },
+        { label: 'Songs', w: 'w-14', right: true },
+        { label: 'Actions', w: 'w-64' },
+      ]}
+    >
+      <Fragment slot="lede">
+        <p class="text-base-content/50 mb-3 max-w-2xl font-sans text-sm">
+          The words a song is filed under, in the order the room reads them — dark to light. Keep it short: two words
+          for one shelf is how a vocabulary stops meaning anything.
+        </p>
 
-      {
-        /* Adding one here rather than mid-listen, when it is a considered
+        {
+          /* Adding one here rather than mid-listen, when it is a considered
         addition rather than something a track just did to you. */
-      }
-      <div class="mb-3 flex items-center gap-2">
-        <input
-          id="feeling-new"
-          placeholder="a new word…"
-          aria-label="New feeling"
-          class="input input-xs input-bordered w-44"
-        />
-        <button id="feeling-add" class="btn btn-primary btn-xs normal-case">Add</button>
-      </div>
-
-      <div class="rounded-box border-base-300 overflow-x-auto border">
-        <table class="w-full font-sans text-sm">
-          <thead>
-            <tr
-              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
-            >
-              <th scope="col" class="px-3 py-2 font-normal">Word</th>
-              <th scope="col" class="w-20 px-3 py-2 font-normal">Order</th>
-              <th scope="col" class="px-3 py-2 font-normal">Link</th>
-              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Songs</th>
-              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              (feelings ?? []).map((f) => (
-                <tr
-                  class="lib-row border-base-300 border-b align-top last:border-0"
-                  data-entity="feeling"
-                  data-id={f.id}
-                  data-name={f.name}
-                  data-uses={feelingCount[f.id] ?? 0}
-                >
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="name"
-                      value={f.name}
-                      aria-label="Feeling"
-                      class="input input-xs input-bordered w-36"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="sort"
-                      type="number"
-                      value={f.sort}
-                      aria-label="Position in the spectrum"
-                      class="input input-xs input-bordered w-16"
-                    />
-                  </td>
-                  {/* Not editable, and shown so the freeze is visible rather than
+        }
+        <div class="mb-3 flex items-center gap-2">
+          <input
+            id="feeling-new"
+            placeholder="a new word…"
+            aria-label="New feeling"
+            class="input input-xs input-bordered w-44"
+          />
+          <button id="feeling-add" class="btn btn-primary btn-xs normal-case">Add</button>
+        </div>
+      </Fragment>
+      {
+        (feelings ?? []).map((f) => (
+          <tr
+            class="lib-row border-base-300 border-b align-top last:border-0"
+            data-entity="feeling"
+            data-id={f.id}
+            data-name={f.name}
+            data-uses={feelingCount[f.id] ?? 0}
+          >
+            <td class="px-3 py-2">
+              <input data-field="name" value={f.name} aria-label="Feeling" class="input input-xs input-bordered w-36" />
+            </td>
+            <td class="px-3 py-2">
+              <input
+                data-field="sort"
+                type="number"
+                value={f.sort}
+                aria-label="Position in the spectrum"
+                class="input input-xs input-bordered w-16"
+              />
+            </td>
+            {/* Not editable, and shown so the freeze is visible rather than
                       surprising. A word renamed away from its link is the one
                       state that can make a later addition fail. */}
-                  <td class="text-base-content/45 px-3 py-2 font-mono text-xs">{f.slug}</td>
-                  <td class="text-base-content/60 px-3 py-2 text-right">{feelingCount[f.id] ?? 0}</td>
-                  <td class="px-3 py-2">
-                    <div class="flex items-center gap-2">
-                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                        <option value="">Merge into…</option>
-                        {(feelings ?? [])
-                          .filter((o) => o.id !== f.id)
-                          .map((o) => (
-                            <option value={o.id}>{o.name}</option>
-                          ))}
-                      </select>
-                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
+            <td class="text-base-content/45 px-3 py-2 font-mono text-xs">{f.slug}</td>
+            <td class="text-base-content/60 px-3 py-2 text-right">{feelingCount[f.id] ?? 0}</td>
+            <td class="px-3 py-2">
+              <VocabActions entity="feeling" id={f.id} name={f.name} />
+            </td>
+          </tr>
+        ))
+      }
+    </VocabTable>
 
     {/* AUTHORS */}
-    <section class="mb-12">
-      <h2 class="font-display mb-3 text-lg">
-        Authors <span class="text-base-content/40 text-sm">({(authors ?? []).length})</span>
-      </h2>
-      <div class="rounded-box border-base-300 overflow-x-auto border">
-        <table class="w-full font-sans text-sm">
-          <thead>
-            <tr
-              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
-            >
-              <th scope="col" class="px-3 py-2 font-normal">Name</th>
-              <th scope="col" class="px-3 py-2 font-normal">Note</th>
-              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              (authors ?? []).map((a) => (
-                <tr
-                  class="lib-row border-base-300 border-b align-top last:border-0"
-                  data-entity="author"
-                  data-id={a.id}
-                  data-name={a.name}
-                  data-uses={authorCount[a.id] ?? 0}
-                  data-own-note={a.note?.trim() ? '1' : ''}
-                >
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="name"
-                      value={a.name}
-                      aria-label="Author name"
-                      class="input input-xs input-bordered w-44"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="note"
-                      value={a.note ?? ''}
-                      placeholder="dates, a line…"
-                      class="input input-xs input-bordered w-full"
-                    />
-                  </td>
-                  <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
-                  <td class="px-3 py-2">
-                    <div class="flex items-center gap-2">
-                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                        <option value="">Merge into…</option>
-                        {(authors ?? [])
-                          .filter((o) => o.id !== a.id)
-                          .map((o) => (
-                            <option value={o.id}>{o.name}</option>
-                          ))}
-                      </select>
-                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <VocabTable
+      title="Authors"
+      count={(authors ?? []).length}
+      columns={[
+        { label: 'Name' },
+        { label: 'Note' },
+        { label: 'Used', w: 'w-14', right: true },
+        { label: 'Actions', w: 'w-64' },
+      ]}
+    >
+      {
+        (authors ?? []).map((a) => (
+          <tr
+            class="lib-row border-base-300 border-b align-top last:border-0"
+            data-entity="author"
+            data-id={a.id}
+            data-name={a.name}
+            data-uses={authorCount[a.id] ?? 0}
+            data-own-note={a.note?.trim() ? '1' : ''}
+          >
+            <td class="px-3 py-2">
+              <input
+                data-field="name"
+                value={a.name}
+                aria-label="Author name"
+                class="input input-xs input-bordered w-44"
+              />
+            </td>
+            <td class="px-3 py-2">
+              <input
+                data-field="note"
+                value={a.note ?? ''}
+                placeholder="dates, a line…"
+                class="input input-xs input-bordered w-full"
+              />
+            </td>
+            <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
+            <td class="px-3 py-2">
+              <VocabActions entity="author" id={a.id} name={a.name} />
+            </td>
+          </tr>
+        ))
+      }
+    </VocabTable>
 
     {/* WORKS */}
-    <section class="mb-12">
-      <h2 class="font-display mb-3 text-lg">
-        Works <span class="text-base-content/40 text-sm">({(works ?? []).length})</span>
-      </h2>
-      <div class="rounded-box border-base-300 overflow-x-auto border">
-        <table class="w-full font-sans text-sm">
-          <thead>
-            <tr
-              class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
-            >
-              <th scope="col" class="px-3 py-2 font-normal">Title</th>
-              <th scope="col" class="px-3 py-2 font-normal">Author</th>
-              <th scope="col" class="w-16 px-3 py-2 font-normal">Year</th>
-              <th scope="col" class="w-14 px-3 py-2 text-right font-normal">Used</th>
-              <th scope="col" class="w-64 px-3 py-2 font-normal">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              (works ?? []).map((w) => (
-                <tr
-                  class="lib-row border-base-300 border-b align-top last:border-0"
-                  data-entity="work"
-                  data-id={w.id}
-                  data-name={w.title}
-                  data-uses={workCount[w.id] ?? 0}
-                  data-shelves={shelfCount[w.id] ?? 0}
-                  data-shelf-notes={shelfNotes[w.id] ?? 0}
-                >
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="title"
-                      value={w.title}
-                      aria-label="Work title"
-                      class="input input-xs input-bordered w-44"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
-                      <option value="">— none —</option>
-                      {(authors ?? []).map((a) => (
-                        <option value={a.id} selected={a.id === w.author_id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td class="px-3 py-2">
-                    <input
-                      data-field="year"
-                      type="number"
-                      value={w.year ?? ''}
-                      aria-label="Year"
-                      class="input input-xs input-bordered w-16"
-                    />
-                  </td>
-                  <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
-                  <td class="px-3 py-2">
-                    <input data-field="kind" type="hidden" value={w.kind ?? ''} />
-                    <div class="flex items-center gap-2">
-                      <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
-                      <select class="lib-merge select select-xs select-bordered max-w-[8rem]" aria-label="Merge into">
-                        <option value="">Merge into…</option>
-                        {(works ?? [])
-                          .filter((o) => o.id !== w.id)
-                          .map((o) => (
-                            <option value={o.id}>{o.title}</option>
-                          ))}
-                      </select>
-                      <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <VocabTable
+      title="Works"
+      count={(works ?? []).length}
+      columns={[
+        { label: 'Title' },
+        { label: 'Author' },
+        { label: 'Year', w: 'w-16' },
+        { label: 'Used', w: 'w-14', right: true },
+        { label: 'Actions', w: 'w-64' },
+      ]}
+    >
+      {
+        (works ?? []).map((w) => (
+          <tr
+            class="lib-row border-base-300 border-b align-top last:border-0"
+            data-entity="work"
+            data-id={w.id}
+            data-name={w.title}
+            data-uses={workCount[w.id] ?? 0}
+            data-shelves={shelfCount[w.id] ?? 0}
+            data-shelf-notes={shelfNotes[w.id] ?? 0}
+          >
+            <td class="px-3 py-2">
+              <input
+                data-field="title"
+                value={w.title}
+                aria-label="Work title"
+                class="input input-xs input-bordered w-44"
+              />
+            </td>
+            <td class="px-3 py-2">
+              <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
+                <option value="">— none —</option>
+                {(authors ?? []).map((a) => (
+                  <option value={a.id} selected={a.id === w.author_id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td class="px-3 py-2">
+              <input
+                data-field="year"
+                type="number"
+                value={w.year ?? ''}
+                aria-label="Year"
+                class="input input-xs input-bordered w-16"
+              />
+            </td>
+            <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
+            <td class="px-3 py-2">
+              <input data-field="kind" type="hidden" value={w.kind ?? ''} />
+              <VocabActions entity="work" id={w.id} name={w.title} />
+            </td>
+          </tr>
+        ))
+      }
+    </VocabTable>
   </div>
 
+  <MergeDialog options={mergeOptions} />
+
   <script>
-    import { actions } from 'astro:actions';
-    import { confirmDialog } from '../../scripts/confirm-dialog';
-    import { callAction, formatActionError, submitAction } from '../../scripts/action-error';
-    import { deleteWarning } from '../../lib/library-delete';
-
-    const A: Record<string, any> = {
-      subject: actions.subjects,
-      author: actions.authors,
-      work: actions.works,
-      feeling: actions.feelings,
-    };
-
-    const err = document.getElementById('lib-error') as HTMLParagraphElement;
-    const showErr = (m: string) => {
-      err.textContent = m;
-      err.hidden = false;
-      err.scrollIntoView({ block: 'nearest' });
-    };
-
-    /* ⚠ THIS PAGE PUTS ~100 LIVE `<input>`s ON SCREEN AT ONCE and every write
-       below ends in `location.reload()`. Until 2026-08-12 that meant: correct
-       three subject definitions, press Save on the first, and the other two were
-       gone — nothing asked, nothing said. [ADR
-       0032](../../../docs/adr/0032-a-sheet-is-dismissible-and-says-what-that-costs.md)
-       closed exactly this class across nine dialogs (*"one stray click silently
-       destroys everything typed into the sheet"*) and never reached the in-page
-       edit surfaces; this room holds more editable state at once than any sheet
-       in the building.
-
-       ONE DELEGATED LISTENER, NOT `dirtyTracker` PER ROW. That helper answers
-       "is this root dirty" with a boolean, and the question here is "WHICH of a
-       hundred rows are dirty" — a Map of a hundred trackers to answer what one
-       listener and an attribute answer. `data-dirty` is also readable from the
-       elements panel, which matters in the one room that has no other state.
-
-       ⚠ `[data-field]` ONLY, AND THAT IS NOT A DETAIL. The other control in a
-       row is the merge `<select>`, which fires `change` on arrow-key — the same
-       fault §1.2 is about — and it is not an edit to anything Save submits. Mark
-       on it and tabbing past three rows would report three rows of "unsaved
-       edits" that do not exist, which teaches you to click through the guard.
-       The set that can be dirty is exactly the set `.lib-save` puts in the
-       FormData below: `[data-field]`. */
-    const markDirty = (e: Event) => {
-      const el = (e.target as Element)?.closest?.('[data-field]');
-      el?.closest('.lib-row')?.setAttribute('data-dirty', '');
-    };
-    document.addEventListener('input', markDirty);
-    document.addEventListener('change', markDirty);
-
-    /* ⚠ THE GUARD ASKS AFTER THE WRITE, NOT BEFORE IT, AND THAT ORDER IS THE
-       WHOLE DESIGN. Asking first can only ever inform you — whichever row you
-       then save still reloads the page and still discards the rest, so a
-       warn-before is a dialog that makes you choose which two edits to lose.
-       Asking after means the save has already landed and refusing only DEFERS
-       the refresh: save one, keep editing, save the next, keep editing, and the
-       last one (nothing else dirty) refreshes for you. All three survive.
-
-       ⚠ THE RELOAD ITSELF IS NOT THE BUG AND MUST NOT BE "FIXED". A rename
-       changes the row, every "Merge into…" menu and the listening bench's chip
-       order at once — see the note on `createFeeling` below, which argues it at
-       length and is right. What was missing was the guard, not the refresh.
-
-       THE ALTERNATIVE THAT LOST IS SAVE-ALL — one Save writing every dirty row.
-       It is friendlier and it is probably where this ends up, but it changes
-       what a per-row button on a hundred-row page MEANS, and `library.spec.ts`
-       pins the current meaning (fill one field, press that row's Save, expect
-       that row's write). Warn is one predicate and closes the data loss today;
-       save-all is a shape decision and Michael's to take. */
-    async function reloadUnless(mine: HTMLElement) {
-      const others = [...document.querySelectorAll<HTMLElement>('.lib-row[data-dirty]')].filter((r) => r !== mine);
-      if (others.length) {
-        const ok = await confirmDialog({
-          title: 'Saved',
-          message:
-            others.length === 1
-              ? 'One other row has edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save that row too.'
-              : `${others.length} other rows have edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save those rows too.`,
-          confirmLabel: 'Refresh anyway',
-          danger: true,
-        });
-        if (!ok) return;
-      }
-      location.reload();
-    }
-
-    document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
-      const entity = row.dataset.entity!;
-      const id = row.dataset.id!;
-      const api = A[entity];
-
-      /* ⚠ `submitAction`, NOT A BARE AWAIT — and the reason this file went four
-         years' worth of audits without it is written into
-         `src/tests/action-guard.test.ts:21-24`, which names its own blind spots.
-         The first is "an action awaited through an alias", and `A[entity]` above
-         is precisely that: the tripwire matches the literal TEXT of a direct
-         `actions.x.y()` await, so `await api.update(fd)` is invisible to it and
-         `verify` stayed green.
-
-         ⚠ AND DO NOT SPELL THAT PATTERN OUT IN PROSE HERE. This comment quoted
-         it verbatim on the first draft and `action-guard.test.ts` went red on
-         its own explanation — its line filter only skips a line that BEGINS
-         with a comment marker, and the wrapped body of a block comment does
-         not. `src/tests/` is excluded from the walk for exactly this reason;
-         nothing else is.
-
-         What was actually happening: `astro:actions` THROWS on a dead network
-         rather than returning `{ error }`, so the rejection skipped the
-         re-enable one line down and this row's Save stayed disabled for the life
-         of the page with nothing on screen. Same class
-         [25](docs/plans/archive/25-the-save-survives.md) closed everywhere else,
-         and `callAction` was already imported into this file — used by
-         `createFeeling` forty lines below, under a comment explaining exactly
-         this. The paste reached the new handler and not the three old ones.
-
-         ⚠ DO NOT DELETE THESE AS REDUNDANT. `action-guard.test.ts` will stay
-         green if you do; it cannot see this file. */
-      row.querySelector('.lib-save')?.addEventListener('click', async (e) => {
-        const btn = e.currentTarget as HTMLButtonElement;
-        const fd = new FormData();
-        fd.set('id', id);
-        row
-          .querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]')
-          .forEach((el) => fd.set(el.dataset.field!, el.value));
-        const res = await submitAction(() => api.update(fd), { button: btn, onError: showErr });
-        if (res.ok) await reloadUnless(row);
-      });
-
-      row.querySelector('.lib-delete')?.addEventListener('click', async () => {
-        const ok = await confirmDialog({
-          title: 'Delete',
-          // The counts are rendered onto the row above; this reads them back
-          // rather than re-querying, so the number in the dialog is exactly the
-          // number in the "Used" column beside the button you pressed.
-          message: deleteWarning({
-            entity: row.dataset.entity as 'subject' | 'author' | 'work' | 'feeling',
-            name: row.dataset.name,
-            uses: Number(row.dataset.uses ?? 0),
-            shelves: Number(row.dataset.shelves ?? 0),
-            shelfNotes: Number(row.dataset.shelfNotes ?? 0),
-            ownNote: !!row.dataset.ownNote,
-          }),
-          confirmLabel: 'Delete',
-          danger: true,
-        });
-        if (!ok) return;
-        const fd = new FormData();
-        fd.set('id', id);
-        // `submitAction` for the same reason as Save above — the alias hides
-        // this await from the tripwire, and a delete that silently does nothing
-        // after you have answered a destructive confirm is the worst of the
-        // three to leave unguarded.
-        const res = await submitAction(() => api.remove(fd), {
-          button: row.querySelector<HTMLButtonElement>('.lib-delete'),
-          onError: showErr,
-        });
-        if (res.ok) await reloadUnless(row);
-      });
-
-      const merge = row.querySelector<HTMLSelectElement>('.lib-merge');
-      merge?.addEventListener('change', async () => {
-        const into = merge.value;
-        if (!into) return;
-        const ok = await confirmDialog({
-          title: 'Merge',
-          message: 'Move everything onto the target and delete this one? This can’t be undone.',
-          confirmLabel: 'Merge',
-          danger: true,
-        });
-        if (!ok) {
-          merge.value = '';
-          return;
-        }
-        const fd = new FormData();
-        fd.set('from', id);
-        fd.set('into', into);
-        // No `button` to disable — the control here is a `<select>`, which is
-        // half of why plan 38 · §1.2 wants it replaced. `submitAction` still
-        // owns the throw and the sentence, which is what this call is for.
-        const res = await submitAction(() => api.merge(fd), { onError: showErr });
-        if (res.ok) await reloadUnless(row);
-      });
-    });
-
-    // ⚠ THE ONLY VOCABULARY ON THIS PAGE WITH A CREATE CONTROL, and the reason
-    // is that it is the only one nothing else creates. A subject, author or work
-    // comes into existence as a side effect of saving a fragment that names it;
-    // a feeling is never implied by anything, so without this row the vocabulary
-    // could only ever grow from the listening bench.
-    //
-    // It reloads on success rather than appending a row, because a new word
-    // changes three things at once — the table, every "Merge into…" menu, and
-    // the bench's chip order — and re-rendering all of that by hand is how two
-    // of them end up disagreeing.
-    const newFeeling = document.getElementById('feeling-new') as HTMLInputElement | null;
-    const addFeeling = document.getElementById('feeling-add') as HTMLButtonElement | null;
-    const createFeeling = async () => {
-      const name = newFeeling?.value.trim();
-      if (!newFeeling || !addFeeling || !name) return;
-      const fd = new FormData();
-      fd.set('name', name);
-      addFeeling.disabled = true;
-      // `callAction`, not a bare await: `astro:actions` THROWS on a dead
-      // network rather than returning `{ error }`, and the rejection would skip
-      // the line below — leaving the button disabled with nothing said, on the
-      // one control on this page that has no row to fall back to.
-      const { error } = await callAction(actions.feelings.create(fd));
-      addFeeling.disabled = false;
-      if (error) showErr(formatActionError(error));
-      else location.reload();
-    };
-    addFeeling?.addEventListener('click', () => void createFeeling());
-    newFeeling?.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      void createFeeling();
-    });
+    import '../../scripts/library';
   </script>
 </AdminLayout>

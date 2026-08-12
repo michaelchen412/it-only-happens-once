@@ -1,0 +1,77 @@
+---
+/*
+  MergeDialog — one picker for the whole Library: "merge THIS row into which?"
+
+  ⚠ IT EXISTS TO KILL AN O(n²) DOM, AND THAT IS MEASURABLE RATHER THAN
+  AESTHETIC. Every row used to carry a `<select>` listing every OTHER row of its
+  vocabulary — plan 19 counted **11,309 `<option>` elements, 86% of this page's
+  DOM**. One dialog reading one JSON payload per vocabulary is linear: the same
+  list serves a hundred rows, and the payload ships once.
+
+  ⚠ AND IT IS WHAT MAKES THE CONFIRM ABLE TO NAME THE TARGET. The old flow
+  proposed "Move everything onto the target and delete this one?" without ever
+  saying WHICH target, on an action that hard-deletes the loser. A picker knows
+  both names, so the confirm can use them.
+
+  Three plans wanted this control replaced — [16 · Piece 2] deferred its search
+  endpoint, [19 · §1b] measured the DOM, and [38 · §1.2] found the arrow-key
+  fault. It waited for `VocabTable` so it could be built once rather than four
+  times, which is 38's own load-bearing sequencing note.
+
+  ⚠ NO SEARCH ENDPOINT, DELIBERATELY. 16 · Piece 2 deferred one and this does not
+  revive it: the four vocabularies are a few hundred rows between them, they are
+  already on the page for the table itself, and filtering in the browser has no
+  round trip to wait for. An endpoint earns itself when the list outgrows the
+  page, not before.
+*/
+import { jsonForScript } from '../../lib/serialize';
+
+interface Props {
+  /** `entity → [{ id, name }]`, every candidate target for that vocabulary. */
+  options: Record<string, { id: string; name: string }[]>;
+}
+const { options } = Astro.props;
+---
+
+{
+  /* `is:inline` because this is DATA, not code. Without it Astro hands the tag
+    to its script pipeline, which is for modules it bundles — this one is read
+    with `JSON.parse(el.textContent)` and must reach the browser verbatim. */
+}
+<script type="application/json" id="merge-options" is:inline set:html={jsonForScript(options)} />
+
+<dialog id="merge-dialog" class="modal-dialog w-full max-w-md" aria-labelledby="merge-title">
+  <div class="flex max-h-[80vh] flex-col">
+    <header class="border-base-300 flex items-center justify-between border-b px-6 py-4">
+      <h2 id="merge-title" class="font-display truncate text-xl">Merge</h2>
+      <button
+        type="button"
+        data-merge-close
+        class="text-base-content/50 hover:text-base-content shrink-0"
+        aria-label="Close"
+      >
+        ✕
+      </button>
+    </header>
+
+    <div class="px-6 pt-4">
+      <p id="merge-lede" class="admin-hint mb-3"></p>
+      {
+        /* `.search--w` and not `.search`: the roster's fixed 9rem would strand
+          this field at a third of the dialog. Same pair LinkSheet uses. */
+      }
+      <label class="search search--w">
+        <span class="text-base-content/40" aria-hidden="true">⌕</span>
+        <input type="search" id="merge-q" placeholder="Search…" autocomplete="off" aria-label="Search for a target" />
+      </label>
+    </div>
+
+    {
+      /* The list is a `<ul>` of buttons rather than a `<select>` — the whole
+        point of the change. A button cannot be triggered by an arrow key, so
+        moving through the list proposes nothing and destroys nothing. */
+    }
+    <ul id="merge-list" class="min-h-0 flex-1 overflow-y-auto px-6 py-3 font-sans text-sm"></ul>
+    <p id="merge-empty" hidden class="admin-hint px-6 pb-4">Nothing else to merge into.</p>
+  </div>
+</dialog>

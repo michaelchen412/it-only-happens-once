@@ -1,0 +1,55 @@
+---
+/*
+  VocabActions — the Save / Merge… / Delete cluster on a Library row.
+
+  WRITTEN FOUR TIMES BEFORE THIS (plan 38 · §4.3), once per vocabulary, and that
+  is why §1.2's fix waited for §4.3: replacing the merge control in four places
+  means building the replacement four times, which is what plans 16 and 19 have
+  already half-done once between them.
+
+  ⚠ THE MERGE CONTROL WAS A `<select>` AND IS NOW A BUTTON, AND THAT IS A
+  BEHAVIOUR FIX RATHER THAN A TIDY-UP. The old one hung the merge on the
+  select's `change` event: tab to "Merge into…" and press ↓ and the browser
+  changes the value and fires `change`, so a confirm opened proposing to merge
+  the row you were standing on into the first alphabetical entity. Merge
+  reassigns every link and HARD-DELETES the loser — the dialog's own words are
+  "This can't be undone." The decline path reset the value so it recovered, but
+  a `<select>` is a value control and this is an action. A button cannot be
+  triggered by an arrow key.
+
+  ⚠ AND IT TAKES 11,309 `<option>` ELEMENTS OUT OF THE PAGE. Every row rendered
+  every OTHER row as an option — O(n²), and 86% of this page's DOM by plan 19's
+  count. The picker reads one JSON payload per vocabulary instead, so the cost
+  is linear and the same list serves every row.
+
+  The rejected alternative is "just add a confirm", which is what it already had:
+  the confirm was never the missing piece, the arrow key was.
+*/
+interface Props {
+  /** Which vocabulary — the key the page's action map is dialled by. */
+  entity: 'subject' | 'feeling' | 'author' | 'work';
+  /** This row's id, so the picker can exclude it from its own target list. */
+  id: string;
+  /** This row's name, so the confirm can say what is being merged AWAY. */
+  name: string;
+}
+const { entity, id, name } = Astro.props;
+---
+
+<div class="flex items-center gap-2">
+  <button class="lib-save btn btn-primary btn-xs normal-case">Save</button>
+  {
+    /* `data-lib-merge` rather than the old `.lib-merge` class, deliberately: the
+      class named a `<select>` that no longer exists, and a stale selector that
+      still matches something is worse than one that matches nothing. */
+  }
+  <button
+    type="button"
+    data-lib-merge
+    data-entity={entity}
+    data-id={id}
+    data-name={name}
+    class="btn btn-ghost btn-xs normal-case">Merge…</button
+  >
+  <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
+</div>
