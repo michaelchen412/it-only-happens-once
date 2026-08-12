@@ -1159,6 +1159,25 @@ a.row__t:hover {
   font-size: 0.8125rem;
   width: 9rem;
 }
+/* ⚠ THE LINE ABOVE DROPS THE OUTLINE AND THIS ONE PUTS SOMETHING BACK. Without
+   it, tabbing into the roster search (`people.astro`) or LinkSheet's corpus
+   search moved focus somewhere invisible — WCAG 2.4.7, Level A, and the one
+   genuine omission among the five `outline: none` rules in this file. The other
+   four each swap in a border-colour change already: `.f input` (below), `.ta`,
+   `.times input`, and `.logbox textarea` via `:focus-within` on its wrapper.
+
+   ⚠ AND IT IS `:focus-within` ON THE WRAPPER, NOT A `:focus-visible` RING ON THE
+   INPUT — deliberately, and the ring is the alternative that lost. The border
+   lives on `.search`, not on the field inside it, so a ring on the input would
+   draw a second box inside the first. More to the point: four controls in this
+   file already answer focus by moving their border to `--color-primary`, and a
+   fifth answering differently is how the next reader learns the wrong
+   convention. Plan 19 counted 45 tab stops and reported zero missing rings —
+   it never entered this room, which is why matching what is beside it matters
+   more than picking the ring in the abstract. */
+.search:focus-within {
+  border-color: var(--color-primary);
+}
 /* The roster's search sits in a header row and wants its own intrinsic width;
    a search inside a sheet wants the sheet's. The fixed 9rem above would
    otherwise leave the field stranded at a third of the drawer. */
