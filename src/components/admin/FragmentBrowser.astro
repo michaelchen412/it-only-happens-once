@@ -1,116 +1,183 @@
 ---
 /*
-  FragmentBrowser — the composer's "Add" surface: a large <dialog> drawer
-  holding a mini Fragment Manager (the same table/filters as /admin/fragments, served by
-  the fragments-panel partial in mode=pick). Browse the whole corpus, place
-  with the per-row ＋ or checkbox-select many and place them together. Rows
-  already in this constellation render dimmed and unselectable (visible truth,
-  never re-addable). Clicking a row opens its real editor in a sheet on top —
-  quote/song → FragmentSheet, writing → WritingSheet — and the header's own
-  Add ▾ creates new fragments that auto-place via body[data-place-in].
+  FragmentBrowser — the workshop's browse-and-choose drawer: a large <dialog>
+  holding a mini Fragment Manager (the same table/filters as /admin/fragments,
+  served by the fragments-panel partial). TWO ROOMS USE IT, and the second one
+  is why this file stopped being about constellations:
+
+   · mode="pick"  — the composer's Add surface. Browse the whole corpus, place
+     with the per-row ＋ or checkbox-select many and place them together
+     (`constellations.place`). Rows already in this constellation render dimmed
+     and unselectable. Clicking a row opens its real editor in a sheet on top;
+     the header's Add ▾ creates fragments that auto-place.
+   · mode="pair"  — the song sheet's pairing picker (plan 39). ONE writing, one
+     foreign key (`songs.pair`). No cart, no Add ▾, and no editors at all.
+
+  ⚠ `pick` IS THE BIGGER MODE, NOT THE DEFAULT ONE. Everything `pair` lacks it
+  lacks for a stated reason, not by not-yet-being-built — see each region below.
+  The instinct while reading this file will be to make the two symmetrical;
+  don't. Placing is curation (you must read what you curate, hence the editors),
+  pairing is one decision you have already made by the time you open the drawer.
+
+  ⚠ AND EVERYTHING INSIDE IS CLASS-SCOPED. The dialog itself carries the only
+  id, because /admin/fragments now mounts BOTH a manage-mode panel and this
+  drawer, and two `#fb-panel`s on one page is one `#fb-panel` and a silent bug.
+  The panel this wraps was written class-scoped from the start for exactly this
+  reason (FragmentListPanel.astro) — the shell simply never followed until now.
+  `id` stays a prop so BackToTop can name one instance's scroller.
 
   Nothing here navigates. A sheet that saves on top of this drawer, and this
-  drawer closing after a placement, both announce `fragments:changed` — the
-  composer refreshes its suite in place and this drawer refreshes its own rows,
-  so composing survives a save with its scroll position, its view mode and its
-  unsaved form edits intact. The #browse hash is kept for a genuine hard
-  refresh; it is no longer what makes a save land back inside the browser,
-  because the browser no longer closes for one.
+  drawer closing after a placement, both announce `fragments:changed` — the host
+  refreshes in place and this drawer refreshes its own rows, so composing
+  survives a save with its scroll position, its view mode and its unsaved form
+  edits intact. The #browse hash is kept for a genuine hard refresh (pick only).
 */
 import { Icon } from 'astro-icon/components';
 import TypeMark from './TypeMark.astro';
 import BackToTop from '../BackToTop.astro';
 
 interface Props {
-  constellation: string;
+  /** Which room this instance serves. See the header. */
+  mode?: 'pick' | 'pair';
+  /** The dialog's own id — the ONE id in here, so two can coexist on a page. */
+  id?: string;
+  /** pick only: the target constellation. */
+  constellation?: string;
   /** Shown on rows the moment they're placed, so the column stays truthful. */
-  constellationName: string;
+  constellationName?: string;
   /** The "what is this for" reminder while you pick (docs/admin.md §2). */
   constellationDescription?: string | null;
   /** Colour slot, so a chip added live matches the server-rendered ones. */
   constellationColor?: string | null;
 }
-const { constellation, constellationName, constellationDescription, constellationColor } = Astro.props;
+const {
+  mode = 'pick',
+  id = mode === 'pair' ? 'pair-browser' : 'fbrowser',
+  constellation,
+  constellationName = '',
+  constellationDescription,
+  constellationColor,
+} = Astro.props;
+const pick = mode === 'pick';
 ---
 
 <dialog
-  id="fbrowser"
-  class="drawer-dialog w-full max-w-5xl"
+  id={id}
+  class="fbrowser drawer-dialog w-full max-w-5xl"
+  data-mode={mode}
   data-constellation={constellation}
-  data-constellation-name={constellationName}
+  data-constellation-name={constellationName || undefined}
   data-constellation-color={constellationColor}
-  aria-labelledby="fb-title"
+  aria-labelledby={`${id}-title`}
 >
   <div class="flex h-full flex-col">
     <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">
-        <h2 id="fb-title" class="font-display truncate text-xl">
-          Add to <span id="fb-cname" class="text-primary">{constellationName}</span>
-        </h2>
+        {
+          pick ? (
+            <h2 id={`${id}-title`} class="font-display truncate text-xl">
+              Add to <span class="fb-cname text-primary">{constellationName}</span>
+            </h2>
+          ) : (
+            /* ⚠ THE SONG IS NAMED IN THE HEADING, and it is filled at open time
+              rather than rendered: one drawer serves every song the sheet
+              opens. "Pair … with a piece" rather than "Add to" because the
+              verb is the whole difference between the two modes, and a picker
+              that says the wrong verb is how you end up believing you placed
+              something in a suite. */
+            <h2 id={`${id}-title`} class="font-display truncate text-xl">
+              Pair <span class="fb-cname text-primary" /> with a piece
+            </h2>
+          )
+        }
         {
           /* Rendered even when empty, so a description added in the form behind
-          this drawer has somewhere to land without a reload (sky:changed). */
+          this drawer has somewhere to land without a reload (sky:changed). In
+          pair mode it is a fixed line rather than a constellation's words. */
         }
         <p
-          id="fb-cdesc"
-          class="admin-hint line-clamp-1"
-          title={constellationDescription}
-          hidden={!constellationDescription}
+          class="fb-cdesc admin-hint line-clamp-1"
+          title={pick ? constellationDescription : undefined}
+          hidden={pick && !constellationDescription}
         >
-          {constellationDescription}
+          {pick ? constellationDescription : 'One piece at a time. Anything already holding another song will say so.'}
         </p>
       </div>
-      <p id="fb-error" hidden role="alert" class="admin-alert px-2 py-1 text-xs"></p>
-      <div class="relative ml-auto">
-        <button
-          id="fb-add-btn"
-          class="btn btn-primary btn-sm gap-1 font-sans"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
-        </button>
-        <div
-          id="fb-add-menu"
-          hidden
-          role="menu"
-          aria-label="Add a fragment"
-          class="rounded-box border-base-300 bg-base-100 absolute right-0 z-30 mt-1 w-40 overflow-hidden border py-1 shadow-lg"
-        >
-          <button
-            data-new-writing
-            role="menuitem"
-            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-            ><TypeMark type="writing" /> Writing</button
-          >
-          <button
-            data-new="quote"
-            role="menuitem"
-            class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-            ><TypeMark type="quote" /> Quote</button
-          >
-          {
-            /* NO SONG, and its absence is the decision rather than an omission
-              (ADR 0031). This menu makes a fragment *to place in this suite*,
-              and a song is never a suite stanza — it accompanies a
-              constellation through `score_url` or through an essay's
-              `paired_song_id`, both relations rather than membership. Offering
-              a create here would make something the picker below cannot show
-              and `constellations.place` refuses. Songs enter at
-              /admin/listening, in the same motion as the listening. */
-          }
-        </div>
-      </div>
-      <button type="button" data-fb-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
-        >✕</button
+      {
+        /* ⚠ THE MARKUP IS NOT `SheetError`'S BUT THE SEAM IS (plan 38 · §3).
+          That component hard-codes `mx-6 mt-4`, which is the inset for an error
+          line at the top of a form panel; this one sits INSIDE the header row
+          between the title and the ✕, so it needs no margin and a smaller type
+          size, and `class` on that component appends rather than replaces.
+
+          What §3 actually asked for is the half that matters and is honoured
+          here: `data-sheet-error`, so `sheetError(root)` finds it BY ROLE and
+          this drawer does not mint a twenty-first invented id. The class stays
+          only as the thing Tailwind hangs the header layout on. */
+      }
+      <p class="fb-error admin-alert px-2 py-1 text-xs" data-sheet-error hidden role="alert"></p>
+      {
+        /* ⚠ NO Add ▾ IN PAIR MODE, and its replacement is the footer bar below.
+          This menu makes a fragment *to place in this suite*; the pair picker's
+          equivalent question — "the piece I mean does not exist yet" — is
+          answered by typing its name in the search field, which is where you
+          already are. A menu would ask you to name it twice. */
+      }
+      {
+        pick && (
+          <div class="relative ml-auto">
+            <button
+              class="fb-add-btn btn btn-primary btn-sm gap-1 font-sans"
+              aria-haspopup="menu"
+              aria-expanded="false"
+            >
+              <Icon name="ph:plus" /> Add <span aria-hidden="true">▾</span>
+            </button>
+            <div
+              class="fb-add-menu rounded-box border-base-300 bg-base-100 absolute right-0 z-30 mt-1 w-40 overflow-hidden border py-1 shadow-lg"
+              hidden
+              role="menu"
+              aria-label="Add a fragment"
+            >
+              <button
+                data-new-writing
+                role="menuitem"
+                class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+              >
+                <TypeMark type="writing" /> Writing
+              </button>
+              <button
+                data-new="quote"
+                role="menuitem"
+                class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+              >
+                <TypeMark type="quote" /> Quote
+              </button>
+              {/* NO SONG, and its absence is the decision rather than an omission
+                  (ADR 0031). This menu makes a fragment *to place in this suite*,
+                  and a song is never a suite stanza — it accompanies a
+                  constellation through `score_url` or through an essay's
+                  `paired_song_id`, both relations rather than membership. Offering
+                  a create here would make something the picker below cannot show
+                  and `constellations.place` refuses. Songs enter at
+                  /admin/listening, in the same motion as the listening. */}
+            </div>
+          </div>
+        )
+      }
+      <button
+        type="button"
+        data-fb-close
+        class:list={['text-base-content/50 hover:text-base-content', !pick && 'ml-auto']}
+        aria-label="Close">✕</button
       >
     </header>
 
-    <div id="fb-panel" class="grow overflow-y-auto overscroll-contain px-6 py-4">
+    <div class="fb-panel grow overflow-y-auto overscroll-contain px-6 py-4">
       <p class="text-base-content/50 font-sans text-sm">Loading fragments…</p>
     </div>
 
-    <BackToTop scroller="#fb-panel" inDialog class="bottom-20" />
+    <BackToTop scroller={`#${id} .fb-panel`} inDialog class="bottom-20" />
 
     {
       /* The cart bar — it appears once anything is in the cart, and STAYS while
@@ -118,20 +185,70 @@ const { constellation, constellationName, constellationDescription, constellatio
         that: the "· n shown here" half of the count, which explains a number
         you can't finish counting on screen, and Clear — with a persisting cart,
         "change the filter" is no longer the way to empty it, so there has to be
-        one. */
+        one.
+
+        ⚠ PICK ONLY. `paired_song_id` is one key on one row; there is no "pair
+        all four of these" to express, so the pair drawer has no cart to show
+        and its footer holds a different verb entirely. */
     }
-    <footer
-      id="fb-bulkbar"
-      hidden
-      class="border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
-    >
-      <span id="fb-bulkcount" class="text-base-content/70 whitespace-nowrap">0 selected</span>
-      <button id="fb-place-selected" class="btn btn-primary btn-xs normal-case">Place in constellation</button>
-      <button id="fb-clear-selected" class="btn btn-ghost btn-xs ml-auto normal-case">Clear</button>
-    </footer>
+    {
+      pick && (
+        <footer
+          class="fb-bulkbar border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
+          hidden
+        >
+          <span class="fb-bulkcount text-base-content/70 whitespace-nowrap">0 selected</span>
+          <button class="fb-place-selected btn btn-primary btn-xs normal-case">Place in constellation</button>
+          <button class="fb-clear-selected btn btn-ghost btn-xs ml-auto normal-case">Clear</button>
+        </footer>
+      )
+    }
+
+    {
+      /* ⚠ THE PIECE THAT DOES NOT EXIST YET (plan 39 · rulings 6 and 7), and it
+        sits in the footer for two reasons rather than one.
+
+        The reason it is not a row inside the table: the table is a SHARED
+        SERVER PARTIAL that knows nothing about this mode, and it is replaced
+        wholesale on every filter change — a create row rendered into it would
+        have to be re-injected after each swap, and would carry a stale search
+        term for the frame in between.
+
+        The reason the footer is right anyway: EntityCombo settled the ordering
+        question already — ＋ Add «what you typed» goes AFTER the matches, never
+        above them, because putting "make a new one" first offers a duplicate
+        before the real thing. A bar below the list is that ordering, and it is
+        the same corner of the drawer where pick keeps its own verb.
+
+        It types nothing twice: the search term IS the title. */
+    }
+    {
+      !pick && (
+        <footer
+          class="fb-createbar border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
+          hidden
+        >
+          <button class="fb-create btn btn-primary btn-xs gap-1 normal-case">
+            <Icon name="ph:plus" /> Write about “<span class="fb-create-term" />”
+          </button>
+          <span class="admin-hint">Starts a draft with that title and pairs this song to it.</span>
+        </footer>
+      )
+    }
   </div>
 </dialog>
 
+{
+  /* ⚠ THIS SCRIPT WIRES THE COMPOSER'S DRAWER ONLY, and it self-guards rather
+    than being rendered conditionally — an Astro `<script>` inside a `{}`
+    expression is inert HTML, not a hoisted module, so a conditional import
+    would silently ship a dead drawer. `fragment-browser.ts` looks for a
+    pick-mode root and returns if there isn't one.
+
+    The pair drawer is wired by song-sheet.ts instead, because it has to be told
+    WHICH song it is open on and that changes every time the sheet loads one.
+    A self-wiring module has no way to be told. */
+}
 <script>
   import '../../scripts/fragment-browser';
 </script>

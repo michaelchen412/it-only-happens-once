@@ -5,7 +5,10 @@
 
    · /admin/fragments' in-place refresh (mode=manage, filters as query params);
    · the composer's browser sheet (mode=pick&constellation=<id>), which also
-     marks already-placed rows so they render dimmed and unselectable.
+     marks already-placed rows so they render dimmed and unselectable;
+   · the song sheet's pairing picker (mode=pair&song=<id>), plan 39 · §2 — the
+     same idea one notch narrower: writing only, single-select, and rows already
+     paired to that song render the same dimmed way placed ones do.
 
   Auth: middleware gates every /admin path, so this partial is admin-only too.
   Styling comes from the host page's global stylesheet; behavior from the host's
@@ -16,7 +19,8 @@ import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
 
 export const partial = true;
 
-const mode = Astro.url.searchParams.get('mode') === 'pick' ? 'pick' : 'manage';
+const modeParam = Astro.url.searchParams.get('mode');
+const mode = modeParam === 'pick' || modeParam === 'pair' ? modeParam : 'manage';
 const params = parseListParams(Astro.url.searchParams);
 if (mode === 'pick') {
   params.view = 'list'; // trash never reaches the picker
@@ -24,8 +28,15 @@ if (mode === 'pick') {
   // as a score or through an essay's pairing, both relations rather than
   // membership. The picker must not offer what `constellations.place` refuses.
   params.placeable = true;
+  params.pairedSong = null; // paired-marking is a pair-mode concern
+} else if (mode === 'pair') {
+  params.view = 'list'; // ditto — nor does trash reach this one
+  // `songs.pair` filters its update to `type = 'writing'`, so writing is the
+  // whole of what may be offered here (plan 39 · §2).
+  params.pairable = true;
 } else {
   params.constellation = null; // placed-marking is a pick-mode concern
+  params.pairedSong = null;
 }
 const data = await queryFragmentList(Astro.locals.supabase, params);
 ---

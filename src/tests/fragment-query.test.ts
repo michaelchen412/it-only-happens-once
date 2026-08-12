@@ -13,8 +13,9 @@
 // cannot be tested here at all: it needs the real anon key against live
 // PostgREST (done by hand 2026-07-30; see docs/plans/09 Piece 2).
 import { describe, it, expect } from 'vitest';
-import { parseListParams } from '../lib/fragment-query';
+import { parseListParams, queryFragmentList } from '../lib/fragment-query';
 import { FRAGMENT_TYPES } from '../lib/fragments-display';
+import { fakeDb, type FakeDb } from './stubs/supabase';
 
 const view = (qs: string) => parseListParams(new URLSearchParams(qs)).view;
 
@@ -61,6 +62,110 @@ describe('parseListParams — filters', () => {
   it('accepts each of the three kinds, and nothing else', () => {
     for (const t of FRAGMENT_TYPES) expect(parseListParams(new URLSearchParams(`type=${t}`)).type).toBe(t);
     expect(parseListParams(new URLSearchParams('type=note')).type).toBeNull();
+  });
+});
+
+describe('parseListParams — the two picker scopes', () => {
+  // ⚠ NEITHER IS A URL PARAM, AND THAT IS THE PROPERTY UNDER TEST (plan 39 · §2).
+  // `placeable` and `pairable` are properties of the ROOM — a song cannot go in
+  // a suite, a quote cannot be paired — and `fragments-panel.astro` sets them.
+  // If either ever became readable from the query string, a crafted URL would
+  // widen or narrow a picker in a way its own page never intended, and the
+  // failure would be silent: a picker offering rows the action then refuses.
+  it('never lets the URL set either scope', () => {
+    for (const qs of ['placeable=1', 'pairable=1', 'placeable=true&pairable=true', 'mode=pair', 'mode=pick']) {
+      const p = parseListParams(new URLSearchParams(qs));
+      expect(p.placeable).toBe(false);
+      expect(p.pairable).toBe(false);
+    }
+  });
+
+  it('reads the song to mark pairings against, and defaults it to null', () => {
+    expect(parseListParams(new URLSearchParams('')).pairedSong).toBeNull();
+    expect(parseListParams(new URLSearchParams('song=  ')).pairedSong).toBeNull();
+    expect(parseListParams(new URLSearchParams('song=abc-123')).pairedSong).toBe('abc-123');
+  });
+});
+
+describe('queryFragmentList — what each picker is allowed to offer', () => {
+  const params = (over: Partial<ReturnType<typeof parseListParams>> = {}) => ({
+    ...parseListParams(new URLSearchParams('')),
+    ...over,
+  });
+  /** The type predicates applied to the MAIN row query, in order. */
+  const typeOps = (db: FakeDb) =>
+    db
+      .ops('fragments')
+      .filter((o) => o.method === 'eq' || o.method === 'neq')
+      .filter((o) => o.args[0] === 'type')
+      .map((o) => `${o.method}:${o.args[1]}`);
+
+  it('offers writing ONLY when pairing — a quote is something songs.pair refuses', async () => {
+    const db = fakeDb({}, { record: true });
+    await queryFragmentList(db.client, params({ pairable: true }));
+    expect(typeOps(db)).toContain('eq:writing');
+    expect(typeOps(db)).not.toContain('neq:song');
+  });
+
+  it('still only excludes songs when placing — a quote IS a suite stanza', async () => {
+    const db = fakeDb({}, { record: true });
+    await queryFragmentList(db.client, params({ placeable: true }));
+    expect(typeOps(db)).toContain('neq:song');
+    expect(typeOps(db)).not.toContain('eq:writing');
+  });
+
+  it('constrains neither in the manager', async () => {
+    const db = fakeDb({}, { record: true });
+    await queryFragmentList(db.client, params());
+    expect(typeOps(db)).toEqual([]);
+  });
+
+  it('narrows to writing even if both scopes are somehow set', async () => {
+    // Belt and braces on a state the partial cannot produce today. The failure
+    // it guards is the widening one: pairable losing to placeable would put
+    // quotes in the pair picker.
+    const db = fakeDb({}, { record: true });
+    await queryFragmentList(db.client, params({ placeable: true, pairable: true }));
+    expect(typeOps(db)).toContain('eq:writing');
+    expect(typeOps(db)).not.toContain('neq:song');
+  });
+});
+
+describe('queryFragmentList — marking what is already paired', () => {
+  const rows = [
+    { id: 'w1', type: 'writing', status: 'draft', paired_song_id: 'song-a' },
+    { id: 'w2', type: 'writing', status: 'draft', paired_song_id: 'song-b' },
+    { id: 'w3', type: 'writing', status: 'published', paired_song_id: null },
+  ];
+  const params = (over: Record<string, unknown> = {}) => ({
+    ...parseListParams(new URLSearchParams('')),
+    ...over,
+  });
+
+  it('derives pairedIds from the rows it already has, with no extra query', async () => {
+    // ⚠ THE ASYMMETRY WITH `placedIds` IS THE DATA MODEL, not an optimisation:
+    // membership is a link table you must go and read, `paired_song_id` is a
+    // column on the row. If this ever starts querying, the picker got slower
+    // for nothing.
+    const db = fakeDb({ fragments: { data: rows } }, { record: true });
+    const data = await queryFragmentList(db.client, params({ pairable: true, pairedSong: 'song-a' }));
+    expect([...data.pairedIds]).toEqual(['w1']);
+    expect(db.ops('fragments').some((o) => o.method === 'eq' && o.args[0] === 'paired_song_id')).toBe(false);
+  });
+
+  it('names the OTHER song a pick would steal from, and not the target itself', async () => {
+    const db = fakeDb({ fragments: { data: rows } }, { record: true });
+    await queryFragmentList(db.client, params({ pairable: true, pairedSong: 'song-a' }));
+    // Only song-b is looked up: w1 is ours (pairedIds says so) and w3 is free.
+    const lookup = db.ops('fragments').find((o) => o.method === 'in');
+    expect(lookup?.args).toEqual(['id', ['song-b']]);
+  });
+
+  it('asks nothing about other songs outside pair mode', async () => {
+    const db = fakeDb({ fragments: { data: rows } }, { record: true });
+    const data = await queryFragmentList(db.client, params());
+    expect(data.songTitleById).toEqual({});
+    expect(data.pairedIds.size).toBe(0);
   });
 });
 

@@ -14,6 +14,21 @@
   constellation render dimmed with a disabled checkbox — visible, never
   re-addable; everything else gets a per-row ＋ place button (data-act).
 
+  mode="pair" (the song sheet's picker, plan 39): the same dimming for rows
+  already paired to THIS song, and no checkbox column at all — `paired_song_id`
+  is one key on one row, so there is nothing to multi-select. Two ⚠ deviations
+  from pick, both deliberate:
+
+   · THE TITLE PAIRS INSTEAD OF OPENING (ruling 5). `.row-open` is still the
+     control; what the host does with it is the host's business, and the pair
+     picker's host pairs. The composer opens editors because placing is
+     curation and you must read what you curate — pairing is not curation, you
+     already know what the piece is.
+   · THE MEMBERSHIP CELL STOPS BEING A BUTTON, for the same reason: pressing it
+     opens this fragment's editor, and /admin/listening does not mount one. It
+     renders as a plain label so the column still says where the piece lives and
+     the four columns beside it stay in line.
+
   The CONSTELLATIONS CELL is a control, not a label: it opens this fragment's
   editor already on its Constellations tab (`data-act="constellations"` →
   src/scripts/open-editor.ts). See the cell itself for why it's one button
@@ -21,8 +36,14 @@
 
   When a search term is active, the title/attribution highlight matches and a
   `writing` fragment shows an excerpt line per match window (search-highlight.ts).
+
+  `data-status` is on the row for the pair picker, which repaints the song
+  sheet's paired list from the row it just picked rather than refetching the
+  song. Reading the status chip's rendered text was the alternative, and it is
+  one relabelling away from breaking.
 */
 import type { Database } from '../../lib/database.types';
+import type { PanelMode } from '../../lib/fragment-query';
 import { shortDate, rowTitle } from '../../lib/fragments-display';
 import { excerpts, toPlain } from '../../lib/search-highlight';
 import Highlighted from './Highlighted.astro';
@@ -38,8 +59,17 @@ interface Props {
   authorName?: string;
   workName?: string;
   view?: 'list' | 'trash';
-  mode?: 'manage' | 'pick';
+  mode?: PanelMode;
   placed?: boolean;
+  /** pair mode: already paired to the song the picker is open on. */
+  paired?: boolean;
+  /**
+   * pair mode: the title of the song this piece is paired to, when it is a
+   * DIFFERENT one. Empty otherwise — including for the target song itself,
+   * which `paired` already covers. It rides on the row so the confirm can name
+   * what a pick is about to take without a second round trip (ruling 2).
+   */
+  pairedToOther?: string;
   searchTerm?: string;
 }
 const {
@@ -51,6 +81,8 @@ const {
   view = 'list',
   mode = 'manage',
   placed = false,
+  paired = false,
+  pairedToOther = '',
   searchTerm = '',
 } = Astro.props;
 // The combo prefill needs ids (to select the existing entity), not just names.
@@ -58,6 +90,11 @@ const authorId = r.author_id ?? '';
 const workId = r.work_id ?? '';
 const trash = mode === 'manage' && view === 'trash';
 const pick = mode === 'pick';
+const pair = mode === 'pair';
+// "Already in the target" — placed for a constellation, paired for a song. One
+// name because every use below is the same question, and writing both conditions
+// at each of the five sites is how the two modes drift apart.
+const taken = pick ? placed : pair && paired;
 const term = searchTerm.trim();
 
 // Excerpt the essay body (writing only — for quotes the body IS the shown title).
@@ -134,26 +171,33 @@ const editorData =
 <tr
   class:list={[
     'fragment-row border-base-300 border-b last:border-0',
-    !trash && !placed && 'hover:bg-base-200/40',
-    pick && placed && 'opacity-45',
+    !trash && !taken && 'hover:bg-base-200/40',
+    taken && 'opacity-45',
   ]}
   data-id={r.id}
   data-type={r.type}
+  data-status={r.status}
   data-writing={r.type === 'writing' ? r.id : undefined}
   data-song={r.type === 'song' ? r.id : undefined}
   data-fragment={editorData || undefined}
   data-placed={placed ? '' : undefined}
+  data-paired={paired ? '' : undefined}
+  data-paired-to={pairedToOther || undefined}
   data-constellations={constellations.map((c) => c.id).join(',')}
 >
-  <td class="w-8 px-3 py-2.5 align-top" data-noedit>
-    <input
-      type="checkbox"
-      class="row-check checkbox checkbox-xs"
-      value={r.id}
-      disabled={pick && placed}
-      aria-label={`Select ${primaryText}`}
-    />
-  </td>
+  {
+    !pair && (
+      <td class="w-8 px-3 py-2.5 align-top" data-noedit>
+        <input
+          type="checkbox"
+          class="row-check checkbox checkbox-xs"
+          value={r.id}
+          disabled={pick && placed}
+          aria-label={`Select ${primaryText}`}
+        />
+      </td>
+    )
+  }
   <td class="w-6 pt-2.5 text-center align-top">
     <TypeMark type={r.type} />
   </td>
@@ -250,6 +294,30 @@ const editorData =
         it out of line with the rows above and below. */
       (r.type === 'song' ? (
         <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit />
+      ) : pair ? (
+        /* ⚠ THE SAME CHIPS, NOT A CONTROL (plan 39 · ruling 5). This cell's
+          whole job elsewhere is to open the fragment's editor on its
+          Constellations tab — and the pair picker has ruled that it opens no
+          editors, because /admin/listening does not mount the writing sheet and
+          a control that silently does nothing is worse than one that isn't
+          there. The column still earns its width: where a piece already lives
+          is exactly the context you want while deciding what to pair to it. */
+        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
+          <span class="cn-cell cn-cell--static" title={cnTitle}>
+            <span class="cn-cell__chips">
+              {constellations.length === 0 ? (
+                <span class="admin-chip admin-chip--none">none</span>
+              ) : (
+                constellations.map((c) => (
+                  <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
+                    <StarMark class="mr-1" />
+                    {c.name}
+                  </span>
+                ))
+              )}
+            </span>
+          </span>
+        </td>
       ) : (
         <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
           <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
@@ -300,6 +368,32 @@ const editorData =
             title="Place in this constellation"
           >
             ＋
+          </button>
+        )}
+      </td>
+    )
+  }
+  {
+    pair && (
+      <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
+        {paired ? (
+          <span class="text-primary/70 font-sans text-[0.65rem] tracking-wide uppercase">
+            <StarMark /> paired
+          </span>
+        ) : (
+          /* ⚠ THE BUTTON SAYS WHAT IT WILL COST, and this is the one row where
+            ＋ alone would be a lie: pairing a piece that already holds another
+            song REPLACES that song. The word is on the control and the whole
+            sentence is in the confirm behind it (ruling 2), so the steal is
+            legible before the press and impossible without a second one. */
+          <button
+            type="button"
+            class:list={['btn btn-ghost btn-xs font-sans normal-case', pairedToOther && 'text-warning']}
+            data-act="pair"
+            data-id={r.id}
+            title={pairedToOther ? `Replace ${pairedToOther} with this song` : 'Pair this song to it'}
+          >
+            {pairedToOther ? 'Replace' : '＋'}
           </button>
         )}
       </td>

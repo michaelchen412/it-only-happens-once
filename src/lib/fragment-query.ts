@@ -58,6 +58,23 @@ export interface FragmentListParams {
    * pins `view` to 'list' there.
    */
   placeable: boolean;
+  /**
+   * Only fragments that may be PAIRED to a song — the song sheet's own picker
+   * (plan 39 · §2). Narrower than `placeable`, which still admits a quote:
+   * `songs.pair` writes `paired_song_id` on a row it filters to
+   * `type = 'writing'`, so a quote here would be an offer the action declines.
+   *
+   * ⚠ NOT A URL PARAM, for the same reason `placeable` isn't, and the reason is
+   * worth keeping in both places: a quote is not something you have filtered out
+   * of this picker, it is something that cannot be paired at all.
+   */
+  pairable: boolean;
+  /**
+   * pair mode: mark rows already paired to THIS song. The sibling of
+   * `constellation` above, and it needs no query of its own — `paired_song_id`
+   * is a column on the row, so the marking is a read of what we already have.
+   */
+  pairedSong: string | null;
   filtered: boolean;
 }
 
@@ -88,6 +105,8 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     constellation: (sp.get('constellation') || '').trim() || null,
     membership,
     placeable: false, // the picker turns it on; see the field's comment
+    pairable: false, // ditto — fragments-panel.astro sets both, never the URL
+    pairedSong: (sp.get('song') || '').trim() || null,
 
     filtered:
       !!typeParam || subjectSlugs.length > 0 || q.length >= MIN_SEARCH || !!authorSlug || !!workSlug || !!membership,
@@ -111,6 +130,16 @@ export interface ConstellationRefLite {
    */
   description?: string | null;
 }
+
+/**
+ * Which room is rendering the panel — `manage` is /admin/fragments, `pick` is
+ * the composer's browser, `pair` is the song sheet's picker (plan 39).
+ *
+ * ⚠ ONE DECLARATION, IMPORTED TWICE, rather than the same union hand-written in
+ * `FragmentListPanel` and `FragmentRow` — which is what it was, and adding a
+ * third value to two copies is exactly the drift plans/29 · §3 named.
+ */
+export type PanelMode = 'manage' | 'pick' | 'pair';
 
 export interface FragmentListData {
   rows: FragmentRowT[];
@@ -137,6 +166,14 @@ export interface FragmentListData {
   trashCount: number;
   /** fragment ids already placed in params.constellation (empty set otherwise) */
   placedIds: Set<string>;
+  /** fragment ids already paired to params.pairedSong (empty set otherwise) */
+  pairedIds: Set<string>;
+  /**
+   * Titles of the songs OTHER listed rows are paired to, for the sentence a
+   * collision has to say out loud (plan 39 · ruling 2). Only populated in pair
+   * mode — nothing else has a use for it, and it costs a query.
+   */
+  songTitleById: Record<string, string>;
 }
 
 export async function queryFragmentList(supabase: DB, p: FragmentListParams): Promise<FragmentListData> {
@@ -232,9 +269,16 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // rather than in the list query is what keeps the badge above each column
   // honest — filter the rows in one place and the counts in another, and the
   // picker ends up offering a segment that leads to nothing.
+  //
+  // ⚠ AND PAIRING NARROWS IT FURTHER, in the same place and for the same reason
+  // (plan 39 · §2). `songs.pair` writes `paired_song_id` on a row it filters to
+  // `type = 'writing'`, so a quote in that picker is an offer the action
+  // declines — one step worse than the song case above, because a quote looks
+  // like a perfectly reasonable thing to pair music to until you press it.
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
     const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
     const working = live.neq('status', 'note') as T;
+    if (p.pairable) return working.eq('type', 'writing') as T;
     return (p.placeable ? working.neq('type', 'song') : working) as T;
   };
 
@@ -327,6 +371,29 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     for (const l of links ?? []) placedIds.add(l.fragment_id);
   }
 
+  // pair mode: which of these are already paired to the target song, and what
+  // the REST are paired to.
+  //
+  // ⚠ NO QUERY FOR THE FIRST HALF, unlike `placedIds` one line up, and the
+  // asymmetry is the data model rather than an optimisation: membership is a
+  // link table you have to go and read, whereas `paired_song_id` is a column on
+  // the row we already selected with `*`.
+  const pairedIds = new Set<string>();
+  const songTitleById: Record<string, string> = {};
+  if (p.pairedSong) for (const r of rows) if (r.paired_song_id === p.pairedSong) pairedIds.add(r.id);
+  if (p.pairable) {
+    // The second half DOES cost a query, and only this mode pays it. These are
+    // the essays a pick would STEAL from, and ruling 2 says the steal has to
+    // name what it is taking.
+    const others = [
+      ...new Set(rows.map((r) => r.paired_song_id).filter((id): id is string => !!id && id !== p.pairedSong)),
+    ];
+    if (others.length) {
+      const { data: songs } = await supabase.from('fragments').select('id, title').in('id', others);
+      for (const s of songs ?? []) songTitleById[s.id] = s.title || '(untitled)';
+    }
+  }
+
   return {
     rows,
     truncated: rows.length >= LIST_CEILING,
@@ -342,5 +409,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     totalCount: (typeRows ?? []).length,
     trashCount: trashCount ?? 0,
     placedIds,
+    pairedIds,
+    songTitleById,
   };
 }

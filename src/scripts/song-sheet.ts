@@ -26,6 +26,7 @@ import { wireSheetTabs } from './sheet-tabs';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { wirePairBrowser, type PairedPiece } from './pair-browser';
 import { sheetError } from './sheet-error';
 
 /** Everything the sheet needs to open on one song. */
@@ -40,8 +41,15 @@ export interface SongSheetSeed {
   feelingIds: string[];
   publicNote: string;
   privateNote: string;
-  /** Essay titles this song is paired to. Read-only here; see the component. */
-  paired: string[];
+  /**
+   * The pieces this song is paired to — EDITABLE here since plan 39.
+   *
+   * ⚠ A LIST, NOT A VALUE, and the asymmetry is the data model: a writing has
+   * at most one song (`paired_song_id` is a single column) while a song may be
+   * paired to many writings. The writing sheet's Music tab shows one; this
+   * shows all of them.
+   */
+  paired: PairedPiece[];
   embed: { src: string; height: number; allow: string };
   /**
    * What a lookup returned, and the only thing a CREATE needs.
@@ -139,8 +147,10 @@ function wire(sheet: HTMLDialogElement) {
   const artistEl = el<HTMLInputElement>('sng-artist');
   const albumEl = el<HTMLInputElement>('sng-album');
   const yearEl = el<HTMLInputElement>('sng-year');
-  const pairedWrap = el('sng-paired-wrap');
-  const pairedEl = el('sng-paired');
+  const pairedEl = el<HTMLUListElement>('sng-paired');
+  const pairedNoneEl = el('sng-paired-none');
+  const pairAddBtn = el<HTMLButtonElement>('sng-pair-add');
+  const pairQueuedEl = el('sng-pair-queued');
   const newWordEl = el<HTMLInputElement>('sng-newword');
   const addWordBtn = el<HTMLButtonElement>('sng-addword');
   const wordNoteEl = el('sng-wordnote');
@@ -206,6 +216,91 @@ function wire(sheet: HTMLDialogElement) {
     errorEl.hidden = true;
     errorEl.textContent = '';
   };
+
+  // --- the pairing (plan 39) -----------------------------------------------
+  //
+  // ⚠ IT WRITES IMMEDIATELY AND IS NOT PART OF `Save`, which is a deliberate
+  // exception to this sheet's own "one Save for the whole sheet" rule — the
+  // same exception, and the same reasoning, as Shared by beside it. `songs.pair`
+  // is a RELATION with its own action and no compare-and-set; folding it into
+  // Save would make pairing able to lose a rewrite, and would mean the fast
+  // loop's one press now commits a foreign key on somebody else's row.
+  //
+  // ⚠ AND SAVE DESTROYS THE IFRAME. A pairing that only landed on Save would
+  // stop the music every time you recorded a thought about it, which is the
+  // defect this whole feature was opened against.
+  let pairs: PairedPiece[] = [];
+
+  const pairBrowser = wirePairBrowser(document.getElementById('pair-browser') as HTMLDialogElement, {
+    onPaired(piece, queued) {
+      if (!pairs.some((p) => p.id === piece.id)) pairs.push(piece);
+      paintPairs(queued ? pairBrowser.queued().length : 0);
+    },
+  });
+
+  /** Render the list. `queued` > 0 says n picks are waiting on the first Save. */
+  function paintPairs(queued = pairBrowser.queued().length) {
+    pairedEl.replaceChildren(
+      ...pairs.map((p) => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2';
+        li.dataset.pair = p.id;
+        const name = document.createElement('span');
+        name.className = 'font-serif';
+        name.textContent = p.title;
+        const chip = document.createElement('span');
+        chip.className = `admin-chip admin-chip--${p.status}`;
+        chip.textContent = p.status;
+        const un = document.createElement('button');
+        un.type = 'button';
+        un.className = 'btn btn-ghost btn-xs text-error ml-auto normal-case';
+        un.textContent = 'Unpair';
+        // ⚠ NAMED, NOT ✕. This removes a relation, not a chip — and the row it
+        // is removing from is an essay you are not looking at. A glyph on a
+        // fast, unaimed click is how you silently unpair the wrong piece;
+        // FragmentRow makes the same call about its membership cell.
+        un.setAttribute('aria-label', `Unpair ${p.title}`);
+        un.addEventListener('click', () => void unpair(p));
+        li.append(name, chip, un);
+        return li;
+      }),
+    );
+    pairedNoneEl.hidden = pairs.length > 0;
+    pairQueuedEl.hidden = queued === 0;
+    pairQueuedEl.textContent = queued
+      ? `${queued} waiting — ${queued === 1 ? 'it lands' : 'they land'} when you save the song.`
+      : '';
+  }
+
+  async function unpair(piece: PairedPiece) {
+    clearError();
+    // `song_id` absent is the clear path — the same action, and the reason
+    // `pair` takes an optional id rather than having a sibling.
+    if (cur.id) {
+      const { error } = await callAction(actions.songs.pair({ fragment_id: piece.id }));
+      if (error) return showError(formatActionError(error));
+    }
+    pairs = pairs.filter((p) => p.id !== piece.id);
+    // ⚠ AND THE PICKER HAS TO BE TOLD. On an UNSAVED song there is no write to
+    // undo — the pick is sitting in the picker's queue waiting for the first
+    // Save — so removing it from this list alone made the row disappear and
+    // then come back, because `flush` still had it. Found by walking the path
+    // rather than by any check: everything about it is green.
+    pairBrowser.drop(piece.id);
+    paintPairs();
+  }
+
+  pairAddBtn.addEventListener('click', () => {
+    clearError();
+    pairBrowser.open({
+      songId: cur.id,
+      // The heading names the song, and it comes from the FIELD rather than
+      // from `cur` — you may have just corrected the title, and the picker
+      // should say what is on screen.
+      songName: songTitleEl.value.trim() || cur.title,
+      paired: pairs,
+    });
+  });
 
   // --- the words -----------------------------------------------------------
   const chips = () => [...wordsEl.querySelectorAll<HTMLButtonElement>('.sng-word')];
@@ -283,8 +378,13 @@ function wire(sheet: HTMLDialogElement) {
     priv.editor.commands.setContent(seed.privateNote || '', { emitUpdate: false });
     paintBadges();
 
-    pairedWrap.hidden = seed.paired.length === 0;
-    pairedEl.textContent = seed.paired.join(' · ');
+    // ⚠ RESET BEFORE PAINTING. The picker holds queued picks against the song
+    // it was opened on; loading a different one into the same sheet must not
+    // carry them across, or the next Save writes this song's pairings onto that
+    // one. `load` runs on every open, which is exactly the boundary.
+    pairs = [...seed.paired];
+    pairBrowser.reset();
+    paintPairs();
 
     deleteZone.hidden = !seed.id;
     sharedBy?.setFragment(seed.id, seed.id ? (sharedByMap[seed.id] ?? []) : []);
@@ -446,6 +546,15 @@ function wire(sheet: HTMLDialogElement) {
       // Ticks made before the row existed are QUEUED by SharedByField; this is
       // the moment they can land.
       await sharedBy?.flush(data.id);
+      // ⚠ AND SO ARE PAIRINGS (plan 39 · ruling 3). Same moment, same reason:
+      // `songs.pair` needs a `song_id` and there wasn't one when you picked.
+      // A failure here does NOT stop the save — the song is real, its feelings
+      // and notes still have to land, and the queue keeps whatever didn't so a
+      // second Save retries it.
+      if (!(await pairBrowser.flush(data.id))) {
+        showError('The song is saved, but a pairing didn’t land. Try Save again.');
+      }
+      paintPairs();
     } else if (metaChanged()) {
       // 2 · the metadata, only when it moved — see `base` above.
       const fd = new FormData();

@@ -1015,7 +1015,12 @@ export const songs = {
         // anyone but Michael, which is correct and also indistinguishable from
         // "there is no note". Asking directly makes the difference legible.
         sb.from('fragment_private_notes').select('notes').eq('fragment_id', id).maybeSingle(),
-        sb.from('fragments').select('title').eq('paired_song_id', id).is('deleted_at', null),
+        // ⚠ ids AND status, not just titles (plan 39 · §3). The Facts tab used
+        // to join these into one read-only string; it is a list of controls
+        // now, so each row needs an id to unpair BY and a status to say whether
+        // the piece is still in progress — which is the question you are
+        // actually asking about a paired essay while the song is playing.
+        sb.from('fragments').select('id, title, status').eq('paired_song_id', id).is('deleted_at', null),
       ]);
       if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
       if (song.type !== 'song') throw fail('That is not a song.', 'BAD_REQUEST');
@@ -1036,7 +1041,7 @@ export const songs = {
         feelingIds: (song.fragment_feelings ?? []).map((f) => f.feeling_id),
         publicNote: song.body ?? '',
         privateNote: priv?.notes ?? '',
-        paired: (essays ?? []).map((e) => e.title || '(untitled)'),
+        paired: (essays ?? []).map((e) => ({ id: e.id, title: e.title || '(untitled)', status: e.status })),
         embed: { src: embed?.src ?? '', height: embed?.height ?? 0, allow: embed?.allow ?? '' },
       };
     },

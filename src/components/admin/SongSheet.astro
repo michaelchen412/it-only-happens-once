@@ -29,6 +29,7 @@
   replaced.
 */
 import SharedByField from './SharedByField.astro';
+import FragmentBrowser from './FragmentBrowser.astro';
 import BackToTop from '../BackToTop.astro';
 import MiniEditor from './MiniEditor.astro';
 import SheetHeader from './SheetHeader.astro';
@@ -218,22 +219,66 @@ const thisYear = new Date().getUTCFullYear();
       </label>
 
       {
-        /* THE PAIRING, SHOWN AND READ-ONLY (ADR 0011, plan 37 §2). It is the
-          single most useful fact about 46 of the 48 songs here and was invisible
-          anywhere in the workshop until now.
+        /* THE PAIRING (ADR 0011, plan 37 §2, plan 39). It is the single most
+          useful fact about 46 of the 48 songs here.
 
-          ⚠ NOT EDITABLE, and that is the decision rather than a shortcut.
-          Pairing is the ESSAY's decision — `songs.pair` is called from the
-          writing sheet's Music tab, which is where you are when the question
-          "what goes with this piece?" actually arises. A second control here
-          would be a second write path for a relation that already has one, and
-          the pairing would then have two homes that could disagree about which
-          essay a song belongs to. */
+          ⚠ THIS WAS READ-ONLY UNTIL 2026-08-12, AND THE REVERSAL IS THE POINT.
+          What stood here said: *"NOT EDITABLE, and that is the decision rather
+          than a shortcut. Pairing is the ESSAY's decision — `songs.pair` is
+          called from the writing sheet's Music tab, which is where you are when
+          the question 'what goes with this piece?' actually arises. A second
+          control here would be a second write path…"*
+
+          Half of that is still true and it is the half worth keeping: *where you
+          are when the question arises* is the right test. It was applied to ONE
+          question. There are two, they are different, and they arise in
+          different rooms:
+
+            what song goes with this piece?  →  the writing sheet, mid-draft
+            what am I going to write about?  →  HERE, mid-listen
+
+          The half that was never true is "a second write path". Both doors call
+          ONE `songs.pair`, against ONE column, with ONE enforcement of
+          `type = 'writing'`. Nothing can disagree, because the invariant that
+          mattered was never *one control* — it was *one write path*.
+
+          ⚠ AND THE OLD ROUTE WAS ONLY WALKABLE BY STOPPING THE MUSIC, which is
+          what makes this a defect rather than a preference. Reaching the Music
+          tab meant closing this sheet, and closing this sheet DESTROYS THE
+          IFRAME (see the player above). The only control that could record the
+          thought was unreachable without ending the listening that produced it.
+
+          ⚠ THE CARDINALITY IS ASYMMETRIC AND NOTHING ELSE IN THE REPO SAYS SO.
+          A writing has at MOST ONE song — `paired_song_id` is a single column.
+          A song may be paired to MANY writings; there is no unique constraint.
+          So this is a LIST where the writing sheet's version is a single value,
+          and a pick from this side can take a slot that already holds another
+          song. That steal is possible on purpose and confirmed on purpose
+          (plan 39 · ruling 2). It is never silent.
+
+          ⚠ THE WRAP NO LONGER HIDES WHEN EMPTY. It is the door now, and a door
+          that disappears when there is nothing behind it cannot be used. */
       }
-      <div id="sng-paired-wrap" hidden class="f">
-        <span class="f__k">Paired with</span>
-        <p id="sng-paired" class="text-base-content/60 font-serif"></p>
-        <span class="admin-hint">Set from the essay’s own Music tab.</span>
+      <div id="sng-paired-wrap" class="f">
+        <span class="f__k">Paired with <span>— the pieces this song plays above</span></span>
+        <ul id="sng-paired" class="flex flex-col gap-1"></ul>
+        <p id="sng-paired-none" class="f__h italic">Nothing yet.</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <button id="sng-pair-add" type="button" class="btn btn-ghost btn-xs gap-1 normal-case">
+            ＋ Pair with a piece
+          </button>
+          {
+            /* ⚠ OFFERED, NOT DISABLED, WHILE THE SONG IS UNSAVED (plan 39 ·
+              ruling 3). Disabling until Save was the alternative, and it loses
+              on the very flow this sheet exists for: Save destroys the iframe,
+              so "save first, then pair" is "stop the music, then pair" — the
+              defect above, rebuilt one control to the left. The pick is held and
+              flushed on the first save, the way SharedByField already holds its
+              ticks. This line is what keeps the wait legible instead of looking
+              like a press that did nothing. */
+          }
+          <span id="sng-pair-queued" hidden class="f__h italic"></span>
+        </div>
       </div>
 
       <SharedByField scope="song" people={people} />
@@ -363,6 +408,20 @@ const thisYear = new Date().getUTCFullYear();
   </div>
   <BackToTop scroller="#sng-scroll" inDialog />
 </dialog>
+
+{
+  /* ⚠ THE PAIRING PICKER SHIPS WITH THE SHEET, NOT WITH THE PAGE (plan 39), for
+    the same reason the paste bar does — stated at the top of this file: *"a
+    sheet carrying its own front door is MOUNTABLE ANYWHERE"*. Both rooms that
+    mount this sheet get the picker by construction, and neither has to know it
+    exists. A page-level mount would have been two more imports to keep in step,
+    and the day a third room opens a song it would have shipped without one.
+
+    It is a SIBLING of the sheet, not a child: a <dialog> nested inside another
+    <dialog> inherits the parent's `display: none` when the parent is closed,
+    and the top layer does not care about DOM depth anyway. */
+}
+<FragmentBrowser mode="pair" />
 
 <style>
   /* The pressed state, and it is the only styling this sheet adds.

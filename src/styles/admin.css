@@ -1346,14 +1346,23 @@ html.reader-open .sky-return {
 /* Gated: on touch, `:hover` sticks after a tap and would leave one row lit
    until you tapped elsewhere. The at-rest ＋ is what those devices get. */
 @media (hover: hover) {
-  .cn-cell:hover {
+  .cn-cell:not(.cn-cell--static):hover {
     background: color-mix(in oklab, var(--color-primary) 7%, transparent);
     border-color: color-mix(in oklab, var(--color-primary) 32%, transparent);
   }
-  .cn-cell:hover .cn-cell__mark {
+  .cn-cell:not(.cn-cell--static):hover .cn-cell__mark {
     opacity: 1;
     color: var(--color-primary);
   }
+}
+/* ⚠ THE SAME CELL WITH NO DOOR BEHIND IT (plan 39 · ruling 5). The song
+   sheet's pair picker shows where a piece already lives but opens no editors,
+   so the chips render in a <span> instead of a <button>. It keeps the box —
+   dropping the padding would shift this column out of line with the identical
+   table one mode over — and gives up only the hover, because rule 1 above cuts
+   both ways: a cell that lights up under the cursor is PROMISING a door. */
+.cn-cell--static {
+  cursor: default;
 }
 .cn-cell:focus-visible {
   outline: none;
