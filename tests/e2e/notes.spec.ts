@@ -448,7 +448,33 @@ test.describe('the chooser — four destinations, one question', () => {
 
     const trigger = await second.locator('[data-file]').boundingBox();
     const box = await menu.boundingBox();
-    expect(box!.y).toBeGreaterThan(trigger!.y); // below its own trigger…
+
+    // ⚠ ADJACENT TO ITS OWN TRIGGER, ON WHICHEVER SIDE FITS — not "below".
+    //
+    // This asserted `box.y > trigger.y` until 2026-08-12, and that was wrong in
+    // a way worth keeping written down: `pop-anchor.ts` places the menu below by
+    // default and ABOVE when below would run off the bottom of the window, which
+    // is a documented branch and not a fallback. At 1280×720 the second card's
+    // trigger sits at y=574, so below would end at 778 against a 714 limit and
+    // the menu correctly flips to 414. The spec went red on correct behaviour
+    // the moment the pile grew a second card low enough to trigger it.
+    //
+    // ⚠ AND THE OLD ASSERTION COULD NOT TELL THE TWO CASES APART, which is the
+    // real reason to replace it rather than invert it. A menu wrongly anchored
+    // to the FIRST card would sit at y≈267 — also less than 574, also red, for
+    // the opposite reason. It failed on the right answer and the wrong one
+    // identically, so it never proved the thing its own comment claims.
+    //
+    // Proximity does discriminate: anchored to its own trigger the menu touches
+    // it on one side or the other, and anchored to the first card it is ~300px
+    // away from both.
+    const GAP = 6; // pop-anchor.ts
+    const belowGap = Math.abs(box!.y - (trigger!.y + trigger!.height));
+    const aboveGap = Math.abs(box!.y + box!.height - trigger!.y);
+    expect(
+      Math.min(belowGap, aboveGap),
+      `menu at ${box!.y}–${box!.y + box!.height} is anchored to neither side of its trigger at ${trigger!.y}–${trigger!.y + trigger!.height}`,
+    ).toBeLessThanOrEqual(GAP + 1);
     expect(Math.abs(box!.x - trigger!.x)).toBeLessThan(200); // …and beside it
   });
 

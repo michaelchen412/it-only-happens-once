@@ -601,10 +601,26 @@ a.row__t:hover {
   font-size: 0.9375rem;
   opacity: 0.55;
 }
-/* TRAP 6: `:hover` beats the selected state at equal specificity, so the
-   selected rules come AFTER and carry their own hover. Get this backwards and
-   the option you just tapped goes pale under the cursor, which reads as
-   disabled — on the one control you are using. */
+/* TRAP 6: the option you just tapped must not go pale under the cursor, which
+   reads as disabled — on the one control you are using.
+
+   ⚠ THE DEFENCE IS THE `:hover` VARIANT IN THE PRESSED SELECTOR, NOT THE SOURCE
+   ORDER, and this comment said the opposite until 2026-08-12. Measured by
+   reintroducing the fault both ways:
+
+     `.opt:hover`                        (0,2,0)
+     `.opt[aria-pressed='true']`         (0,2,0)  ← equal, so ORDER decides
+     `.opt[aria-pressed='true']:hover`   (0,3,0)  ← wins on WEIGHT, always
+
+   So moving `.opt:hover` below the pressed rules changes nothing while the pair
+   exists — the attribute adds a point the bare hover cannot match. What the
+   order protects is the case where somebody drops the `:hover` half of that
+   selector list as redundant, which is the likely edit and the one that brings
+   the fault straight back. Belt AND braces, and now they are labelled.
+
+   `checkin.mobile.spec.ts` holds the ratchet, and it was verified against the
+   real fault rather than assumed: with the pair removed and `:hover` last, it
+   goes red; restored, green. */
 .opt:hover {
   background: var(--color-base-200);
 }

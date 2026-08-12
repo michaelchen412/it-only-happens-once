@@ -229,8 +229,29 @@ test.describe('the check-in at 390px', () => {
     // transitions makes it a question about the CASCADE, which is what it is.
     await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' });
 
-    const opt = page.locator('[data-lat="15_30"]');
+    // ⚠ WHICHEVER OPTION IS NOT ALREADY CHOSEN, NOT A NAMED ONE. This asked for
+    // `15_30` until 2026-08-12 and went red the day Michael's real check-in
+    // recorded that latency: the option arrived already pressed, so the click
+    // TOGGLED IT OFF and the test then compared an unselected option's normal
+    // colour against its hover — which differ, correctly, and always will.
+    //
+    // It is the same environmental failure this file's own `beforeEach` was
+    // written to defeat one level up ("which door is showing … is a fact about
+    // whether today happens to have been answered yet"). The lesson reached the
+    // door and not the controls behind it. The suite runs read-only against the
+    // LIVE project, so anything that assumes a starting VALUE is really asking
+    // what Michael did last night.
+    const all = page.locator('[data-lat]');
+    const states = await all.evaluateAll((els) => els.map((e) => e.getAttribute('aria-pressed') === 'true'));
+    const free = states.map((on, i) => (on ? -1 : i)).filter((i) => i >= 0);
+    test.skip(free.length < 2, 'needs two unchosen latencies to compare');
+
+    const opt = all.nth(free[0]);
     await opt.click();
+    await expect(opt, 'the click did not select it — this test is measuring the wrong state').toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     // Clicking leaves the pointer ON the control, so this reading is already
     // "selected + hovered". Move away to get the selected colour by itself.
     await page.mouse.move(0, 0);
@@ -241,9 +262,7 @@ test.describe('the check-in at 390px', () => {
 
     expect(hovered, 'hovering a selected option must not change how it looks').toBe(settled);
     // …and it must not be the plain hover grey, which is what "pale" meant.
-    const unselected = await page.locator('[data-lat="30_60"]').evaluate((el) => {
-      return getComputedStyle(el).backgroundColor;
-    });
+    const unselected = await all.nth(free[1]).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(hovered).not.toBe(unselected);
   });
 });
