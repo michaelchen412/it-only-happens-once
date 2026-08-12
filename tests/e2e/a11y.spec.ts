@@ -29,6 +29,15 @@ const ROOMS = [
   '/admin/constellations',
   '/admin/library',
   '/admin/about',
+  // ⚠ ADDED 2026-08-12, AND ITS ABSENCE IS THE REASON THIS FILE MISSED A DEFECT.
+  // Plan 38 · §1.5 found the roster search focusing invisibly — a Level A
+  // failure that plan 19 walked past while counting 45 tab stops, because the
+  // list below was a list of rooms and the check above was a check of tab ORDER.
+  // Two gaps, and only one of them was the room list. `/admin/listening` was
+  // simply never here; the other three shells this file still doesn't cover
+  // (`constellations/[id]`, `people/[slug]`, `agenda/goals/[slug]`) need a real
+  // id, so they need a fixture row rather than a line here.
+  '/admin/listening',
 ];
 
 const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
@@ -129,6 +138,104 @@ test.describe('no horizontal overflow', () => {
         if (over > 0) bad.push(`${route} (+${over}px)`);
       }
       expect(bad, 'rooms scrolling sideways').toEqual([]);
+    });
+  }
+});
+
+test.describe('focus is visible where it lands', () => {
+  // ⚠ THE CHECK THIS FILE DID NOT HAVE, and the gap is exactly the shape plan
+  // 19 warned about in its own header: it counted 45 tab stops and reported
+  // ZERO missing focus rings, because counting tab stops is not looking at
+  // them. `hq.css`'s `.search input` cleared `outline` and put nothing back, so
+  // tabbing into the roster search moved focus somewhere invisible — WCAG
+  // 2.4.7, Level A, live the whole time on a room already in ROOMS above.
+  //
+  // WHAT IT ASSERTS IS "SOMETHING CHANGED", NOT "AN OUTLINE APPEARED", and the
+  // looseness is deliberate. Four controls in `hq.css` answer focus by moving a
+  // BORDER to `--color-primary` rather than by drawing a ring, and that is a
+  // decision this codebase took on purpose (see `.search:focus-within`). A spec
+  // demanding `outline-width > 0` would fail all four and teach the next reader
+  // to undo them. Any of outline / border / box-shadow counts; nothing at all
+  // does not.
+  for (const route of ROOMS) {
+    test(route, async ({ page }) => {
+      await settle(page, route);
+      const invisible = await page.evaluate(() => {
+        const seen = (el: Element) => {
+          const s = getComputedStyle(el);
+          return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.borderColor, s.boxShadow].join('|');
+        };
+        const bad: string[] = [];
+        for (const el of document.querySelectorAll<HTMLElement>('input:not([type="hidden"]), textarea')) {
+          if (el.hasAttribute('disabled') || el.offsetParent === null) continue;
+          // The wrapper, because that is where four of this codebase's five
+          // focus answers live — `.search`, `.logbox`, and anything using
+          // `:focus-within`. Reading only the field would call those five blind.
+          const box = el.parentElement ?? el;
+          const before = seen(el) + '//' + seen(box);
+          el.focus();
+          const after = seen(el) + '//' + seen(box);
+          if (before === after) bad.push(`${el.tagName.toLowerCase()}${el.id ? '#' + el.id : '.' + el.className}`);
+          el.blur();
+        }
+        return bad.slice(0, 12);
+      });
+      expect(invisible, `focused and nothing changed: ${JSON.stringify(invisible)}`).toEqual([]);
+    });
+  }
+});
+
+test.describe('the ✚ does not sit on the last row', () => {
+  // `.cap-fab` is mounted from AdminLayout onto every admin page — fixed,
+  // 3.5rem square, 1.25rem off the bottom — so it owns the bottom ~76px of the
+  // right edge in every room. Seven rooms cleared it with `pb-24` and seven did
+  // not, because the corpus rooms predate the ✚ (plan 38 · §1.3).
+  //
+  // ⚠ THIS EXISTS BECAUSE THE FINDING WAS MEASURED FROM THE CSS, NOT SEEN. The
+  // plan's own hands item says so. A rule read off a stylesheet is a claim; an
+  // overlap measured at the bottom of a scrolled page is the thing itself — and
+  // the clearance now lives in ONE place, which is exactly the kind of single
+  // point whose removal should go red rather than unnoticed.
+  //
+  // ⚠ 390px, AND THE VIEWPORT IS LOAD-BEARING — the first version of this spec
+  // ran at the default 1280 and passed with the clearance DELETED, which is the
+  // only reason it was caught. Every room centres its content in a `max-w-*`
+  // container, so at 1280 the container spans x=128..1152 while the ✚ sits at
+  // x≈1204..1260: the two never share a column and no amount of missing padding
+  // can make them overlap. The defect is real and is a PHONE defect. A spec that
+  // reproduces it has to stand where it happens.
+  //
+  // ⚠ AND IT IS DATA-DEPENDENT IN ONE DIRECTION, which is worth knowing before
+  // trusting a green: a room with too little content to scroll cannot collide
+  // with anything, so this proves "no overlap" and never "the padding is there".
+  // It is a ratchet against regression in the rooms that are full, not a proof
+  // about the empty ones.
+  for (const route of ROOMS) {
+    test(route, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await settle(page, route);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      const collisions = await page.evaluate((sel) => {
+        const fab = document.querySelector('.cap-fab');
+        if (!fab) return ['no .cap-fab on the page at all'];
+        const f = fab.getBoundingClientRect();
+        return [...document.querySelectorAll<HTMLElement>(sel)]
+          .filter((el) => !el.closest('[inert]') && !el.closest('dialog') && el.offsetParent !== null)
+          .filter((el) => el !== fab && !fab.contains(el))
+          .filter((el) => {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) return false;
+            // `position: fixed` peers share the viewport with the ✚ by design —
+            // BackToTop is placed against it deliberately (hq.css `:has`).
+            if (getComputedStyle(el).position === 'fixed') return false;
+            return r.left < f.right && r.right > f.left && r.top < f.bottom && r.bottom > f.top;
+          })
+          .map(
+            (el) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''} "${el.textContent?.trim().slice(0, 20)}"`,
+          )
+          .slice(0, 8);
+      }, FOCUSABLE);
+      expect(collisions, `under the ✚ at the bottom of the page: ${JSON.stringify(collisions)}`).toEqual([]);
     });
   }
 });
