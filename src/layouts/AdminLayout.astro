@@ -400,7 +400,32 @@ const nav = [
         </a>
       </div>
 
-      <main id="admin-main" class="min-w-0 flex-1" tabindex="-1">
+      {
+        /* ⚠ `pb-24` IS THE ✚'s CLEARANCE AND IT BELONGS HERE, NOT ON THE PAGE.
+          `.cap-fab` is mounted from this layout onto every admin page — fixed,
+          3.5rem square, 1.25rem from the bottom — so it owns the bottom ~76px of
+          the right edge in every room. The rule is already written out at length
+          in `app.css` for the public footer (*"5rem CLEARS THE FLOATING
+          CONTROL… At the bench's 3rem the ⌗ and the ↑ met to the pixel"*).
+
+          THE ALTERNATIVE THAT LOST IS THE ONE THAT WAS ALREADY HERE: padding on
+          each page shell. Seven HQ rooms carried `pb-24` and the seven corpus
+          rooms carried `py-8` / `py-10`, so scrolling `/admin/library` or
+          `/admin/fragments` to the bottom put the last row of content under the
+          button. Nobody decided that — the corpus rooms simply predate the ✚,
+          and per-page padding is a rule that has to be remembered fourteen times
+          and was remembered seven. A control the LAYOUT mounts gets its
+          clearance from the layout; that is the whole correction.
+
+          ⚠ ONLY THE BOTTOM MOVED. The gutters (`px-4 sm:px-6` in HQ, a flat
+          `px-6` in the corpus) stay on the pages for now, because they are not a
+          defect and hoisting them here would break the one page that wants a
+          full-bleed child: `/admin/about`'s sticky command bar is a `border-b`
+          spanning the full width, and horizontal padding on `<main>` would inset
+          that rule from both edges. That convergence is plan 38 · §6.3 and it
+          wants its own look. */
+      }
+      <main id="admin-main" class="min-w-0 flex-1 pb-24" tabindex="-1">
         <slot />
       </main>
     </div>
