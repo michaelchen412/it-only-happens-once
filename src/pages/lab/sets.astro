@@ -1,0 +1,277 @@
+---
+/*
+  /lab/sets — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  ⚠ DELIBERATELY SEPARATE FROM /lab/music, AND THAT IS THE PREMISE RATHER THAN
+  TIDINESS. Michael, 2026-08-14: *"can we not have this prototype overlap with
+  the legacy implementation? meaning if we move forward with this playlist idea,
+  we're ditching the rest for the most part."* The sets were briefly mounted
+  inside the room's bench, which quietly asserted that the two coexist. They may
+  not. Nothing on this page imports `MusicRoom`, `music-room.ts` or the feelings
+  vocabulary, and the room is left shipped and untouched — if the sets win,
+  deleting it is a separate small commit, and if they lose nothing was spent.
+
+  THE QUESTION WAS: **which arrangement, and where do the quotes go?**
+  ANSWERED 2026-08-14, and the losers are deleted rather than kept as controls —
+  `detail` over `accordion` and `stacked`, `lede` over `above` and `below`, and
+  ONE quote rather than three. Michael: *"I think it starts to get cluttered
+  both from the perspective of ideas and visually."* The rule this folder set on
+  2026-08-10 is that a bench is legitimate while its question is live; what the
+  losing arrangements were is in `git log`.
+
+  ⚠ SO THIS PAGE IS NOW A DRIVING SURFACE, NOT A COMPARISON. It exists because
+  `components/MusicSets.astro` has no production data behind it yet — there is
+  no `sets` table (plan 40 §4, phase 0) — and this is the only place the real
+  component can be driven over real playlists until there is.
+
+  THE ONE QUESTION STILL LIVE: **the embed height.** 352 is Spotify's convention
+  and not a ceiling; the player fills whatever it is given. 600 leaves ~250px of
+  dead space under a three-track playlist and 480 does not, so the right number
+  depends on how long the sets get — curation, not code. The switch stays until
+  that settles.
+
+  WHAT TO JUDGE:
+    1. Switch sets twice. The FIRST switch and every one after it should be a
+       `loadEntity` into a frame whose bundle is already parsed — no white
+       flash, no reload, the skeleton breathing underneath until the embed's own
+       `ready` fires. If the second still flickers, the controller never arrived
+       and `mountPlainFrame` is carrying the page.
+    2. The two sets with NO quote, against the ones that have one. If absence
+       reads as unfinished rather than as a choice, that is a failure of a
+       constraint that outlives the layout — most sets will carry no quote for a
+       long time.
+    3. *The point of a journey is not to return* — a quote and NO description.
+       If it reads as complete, a borrowed line can stand instead of Michael's
+       own and the description stops being mandatory.
+    4. The index as typography. It leans (`INDEX_INDENTS`, borrowed from
+       ConstellationSuite's stanzas) and the open one goes `--color-primary`
+       while the rest recede — the room's own grammar, kept on purpose so that
+       what Michael liked about looking at the room survives the mechanism being
+       deleted under it.
+    5. Press Save inside a player while signed in to Spotify. That is the entire
+       product — everything else here is in service of somebody doing that once
+       and never coming back.
+
+  ⚠ NO DATABASE WORK WAS DONE FOR THIS. No migration, no table, no schema
+  opinion. The fixture is hardcoded and the whole bench is one deletable file.
+
+  ⚠ THE PLAYLISTS ARE REAL AND THE TITLES ARE MICHAEL'S — seven, sent
+  2026-08-14, with the titles read back from the Spotify Web API rather than
+  retyped so the page and the embed cannot disagree about what a set is called.
+  EVERY DESCRIPTION IS INVENTED, which is the same rule /lab/music's feelings
+  follow and for the same reason: nothing on a bench is a reading of anything.
+  Lengths vary on purpose — one long, one single line, one empty — so the
+  measure is judged on the range it will actually hold.
+
+  ⚠ EIGHT WERE SENT AND SEVEN ARE HERE. `1VhNk7ZgnfvEcPEUobgE5w` appeared twice
+  under different `?si=` tokens, which is exactly the paste-twice that a
+  canonical URL makes visible and a raw one hides. `?si=` is stripped per
+  data-model.md's rule for `source_url`.
+*/
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import MusicSets from '../../components/MusicSets.astro';
+import { resolveSet, type MusicSet } from '../../lib/music-sets';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+/*
+  ⚠ THE QUOTES ARE REAL AND THE PAIRINGS ARE MINE. Every line below is a
+  published row from Michael's Library, read out of the database rather than
+  invented — text, author and work. WHICH QUOTE SITS WITH WHICH SET IS NOT HIS.
+  That is a curation act and it is exactly the thing the /lab/music header
+  refuses to fake about feelings; the same rule holds here, inverted: the
+  material is real, the reading is not.
+
+  ⚠ THE COUNTS ARE UNEVEN ON PURPOSE — three, one, one, two, none, none, one.
+  Michael, asked how many a set should carry, 2026-08-14: *"not sure at this
+  point to be honest."* So the bench does not pick a number; it shows the range
+  and lets the page answer. The two with NONE are the important ones: if a set
+  without a quote reads as unfinished next to one with three, the design has
+  failed a constraint that matters more than the layout, because most sets will
+  not have quotes for a long time.
+
+  ⚠ AND ONE SET IS DELIBERATELY QUOTES-WITHOUT-PROSE. *The point of a journey
+  is not to return* has an empty description and two quotes — the test for
+  question 3, whether a borrowed line can stand INSTEAD of Michael's own, rather
+  than only beside it.
+*/
+const SETS: MusicSet[] = [
+  {
+    slug: 'what-would-you-still-do',
+    title: 'What would you still do, if you knew you would fail?',
+    description:
+      'Placeholder. Two sentences standing in for the real thing, occupying the space a written description will need so the measure can be judged rather than imagined.\n\nA second paragraph, because the renderer takes Markdown and a set this size is likely to want one.',
+    url: 'https://open.spotify.com/playlist/7hw1rFXefBlTXmjVJLmIqp',
+    // THREE — the density case. Does a stack of borrowed voices still read as
+    // an introduction to music, or has the pane become an anthology?
+    quote: { text: 'He who has a why to live for can bear almost any how.', author: 'Friedrich Nietzsche' },
+  },
+  {
+    slug: 'if-nothing-else-i-love-you',
+    title: 'If nothing else, I love you',
+    description:
+      'Placeholder — deliberately one short line, because the index has to hold a quiet set beside a loud one without either looking broken.',
+    url: 'https://open.spotify.com/playlist/07Ns7lY5au4Tlj2n46KggH',
+    // ONE, and the likeliest real shape: a short line beside a short description.
+    quote: { text: 'The heart has its reasons of which reason knows nothing.', author: 'Blaise Pascal' },
+  },
+  {
+    slug: 'nothing-can-be-changed-until-it-is-faced',
+    title: 'Nothing can be changed until it is faced',
+    description:
+      'Placeholder, running long on purpose: this is the stress case for the measure, and for whether a description of real weight still reads as an introduction to the music rather than as an essay that happens to have a player stapled underneath it. If this length looks wrong, the answer is a shorter description and not a wider column.',
+    url: 'https://open.spotify.com/playlist/444Qyx7vVm9J8KXA7beak1',
+    // A LONG quote under a long description — the worst case for the "soup of
+    // small texts" risk, and the one that decides whether italic is enough
+    // separation or whether the two blocks need real distance.
+    quote: {
+      text: 'Ignoring what goes on in other people’s souls—no one ever came to grief that way. But if you won’t keep track of your own soul’s doing, how can you not be unhappy?',
+      author: 'Marcus Aurelius',
+      work: 'Meditations',
+    },
+  },
+  {
+    slug: 'the-point-of-a-journey-is-not-to-return',
+    title: 'The point of a journey is not to return',
+    /* ⚠ EMPTY ON PURPOSE. A set with no description yet is the normal state for
+       the first week of any of these, and the pane must not collapse into a
+       naked player when it happens. */
+    description: '',
+    url: 'https://open.spotify.com/playlist/4CQCuhHxiDkJcxvJSwTeyH',
+    // ⚠ QUOTES AND NO PROSE — question 3's test. If this set reads as complete,
+    // a borrowed line can stand INSTEAD of Michael's own and the description
+    // stops being mandatory.
+    quote: {
+      text: 'Life can only be understood backwards; but it must be lived forwards.',
+      author: 'Søren Kierkegaard',
+    },
+  },
+  {
+    slug: 'for-when-a-face-is-sad',
+    title: 'For when a face is sad,  a heart may be happy',
+    description:
+      'Placeholder. ⚠ The double space after the comma is real — it is in the Spotify playlist name itself, so the embed prints it too. Worth fixing on Spotify rather than papering over here.',
+    url: 'https://open.spotify.com/playlist/1VhNk7ZgnfvEcPEUobgE5w',
+  },
+  {
+    slug: 'thank-you-thats-all-that-needs-to-be-said',
+    title: 'Thank you. That’s all that needs to be said. For now.',
+    description:
+      'Placeholder — the longest title in the set, and the one that decides whether an index line may wrap to two.',
+    url: 'https://open.spotify.com/playlist/78FZLXQhqsxuYPT22ECKEe',
+    // A quote whose own line break the author put there — `whitespace-pre-line`
+    // in SetQuotes exists for this row and nothing else in the fixture tests it.
+    quote: {
+      text: 'Yes, we need to make a living.\nBut how do we make a life?',
+      author: 'Seth Godin',
+      work: 'The Song of Significance',
+    },
+  },
+  {
+    /* ⚠ THIS IS ALSO A CONSTELLATION. `constellations` holds a published row of
+       the same name (lowercase there, sentence case here) whose `score_url` —
+       the field ADR 0009 created to hang a playlist off a read — is empty, as
+       it is on all eight. So the set and the read may be the same object seen
+       twice. Left in deliberately: the collision is a thing to look at, not a
+       mistake to tidy away before Michael sees it. */
+    slug: 'the-blizzard-covers-us-all-the-same',
+    title: 'The blizzard covers us all the same',
+    description: 'Placeholder. See the source — this title already belongs to a published constellation.',
+    url: 'https://open.spotify.com/playlist/6qsgr9Sg0mqK4owiE1ROFS',
+  },
+];
+
+const HEIGHTS = [352, 480, 600, 720];
+
+const rawHeight = Number(Astro.url.searchParams.get('h'));
+const height = HEIGHTS.includes(rawHeight) ? rawHeight : 600;
+const selected = resolveSet(Astro.url.searchParams.get('set'), SETS);
+
+/* The bench mounts the component at its own path WITH its own query string, so
+   a sentence's link keeps the layout and height you are testing. Same reason
+   `musicHref` takes a base. */
+const base = `/lab/sets?h=${height}`;
+const benchHref = (p: Record<string, string>) => {
+  const q = new URLSearchParams(Astro.url.search);
+  for (const [k, v] of Object.entries(p)) q.set(k, v);
+  return `/lab/sets?${q}`;
+};
+---
+
+{
+  /* SiteLayout, not Base — judged inside the site's real chrome, under the real
+    /blog tab strip, the way /lab/music renders the room. Michael, 2026-08-10:
+    "can we actually render the page as it would be in reality? not
+    containerized like this." */
+}
+<SiteLayout title="Sets (bench)" active="blog" description="A local bench. Not the site.">
+  <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
+    <nav class="border-base-300 mb-14 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
+      <a
+        href="/blog"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
+        >Writing</a
+      >
+      <a
+        href="/blog?view=quotes"
+        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
+        >Quotes</a
+      >
+      <span
+        aria-current="page"
+        class="font-display border-primary text-base-content -mb-px border-b-2 pb-3 text-2xl leading-none font-light sm:text-3xl"
+        >Music</span
+      >
+    </nav>
+
+    <MusicSets sets={SETS} selected={selected} height={height} base={base} />
+  </div>
+
+  {
+    /* Everything that would not ship, collapsed to one chip so the page above
+      can be judged as a page. */
+  }
+  <details
+    class="border-base-300 bg-base-100/90 fixed top-20 right-4 z-50 rounded-lg border font-sans text-xs shadow-lg backdrop-blur"
+  >
+    <summary class="text-base-content/50 cursor-pointer list-none px-3 py-2 tracking-wide uppercase select-none"
+      >bench</summary
+    >
+    <div class="border-base-300 flex flex-col gap-3 border-t px-3 py-3">
+      <p class="text-warning max-w-[15rem] leading-relaxed">
+        ⚠ Playlists and titles are real. Every description is invented placeholder text.
+      </p>
+
+      <div>
+        <p class="text-base-content/50 mb-1 tracking-wide uppercase">Embed height</p>
+        <div class="flex flex-wrap gap-2">
+          {
+            HEIGHTS.map((h) => (
+              <a
+                href={benchHref({ h: String(h) })}
+                class:list={[
+                  'underline-offset-2 hover:underline',
+                  height === h ? 'text-primary' : 'text-base-content/45',
+                ]}
+              >
+                {h}
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      <p class="text-base-content/35 max-w-[15rem] leading-relaxed">
+        In <code>detail</code>, switch sets twice — the first reloads, the rest should swap in place.
+      </p>
+      <p class="text-warning max-w-[15rem] leading-relaxed">
+        Quotes are real Library rows. Which quote sits with which set is invented.
+      </p>
+    </div>
+  </details>
+
+  <script>
+    import { wireMusicSets } from '../../scripts/music-sets';
+    wireMusicSets();
+  </script>
+</SiteLayout>

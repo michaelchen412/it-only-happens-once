@@ -1,0 +1,271 @@
+---
+/*
+  THE SETS — curated listens (plan 40 §3). Shape locked 2026-08-14 after the
+  `/lab/sets` bench: an index of sentences beside ONE open set, and in that set
+  a quote, then the description, then the player.
+
+  ⚠ THE THREE ARRANGEMENTS AND THE FOUR QUOTE POSITIONS ARE GONE, and their
+  deletion is the point rather than tidying. A bench is legitimate while its
+  question is live; `detail` beat `accordion` and `stacked`, `lede` beat `above`
+  and `below`, and a shipped component does not carry the losers. What they were
+  is in `git log -- src/components/MusicSets.astro`.
+
+  ⚠ WHY `detail` WON, in one move: there is only ever ONE embed and it never
+  moves. From that follows everything —
+
+    1. The player can be TALL. Nine tracks instead of two. Seven embeds deep
+       enough to be useful would be several thousand pixels of somebody else's
+       green, so "taller" and "all at once" could never both be true.
+    2. Michael's sentence is printed ONCE, in his type. The index carries the
+       title, so this pane renders NO HEADING — and Spotify's copy of the same
+       sentence stays over inside the embed instead of six pixels under ours.
+       `stacked` could not dodge that and it is what killed it.
+    3. Seven sentences in display type become the page, which is the strongest
+       thing on it.
+    4. The frame is stationary, so `scripts/music-sets.ts` swaps sets with
+       `loadEntity` rather than tearing down an iframe. `accordion` moves the
+       frame between list items and re-parenting an iframe reloads it — that was
+       structural, not a missing optimisation.
+
+  ⚠ AND THE QUOTE LEADS. It sits in the hole the missing heading leaves, so the
+  pane opens in someone else's voice while the index answers it in Michael's
+  from the left column: two voices, one per column. Below it his description,
+  and the player last — which is `ConstellationSuite` inverted rather than a new
+  idea. That page runs description → SCORE, small → the suite, long; the score
+  accompanies and the work goes last. Here the quote accompanies and the
+  playlist is the work.
+
+  ⚠ NO FEELING WORDS. Filtering needs volume, and a title like "What would you
+  still do, if you knew you would fail?" IS redemptive, inspiring and defiant —
+  printing those three words under it would explain the joke, the same call
+  `MusicRoom` made when it put a song's feelings below the player rather than
+  above. The vocabulary retires with the room (plan 40).
+*/
+import { embedForUrl } from '../lib/media';
+import { renderMarkdown } from '../lib/markdown';
+import { indentFor, setHref, type MusicSet } from '../lib/music-sets';
+
+interface Props {
+  sets: MusicSet[];
+  /** Always a real slug — `resolveSet` guarantees it. */
+  selected: string;
+  /**
+   * ⚠ THE EMBED HEIGHT IS A FREE PARAMETER AND 352 IS A CONVENTION, NOT A
+   * CEILING. Spotify's own docs pass `height: '200'` and `'160'`; the player
+   * fills whatever it is given with more track rows. Michael, 2026-08-14: *"it
+   * only shows 2 songs at a time in what little space it has"*.
+   *
+   * Still open at 480 vs 600 — the bench keeps the switch. 600 leaves ~250px of
+   * dead space under a three-track playlist, so the right number depends on how
+   * long the sets get, which is curation rather than code.
+   */
+  height?: number;
+  base?: string;
+}
+const { sets, selected, height = 480, base = '/blog?view=music' } = Astro.props;
+
+const open = sets.find((s) => s.slug === selected) ?? sets[0];
+const openEmbed = open ? embedForUrl(open.url) : null;
+const descOf = (s: MusicSet) => (s.description.trim() ? renderMarkdown(s.description) : '');
+
+/* Selected goes `--color-primary`, the rest recede — the room's own grammar for
+   a chosen word (`.feel-word.is-on`). Deliberately inherited: the room's
+   mechanism is being deleted, but the way it felt to look at should survive it. */
+const INDEX_ITEM = 'font-display block text-xl leading-snug font-light transition-colors duration-300 sm:text-2xl';
+
+/* Italic against the description's upright, because both are serif at a similar
+   size and without a slant they read as one block of small text. Italic for a
+   borrowed voice is also what the constellation epigraph already does. */
+const QUOTE_TEXT = 'font-serif text-xl leading-relaxed italic text-base-content/70 sm:text-2xl';
+const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all-small-caps] text-base-content/30';
+---
+
+{
+  sets.length > 0 && (
+    <Fragment>
+      {/* ⚠ TWO ORIGINS, AND THE SECOND MATTERS MORE. `open.spotify.com` serves
+          the embed document and its bundle; `i.scdn.co` serves the cover art,
+          which is a separate origin and is what the eye waits for on a switch.
+          In the body rather than the head because this is a component and the
+          alternative is threading a head slot through the layout for two links;
+          browsers honour `preconnect` wherever it appears. */}
+      <link rel="preconnect" href="https://open.spotify.com" />
+      <link rel="preconnect" href="https://i.scdn.co" crossorigin />
+
+      <section
+        class="mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-16"
+        aria-label="Playlists"
+      >
+        <nav aria-label="Sets">
+          <ul class="flex flex-col gap-7">
+            {sets.map((s, i) => {
+              const isOpen = s.slug === open?.slug;
+              return (
+                <li style={`padding-left:${indentFor(i)}`}>
+                  <a
+                    href={setHref(s.slug, base)}
+                    data-set={s.slug}
+                    aria-current={isOpen ? 'true' : undefined}
+                    class:list={[
+                      INDEX_ITEM,
+                      isOpen ? 'text-primary' : 'text-base-content/40 hover:text-base-content/75',
+                    ]}
+                  >
+                    {s.title}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {open && (
+          /* ⚠ NO HEADING IN HERE, ON PURPOSE — see the file header. The selected
+             sentence in the index is this pane's title, which is the whole
+             reason the double print goes away. `aria-live="polite"` because
+             pressing an index item replaces this region without moving focus,
+             and a screen reader otherwise gets no signal that anything
+             happened. */
+          <div id="set-detail" aria-live="polite" data-height={height} data-base={base} data-open={open.slug}>
+            {/* Always rendered even when empty — the client writes the next
+                set's quote into it, and a container that appears and disappears
+                is a layout shift on every switch. */}
+            <figure id="set-quote" class="prose-measure" hidden={!open.quote}>
+              <blockquote class={QUOTE_TEXT}>
+                {/* A quote may carry the line break its author put there. */}
+                <p class="whitespace-pre-line" data-quote-text>
+                  {open.quote?.text}
+                </p>
+              </blockquote>
+              <figcaption class:list={['mt-2', QUOTE_CITE]}>
+                <span data-quote-author>{open.quote?.author}</span>
+                {open.quote?.work && (
+                  <span class="text-base-content/20" data-quote-work>
+                    , {open.quote.work}
+                  </span>
+                )}
+              </figcaption>
+            </figure>
+
+            <div
+              id="set-desc"
+              class="cn-desc prose-measure text-base-content/60 mt-7 font-serif text-lg empty:mt-0"
+              set:html={descOf(open)}
+            />
+
+            {/* ⚠ THE CLIP LIVES ON THIS WRAPPER, NOT ON THE IFRAME, because we
+                do not own the iframe: `createController` replaces the mount with
+                its own element and gives it `border-radius: 0`. Spotify paints a
+                12px-rounded card inside a frame whose document canvas is WHITE,
+                and with nothing clipping it that canvas shows at all four
+                corners. Measured at 4× on 2026-08-14 — it is the embed's own
+                background, not something showing through from behind. */}
+            <div
+              id="set-embed-slot"
+              class="relative mt-8 overflow-hidden"
+              style={`height:${height}px;border-radius:var(--radius-box)`}
+            >
+              {/* ⚠ THE SKELETON SITS BEHIND THE PLAYER RATHER THAN INSTEAD OF
+                  IT. The frame above starts at `opacity:0` and is revealed on
+                  the embed's own `ready` event — which, measured 2026-08-14,
+                  RE-FIRES on every `loadEntity` about 270ms after the call
+                  rather than only at init. So nobody sees a half-built player:
+                  they see this box, then the finished thing fading in over it.
+
+                  Deliberately not a spinner. This site builds distinctiveness
+                  from structure and type rather than iconography, and a spinner
+                  would be the only piece of UI-kit chrome on a public page. */}
+              <div class="set-skeleton absolute inset-0" style="border-radius:var(--radius-box)" />
+
+              <div id="set-embed-frame" class="relative h-full opacity-0 transition-opacity duration-500 ease-out">
+                {/* A PLACEHOLDER, NOT AN IFRAME. `createController` REPLACES the
+                    element it is given, so server-rendering a real frame and
+                    then building a controller over it costs two document loads.
+                    The box is reserved at the final height so the text above it
+                    never moves. */}
+                <div id="set-embed-mount" class="w-full" style={`height:${height}px`} />
+              </div>
+
+              {openEmbed && (
+                <noscript>
+                  <iframe
+                    src={openEmbed.src}
+                    width="100%"
+                    height={height}
+                    loading="lazy"
+                    allow={openEmbed.allow}
+                    title={open.title}
+                    style="border-radius: var(--radius-box); border: 0"
+                  />
+                </noscript>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Every set's quote and prose, inert, so the client can change panes
+          without a fetch. Cheap — seven short records — and it is what lets a
+          switch cost no navigation. */}
+      <script
+        type="application/json"
+        id="set-data"
+        is:inline
+        set:html={JSON.stringify(
+          Object.fromEntries(
+            sets.map((s) => [s.slug, { title: s.title, desc: descOf(s), url: s.url, quote: s.quote ?? null }]),
+          ),
+        )}
+      />
+    </Fragment>
+  )
+}
+
+<style>
+  /* The waiting state. Slow and shallow on purpose — this is a page you read,
+     and anything that pulses at UI speed would pull the eye off the sentences
+     while the player loads. */
+  .set-skeleton {
+    animation: set-breathe 2s ease-in-out infinite;
+    opacity: 1;
+    transition: opacity 500ms ease-out;
+  }
+
+  /* ⚠ THE PULSE ANIMATES `background`, NOT `opacity`, AND THAT IS LOAD-BEARING.
+     `opacity` is spoken for: it is how the skeleton is dismissed once the player
+     arrives, and a running keyframe on the same property beats the transition
+     every time — the box would keep breathing behind a finished embed forever. */
+  @keyframes set-breathe {
+    0%,
+    100% {
+      background: color-mix(in oklab, var(--color-base-content) 4%, transparent);
+    }
+    50% {
+      background: color-mix(in oklab, var(--color-base-content) 9%, transparent);
+    }
+  }
+
+  /* Dismissed rather than left behind, because a loading state's job ends when
+     the loading does. */
+  #set-embed-slot.is-ready .set-skeleton {
+    opacity: 0;
+  }
+
+  /* ⚠ THE CLIP NEEDS ITS OWN STACKING CONTEXT OR SAFARI IGNORES IT. Nesting an
+     iframe inside `overflow:hidden` + `border-radius` is the one case WebKit has
+     historically painted square anyway. `isolation` buys the context without a
+     transform, which would make this a containing block and change what
+     `position:fixed` means for anything that ever lands inside. */
+  #set-embed-slot {
+    isolation: isolate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .set-skeleton {
+      animation: none;
+    }
+    #set-embed-frame {
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
