@@ -265,6 +265,24 @@ test.describe('an essay closes with its apparatus', () => {
   });
 
   test('the subjects are in the strip, and still filter the feed', async ({ page }) => {
+    /*
+      ⚠ ITS OWN ESSAY, NOT THE `beforeEach`'s. This is the one test in the block
+      that needs the piece to HAVE subjects, and `publishedSlug` is only ever
+      "the first published essay back" — which on 2026-08-15 was one with zero of
+      them. The result was a red spec on a public page and a look through the
+      database for a fault that was not there.
+
+      `subjectedEssaySlug` is discovered in auth.setup.ts, the same way
+      `richQuoteSlug` is and for the same reason: a spec that needs a richer row
+      than "any" should ask for that shape and SKIP when the corpus has none,
+      rather than assert against whatever turned up first. The four tests around
+      this one still want the ordinary case, so the shared fixture is untouched.
+    */
+    const { subjectedEssaySlug } = fixtures();
+    test.skip(!subjectedEssaySlug, 'no published essay in the corpus carries a subject');
+    await page.goto(`/blog/${subjectedEssaySlug}`);
+    await expect(page.locator('.post-article')).toBeVisible();
+
     const strip = page.locator('[data-share]').locator('..');
     const first = strip.locator('a[href*="subject="]').first();
     await expect(first).toBeVisible();

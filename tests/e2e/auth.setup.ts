@@ -110,14 +110,30 @@ setup('mint an admin session and find fixtures', async () => {
     .neq('status', 'published')
     .limit(1)
     .maybeSingle();
-  const { data: published } = await service
+  const { data: publishedEssays } = await service
     .from('fragments')
-    .select('slug')
+    .select('id, slug')
     .eq('type', 'writing')
     .eq('status', 'published')
-    .is('deleted_at', null)
-    .limit(1)
-    .maybeSingle();
+    .is('deleted_at', null);
+  const published = (publishedEssays ?? [])[0] ?? null;
+
+  /*
+    A published essay THAT ACTUALLY HAS SUBJECTS, which "any published essay" is
+    not: `publishedSlug` takes the first row back and that landed on one with
+    zero, so the spec asserting the subject strip failed against a perfectly
+    healthy database. Same shape and same reason as `richQuoteSlug` below — when
+    a spec needs a richer row than "any", discover that shape and let it skip
+    rather than asserting against whatever turned up first.
+
+    ⚠ IT IS A SEPARATE FIXTURE RATHER THAN A NARROWER `publishedSlug`, because
+    the other specs in that file want the ordinary case. Narrowing the shared one
+    would quietly move four other tests onto a row chosen for a property they do
+    not care about.
+  */
+  const { data: subjectLinks } = await service.from('fragment_subjects').select('fragment_id');
+  const withSubjects = new Set((subjectLinks ?? []).map((l) => l.fragment_id));
+  const subjectedEssay = (publishedEssays ?? []).find((f) => withSubjects.has(f.id)) ?? null;
 
   /*
     An essay that actually CARRIES A SONG. Discovered like everything else here,
@@ -211,6 +227,7 @@ setup('mint an admin session and find fixtures', async () => {
         draftSlug: draft?.slug ?? null,
         draftStatus: draft?.status ?? null,
         publishedSlug: published?.slug ?? null,
+        subjectedEssaySlug: subjectedEssay?.slug ?? null,
         pairedEssayId: pairedEssay?.id ?? null,
         constellationId: constellation?.id ?? null,
         composedConstellationId: composed,

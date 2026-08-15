@@ -173,6 +173,11 @@ export interface Fixtures {
   draftStatus: 'note' | 'draft' | null;
   /** An existing published essay. */
   publishedSlug: string | null;
+  /** A published essay that actually carries subjects. `publishedSlug` takes the
+   *  first row back, which is not reliably one — the strip spec failed on an
+   *  essay with zero. Same idiom as `richQuoteSlug`: discover the richer shape,
+   *  skip when the corpus has none. */
+  subjectedEssaySlug: string | null;
   /** An essay with a song paired to it — the shape ADR 0035 changed under the
    *  admin's `get`, and the only one that exercises the `paired_song` embed. */
   pairedEssayId: string | null;
