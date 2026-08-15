@@ -20,33 +20,6 @@ import {
   uniqueSlug,
 } from './_shared';
 
-/**
- * ⚠ A SONG MAY NOT SIT IN A SUITE (ADR 0031), AND THIS IS WHERE THE DOOR SHUTS.
- *
- * The composer's browser stopped offering songs in the same change, and that is
- * not the same thing: a picker is a UI, and a UI is one refactor away from
- * offering it again with nothing underneath to say no. The type check lives
- * here for exactly the reason `songs.pair` carries its own — the FK cannot
- * express "only a song" / "never a song", so the constraint is a sentence in
- * the action instead of a silent success.
- *
- * The refusal NAMES THE TWO THINGS THAT DO WORK, because "no" on its own would
- * read as a missing feature rather than as a shape. Music accompanies a
- * constellation as its score, or one essay through `paired_song_id`.
- *
- * Only checked when something is being ADDED. Un-placing a song must stay
- * possible for a row that predates this rule, and a refusal on removal would
- * make such a row permanently stuck in a suite it may not be in.
- */
-async function refuseSongPlacement(sb: App.Locals['supabase'], fragmentId: string) {
-  const { data } = await sb.from('fragments').select('type').eq('id', fragmentId).maybeSingle();
-  if (data?.type === 'song')
-    throw fail(
-      'A song can’t sit in a suite. Pair it to a piece of writing, or set the constellation’s score.',
-      'BAD_REQUEST',
-    );
-}
-
 export const constellations = {
   save: defineAction({
     accept: 'form',
@@ -242,7 +215,6 @@ export const constellations = {
     handler: async (input, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
-      await refuseSongPlacement(sb, input.fragment_id);
       const { data: last } = await sb
         .from('fragment_constellations')
         .select('position')
@@ -298,9 +270,6 @@ export const constellations = {
           .map((s) => s.trim())
           .filter(Boolean),
       );
-      // Additions only — see the helper. An empty set here is "belongs to
-      // none", which must stay reachable for anything already placed.
-      if (want.size) await refuseSongPlacement(sb, input.fragment_id);
       const { data: current, error: readErr } = await sb
         .from('fragment_constellations')
         .select('constellation_id')

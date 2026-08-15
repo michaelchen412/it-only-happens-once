@@ -158,13 +158,25 @@ test.describe('focus is visible where it lands', () => {
   // demanding `outline-width > 0` would fail all four and teach the next reader
   // to undo them. Any of outline / border / box-shadow counts; nothing at all
   // does not.
+  //
+  // ⚠ AN OUTLINE WITH `style: none` IS NOT AN OUTLINE, and normalising that away
+  // is what keeps this spec honest (2026-08-15). app.css gained a site-wide
+  // `:focus-visible` ring that day; every control that answers focus its own way
+  // still overrides it, but several do so with the `outline-style` LONGHAND —
+  // which leaves the ring's colour and width applied to an outline that is not
+  // drawn. Compared raw, those two properties change on focus for every field on
+  // the page, and this test would have reported "something changed" for all of
+  // them forever after. It would still have been green. It would have been
+  // measuring the cascade rather than the reader.
   for (const route of ROOMS) {
     test(route, async ({ page }) => {
       await settle(page, route);
       const invisible = await page.evaluate(() => {
         const seen = (el: Element) => {
           const s = getComputedStyle(el);
-          return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.borderColor, s.boxShadow].join('|');
+          const outline =
+            s.outlineStyle === 'none' ? 'none' : [s.outlineStyle, s.outlineWidth, s.outlineColor].join(' ');
+          return [outline, s.borderColor, s.boxShadow].join('|');
         };
         const bad: string[] = [];
         for (const el of document.querySelectorAll<HTMLElement>('input:not([type="hidden"]), textarea')) {

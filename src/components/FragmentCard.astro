@@ -17,14 +17,13 @@ import { TYPE_META } from '../lib/fragments-display';
       (rail passes `w-72 shrink-0`; a grid lets them fill the column).
 
   Per type:
-    song    → title + artist,   provenance year   (Added)
     quote   → the quote (2 ln) + attribution,      (Added)
     writing → title + excerpt,  posted date + read (Posted)
   The Spotify embed / full quote / full essay live on the fragment's own page,
   not on the card — that's what keeps every card the same shape.
 */
 interface Props {
-  type: 'song' | 'quote' | 'writing';
+  type: 'quote' | 'writing';
   title?: string;
   body?: string; // quote text, excerpt, or (song) optional album line
   attribution?: string; // artist(+album) · quote author · source
@@ -39,7 +38,6 @@ const { type, title, body, attribution, date, updated, precision = 'day', meta, 
 // glyph/label/tone come from TYPE_META (the one map); the card adds only what
 // is its own business — the hover border and which date word it uses.
 const CARD = {
-  song: { hover: 'hover:border-primary/40', kind: 'added' },
   quote: { hover: 'hover:border-secondary/40', kind: 'added' },
   writing: { hover: 'hover:border-accent/40', kind: 'posted' },
 }[type];

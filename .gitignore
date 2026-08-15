@@ -45,3 +45,7 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Supabase CLI scratch — written by `supabase link`/`db push`, machine-local
+# and not part of the schema record. `supabase/migrations/` is.
+supabase/.temp/

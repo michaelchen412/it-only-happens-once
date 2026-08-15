@@ -48,6 +48,11 @@ export const TABLES = [
   'works',
   'constellations',
   'pages',
+  // Before `fragments`, which carries `paired_song_id` into it — this list is
+  // in foreign-key order so an importer walking it top to bottom never trips a
+  // reference. A song is not re-derivable either: the recording lives on
+  // Spotify, but which essay wanted it does not.
+  'songs',
   'fragments',
   'fragment_subjects',
   'fragment_constellations',

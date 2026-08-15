@@ -30,11 +30,7 @@ const SEED: SongForSheet = {
   id: SONG,
   title: 'Blue in Green',
   artist: 'Miles Davis',
-  album: 'Kind of Blue',
-  year: 2026,
   url: 'https://open.spotify.com/track/0000000000000000000000',
-  publicNote: '',
-  privateNote: '',
   paired: [{ id: ESSAY, title: 'A piece that already has it', status: 'draft' }],
   // No embed: an iframe to Spotify on every run is a third party this suite
   // does not need, and nothing here is about the player.

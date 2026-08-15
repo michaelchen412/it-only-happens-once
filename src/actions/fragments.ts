@@ -481,57 +481,38 @@ export const fragments = {
       // and the kind both come from it, so a stale hidden field can't disagree.
       const ref = parseSongRef(input.spotify_url);
       if (!ref) throw fail('That doesn’t look like a Spotify track, album, or YouTube link', 'BAD_REQUEST');
-      // Songs freeze too, though they have no public URL of their own today
-      // (docs/admin.md). The rule is "a published FRAGMENT keeps its slug", and
-      // two of three types obeying it is the version a later session has to
-      // stop and work out the reason for. There isn't one.
-      const slug = await fragmentSlug(sb, {
-        id: input.id,
-        override: input.slug,
-        base: `${input.title} ${input.attribution}`,
-      });
-      // `spotify_id` stays the key for Spotify refs so existing rows keep their
-      // meaning; a YouTube citation records its own id under its own name.
-      const details: Record<string, Json> =
-        ref.provider === 'youtube' ? { youtube_id: ref.id } : { spotify_id: ref.id };
-      if (input.album) details.album = input.album;
-      if (input.thumbnail_url) details.thumbnail_url = input.thumbnail_url;
-      // The release year is the ALBUM's claim, kept distinct from `occurred_at`,
-      // which on a song means the year you added it (docs/plans/04 open qs).
-      if (input.release_year) details.release_year = input.release_year;
-      if (input.spotify_album_id) details.spotify_album_id = input.spotify_album_id;
-      if (input.spotify_artist_ids) {
-        details.spotify_artist_ids = input.spotify_artist_ids
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-      // provenance facets follow the shown fields: artist → author, album → work
-      const author_id = await resolveAuthor(sb, input.attribution);
-      const work_id = await resolveWork(sb, input.album, author_id);
-      const row: Omit<FragmentInsert, 'id' | 'published_at'> = {
-        type: 'song',
+      /*
+        ⚠ THREE FIELDS, AND EVERYTHING ELSE THIS USED TO WRITE IS GONE WITH THE
+        TABLE (ADR 0035). It used to freeze a slug, resolve an author from the
+        artist and a work from the album, build a `details` blob of Web-API
+        metadata, set a status and a year. `songs` has title, artist and a URL,
+        because that is all a recording needs to be played under the essay that
+        wanted it:
+
+          · no slug   — nothing addresses a song
+          · no status — a song is visible exactly when its essay is
+          · no author/work — provenance is the Library's job for QUOTES, and a
+            song's artist is a string on the row, not an entity to be groomed
+          · no `details` — `spotify_id` was derived from `source_url`, which
+            data-model.md already calls the one source of truth for id and kind,
+            and nothing rendered the rest
+      */
+      const row = {
         title: input.title,
-        slug,
-        // ⚠ NO `body` KEY AT ALL — see the note above the handler. `persist`
-        // updates the keys it is given, so its ABSENCE is what protects the
-        // public note from a metadata save.
-        attribution: input.attribution,
+        artist: input.attribution,
         // Canonical, not what was pasted: Spotify's share sheet appends a `?si=`
         // tracking token, and that token has no business on a public page.
         source_url: songRefUrl(ref),
-        details,
-        author_id,
-        work_id,
-        status: input.status,
-        occurred_at: yearToISO(input.year),
-        date_precision: 'year',
       };
-      // `undefined` subjects, which `syncSubjects` reads as "none" — so a save
-      // here CLEARS any a song still carries. Stated rather than left to be
-      // discovered: it is deliberate self-healing under ADR 0031 (no song has
-      // one today), not a side effect of dropping the field.
-      return persist(sb, input.id, row, undefined);
+
+      if (input.id) {
+        const { error } = await sb.from('songs').update(row).eq('id', input.id);
+        if (error) throw fail(error.message);
+        return { id: input.id };
+      }
+      const { data, error } = await sb.from('songs').insert(row).select('id').single();
+      if (error) throw fail(error.message);
+      return { id: data.id };
     },
   }),
 
@@ -881,14 +862,12 @@ async function songForRef(sb: DB, url: string) {
   const ref = parseSongRef(url);
   if (!ref) return null;
   const { data } = await sb
-    .from('fragments')
-    .select('id, title, attribution')
-    .eq('type', 'song')
+    .from('songs')
+    .select('id, title, artist')
     .eq('source_url', songRefUrl(ref))
-    .is('deleted_at', null)
     .limit(1)
     .maybeSingle();
-  return data ? { id: data.id, title: data.title ?? '(untitled)', artist: data.attribution ?? '' } : null;
+  return data ? { id: data.id, title: data.title, artist: data.artist ?? '' } : null;
 }
 
 export const songs = {
@@ -952,17 +931,8 @@ export const songs = {
     handler: async ({ id }, ctx) => {
       requireAdmin(ctx);
       const sb = ctx.locals.supabase;
-      const [{ data: song }, { data: priv }, { data: essays }] = await Promise.all([
-        sb
-          .from('fragments')
-          .select('id, type, title, body, attribution, source_url, details, occurred_at, deleted_at')
-          .eq('id', id)
-          .maybeSingle(),
-        // A separate read because it is a separate TABLE, and an admin-only one
-        // — a PostgREST embed would re-apply its policy and come back null for
-        // anyone but Michael, which is correct and also indistinguishable from
-        // "there is no note". Asking directly makes the difference legible.
-        sb.from('fragment_private_notes').select('notes').eq('fragment_id', id).maybeSingle(),
+      const [{ data: song }, { data: essays }] = await Promise.all([
+        sb.from('songs').select('id, title, artist, source_url').eq('id', id).maybeSingle(),
         // ⚠ ids AND status, not just titles (plan 39 · §3). The Facts tab used
         // to join these into one read-only string; it is a list of controls
         // now, so each row needs an id to unpair BY and a status to say whether
@@ -970,107 +940,18 @@ export const songs = {
         // actually asking about a paired essay while the song is playing.
         sb.from('fragments').select('id, title, status').eq('paired_song_id', id).is('deleted_at', null),
       ]);
-      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
-      if (song.type !== 'song') throw fail('That is not a song.', 'BAD_REQUEST');
+      if (!song) throw fail('That song no longer exists.', 'NOT_FOUND');
 
-      const details = (song.details ?? {}) as { album?: string };
-      const ref = song.source_url ? parseSongRef(song.source_url) : null;
+      const ref = parseSongRef(song.source_url);
       const embed = ref ? songEmbed(ref) : null;
       return {
         id: song.id,
-        title: song.title ?? '',
-        artist: song.attribution ?? '',
-        album: details.album ?? '',
-        // The year it ENTERED the corpus, which is `occurred_at` — deliberately
-        // not `details.release_year`, the album's own claim. The two are easy to
-        // conflate and mean different things; `saveSong`'s comment has the account.
-        year: new Date(song.occurred_at).getUTCFullYear(),
-        url: song.source_url ?? '',
-        publicNote: song.body ?? '',
-        privateNote: priv?.notes ?? '',
+        title: song.title,
+        artist: song.artist ?? '',
+        url: song.source_url,
         paired: (essays ?? []).map((e) => ({ id: e.id, title: e.title || '(untitled)', status: e.status })),
         embed: { src: embed?.src ?? '', height: embed?.height ?? 0, allow: embed?.allow ?? '' },
       };
-    },
-  }),
-
-  /**
-   * Both notes on a song, in one call (ADR 0031).
-   *
-   * ⚠ THIS REPLACES "WHY THIS ONE", AND THE RENAME IS THE WHOLE POINT. ADR 0009
-   * gave a song `body` as an annotation — Michael's sentence on *why this song*
-   * — and in seventeen days one song in forty-eight used it. The sentence it
-   * used it for was *"I love Janek's playing in the beginning; it really sets
-   * the tone for the whole piece"*: an observation, not a justification. The
-   * field was mislabelled from the hour it was created, and the label is what
-   * kept it empty. Michael, 2026-08-11: *"I don't need to tell you why the music
-   * is good… I want to show and not tell."*
-   *
-   * TWO NOTES, SPLIT BY AUDIENCE RATHER THAN BY LENGTH:
-   *
-   *  · `public_notes` → `fragments.body`, still meaning *the words of this
-   *    fragment*. It renders in the music room behind a popover on the card,
-   *    and nowhere else — never above a player, which is the caption this site
-   *    already removed once for saying what the embed says.
-   *  · `private_notes` → `fragment_private_notes`, admin-only in RLS and
-   *    revoked from `anon` at the privilege layer. Where a song came from, what
-   *    week it belongs to, what to listen for at 2:41.
-   *
-   * Applies IMMEDIATELY and sends BOTH every time, exactly like `setFeelings`
-   * above and for the same reason: a note is written while listening, often
-   * years after the row was, and it must not have to ride along with a save of
-   * the metadata beside it. Sending both halves is what stops the pair drifting
-   * out of step with the two editors on screen.
-   *
-   * ⚠ AND `saveSong` NO LONGER WRITES `body` AT ALL — see its handler. If it
-   * did, saving the metadata tab would blank a note written on the next tab.
-   */
-  setNotes: defineAction({
-    input: z.object({
-      song_id: z.uuid(),
-      /** Markdown, both of them — same editor, same pipeline as a quote body. */
-      public_notes: z.string(),
-      private_notes: z.string(),
-    }),
-    handler: async ({ song_id, public_notes, private_notes }, ctx) => {
-      requireAdmin(ctx);
-      const sb = ctx.locals.supabase;
-      // Same type gate as `setFeelings`, for the same reason: the FK cannot say
-      // "only a song", so the refusal is a sentence here rather than a
-      // constraint name. `fragment_private_notes` is keyed on `fragment_id` and
-      // would happily take an essay.
-      const { data: song } = await sb.from('fragments').select('id, type, deleted_at').eq('id', song_id).maybeSingle();
-      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
-      if (song.type !== 'song') throw fail('Only a song carries notes.', 'BAD_REQUEST');
-
-      const pub = public_notes.trim();
-      const priv = private_notes.trim();
-
-      const { error: bodyErr } = await sb
-        .from('fragments')
-        .update({ body: pub || null })
-        .eq('id', song_id);
-      if (bodyErr) throw fail(bodyErr.message);
-
-      // ⚠ EMPTY DELETES THE ROW rather than storing ''. The column defaults to
-      // '' and would take it happily — but then "has a private note" becomes a
-      // question about a string instead of about a row, and every reader has to
-      // remember which. This way the table IS the set of songs with a note.
-      if (priv) {
-        const { error } = await sb
-          .from('fragment_private_notes')
-          .upsert({ fragment_id: song_id, notes: priv }, { onConflict: 'fragment_id' });
-        if (error) throw fail(error.message);
-      } else {
-        const { error } = await sb.from('fragment_private_notes').delete().eq('fragment_id', song_id);
-        if (error) throw fail(error.message);
-      }
-
-      // ⚠ NOT A TRANSACTION, same call as `setFeelings` makes. A half-applied
-      // pair leaves one note saved and one not, on the screen you are looking
-      // at, re-fixable by pressing save again. `merge_feelings` is the pattern
-      // to reach for if that ever stops being true.
-      return { ok: true, hasPublic: !!pub, hasPrivate: !!priv };
     },
   }),
 
@@ -1084,11 +965,9 @@ export const songs = {
     handler: async ({ q }, ctx) => {
       requireAdmin(ctx);
       let query = ctx.locals.supabase
-        .from('fragments')
-        .select('id, title, attribution, body')
-        .eq('type', 'song')
-        .is('deleted_at', null)
-        .order('occurred_at', { ascending: false })
+        .from('songs')
+        .select('id, title, artist')
+        .order('created_at', { ascending: false })
         .limit(20);
       // PostgREST `.or()` values can't contain its own delimiters.
       const term = (q ?? '')
@@ -1100,10 +979,13 @@ export const songs = {
       if (error) throw fail(error.message);
       return (data ?? []).map((s) => ({
         id: s.id,
-        title: s.title ?? '(untitled)',
-        artist: s.attribution ?? '',
-        /** Whether it has an annotation — the picker marks the ones that speak. */
-        annotated: Boolean(s.body?.trim()),
+        title: s.title,
+        artist: s.artist ?? '',
+        // ⚠ ALWAYS FALSE, AND THE FIELD STAYS FOR NOW. The picker marked songs
+        // that carried an annotation; a song has no note since ADR 0035, so
+        // nothing is ever marked. Kept rather than removed in the same pass
+        // that removed the notes, so the picker's shape is one change at a time.
+        annotated: false,
       }));
     },
   }),
@@ -1128,13 +1010,13 @@ export const songs = {
       const sb = ctx.locals.supabase;
       if (song_id) {
         if (song_id === fragment_id) throw fail('A piece can’t be paired with itself.', 'BAD_REQUEST');
-        const { data: song } = await sb
-          .from('fragments')
-          .select('id, type, deleted_at')
-          .eq('id', song_id)
-          .maybeSingle();
-        if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
-        if (song.type !== 'song') throw fail('Only a song can be paired to a piece of writing.', 'BAD_REQUEST');
+        // ⚠ THE TYPE CHECK IS GONE BECAUSE THE TYPE IS. `paired_song_id` now
+        // references `songs`, so "only a song" is a foreign key rather than a
+        // sentence — the thing ADR 0034 wanted and could not have while a song
+        // was a fragment. The existence check stays: the FK would refuse an
+        // unknown id with a constraint name, and this refuses it with English.
+        const { data: song } = await sb.from('songs').select('id').eq('id', song_id).maybeSingle();
+        if (!song) throw fail('That song no longer exists.', 'NOT_FOUND');
       }
       // `.eq('type', 'writing')` so this can only ever touch an essay. RLS is
       // still the boundary — a non-admin's update matches zero rows regardless.

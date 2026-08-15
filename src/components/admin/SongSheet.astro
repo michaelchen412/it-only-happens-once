@@ -31,7 +31,6 @@
 import SharedByField from './SharedByField.astro';
 import FragmentBrowser from './FragmentBrowser.astro';
 import BackToTop from '../BackToTop.astro';
-import MiniEditor from './MiniEditor.astro';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
 
@@ -43,7 +42,6 @@ interface Props {
   sharedBy?: Record<string, string[]>;
 }
 const { people = [], sharedBy = {} } = Astro.props;
-const thisYear = new Date().getUTCFullYear();
 ---
 
 <dialog
@@ -76,85 +74,24 @@ const thisYear = new Date().getUTCFullYear();
           class="w-full font-sans"
         />
       </label>
-      {
-        /* ⚠ THE PLAYER IS A DIV THE SCRIPT FILLS, AND REMOVING THE IFRAME IS THE
-          ONLY PAUSE WE HAVE. A cross-origin frame cannot be controlled from
-          outside — no API, no postMessage we own. So closing the sheet, loading
-          a different song, and saving all DESTROY the frame, and that is what
-          stops the sound. Anything that "hides" a player instead of removing it
-          leaves music playing in a room you have left. */
-      }
-      <div id="sng-player" class="mt-4 empty:mt-0"></div>
-    </div>
-
-    <div class="admin-tabs mt-4 px-6" role="tablist" aria-label="Song sections">
-      {
-        /* ⚠ FEELINGS IS FIRST AND IS THE DEFAULT, and that is the ergonomic
-          argument for the whole sheet. The loop plan 33 §3 says decides whether
-          any of this happens — paste, listen, press the words, save, next — must
-          never require visiting a second tab. The metadata arrives already
-          filled from `songs.lookup`, so Facts is the tab you open when the
-          lookup got something wrong, not the one you pass through.
-
-          ⚠ THE NAMES WERE A TRIAD AND ARE NOW A PAIR: Facts / Notes — what is
-          true about it, and what you want to say. Feelings led, and its whole
-          job was to state ADR 0031's claim in the interface: a feeling is not a
-          property of the song and a fact is. Plan 40 retired the vocabulary, so
-          the distinction has nothing left to draw and the tab that drew it is
-          gone. "Facts" stays because it still picks up the quote sheet's
-          vocabulary, where provenance is already "the three facts". */
-      }
-      <button
-        type="button"
-        role="tab"
-        class="admin-tab"
-        data-tab="facts"
-        aria-selected="true"
-        aria-selected="false"
-        tabindex="-1"
-        aria-controls="sng-panel-facts"
-      >
-        Facts
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="admin-tab"
-        data-tab="notes"
-        aria-selected="false"
-        tabindex="-1"
-        aria-controls="sng-panel-notes"
-      >
-        Notes<span id="sng-notes-mark" class="admin-tab__n"></span>
-      </button>
-    </div>
-
-    {/* ── FACTS ────────────────────────────────────────────────────────── */}
-    <div id="sng-panel-facts" role="tabpanel" data-tabpanel="facts" class="flex flex-col gap-4 px-6 py-5 font-sans">
-      {
-        /* Auto-filled from the lookup but editable: a five-artist track joins to
+      {/* ── FACTS ────────────────────────────────────────────────────────── */}
+      <div id="sng-panel-facts" role="tabpanel" data-tabpanel="facts" class="flex flex-col gap-4 px-6 py-5 font-sans">
+        {
+          /* Auto-filled from the lookup but editable: a five-artist track joins to
           "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans", which is
           a credit list rather than an attribution. */
-      }
-      <label class="f">
-        <span class="f__k">Title</span>
-        <input id="sng-song-title" class="font-serif" />
-      </label>
-      <label class="f">
-        <span class="f__k">Artist</span>
-        <input id="sng-artist" placeholder="Miles Davis" />
-      </label>
-      <label class="f">
-        <span class="f__k">Album</span>
-        <input id="sng-album" placeholder="Kind of Blue" />
-      </label>
-      <label class="f">
-        <span class="f__k">Added <span>— the year it entered the corpus</span></span>
-        <input id="sng-year" type="number" value={thisYear} />
-      </label>
+        }
+        <label class="f">
+          <span class="f__k">Title</span>
+          <input id="sng-song-title" class="font-serif" />
+        </label>
+        <label class="f">
+          <span class="f__k">Artist</span>
+          <input id="sng-artist" placeholder="Miles Davis" />
+        </label>
 
-      {
-        /* THE PAIRING (ADR 0011, plan 37 §2, plan 39). It is the single most
+        {
+          /* THE PAIRING (ADR 0011, plan 37 §2, plan 39). It is the single most
           useful fact about 46 of the 48 songs here.
 
           ⚠ THIS WAS READ-ONLY UNTIL 2026-08-12, AND THE REVERSAL IS THE POINT.
@@ -193,17 +130,17 @@ const thisYear = new Date().getUTCFullYear();
 
           ⚠ THE WRAP NO LONGER HIDES WHEN EMPTY. It is the door now, and a door
           that disappears when there is nothing behind it cannot be used. */
-      }
-      <div id="sng-paired-wrap" class="f">
-        <span class="f__k">Paired with <span>— the pieces this song plays above</span></span>
-        <ul id="sng-paired" class="flex flex-col gap-1"></ul>
-        <p id="sng-paired-none" class="f__h italic">Nothing yet.</p>
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <button id="sng-pair-add" type="button" class="btn btn-ghost btn-xs gap-1 normal-case">
-            ＋ Pair with a piece
-          </button>
-          {
-            /* ⚠ OFFERED, NOT DISABLED, WHILE THE SONG IS UNSAVED (plan 39 ·
+        }
+        <div id="sng-paired-wrap" class="f">
+          <span class="f__k">Paired with <span>— the pieces this song plays above</span></span>
+          <ul id="sng-paired" class="flex flex-col gap-1"></ul>
+          <p id="sng-paired-none" class="f__h italic">Nothing yet.</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <button id="sng-pair-add" type="button" class="btn btn-ghost btn-xs gap-1 normal-case">
+              ＋ Pair with a piece
+            </button>
+            {
+              /* ⚠ OFFERED, NOT DISABLED, WHILE THE SONG IS UNSAVED (plan 39 ·
               ruling 3). Disabling until Save was the alternative, and it loses
               on the very flow this sheet exists for: Save destroys the iframe,
               so "save first, then pair" is "stop the music, then pair" — the
@@ -211,15 +148,15 @@ const thisYear = new Date().getUTCFullYear();
               flushed on the first save, the way SharedByField already holds its
               ticks. This line is what keeps the wait legible instead of looking
               like a press that did nothing. */
-          }
-          <span id="sng-pair-queued" hidden class="f__h italic"></span>
+            }
+            <span id="sng-pair-queued" hidden class="f__h italic"></span>
+          </div>
         </div>
-      </div>
 
-      <SharedByField scope="song" people={people} />
+        <SharedByField scope="song" people={people} />
 
-      {
-        /* DELETE LEFT THE STICKY FOOTER (plan 38 · §1.4), for the reason
+        {
+          /* DELETE LEFT THE STICKY FOOTER (plan 38 · §1.4), for the reason
           `WritingSheet.astro` states about its own: *"a destructive action does
           not belong in a row of benign ones, one keystroke from Unpublish."*
           Here it was worse than in the quote sheet — the footer FOLLOWS YOU
@@ -239,66 +176,21 @@ const thisYear = new Date().getUTCFullYear();
           The alternative that lost: the foot of Notes, because Notes is last.
           Last is not the same as "the end of the object" — a private note is
           the one part of a song you would keep if you could. */
-      }
-      <div
-        id="sng-delete-zone"
-        hidden
-        class="border-base-300 mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
-      >
-        <p class="admin-hint">
-          Deleting removes this song and its notes. Any essay it was paired with keeps its own text.
-        </p>
-        <button id="sng-delete" type="button" class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+        }
+        <div
+          id="sng-delete-zone"
+          hidden
+          class="border-base-300 mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
+        >
+          <p class="admin-hint">
+            Deleting removes this song and its notes. Any essay it was paired with keeps its own text.
+          </p>
+          <button id="sng-delete" type="button" class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
+        </div>
       </div>
-    </div>
 
-    {/* ── NOTES ────────────────────────────────────────────────────────── */}
-    <div
-      id="sng-panel-notes"
-      role="tabpanel"
-      data-tabpanel="notes"
-      hidden
-      class="flex flex-col gap-5 px-6 py-5 font-sans"
-    >
       {
-        /* ⚠ THIS IS NOT "WHY THIS ONE", AND THE RENAME IS THE WHOLE POINT (ADR
-          0031). ADR 0009 gave a song `body` as an annotation — the sentence on
-          *why this song* — and in seventeen days one song in forty-eight used
-          it. What it was used for was *"I love Janek's playing in the beginning;
-          it really sets the tone for the whole piece"*: an observation, not a
-          justification. The field was mislabelled from the hour it was created,
-          and the label is what kept it empty.
-
-          Michael, 2026-08-11: *"I don't need to tell you why the music is good.
-          That's violating a really big aesthetic principle of mine — I want to
-          show and not tell."*
-
-          SPLIT BY AUDIENCE, NOT BY LENGTH, and the helper lines say which is
-          which in the one place the choice is actually made. That sentence
-          existed nowhere in the old form, and its absence WAS the bug: nothing
-          said who would read what you were typing. */
-      }
-      <div class="f">
-        <span class="f__k">A note <span>— anyone can open this</span></span>
-        <MiniEditor id="sng-pub" wrapId="sng-pub-wrap" size="max-h-[28vh] min-h-[5rem]" />
-        <span class="text-base-content/45 text-xs">
-          Opens from a small mark beside the song in the music room. Leave it empty and there is no mark — which is the
-          normal case.
-        </span>
-      </div>
-
-      <div class="f">
-        <span class="f__k">For you <span>— nobody else, ever</span></span>
-        <MiniEditor id="sng-priv" wrapId="sng-priv-wrap" size="max-h-[28vh] min-h-[5rem]" />
-        <span class="text-base-content/45 text-xs">
-          Where it came from, the week it belongs to, what to listen for. Stored in its own table, admin-only, and
-          revoked from the public key — it is never rendered anywhere.
-        </span>
-      </div>
-    </div>
-
-    {
-      /* ONE SAVE, IN THE FOOTER, FOR THE WHOLE SHEET — and this deviates from
+        /* ONE SAVE, IN THE FOOTER, FOR THE WHOLE SHEET — and this deviates from
         plan 37's table, which had the feelings and notes applying immediately
         while the metadata kept a Save.
 
@@ -317,9 +209,9 @@ const thisYear = new Date().getUTCFullYear();
 
         The exception is Shared by, which keeps its own immediate contract and
         queues its ticks until a new song has an id — see SharedByField. */
-    }
-    {
-      /* ⚠ THE ONLY SHEET IN THE WORKSHOP WITH A STICKY FOOTER, and it is the
+      }
+      {
+        /* ⚠ THE ONLY SHEET IN THE WORKSHOP WITH A STICKY FOOTER, and it is the
         one that should have one. Every other sheet's primary action sits inline
         at the end of ITS FORM, because the form is the whole sheet — the quote
         sheet's second tab applies immediately and has nothing to save. Here one
@@ -330,21 +222,21 @@ const thisYear = new Date().getUTCFullYear();
         Checked against the others during the consistency pass (ADR 0032) rather
         than assumed — this is drift that earns itself, which is a different
         thing from drift nobody noticed. */
-    }
-    <div class="border-base-300 bg-base-100 sticky bottom-0 mt-auto flex items-center gap-2 border-t px-6 py-4">
-      {
-        /* Named, like "Save quote" and "Add task" beside it — a bare "Save" is
-          the one label that tells you nothing about what you are committing. */
       }
-      <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
-      <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
+      <div class="border-base-300 bg-base-100 sticky bottom-0 mt-auto flex items-center gap-2 border-t px-6 py-4">
+        {
+          /* Named, like "Save quote" and "Add task" beside it — a bare "Save" is
+          the one label that tells you nothing about what you are committing. */
+        }
+        <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
+        <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
+      </div>
     </div>
+    <BackToTop scroller="#sng-scroll" inDialog />
   </div>
-  <BackToTop scroller="#sng-scroll" inDialog />
-</dialog>
 
-{
-  /* ⚠ THE PAIRING PICKER SHIPS WITH THE SHEET, NOT WITH THE PAGE (plan 39), for
+  {
+    /* ⚠ THE PAIRING PICKER SHIPS WITH THE SHEET, NOT WITH THE PAGE (plan 39), for
     the same reason the paste bar does — stated at the top of this file: *"a
     sheet carrying its own front door is MOUNTABLE ANYWHERE"*. Both rooms that
     mount this sheet get the picker by construction, and neither has to know it
@@ -354,22 +246,23 @@ const thisYear = new Date().getUTCFullYear();
     It is a SIBLING of the sheet, not a child: a <dialog> nested inside another
     <dialog> inherits the parent's `display: none` when the parent is closed,
     and the top layer does not care about DOM depth anyway. */
-}
-<FragmentBrowser mode="pair" />
+  }
+  <FragmentBrowser mode="pair" />
 
-<style>
-  /* The pressed state, and it is the only styling this sheet adds.
+  <style>
+    /* The pressed state, and it is the only styling this sheet adds.
 
      A border and a weight rather than a fill: the row is a row of WORDS, and a
      block of coloured chips reads as a form control. `--color-primary` is the
      same accent the rest of the workshop uses for "this is on". */
-  .sng-word[aria-pressed='true'] {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    font-weight: 500;
-  }
-</style>
+    .sng-word[aria-pressed='true'] {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      font-weight: 500;
+    }
+  </style>
 
-<script>
-  import '../../scripts/song-sheet';
-</script>
+  <script>
+    import '../../scripts/song-sheet';
+  </script>
+</dialog>

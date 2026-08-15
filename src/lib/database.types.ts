@@ -609,7 +609,7 @@ export type Database = {
             foreignKeyName: "fragments_paired_song_id_fkey"
             columns: ["paired_song_id"]
             isOneToOne: false
-            referencedRelation: "fragments"
+            referencedRelation: "songs"
             referencedColumns: ["id"]
           },
           {
@@ -989,6 +989,30 @@ export type Database = {
         }
         Relationships: []
       }
+      songs: {
+        Row: {
+          artist: string | null
+          created_at: string
+          id: string
+          source_url: string
+          title: string
+        }
+        Insert: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          source_url: string
+          title: string
+        }
+        Update: {
+          artist?: string | null
+          created_at?: string
+          id?: string
+          source_url?: string
+          title?: string
+        }
+        Relationships: []
+      }
       subjects: {
         Row: {
           created_at: string
@@ -1197,7 +1221,7 @@ export type Database = {
       date_precision: "day" | "year"
       dream_recall: "none" | "neutral" | "anxious" | "distressing"
       fragment_status: "note" | "draft" | "published"
-      fragment_type: "writing" | "quote" | "song"
+      fragment_type: "writing" | "quote"
       goal_horizon: "this_season" | "this_year" | "next_few_years"
       goal_status: "active" | "paused" | "achieved" | "let_go"
       interaction_kind:
@@ -1352,7 +1376,7 @@ export const Constants = {
       date_precision: ["day", "year"],
       dream_recall: ["none", "neutral", "anxious", "distressing"],
       fragment_status: ["note", "draft", "published"],
-      fragment_type: ["writing", "quote", "song"],
+      fragment_type: ["writing", "quote"],
       goal_horizon: ["this_season", "this_year", "next_few_years"],
       goal_status: ["active", "paused", "achieved", "let_go"],
       interaction_kind: [

@@ -157,11 +157,11 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       paired_song_id?: string | null;
       paired_song?: {
         id: string;
-        title: string | null;
-        attribution: string | null;
-        source_url: string | null;
-        deleted_at: string | null;
+        title: string;
+        artist: string | null;
+        source_url: string;
       } | null;
+      paired_playlist_url?: string | null;
       details?: unknown;
       is_self?: boolean | null;
       authors?: { name: string; slug: string } | null;

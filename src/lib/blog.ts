@@ -158,7 +158,7 @@ function sanitizeQuery(q: string): string {
  * "almost nothing" is not the property worth relying on.
  */
 export const PAIRED_SELECT =
-  'paired_song_id, paired_song:paired_song_id(id, title, attribution, source_url, deleted_at), paired_playlist_url';
+  'paired_song_id, paired_song:paired_song_id(id, title, artist, source_url), paired_playlist_url';
 
 /**
  * Shape of what PAIRED_SELECT adds to a row.
@@ -176,10 +176,9 @@ export interface PairedRow {
   paired_song_id?: string | null;
   paired_song?: {
     id: string;
-    title: string | null;
-    attribution: string | null;
-    source_url: string | null;
-    deleted_at: string | null;
+    title: string;
+    artist: string | null;
+    source_url: string;
   } | null;
   paired_playlist_url?: string | null;
 }
@@ -208,13 +207,22 @@ export interface PairedRow {
 export function pairedMediaOf(row: PairedRow): PairedMedia | null {
   if (row.paired_song_id) {
     const song = row.paired_song;
-    // A soft-deleted song is not a pairing. The FK can't see `deleted_at`, so
-    // it still resolves — trash would otherwise keep playing on a live essay.
-    if (!song || song.deleted_at || !song.source_url) return null;
+    /*
+      ⚠ THE `deleted_at` CHECK IS GONE BECAUSE THE COLUMN IS. A song used to be
+      a fragment and inherited soft delete, so the FK resolved a row that was in
+      the trash and an essay went on playing it. `songs` has no bin: there is
+      nothing in a song a minute of retyping cannot restore, and `ON DELETE SET
+      NULL` blanks the pairing rather than orphaning the essay.
+
+      The null check STAYS and is still the security property. RLS could hide a
+      song, or the FK could be null — either way "id set, embed null" means NO
+      pairing and must not fall through to the playlist branch below.
+    */
+    if (!song || !song.source_url) return null;
     return {
       fragmentId: song.id,
-      title: song.title ?? '',
-      artist: song.attribution,
+      title: song.title,
+      artist: song.artist,
       url: song.source_url,
     };
   }

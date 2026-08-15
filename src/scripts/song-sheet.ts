@@ -21,8 +21,6 @@
 import { actions } from 'astro:actions';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
-import { mountMiniEditor } from './rich-editor';
-import { wireSheetTabs } from './sheet-tabs';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
 import { closeWithExit, openDialog } from './dialog-close';
@@ -36,11 +34,7 @@ export interface SongSheetSeed {
   id: string | null;
   title: string;
   artist: string;
-  album: string;
-  year: number | null;
   url: string;
-  publicNote: string;
-  privateNote: string;
   /**
    * The pieces this song is paired to — EDITABLE here since plan 39.
    *
@@ -64,11 +58,7 @@ const EMPTY: SongSheetSeed = {
   id: null,
   title: '',
   artist: '',
-  album: '',
-  year: null,
   url: '',
-  publicNote: '',
-  privateNote: '',
   paired: [],
   embed: { src: '', height: 0, allow: '' },
   resolved: null,
@@ -141,11 +131,8 @@ function wire(sheet: HTMLDialogElement) {
   const urlEl = el<HTMLInputElement>('sng-url');
   const playerEl = el('sng-player');
   const headingEl = el('sng-title');
-  const notesMarkEl = el('sng-notes-mark');
   const songTitleEl = el<HTMLInputElement>('sng-song-title');
   const artistEl = el<HTMLInputElement>('sng-artist');
-  const albumEl = el<HTMLInputElement>('sng-album');
-  const yearEl = el<HTMLInputElement>('sng-year');
   const pairedEl = el<HTMLUListElement>('sng-paired');
   const pairedNoneEl = el('sng-paired-none');
   const pairAddBtn = el<HTMLButtonElement>('sng-pair-add');
@@ -161,7 +148,6 @@ function wire(sheet: HTMLDialogElement) {
   // this element across the admin (plan 29 · §6 + plan 38 · §3).
   const errorEl = sheetError(sheet)!;
 
-  const tabs = wireSheetTabs(sheet);
   /*
     ⚠ SHARED BY IS IGNORED, because a tick there writes IMMEDIATELY (see
     SharedByField) — counting it would warn about edits that are already in the
@@ -174,19 +160,6 @@ function wire(sheet: HTMLDialogElement) {
   const sharedBy = sharedByRoot ? wireSharedBy(sharedByRoot) : null;
   const sharedByMap = JSON.parse(sheet.dataset.sharedBy || '{}') as Record<string, string[]>;
 
-  const pub = mountMiniEditor({
-    editorEl: el('sng-pub'),
-    toolbarRoot: el('sng-pub-wrap'),
-    placeholder: 'Something worth having beside the music…',
-    ariaLabel: 'A note anyone can open',
-  });
-  const priv = mountMiniEditor({
-    editorEl: el('sng-priv'),
-    toolbarRoot: el('sng-priv-wrap'),
-    placeholder: 'For you…',
-    ariaLabel: 'A note only you can read',
-  });
-
   /** The song on the sheet. */
   let cur: SongSheetSeed = { ...EMPTY };
   /**
@@ -198,7 +171,7 @@ function wire(sheet: HTMLDialogElement) {
    * three writes nobody asked for. It is also the difference between "Save"
    * meaning *commit what I changed* and meaning *rewrite this row*.
    */
-  let base = { title: '', artist: '', album: '', year: '', url: '' };
+  let base = { title: '', artist: '', url: '' };
   let lookupTimer: ReturnType<typeof setTimeout> | undefined;
   /** Lookups are async; a stale answer must not replace a newer one. */
   let lookupSeq = 0;
@@ -298,18 +271,6 @@ function wire(sheet: HTMLDialogElement) {
     });
   });
 
-  /** The Notes badge — a MARK rather than a count, see below. */
-  function paintBadges() {
-    // ⚠ A MARK RATHER THAN A COUNT, because "2" would be a lie about what is
-    // there: the two notes are different documents with different readers, not
-    // two of one thing. `··` says both, `·` says one, nothing says neither.
-    notesMarkEl.textContent = (pub.editor.getText().trim() ? '·' : '') + (priv.editor.getText().trim() ? '·' : '');
-  }
-  // TipTap fires no `input` the tracker can hear, so both editors report
-  // themselves — the same reason the quote sheet's editor does.
-  pub.editor.on('update', () => (paintBadges(), dirty.touch()));
-  priv.editor.on('update', () => (paintBadges(), dirty.touch()));
-
   // --- the player ----------------------------------------------------------
   /** ⚠ Replaces the frame rather than hiding it. See the file header. */
   function raisePlayer(embed: SongSheetSeed['embed']) {
@@ -338,22 +299,16 @@ function wire(sheet: HTMLDialogElement) {
     cur = { ...seed };
     clearError();
     statusEl.textContent = '';
-    tabs.select('facts');
 
     headingEl.textContent = seed.id ? seed.title || '(untitled)' : 'New song';
     urlEl.value = seed.url;
     songTitleEl.value = seed.title;
     artistEl.value = seed.artist;
-    albumEl.value = seed.album;
-    yearEl.value = String(seed.year ?? new Date().getFullYear());
-    base = { title: seed.title, artist: seed.artist, album: seed.album, year: yearEl.value, url: seed.url };
+    base = { title: seed.title, artist: seed.artist, url: seed.url };
 
     // emitUpdate: false — TipTap fires `update` on setContent, and the badges
     // are repainted right below anyway; letting it fire would also arm any
     // future dirty-guard against words we put there ourselves.
-    pub.editor.commands.setContent(seed.publicNote || '', { emitUpdate: false });
-    priv.editor.commands.setContent(seed.privateNote || '', { emitUpdate: false });
-    paintBadges();
 
     // ⚠ RESET BEFORE PAINTING. The picker holds queued picks against the song
     // it was opened on; loading a different one into the same sheet must not
@@ -404,7 +359,6 @@ function wire(sheet: HTMLDialogElement) {
       ...EMPTY,
       title: data.title ?? '',
       artist: data.artist ?? '',
-      album: data.album ?? '',
       url: data.url,
       embed: { src: data.embed.src, height: data.embed.height ?? 0, allow: data.embed.allow },
       resolved: {
@@ -436,11 +390,7 @@ function wire(sheet: HTMLDialogElement) {
 
   // --- saving --------------------------------------------------------------
   const metaChanged = () =>
-    songTitleEl.value.trim() !== base.title ||
-    artistEl.value.trim() !== base.artist ||
-    albumEl.value.trim() !== base.album ||
-    yearEl.value !== base.year ||
-    urlEl.value.trim() !== base.url;
+    songTitleEl.value.trim() !== base.title || artistEl.value.trim() !== base.artist || urlEl.value.trim() !== base.url;
 
   const stop = (msg?: string) => {
     saveBtn.disabled = false;
@@ -458,7 +408,6 @@ function wire(sheet: HTMLDialogElement) {
     if (!title || !artist) {
       // Send them where the problem is. An error about a field on a tab you
       // cannot see is an error you have to go hunting for.
-      tabs.select('facts');
       return showError('A song needs a title and an artist before it can be saved.');
     }
 
@@ -492,25 +441,11 @@ function wire(sheet: HTMLDialogElement) {
       fd.set('spotify_url', url);
       fd.set('title', title);
       fd.set('attribution', artist);
-      if (albumEl.value.trim()) fd.set('album', albumEl.value.trim());
-      fd.set('year', yearEl.value || String(new Date().getFullYear()));
-      fd.set('status', 'published');
       const { error } = await callAction(actions.fragments.saveSong(fd));
       if (error) return stop(formatActionError(error));
     }
 
     const songId = cur.id!;
-
-    // 3 · the notes. A separate call because it writes a different table and
-    // fails with a different sentence — the song is real by now either way.
-    const { error: noteErr } = await callAction(
-      actions.songs.setNotes({
-        song_id: songId,
-        public_notes: pub.getMarkdown().trim(),
-        private_notes: priv.getMarkdown().trim(),
-      }),
-    );
-    if (noteErr) return stop(`${formatActionError(noteErr)} The song and its words are saved; the notes are not.`);
 
     stop();
     dirty.reset(); // it is all in the database now

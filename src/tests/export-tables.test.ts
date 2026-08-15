@@ -61,6 +61,7 @@ const ALL: Record<keyof Database['public']['Tables'], true> = {
   push_subscriptions: true,
   sets: true,
   settings: true,
+  songs: true,
   subjects: true,
   task_events: true,
   tasks: true,

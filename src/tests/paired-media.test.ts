@@ -15,12 +15,13 @@
 import { describe, expect, it } from 'vitest';
 import { pairedMediaOf } from '../lib/blog';
 
+// A row from `songs` — four columns, no status and no `deleted_at`, because a
+// song has no independent visibility and no bin (ADR 0035).
 const SONG = {
   id: 'song-1',
   title: 'Creep',
-  attribution: 'Bob Reynolds',
+  artist: 'Bob Reynolds',
   source_url: 'https://open.spotify.com/track/abc',
-  deleted_at: null,
 };
 /** A playlist on the same row — the thing branch 1 must never fall through to. */
 const PLAYLIST = 'https://open.spotify.com/playlist/abc';
@@ -41,28 +42,8 @@ describe('pairedMediaOf — a promoted pairing', () => {
     expect(pairedMediaOf({ paired_song_id: 'song-1', paired_song: null, paired_playlist_url: PLAYLIST })).toBeNull();
   });
 
-  it('shows nothing when the song is in the trash', () => {
-    expect(
-      pairedMediaOf({
-        paired_song_id: 'song-1',
-        paired_song: { ...SONG, deleted_at: '2026-07-31T00:00:00Z' },
-        paired_playlist_url: PLAYLIST,
-      }),
-    ).toBeNull();
-  });
-
-  it('shows nothing when the song somehow has no URL to embed', () => {
-    expect(
-      pairedMediaOf({
-        paired_song_id: 'song-1',
-        paired_song: { ...SONG, source_url: null },
-        paired_playlist_url: PLAYLIST,
-      }),
-    ).toBeNull();
-  });
-
   it('carries an empty artist through rather than inventing one', () => {
-    const got = pairedMediaOf({ paired_song_id: 'song-1', paired_song: { ...SONG, attribution: null } });
+    const got = pairedMediaOf({ paired_song_id: 'song-1', paired_song: { ...SONG, artist: null } });
     expect(got?.artist).toBeNull();
   });
 });

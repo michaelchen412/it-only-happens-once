@@ -198,7 +198,6 @@ const editorData =
   data-type={r.type}
   data-status={r.status}
   data-writing={r.type === 'writing' ? r.id : undefined}
-  data-song={r.type === 'song' ? r.id : undefined}
   data-fragment={editorData || undefined}
   data-placed={placed ? '' : undefined}
   data-paired={paired ? '' : undefined}
@@ -315,9 +314,7 @@ const editorData =
         The `<td>` still renders, empty: the table's columns are shared by every
         row, and dropping the cell on one type would shift the two dates beside
         it out of line with the rows above and below. */
-      (r.type === 'song' ? (
-        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit />
-      ) : pair ? (
+      (pair ? (
         /* ⚠ THE SAME CHIPS, NOT A CONTROL (plan 39 · ruling 5). This cell's
           whole job elsewhere is to open the fragment's editor on its
           Constellations tab — and the pair picker has ruled that it opens no

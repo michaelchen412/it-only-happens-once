@@ -7,13 +7,18 @@
 export const TYPE_META = {
   writing: { glyph: '▤', label: 'writing', tone: 'text-accent' },
   quote: { glyph: '”', label: 'quote', tone: 'text-secondary' },
-  song: { glyph: '♪', label: 'song', tone: 'text-primary' },
 } as const;
 
 export type FragmentType = keyof typeof TYPE_META;
 
 /**
- * The three kinds, in the order every surface offers them.
+ * The two kinds, in the order every surface offers them.
+ *
+ * ⚠ THERE WERE THREE UNTIL 2026-08-15. A `song` was the third, and it left for
+ * a table of its own (ADR 0035) because it was never a fragment in the sense
+ * this union means: text, with subjects, placeable in a constellation, readable
+ * at a URL. Removing it here is what made the compiler find every surface that
+ * assumed otherwise.
  *
  * ⚠ DERIVED FROM `TYPE_META`, NOT WRITTEN OUT AGAIN — which is the whole point,
  * because until 2026-08-09 it WAS written out again three times: privately in

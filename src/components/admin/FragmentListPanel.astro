@@ -84,9 +84,10 @@ const COLUMNS = [
           {
             /* The picker drops the `song` segment entirely rather than showing it
               at zero (ADR 0031). A segment reading "song 0" invites the press that
-              proves it — and the honest statement is not "there are none right
-              now", it is that a song cannot be placed at all. */
-            FRAGMENT_TYPES.filter((t) => !(p.placeable && t === 'song')).map((t) => (
+              proves it. Songs used to be filtered out of the placeable list
+              here because a song could never sit in a suite; since ADR 0035
+              they are not fragments at all, so there is nothing to exclude. */
+            FRAGMENT_TYPES.map((t) => (
               <button
                 type="button"
                 role="radio"

@@ -45,10 +45,9 @@ export type PlacedFragment = {
   paired_song_id?: string | null;
   paired_song?: {
     id: string;
-    title: string | null;
-    attribution: string | null;
-    source_url: string | null;
-    deleted_at: string | null;
+    title: string;
+    artist: string | null;
+    source_url: string;
   } | null;
   paired_playlist_url?: string | null;
 };
@@ -169,12 +168,7 @@ export function buildSuite(placements: Placement[] | null, allLinks: Link[] | nu
       status: f.status,
       editorData,
       read,
-      summary:
-        f.type === 'quote'
-          ? snip(f.body)
-          : f.type === 'song'
-            ? `${f.title ?? ''} — ${f.attribution ?? ''}`
-            : (f.title ?? '(untitled)'),
+      summary: f.type === 'quote' ? snip(f.body) : (f.title ?? '(untitled)'),
       attribution: f.type === 'quote' ? (f.attribution ?? '') : '',
       subjects: (f.fragment_subjects ?? []).map((fs) => fs.subjects?.name).filter(Boolean) as string[],
       others: elsewhere.get(f.id) ?? 0,

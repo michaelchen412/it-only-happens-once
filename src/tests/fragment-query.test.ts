@@ -56,10 +56,10 @@ describe('parseListParams — filters', () => {
   it('reports `filtered` so the empty state can tell "no matches" from "nothing yet"', () => {
     expect(parseListParams(new URLSearchParams('')).filtered).toBe(false);
     expect(parseListParams(new URLSearchParams('view=trash')).filtered).toBe(false);
-    expect(parseListParams(new URLSearchParams('type=song')).filtered).toBe(true);
+    expect(parseListParams(new URLSearchParams('type=quote')).filtered).toBe(true);
   });
 
-  it('accepts each of the three kinds, and nothing else', () => {
+  it('accepts each of the two kinds, and nothing else', () => {
     for (const t of FRAGMENT_TYPES) expect(parseListParams(new URLSearchParams(`type=${t}`)).type).toBe(t);
     expect(parseListParams(new URLSearchParams('type=note')).type).toBeNull();
   });
@@ -175,7 +175,14 @@ describe('FRAGMENT_TYPES', () => {
   // which is the right trade — but it moves the toolbar's filter order into a
   // property of that object literal, where nothing else would notice it
   // changing. This is what notices.
-  it('is the three kinds, in the order the manager offers them', () => {
-    expect(FRAGMENT_TYPES).toEqual(['writing', 'quote', 'song']);
+  it('is the two kinds, in the order the manager offers them', () => {
+    expect(FRAGMENT_TYPES).toEqual(['writing', 'quote']);
+  });
+
+  // ⚠ THE THIRD WAS `song`, AND IT LEFT FOR ITS OWN TABLE (ADR 0035). Pinned
+  // as an absence rather than deleted quietly: a fourth kind added here would
+  // be a real decision, and a song coming BACK would be a reversal of one.
+  it('does not carry song, which is not a fragment', () => {
+    expect(FRAGMENT_TYPES).not.toContain('song');
   });
 });
