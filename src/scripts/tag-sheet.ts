@@ -10,34 +10,25 @@
 // with RRULEs, where the client only ever handles a preset.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
-import { closeWithExit, openDialog } from './dialog-close';
-import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
-import { sheetError } from './sheet-error';
+import { wireSheet } from './sheet';
 
 const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
 const form = document.querySelector<HTMLFormElement>('#tag-form');
 
 if (sheet && form) {
-  /** Every gesture that leaves this sheet routes through `requestClose` below. */
-  const dirty = dirtyTracker(sheet);
-
-  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
-  // Twenty distinct element ids existed for this one job across the admin, which
-  // is the reason there were 35 copies of the markup — every new sheet had to
-  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
-  // without needing to know what it is called.
-  const errorEl = sheetError(sheet);
+  /*
+    The dirty tracker, the error line, the three ways out and the discard
+    confirm are all `wireSheet` now (plan 41 · §4). It GUARDS because it has
+    something to lose: an explicit-save form holds everything ticked into it
+    until the button is pressed, and the confirm cannot fire on a sheet nobody
+    edited because `open()` resets the tracker after every populate.
+  */
+  const ui = wireSheet(sheet, { noun: 'This' });
   const titleEl = form.querySelector<HTMLElement>('[data-tag-title]')!;
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.tag-check'));
 
   let subject: string | null = null;
-
-  const showError = (message: string | null) => {
-    if (!errorEl) return;
-    errorEl.textContent = message ?? '';
-    errorEl.hidden = !message;
-  };
 
   // Delegated: the day panel is server-rendered per request, so a listener per
   // row would need rebinding on every navigation.
@@ -47,34 +38,11 @@ if (sheet && form) {
     subject = trigger.dataset.tag ?? null;
     if (!subject) return;
 
-    showError(null);
     titleEl.textContent = trigger.dataset.tagTitle ?? '';
     const on = new Set((trigger.dataset.tagPeople ?? '').split(',').filter(Boolean));
     checks().forEach((c) => (c.checked = on.has(c.value)));
-    dirty.reset(); // populating is not editing — see dirtyTracker
-    openDialog(sheet);
+    ui.open(); // populate first — `open` clears the error and forgets the fill
   });
-
-  /*
-    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
-    sheet answered only the first for its whole life — clicking away did
-    nothing at all, which reads as stuck and sends the reader to the browser's
-    Back button, where far more is lost than the sheet would have cost.
-  
-    It GUARDS because it has something to lose: an explicit-save form holds
-    everything typed into it until the button is pressed. The confirm cannot
-    fire on a sheet nobody edited — the tracker is reset after every populate —
-    so this costs nothing on the common path.
-  */
-  async function requestClose() {
-    if (dirty.get() && !(await confirmDiscard('This'))) return;
-    dirty.reset();
-    // `!` because a hoisted `async function` cannot inherit the narrowing
-    // from the `if (sheet && …)` around it — the same reason this file already
-    // writes `sheet!` at its other exits.
-    void closeWithExit(sheet!);
-  }
-  wireSheetDismiss(sheet, requestClose);
 
   form.querySelector<HTMLInputElement>('.sby-filter')?.addEventListener('input', (e) => {
     const q = (e.target as HTMLInputElement).value.trim().toLowerCase();
@@ -86,7 +54,7 @@ if (sheet && form) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!subject) return;
-    showError(null);
+    ui.showError(null);
     const externalId = subject; // captured: `subject` is a `let`, so the guard
     // above does not narrow it inside the callback below.
     // The disable/await/format/restore lifecycle is `submitAction` now
@@ -102,7 +70,7 @@ if (sheet && form) {
             .filter((c) => c.checked)
             .map((c) => c.value),
         }),
-      { button: submitBtn, onError: showError },
+      { button: submitBtn, onError: ui.showError },
     );
     if (!res.ok) return;
     // Reload rather than patching: tagging somebody changes the day panel,

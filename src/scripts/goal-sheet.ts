@@ -12,9 +12,7 @@
 import { actions } from 'astro:actions';
 import { options, pick, picked, wireRadioGroups } from './radio-group';
 import { callAction, formatActionError, submitAction } from './action-error';
-import { closeWithExit, openDialog } from './dialog-close';
-import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
-import { sheetError } from './sheet-error';
+import { wireSheet } from './sheet';
 
 const sheet = document.querySelector<HTMLDialogElement>('#goal-sheet');
 const form = document.querySelector<HTMLFormElement>('#goal-form');
@@ -28,25 +26,16 @@ const showPageError = (msg: string | null) => {
 };
 
 if (sheet && form) {
-  /** Every gesture that leaves this sheet routes through `requestClose` below. */
-  const dirty = dirtyTracker(sheet);
-
-  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
-  // Twenty distinct element ids existed for this one job across the admin, which
-  // is the reason there were 35 copies of the markup — every new sheet had to
-  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
-  // without needing to know what it is called.
-  const errorEl = sheetError(sheet);
+  /* The tracker, the error line and the three ways out are `wireSheet` now
+     (plan 41 · §4). ⚠ Its `showError` is the SHEET's line; `showPageError`
+     above is the goal page's own, shared with the status control below, and the
+     two must not be confused — a failure written into the wrong one is a
+     failure nobody sees. */
+  const ui = wireSheet(sheet, { noun: 'This goal' });
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]')!;
   const whyInput = form.querySelector<HTMLTextAreaElement>('textarea[name="why"]')!;
   const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
-
-  const showError = (message: string | null) => {
-    if (!errorEl) return;
-    errorEl.textContent = message ?? '';
-    errorEl.hidden = !message;
-  };
 
   /*
     ⚠ `goal-status`, NOT `goalStatus`, AND THE DIFFERENCE WAS A LIVE BUG.
@@ -79,32 +68,10 @@ if (sheet && form) {
 
   document.querySelectorAll<HTMLElement>('[data-open-goal-sheet], [data-edit-goal]').forEach((btn) =>
     btn.addEventListener('click', () => {
-      showError(null);
-      dirty.reset(); // populating is not editing — see dirtyTracker
-      openDialog(sheet);
+      ui.open(); // clears the error and forgets the fill — see `Sheet.open`
       nameInput.focus();
     }),
   );
-  /*
-    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
-    sheet answered only the first for its whole life — clicking away did
-    nothing at all, which reads as stuck and sends the reader to the browser's
-    Back button, where far more is lost than the sheet would have cost.
-  
-    It GUARDS because it has something to lose: an explicit-save form holds
-    everything typed into it until the button is pressed. The confirm cannot
-    fire on a sheet nobody edited — the tracker is reset after every populate —
-    so this costs nothing on the common path.
-  */
-  async function requestClose() {
-    if (dirty.get() && !(await confirmDiscard('This goal'))) return;
-    dirty.reset();
-    // `!` because a hoisted `async function` cannot inherit the narrowing
-    // from the `if (sheet && …)` around it — the same reason this file already
-    // writes `sheet!` at its other exits.
-    void closeWithExit(sheet!);
-  }
-  wireSheetDismiss(sheet, requestClose);
 
   // The lifecycle — disable, label, format ANY failure, restore — is
   // `submitAction` now (scripts/action-error.ts, docs/plans/25 · §2). Eight
@@ -116,7 +83,7 @@ if (sheet && form) {
   // before `formatActionError` was called to join them.
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    showError(null);
+    ui.showError(null);
     const res = await submitAction(
       () =>
         actions.goals.save({
@@ -127,7 +94,7 @@ if (sheet && form) {
           horizon: picked(form, 'horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
           status: picked(form, 'goal-status', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
         }),
-      { button: submitBtn, busy: 'Saving…', onError: showError },
+      { button: submitBtn, busy: 'Saving…', onError: ui.showError },
     );
     if (!res.ok) return;
     // A new goal goes to its own page; an edit reloads the one you are on.
@@ -161,7 +128,7 @@ if (sheet && form) {
     // connection can no longer send the delete twice.
     const res = await submitAction(() => actions.goals.remove({ id }), {
       button: deleteBtn,
-      onError: showError,
+      onError: ui.showError,
     });
     if (!res.ok) return;
     location.href = '/admin/agenda/goals';

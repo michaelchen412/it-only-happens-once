@@ -37,6 +37,16 @@ const SCRIPTS = fileURLToPath(new URL('../scripts/', import.meta.url));
  * therefore joins this test by existing, which is the property a hand-maintained
  * list would not have.
  *
+ * ⚠⚠ THE MARKER HAS NOW MOVED TWICE, THE SECOND TIME FOR THE SAME REASON AS THE
+ * FIRST. Plan 41 · §4 put the whole lifecycle behind `wireSheet`, which calls
+ * `openDialog` on each sheet's behalf — so seven sheets stopped containing the
+ * literal this detector matched, and would have dropped OUT OF THE CHECKED SET
+ * ENTIRELY while the count assertion went on passing on the dozen non-sheet
+ * dialogs that remain. Twice now, an improvement one layer down has quietly
+ * narrowed this net; both times the fix was to widen the marker rather than to
+ * trust it. `sheet.ts` joins `dialog-close.ts` as a definition rather than a
+ * call site, for the identical reason.
+ *
  * ⚠ THE MARKER MOVED ON 2026-08-15, AND THE CANARY BELOW IS WHY THAT WAS SAFE.
  * It used to be `.showModal()`. Then every sheet was converted to `openDialog()`
  * (scripts/dialog-close.ts) so its exit would animate on WebKit, and the literal
@@ -51,9 +61,12 @@ function sheetScripts(): string[] {
   return (
     readdirSync(SCRIPTS)
       .filter((f) => f.endsWith('.ts'))
-      // The helper itself is the definition, not a call site.
-      .filter((f) => f !== 'dialog-close.ts')
-      .filter((f) => readFileSync(join(SCRIPTS, f), 'utf8').includes('openDialog('))
+      // The helpers themselves are the definition, not a call site.
+      .filter((f) => f !== 'dialog-close.ts' && f !== 'sheet.ts')
+      .filter((f) => {
+        const src = readFileSync(join(SCRIPTS, f), 'utf8');
+        return src.includes('openDialog(') || src.includes('wireSheet(');
+      })
   );
 }
 
@@ -89,10 +102,11 @@ describe('every sheet answers all three ways out (ADR 0032)', () => {
     const src = readFileSync(join(SCRIPTS, file), 'utf8');
     if (file in NOT_SHEETS && NOT_SHEETS[file]) return; // exempt, with its reason above
     expect(
-      src.includes('wireSheetDismiss'),
-      `${file} opens a modal but never calls wireSheetDismiss — so at least one of the ✕, ` +
-        `Escape and the backdrop does nothing. Wire it, or add it to NOT_SHEETS with the ` +
-        `sentence explaining why dismissing it costs nothing.`,
+      src.includes('wireSheetDismiss') || src.includes('wireSheet('),
+      `${file} opens a modal but routes no exit through wireSheetDismiss — directly, or via ` +
+        `wireSheet, which calls it. So at least one of the ✕, Escape and the backdrop does ` +
+        `nothing. Wire it, or add it to NOT_SHEETS with the sentence explaining why dismissing ` +
+        `it costs nothing.`,
     ).toBe(true);
   });
 });
