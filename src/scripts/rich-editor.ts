@@ -11,6 +11,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
 import { ProofreadMarks, proofreadHandle, type ProofreadHandle } from './proofread-marks';
+import { closeWithExit, openDialog } from './dialog-close';
 
 export interface RichEditorHandle {
   editor: Editor;
@@ -278,23 +279,35 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
       const prev = (editor.getAttributes('link').href as string | undefined) ?? '';
       linkUrl.value = prev;
       linkRemove.hidden = !prev;
-      linkDialog.showModal();
+      openDialog(linkDialog);
       linkUrl.focus();
       linkUrl.select();
     };
+    // ⚠ THE EDITOR COMMAND FIRES WHILE THE DIALOG IS STILL FADING, and that is
+    // right rather than sloppy. `closeWithExit` keeps this dialog open for 0.2s,
+    // and the mark being set belongs to the document UNDERNEATH it — deferring
+    // the chain until the fade ended would leave the words unlinked for a fifth
+    // of a second, in full view, on the one gesture whose whole point is that
+    // you can see it take.
+    const leave = () => void closeWithExit(linkDialog);
     const applyLink = () => {
       const url = linkUrl.value.trim();
-      linkDialog.close();
+      leave();
       if (url) editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     };
     linkApply.addEventListener('click', applyLink);
-    linkCancel.addEventListener('click', () => linkDialog.close());
+    linkCancel.addEventListener('click', leave);
     linkRemove.addEventListener('click', () => {
-      linkDialog.close();
+      leave();
       editor.chain().focus().unsetLink().run();
     });
     linkDialog.addEventListener('click', (e) => {
-      if (e.target === linkDialog) linkDialog.close();
+      if (e.target === linkDialog) leave();
+    });
+    // Escape, intercepted so the keyboard exit animates like the other three.
+    linkDialog.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      leave();
     });
     linkUrl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {

@@ -18,6 +18,7 @@
 import { actions } from 'astro:actions';
 import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
@@ -92,9 +93,14 @@ if (sheet && form) {
   // the switch by opening the event sheet, and a second `showModal()` stacks
   // instead of replacing: without this line "make it an event instead" left
   // this sheet sitting underneath, still holding the same sentence.
+  //
+  // ⚠ AND "FIRST" IS NOW A PROMISE, NOT A STATEMENT ORDER — see the identical
+  // note in `event-sheet.ts`. `closeWithExit` keeps this sheet open for the
+  // length of its slide, so the announce has to wait for the slide.
   const setKindBar = mountKindBar(form, (detail, to) => {
-    sheet!.close();
-    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } }));
+    void closeWithExit(sheet!).then(() =>
+      document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
+    );
   });
 
   const showError = (message: string | null) => {
@@ -237,7 +243,7 @@ if (sheet && form) {
     else reset();
     repaint();
     dirty.reset(); // populating is not editing — see dirtyTracker
-    sheet!.showModal();
+    openDialog(sheet!);
     titleInput.focus();
   };
 
@@ -347,7 +353,7 @@ if (sheet && form) {
     // `!` because a hoisted `async function` cannot inherit the narrowing
     // from the `if (sheet && …)` around it — the same reason this file already
     // writes `sheet!` at its other exits.
-    sheet!.close();
+    void closeWithExit(sheet!);
   }
   wireSheetDismiss(sheet, requestClose);
   // ⚠ Abandoning the sheet must forget the dump it was opened for. Without
@@ -423,7 +429,7 @@ if (sheet && form) {
     if (filingNote) {
       const noteId = filingNote;
       filingNote = null;
-      sheet!.close();
+      void closeWithExit(sheet!);
       document.dispatchEvent(
         new CustomEvent('hq:note-filed', {
           detail: { noteId, what: 'a task', href: '/admin/agenda/tasks', undo: { kind: 'task', id: res.data?.id } },

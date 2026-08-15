@@ -9,6 +9,7 @@ import { actions } from 'astro:actions';
 import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 
@@ -129,7 +130,7 @@ if (sheet && personId) {
       noteInput.value = '';
       setMode('work');
       dirty.reset(); // populating is not editing — see dirtyTracker
-      sheet.showModal();
+      openDialog(sheet);
       search.focus();
     }),
   );
@@ -151,7 +152,7 @@ if (sheet && personId) {
     // `!` because a hoisted `async function` cannot inherit the narrowing
     // from the `if (sheet && …)` around it — the same reason this file already
     // writes `sheet!` at its other exits.
-    sheet!.close();
+    void closeWithExit(sheet!);
   }
   wireSheetDismiss(sheet, requestClose);
 

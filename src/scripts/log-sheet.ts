@@ -13,6 +13,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireEntryMeta } from './entry-meta';
+import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 
 const root = document.querySelector<HTMLElement>('[data-log-sheet]');
@@ -73,7 +74,7 @@ if (root && sheet) {
     reset();
     body.value = detail.text;
     syncSave(); // the words arrived after `reset` ran; Save depends on them
-    sheet!.showModal();
+    openDialog(sheet!);
     // NOT focusing the textarea: the words are already there, and the thing
     // still missing is who it was about.
     $<HTMLElement>('[data-who-open]')?.focus();
@@ -89,7 +90,7 @@ if (root && sheet) {
   // an oversight: this sheet is opened FROM a captured note and files it. The
   // body it holds is the note's own text, which already exists in the pile and
   // survives dismissal — so there is nothing here that only lives on screen.
-  wireSheetDismiss(sheet, () => sheet.close());
+  wireSheetDismiss(sheet, () => void closeWithExit(sheet));
 
   // ── saving ────────────────────────────────────────────────────────────────
   saveBtn.addEventListener('click', async () => {
@@ -119,7 +120,7 @@ if (root && sheet) {
     if (!res.ok) return;
     if (!res.data) return showError('Couldn’t save that.');
 
-    sheet!.close();
+    void closeWithExit(sheet!);
     document.dispatchEvent(
       new CustomEvent('hq:note-filed', {
         detail: { noteId: filing, what: 'a log entry', href: null, undo: { kind: 'interaction', id: res.data.id } },

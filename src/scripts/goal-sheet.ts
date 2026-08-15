@@ -12,6 +12,7 @@
 import { actions } from 'astro:actions';
 import { wireRadioGroups } from './radio-group';
 import { callAction, formatActionError, submitAction } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 
@@ -60,7 +61,7 @@ if (sheet && form) {
     btn.addEventListener('click', () => {
       showError(null);
       dirty.reset(); // populating is not editing — see dirtyTracker
-      sheet.showModal();
+      openDialog(sheet);
       nameInput.focus();
     }),
   );
@@ -81,7 +82,7 @@ if (sheet && form) {
     // `!` because a hoisted `async function` cannot inherit the narrowing
     // from the `if (sheet && …)` around it — the same reason this file already
     // writes `sheet!` at its other exits.
-    sheet!.close();
+    void closeWithExit(sheet!);
   }
   wireSheetDismiss(sheet, requestClose);
 

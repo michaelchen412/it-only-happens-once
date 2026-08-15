@@ -96,6 +96,7 @@ import { wireMusicPanel, type PairedSong } from './music-panel';
 import { wireAddMenu } from './fragment-panel';
 import { wireProofread } from './writing-proofread';
 import { wirePublishDialog } from './writing-publish-dialog';
+import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 
 const sheet = document.getElementById('wsheet') as HTMLDialogElement;
@@ -752,7 +753,7 @@ function populate(d: Loaded | null) {
 function openSheet(hash: string, fromHash: boolean) {
   prevHash = fromHash ? '' : location.hash;
   setHash(hash);
-  if (!sheet.open) sheet.showModal();
+  openDialog(sheet);
 }
 
 function openNew(fromHash = false, asNote = false) {
@@ -809,11 +810,17 @@ function closeNow() {
   // now stale in exactly the way a membership change makes it stale.
   const stale = everSaved || picker.changed() || musicPanel.changed();
   setHash(prevHash); // restore the underlying context (e.g. #browse) first
-  sheet.close();
+  void closeWithExit(sheet);
   // This used to be `location.reload()` on the very next line, which meant the
   // 0.28s slide-out got a frame or two before the page started tearing down —
   // the "instantly disappears, and there's some bit of lag" of the report. The
   // close is real now, and the host refreshes in place around it.
+  //
+  // ⚠ THE REFRESH IS DELIBERATELY *NOT* AWAITED ON THE EXIT. `notifyFragmentsChanged`
+  // starts a fetch, and a fetch is off the main thread — starting it now means
+  // the rows behind this sheet are already in flight while it slides. What must
+  // not land mid-slide is the SWAP, and that is `afterDialogClose`'s job inside
+  // the listener (see the header of scripts/dialog-close.ts), not this line's.
   if (stale) notifyFragmentsChanged(sheet);
 }
 async function requestClose() {

@@ -20,6 +20,7 @@
 // changes underneath this dialog while it is open.
 import { nowTime } from './action-error';
 import { wireSubjectSuggest } from './subject-suggest';
+import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
 
 export interface PublishDialogDeps {
@@ -107,7 +108,7 @@ export function wirePublishDialog(deps: PublishDialogDeps): void {
   for (const ev of ['input', 'keyup', 'click']) dialog.addEventListener(ev, renderPreflight);
 
   document.getElementById('pf-constellations')?.addEventListener('click', () => {
-    dialog.close(); // the picker is a tab in the sheet behind this dialog
+    void closeWithExit(dialog); // the picker is a tab in the sheet behind this dialog
     selectTab('constellations');
   });
 
@@ -146,7 +147,7 @@ export function wirePublishDialog(deps: PublishDialogDeps): void {
   });
 
   let dialogMode: 'publish' | 'details' = 'publish';
-  function openDialog(mode: 'publish' | 'details') {
+  function openPublishDialog(mode: 'publish' | 'details') {
     dialogMode = mode;
     dialogError.hidden = true;
     subjectsSuggest.reset(); // a proposal from the last piece must not linger
@@ -155,15 +156,24 @@ export function wirePublishDialog(deps: PublishDialogDeps): void {
       mode === 'publish' ? 'A few last details, then it goes live.' : 'Update the metadata for this published piece.';
     dialogConfirm.textContent = mode === 'publish' ? 'Publish now' : 'Save details';
     renderPreflight();
-    dialog.showModal();
+    openDialog(dialog);
   }
-  document.getElementById('ws-open-publish')?.addEventListener('click', () => openDialog('publish'));
-  document.getElementById('ws-open-details')?.addEventListener('click', () => openDialog('details'));
-  document.getElementById('dialog-cancel')?.addEventListener('click', () => dialog.close());
+  document.getElementById('ws-open-publish')?.addEventListener('click', () => openPublishDialog('publish'));
+  document.getElementById('ws-open-details')?.addEventListener('click', () => openPublishDialog('details'));
+  /** All three exits, one door — the ADR 0032 shape, spelled by hand because
+   *  this dialog is not a sheet and `wireSheetDismiss` looks for `[data-close]`. */
+  const leave = () => void closeWithExit(dialog);
+  document.getElementById('dialog-cancel')?.addEventListener('click', leave);
   // Backdrop click, guarded — the dialog holds an excerpt field and a subjects
   // input you routinely select across before publishing (`backdrop-close.ts`,
   // docs/plans/25 · §3).
-  onBackdropDismiss(dialog, () => dialog.close());
+  onBackdropDismiss(dialog, leave);
+  // Escape, intercepted: the native `cancel` shuts in one frame, which would
+  // make the keyboard the one exit here that doesn't animate.
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    leave();
+  });
 
   dialogConfirm.addEventListener('click', async () => {
     dialogError.hidden = true;
@@ -180,7 +190,7 @@ export function wirePublishDialog(deps: PublishDialogDeps): void {
     const ok = await save(target);
     dialogConfirm.disabled = false;
     if (ok) {
-      dialog.close();
+      void closeWithExit(dialog);
       if (dialogMode === 'publish') setSaved('Published ' + nowTime());
     } else {
       dialogError.textContent = jsError.textContent || 'Something went wrong.';

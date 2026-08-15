@@ -10,6 +10,7 @@
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
@@ -124,9 +125,17 @@ if (sheet && form) {
   // the switch by opening the task sheet, and a second `showModal()` stacks
   // instead of replacing: without this line "make it a task instead" left this
   // sheet sitting underneath, still holding the same sentence.
+  //
+  // ⚠ AND "FIRST" IS NOW A PROMISE, NOT A STATEMENT ORDER (2026-08-15). Closing
+  // through `closeWithExit` keeps this sheet genuinely open for the length of
+  // its slide, so announcing on the next line would open the task sheet ON TOP
+  // of one still leaving — exactly the stack this comment was written to
+  // prevent, reintroduced by a change that looks unrelated. The `.then` is the
+  // same ordering, expressed in the only way that still holds.
   const setKindBar = mountKindBar(form, (detail, to) => {
-    sheet.close();
-    document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } }));
+    void closeWithExit(sheet).then(() =>
+      document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
+    );
   });
 
   const open = (row?: EventRow, on?: string) => {
@@ -139,7 +148,7 @@ if (sheet && form) {
       dateInput.value = on || (form.dataset.today ?? '');
     }
     dirty.reset(); // populating is not editing — see dirtyTracker
-    sheet.showModal();
+    openDialog(sheet!);
     titleInput.focus();
   };
 
@@ -202,7 +211,7 @@ if (sheet && form) {
     // `!` because a hoisted `async function` cannot inherit the narrowing
     // from the `if (sheet && …)` around it — the same reason this file already
     // writes `sheet!` at its other exits.
-    sheet!.close();
+    void closeWithExit(sheet!);
   }
   wireSheetDismiss(sheet, requestClose);
   // Abandoning the sheet forgets the dump it was opened for — otherwise saving
@@ -257,7 +266,7 @@ if (sheet && form) {
     if (filingNote) {
       const noteId = filingNote;
       filingNote = null;
-      sheet.close();
+      void closeWithExit(sheet!);
       document.dispatchEvent(
         new CustomEvent('hq:note-filed', {
           detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: res.data?.id } },

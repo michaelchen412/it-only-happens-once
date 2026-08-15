@@ -40,6 +40,7 @@
 // pressed in anger. `pointerdown`/`focusin` are belt and braces for the tap
 // that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
+import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
 
 const fab = document.getElementById('cap-open') as HTMLButtonElement | null;
@@ -240,7 +241,7 @@ async function boot(dialog: HTMLDialogElement) {
   });
 
   function open() {
-    dialog!.showModal();
+    openDialog(dialog!);
     editor.commands.focus('end');
   }
 
@@ -257,7 +258,24 @@ async function boot(dialog: HTMLDialogElement) {
   async function close() {
     window.clearTimeout(timer);
     await save();
-    dialog!.close();
+    /*
+      ⚠ THE FLUSH IS AWAITED, THE EXIT IS NOT, AND THE RELOAD WAITS FOR BOTH.
+      Michael, 2026-08-15: *"it opens fine but immediately closes with no
+      transition."* Two things were doing that, and only fixing both helps.
+
+      The first was `dialog.close()`, which on any WebKit engine — so on every
+      iOS browser, Chrome included — drops the box out of the top layer in the
+      same frame and never renders the 0.2s fade. `closeWithExit` is the cure
+      and the whole account is in scripts/dialog-close.ts.
+
+      The second only bit in the Notes room and it beat the animation even on a
+      desktop: a `location.reload()` on the very next line tore the page down a
+      frame or two into the fade. Same failure the writing sheet had, same fix —
+      let the exit finish first. It is a reload rather than an in-place refresh
+      because the pile is server-rendered and prepending a card here would mean
+      a second copy of the card's markup kept in step by hand.
+    */
+    await closeWithExit(dialog!);
     if (savedAnything && document.getElementById('notes-pile')) window.location.reload();
   }
 

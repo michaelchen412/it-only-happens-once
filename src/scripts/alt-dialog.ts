@@ -7,6 +7,8 @@
 //   Escape / backdrop  → null, meaning "don't change anything"
 // The editor relies on that distinction: null on insert means empty, but null
 // when re-editing means leave the existing description alone.
+import { closeWithExit, openDialog } from './dialog-close';
+
 export type AskAlt = (current: string) => Promise<string | null>;
 
 export function wireAltDialog(dialog: HTMLDialogElement): AskAlt {
@@ -15,14 +17,25 @@ export function wireAltDialog(dialog: HTMLDialogElement): AskAlt {
   const skip = dialog.querySelector('.alt-skip') as HTMLButtonElement;
   let resolveCurrent: ((v: string | null) => void) | null = null;
 
+  // The three outcomes above, spelled as `returnValue` — set BEFORE leaving,
+  // because `close()` with no argument preserves whatever is already there and
+  // `closeWithExit` owns the call now.
   const close = (how: string) => {
     dialog.returnValue = how;
-    dialog.close();
+    void closeWithExit(dialog);
   };
   apply.addEventListener('click', () => close('apply'));
   skip.addEventListener('click', () => close('skip'));
   dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) dialog.close(); // backdrop → cancel
+    if (e.target === dialog) close(''); // backdrop → cancel
+  });
+  // Escape, intercepted for the same reason confirm-dialog.ts intercepts it:
+  // the native `cancel` shuts in one frame, which would make this the one
+  // dialog that animates away from a click and snaps away from a keystroke.
+  // Empty `returnValue` is what the native close left behind, so → null.
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    close('');
   });
   field.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -48,7 +61,7 @@ export function wireAltDialog(dialog: HTMLDialogElement): AskAlt {
           resolveCurrent = resolve;
           field.value = current;
           dialog.returnValue = '';
-          dialog.showModal();
+          openDialog(dialog);
           field.focus();
           field.select();
         }),

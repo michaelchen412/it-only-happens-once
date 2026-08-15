@@ -2,6 +2,7 @@ import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
 import { submitAction } from './action-error';
 import { deleteWarning } from '../lib/library-delete';
+import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 
 const A: Record<string, any> = {
@@ -215,7 +216,7 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
       mergeLede.textContent = `Everything filed under \u201c${source.name}\u201d moves onto the word you pick, and \u201c${source.name}\u201d is deleted.`;
       mergeQ.value = '';
       paint();
-      mergeDialog.showModal();
+      openDialog(mergeDialog);
       mergeQ.focus();
     }),
   );
@@ -232,7 +233,7 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
      exists to be thrown away, and a pick that does not commit anything on its
      own (it opens a confirm, which owns the destructive half). So all three
      gestures close it outright, with nothing asked. */
-  wireSheetDismiss(mergeDialog, () => mergeDialog.close(), '[data-merge-close]');
+  wireSheetDismiss(mergeDialog, () => void closeWithExit(mergeDialog), '[data-merge-close]');
 
   mergeList.addEventListener('click', async (e) => {
     const hit = (e.target as Element).closest<HTMLButtonElement>('[data-target]');
@@ -240,7 +241,7 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
     const from = source;
     const into = hit.dataset.target!;
     const intoName = hit.dataset.targetName ?? 'it';
-    mergeDialog.close();
+    await closeWithExit(mergeDialog);
     const ok = await confirmDialog({
       title: 'Merge',
       message: `Move everything from \u201c${from.name}\u201d onto \u201c${intoName}\u201d and delete \u201c${from.name}\u201d? This can\u2019t be undone.`,

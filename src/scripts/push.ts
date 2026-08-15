@@ -30,6 +30,7 @@
   instead of offering a button that cannot work.
 */
 import { actions } from 'astro:actions';
+import { closeWithExit, openDialog } from './dialog-close';
 
 /** Public by design — it is the `applicationServerKey` the browser subscribes
  *  with, and it travels in every subscription request anyway. The PRIVATE half
@@ -180,8 +181,8 @@ function mount(): void {
     }
   });
 
-  opener.addEventListener('click', () => dialog.showModal());
-  document.getElementById('push-close')?.addEventListener('click', () => dialog.close());
+  opener.addEventListener('click', () => openDialog(dialog));
+  document.getElementById('push-close')?.addEventListener('click', () => void closeWithExit(dialog));
 
   void sync();
 }

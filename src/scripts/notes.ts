@@ -38,6 +38,7 @@ import { wireAltDialog } from './alt-dialog';
 import { anchorPopover } from './pop-anchor';
 import { mountRichEditor } from './rich-editor';
 import { uploadImage } from './upload';
+import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
 
 const pile = document.getElementById('notes-pile');
@@ -473,7 +474,7 @@ if (undoBar) {
     filing = card;
     if (fileQuery) fileQuery.value = '';
     filterPieces('');
-    fileDialog.showModal();
+    openDialog(fileDialog);
     // Not autofocused: the list is short and ordered most-likely-first, so the
     // common case is picking with your eyes rather than typing.
   }
@@ -491,19 +492,24 @@ if (undoBar) {
     if (fileNone) fileNone.hidden = shown > 0;
   }
 
+  /** Every exit from the picker, so the ✕ and the backdrop can't drift apart. */
+  const closeFiler = () => {
+    if (fileDialog) void closeWithExit(fileDialog);
+  };
+
   fileQuery?.addEventListener('input', () => filterPieces(fileQuery.value));
-  fileDialog?.querySelector('[data-close]')?.addEventListener('click', () => fileDialog.close());
+  fileDialog?.querySelector('[data-close]')?.addEventListener('click', closeFiler);
   // Guarded like every other backdrop in the tree — the least costly of the
   // four to get wrong (this dialog holds a search box and a list, and closing
   // it loses nothing), but a dismiss rule that behaves differently in one
   // dialog is the kind of inconsistency you feel without being able to name.
-  if (fileDialog) onBackdropDismiss(fileDialog, () => fileDialog.close());
+  if (fileDialog) onBackdropDismiss(fileDialog, closeFiler);
 
   fileList?.addEventListener('click', async (e) => {
     const btn = (e.target as Element).closest<HTMLElement>('[data-piece]');
     if (!btn || !filing) return;
     const card = filing;
-    fileDialog?.close();
+    closeFiler();
     try {
       const { data, error } = await actions.fragments.appendToPiece({
         noteId: card.dataset.note!,

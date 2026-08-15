@@ -19,6 +19,7 @@
 import { wireFragmentPanel, type PanelHandle, type PanelOpts } from './fragment-panel';
 import './subject-filter'; // the fetched partial's <subject-filter> needs the definition
 import { onFragmentsChanged } from './fragments-changed';
+import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 
@@ -93,12 +94,21 @@ export function wireBrowserShell(root: HTMLDialogElement, opts: ShellOpts): Shel
     panel: () => panel,
     open() {
       clearError();
-      root.showModal();
+      openDialog(root);
       if (!panel) void loadPanel();
       opts.onOpen?.();
     },
     close() {
-      root.close();
+      // ⚠ `onClose` RUNS *DURING* THE EXIT, NOT AFTER IT, and the ordering is
+      // load-bearing rather than incidental. The composer's `onClose` calls
+      // `notifyFragmentsChanged(root)`, whose `settled` promise is
+      // `afterDialogClose(root)` — a listener for the transition `closeWithExit`
+      // has just started. Awaiting the close first would hand that helper an
+      // already-shut dialog with no transition left to hear, and the host's
+      // refresh would sit on the 350ms fallback timer instead. Started together,
+      // the fetch overlaps the slide and the swap lands the moment it ends,
+      // which is the whole arrangement `fragments-changed.ts` describes.
+      void closeWithExit(root);
       opts.onClose?.();
     },
     showError,

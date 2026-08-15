@@ -33,7 +33,7 @@ import BackToTop from './BackToTop.astro';
 
 <script>
   import { navigate } from 'astro:transitions/client';
-  import { closeWithExit } from '../scripts/dialog-close';
+  import { closeWithExit, openDialog } from '../scripts/dialog-close';
 
   const PREFIX = 'read=';
 
@@ -106,12 +106,13 @@ import BackToTop from './BackToTop.astro';
   }
 
   function show(d: HTMLDialogElement, slug: string) {
-    // Reopened while the last close was still sliding out — tapping a second
-    // fragment straight after dismissing the first. Clearing the flag is what
-    // `closeWithExit` watches for: it stands down instead of shutting a sheet
-    // that has just been handed new content.
-    delete d.dataset.closing;
-    if (!d.open) d.showModal();
+    // ⚠ `openDialog`, NOT `showModal` — it clears `[data-closing]` for the
+    // reopen-mid-exit case (tapping a second fragment straight after dismissing
+    // the first), which is what tells a pending `closeWithExit` to stand down
+    // instead of shutting a sheet that has just been handed new content. This
+    // was two hand-written lines here until 2026-08-15, when the workshop's
+    // twenty dialogs needed the same pair and it became one function.
+    openDialog(d);
     // Which slug this sheet is currently showing. On the ELEMENT, not in a
     // module variable: this script is not re-executed across view transitions,
     // but the dialog node is replaced — so a fresh node correctly reports

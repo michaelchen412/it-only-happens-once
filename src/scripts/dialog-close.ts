@@ -31,6 +31,21 @@
 //
 // ⚠⚠ AND THE `overlay` HALF OF THAT EXIT ONLY EVER WORKED IN CHROMIUM. See
 // `closeWithExit` below, which is what a dialog should use.
+//
+// ── 2026-08-15: THIS MODULE IS NOW THE ONLY WAY A DIALOG OPENS OR SHUTS ──────
+// `closeWithExit` was written 2026-08-11 for the public Reader and then used by
+// that one dialog, while the workshop's twenty kept calling `close()` directly —
+// a state admin.css named in a comment ("the same one-line cure available") and
+// left standing. Michael, 2026-08-15: *"the popovers, sheets, and dialogues on
+// iOS and Chrome never close gracefully, no matter where we are."* That is not
+// device jank; it is this gap, on every sheet in the building.
+//
+// So the pair below is the seam, and both halves are needed — `openDialog`
+// exists because `closeWithExit` leaves a dialog OPEN while it animates, which
+// means every reopen has to be able to say "stand down" (see `onCancelled`).
+// Wiring that by hand at twenty-nine `showModal()` sites is twenty-nine chances
+// to forget, and forgetting is silent: the sheet reopens and then shuts itself
+// 300ms later. One function, one rule, greppable.
 
 /** Longer than the slowest exit (0.28s) with room for a slow frame. */
 const FALLBACK_MS = 350;
@@ -111,12 +126,41 @@ export async function closeWithExit(dialog: HTMLDialogElement, opts: { onCancell
 
   dialog.dataset.closing = '1';
   await afterDialogClose(dialog);
-  // `show()` clears the flag when something reopens the sheet mid-slide. It is
-  // the one signal that this close has been overtaken, so honour it.
+  // `openDialog` clears the flag when something reopens the sheet mid-slide. It
+  // is the one signal that this close has been overtaken, so honour it.
   if (!dialog.dataset.closing) {
     opts.onCancelled?.();
     return;
   }
   delete dialog.dataset.closing;
   dialog.close();
+}
+
+/**
+ * `openDialog(dialog)` — the other half of `closeWithExit`, and the only way a
+ * modal should be opened in this codebase.
+ *
+ * It does two things `showModal()` alone cannot:
+ *
+ * ⚠ IT CANCELS AN EXIT IN FLIGHT. Because a leaving dialog stays genuinely
+ * `open` for the length of its animation, reopening one 100ms after dismissing
+ * it — tapping a second row straight after closing the first, which is an
+ * ordinary thing to do in a list — finds a dialog that is already `open` and
+ * already sliding away. Clearing `[data-closing]` puts it back into its resting
+ * state, and the pending `closeWithExit` sees the cleared flag and stands down
+ * instead of shutting a sheet you just asked for.
+ *
+ * ⚠ IT IS IDEMPOTENT. `showModal()` throws `InvalidStateError` on a dialog that
+ * is already open, so the guard is not politeness — without it, the reopen path
+ * above is an exception rather than a sheet.
+ *
+ * There is no `returnValue` parameter on the close side for the same reason
+ * there is no `show()` (non-modal) here: every dialog in this building is
+ * modal, and the two that carry a `returnValue` (`confirm-dialog`,
+ * `alt-dialog`) set it on the element before closing, which `close()` with no
+ * argument preserves.
+ */
+export function openDialog(dialog: HTMLDialogElement): void {
+  delete dialog.dataset.closing;
+  if (!dialog.open) dialog.showModal();
 }

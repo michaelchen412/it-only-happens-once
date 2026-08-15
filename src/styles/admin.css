@@ -27,19 +27,37 @@ dialog,
   color: var(--color-base-content);
   background: var(--color-base-100);
 }
+/* ⚠ `display`/`overlay` ARE LISTED ON `[open]`, NOT ON THE RESTING STATE, and
+   every dialog rule in this file now follows that shape. A transition runs from
+   the property list of the state being moved TO — so listing them under `[open]`
+   still animates the ENTER (which needs the display flip deferred, or
+   `@starting-style` has nothing to start from) while letting the eventual
+   `close()` take `display: none` at once.
+
+   Taking it at once is correct because every dialog in this building closes
+   AFTER its exit rather than during it (`closeWithExit`), so by the time
+   `close()` runs the sheet has already left the screen and deferring its removal
+   buys nothing. It costs something, though: a `.drawer-dialog` is a phantom
+   full-height box translated 100% off the right edge for a further 0.28s, which
+   at 100vw on a phone is a page-width of horizontal scroll that should not
+   exist. That was found on `.reader` first and fixed there alone, in a scoped
+   override whose comment explained that the workshop's dialogs still needed the
+   old base rule. They don't any more — 2026-08-15 converted all of them — so the
+   fix is the base rule and the override is gone. */
 .modal-dialog::backdrop,
 .drawer-dialog::backdrop {
   background: color-mix(in oklab, var(--color-base-100) 62%, transparent);
   backdrop-filter: blur(2px);
   opacity: 0;
-  transition:
-    opacity 0.25s ease,
-    overlay 0.25s ease allow-discrete,
-    display 0.25s ease allow-discrete;
+  transition: opacity 0.25s ease;
 }
 .modal-dialog[open]::backdrop,
 .drawer-dialog[open]::backdrop {
   opacity: 1;
+  transition:
+    opacity 0.25s ease,
+    overlay 0.25s ease allow-discrete,
+    display 0.25s ease allow-discrete;
 }
 @starting-style {
   .modal-dialog[open]::backdrop,
@@ -62,10 +80,10 @@ dialog,
    `[data-closing]` alone so it out-specifies the `[open]` rules above rather
    than relying on source order.
 
-   The `overlay`/`display` transitions on the rules below STAY: they are what
-   makes the ENTER animate (`@starting-style` needs the display flip deferred),
-   and both of those ARE baseline. It was only ever the exit that needed the
-   part Safari lacks. */
+   The `overlay`/`display` transitions on the `[open]` rules below STAY: they are
+   what makes the ENTER animate (`@starting-style` needs the display flip
+   deferred), and both of those ARE baseline. It was only ever the exit that
+   needed the part Safari lacks. */
 .modal-dialog[open][data-closing],
 .drawer-dialog[open][data-closing] {
   /* Not interactive on the way out — a click during the slide should reach what
@@ -93,13 +111,16 @@ dialog,
   scale: 0.97;
   transition:
     opacity 0.2s ease,
-    scale 0.2s ease,
-    overlay 0.2s ease allow-discrete,
-    display 0.2s ease allow-discrete;
+    scale 0.2s ease;
 }
 .modal-dialog[open] {
   opacity: 1;
   scale: 1;
+  transition:
+    opacity 0.2s ease,
+    scale 0.2s ease,
+    overlay 0.2s ease allow-discrete,
+    display 0.2s ease allow-discrete;
 }
 @starting-style {
   .modal-dialog[open] {
@@ -116,13 +137,14 @@ dialog,
   border-left: 1px solid var(--color-base-300);
   box-shadow: -8px 0 30px -12px color-mix(in oklab, var(--shadow-color) 40%, transparent);
   translate: 100% 0;
+  transition: translate 0.28s ease;
+}
+.drawer-dialog[open] {
+  translate: 0 0;
   transition:
     translate 0.28s ease,
     overlay 0.28s ease allow-discrete,
     display 0.28s ease allow-discrete;
-}
-.drawer-dialog[open] {
-  translate: 0 0;
 }
 @starting-style {
   .drawer-dialog[open] {
@@ -146,44 +168,20 @@ html.reader-open {
   width: min(44rem, 100vw);
   max-width: 100vw;
   flex-direction: column;
-  /* height, right-pin, and the slide-in come from .drawer-dialog */
-
-  /* ⚠ `display`/`overlay` MOVED TO THE `[open]` STATE, for this dialog only.
-     A transition runs from the property list of the state being moved TO, so
-     listing them under `[open]` still animates the ENTER — which needs the
-     display flip deferred, or `@starting-style` has nothing to start from —
-     while letting the eventual `close()` take `display: none` at once.
-
-     It has to be at once because this sheet closes AFTER its slide rather than
-     during it (`closeWithExit`), so by then it has already left the screen and
-     the deferral buys nothing: the drawer just sat in the layout as a phantom
-     `display: flex` box for a further 0.28s, translated fully off the right —
-     which at 100vw on a phone is a page-width of horizontal scroll that should
-     not exist.
-
-     ⚠ AND IT IS SCOPED HERE RATHER THAN ON `.drawer-dialog` because the
-     workshop's ~40 dialogs still call `dialog.close()` directly and rely on the
-     base rule to animate out. They have the same Safari/Firefox defect this
-     fixes (see scripts/dialog-close.ts) and the same one-line cure available,
-     but taking the base rule away without converting them would trade a bug
-     they have on one engine for a bug on every engine. */
-  transition: translate 0.28s ease;
-}
-.reader[open] {
-  transition:
-    translate 0.28s ease,
-    overlay 0.28s ease allow-discrete,
-    display 0.28s ease allow-discrete;
+  /* height, right-pin, the slide-in and the `display`/`overlay` timing all come
+     from .drawer-dialog. ⚠ THAT LAST PART USED TO BE OVERRIDDEN HERE, because
+     this was the only dialog closing through `closeWithExit` and the base rule
+     had to keep animating the twenty that weren't. All of them do now
+     (2026-08-15), so the base rule says it once and this says nothing. */
 }
 /* Lay the sheet out ONLY while it's open. A bare `.reader { display: flex }`
    would beat the UA's `dialog:not([open]) { display: none }` — author origin
    wins over UA regardless of specificity — so the CLOSED drawer stayed in the
    layout: absolutely positioned, full height, translated 100% off the right at
    the very end of the document. That phantom box is what produced the blank
-   scroll-space below and to the right of the feed, and it broke the native
-   discrete-display animation (close felt instant). Gating `display` on [open]
-   hands the closed state back to display:none, letting the allow-discrete
-   transition on .drawer-dialog animate the slide the SAME in both directions. */
+   scroll-space below and to the right of the feed. Gating `display` on [open]
+   hands the closed state back to display:none, which is what the `@starting-
+   style` enter needs to have somewhere to start from. */
 .reader[open] {
   display: flex;
 }

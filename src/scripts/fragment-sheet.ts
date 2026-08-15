@@ -15,6 +15,7 @@ import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
 import { slugify } from '../lib/slug';
 import { submitAction } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { sheetError as sheetErrorOf } from './sheet-error';
 import { confirmDialog } from './confirm-dialog';
@@ -372,7 +373,7 @@ function openSheet(tab = 'fields') {
   // gesture lands where you were already looking instead of one tab away.
   tabs.select(tab);
   refreshCnCount();
-  sheet.showModal(); // native: focus-trap + Escape + focus restore on close
+  openDialog(sheet); // native: focus-trap + Escape + focus restore on close
   dirty = false; // the fields we just populated don't count as user edits
 }
 
@@ -398,7 +399,7 @@ async function requestClose() {
   // was no close animation because there was no close. It read as jarring
   // because it WAS jarring — an element disappearing is not an element closing.
   const stale = membershipTouched();
-  sheet.close();
+  void closeWithExit(sheet);
   // Membership applies immediately, so the list/suite behind us is stale. The
   // host refreshes in place if it can; if nothing claims it, this falls back to
   // the reload that used to be here unconditionally.
@@ -633,7 +634,7 @@ document.addEventListener('fragment:edit', (e) => {
     dirty = false; // saved — don't prompt the unsaved-work guard on the way out
     // The reload used to be what closed this sheet after a save. It isn't any
     // more, so the close is explicit and load-bearing rather than tidying.
-    sheet.close();
+    void closeWithExit(sheet);
     notifyFragmentsChanged(sheet);
   });
 }
@@ -665,7 +666,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
     });
     if (!res.ok) return;
     dirty = false; // trashed — nothing left here worth guarding
-    sheet.close();
+    void closeWithExit(sheet);
     notifyFragmentsChanged(sheet);
   });
 });

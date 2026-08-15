@@ -32,15 +32,29 @@ const SCRIPTS = fileURLToPath(new URL('../scripts/', import.meta.url));
 /**
  * Client scripts that own a `<dialog>` the reader can be inside.
  *
- * Derived rather than listed: a file is in scope if it calls `showModal()`,
- * which is the one thing every modal sheet must do and nothing else does. A
- * tenth sheet therefore joins this test by existing, which is the property a
- * hand-maintained list would not have.
+ * Derived rather than listed: a file is in scope if it opens a modal, which is
+ * the one thing every modal sheet must do and nothing else does. A tenth sheet
+ * therefore joins this test by existing, which is the property a hand-maintained
+ * list would not have.
+ *
+ * ⚠ THE MARKER MOVED ON 2026-08-15, AND THE CANARY BELOW IS WHY THAT WAS SAFE.
+ * It used to be `.showModal()`. Then every sheet was converted to `openDialog()`
+ * (scripts/dialog-close.ts) so its exit would animate on WebKit, and the literal
+ * `.showModal()` survived in exactly one file — the helper that defines
+ * `openDialog`. So this detector went on "working": it matched one file, the
+ * wrong one, and would have reported a passing rule over nineteen unchecked
+ * sheets. The `> 8` assertion in the first `it` is the only thing between that
+ * and a green test suite guarding nothing, which is the entire argument for
+ * writing a count assertion next to a derived list.
  */
 function sheetScripts(): string[] {
-  return readdirSync(SCRIPTS)
-    .filter((f) => f.endsWith('.ts'))
-    .filter((f) => readFileSync(join(SCRIPTS, f), 'utf8').includes('.showModal()'));
+  return (
+    readdirSync(SCRIPTS)
+      .filter((f) => f.endsWith('.ts'))
+      // The helper itself is the definition, not a call site.
+      .filter((f) => f !== 'dialog-close.ts')
+      .filter((f) => readFileSync(join(SCRIPTS, f), 'utf8').includes('openDialog('))
+  );
 }
 
 /**

@@ -25,6 +25,7 @@ import { mountMiniEditor } from './rich-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { wirePairBrowser, type PairedPiece } from './pair-browser';
 import { sheetError } from './sheet-error';
@@ -87,7 +88,7 @@ let loadSeed: ((seed: SongSheetSeed) => void) | null = null;
 export function openSongSheet(seed: Partial<SongSheetSeed> = {}): void {
   if (!sheet || !loadSeed) return;
   loadSeed({ ...EMPTY, ...seed });
-  sheet.showModal();
+  openDialog(sheet);
   // ⚠ FOCUS FOLLOWS THE JOB, and the job changed. An empty sheet is waiting
   // for a link, so it still focuses the URL field. A LOADED one used to focus
   // the first feeling chip, because pressing words was the loop this sheet was
@@ -546,7 +547,7 @@ function wire(sheet: HTMLDialogElement) {
 
   // --- closing -------------------------------------------------------------
   function close() {
-    sheet.close();
+    void closeWithExit(sheet);
   }
   /**
    * ⚠ THIS SHEET HAS THE MOST TO LOSE OF ANY OF THEM (ADR 0032), which is why

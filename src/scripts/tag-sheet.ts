@@ -10,6 +10,7 @@
 // with RRULEs, where the client only ever handles a preset.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';
 
@@ -51,7 +52,7 @@ if (sheet && form) {
     const on = new Set((trigger.dataset.tagPeople ?? '').split(',').filter(Boolean));
     checks().forEach((c) => (c.checked = on.has(c.value)));
     dirty.reset(); // populating is not editing — see dirtyTracker
-    sheet.showModal();
+    openDialog(sheet);
   });
 
   /*
@@ -71,7 +72,7 @@ if (sheet && form) {
     // `!` because a hoisted `async function` cannot inherit the narrowing
     // from the `if (sheet && …)` around it — the same reason this file already
     // writes `sheet!` at its other exits.
-    sheet!.close();
+    void closeWithExit(sheet!);
   }
   wireSheetDismiss(sheet, requestClose);
 
