@@ -61,6 +61,7 @@ const ALL: Record<keyof Database['public']['Tables'], true> = {
   person_works: true,
   push_day_claims: true,
   push_subscriptions: true,
+  sets: true,
   settings: true,
   subjects: true,
   task_events: true,

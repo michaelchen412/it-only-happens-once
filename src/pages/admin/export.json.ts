@@ -74,6 +74,20 @@ export const TABLES = [
   // reason: this file and the nightly dump are its ONLY other copy, and an
   // unpublished thing that is lost is lost completely.
   'fragment_private_notes',
+  // The sets (plan 40 §3) — a curated listen: one playlist, one quote, one
+  // description.
+  //
+  // ⚠ IT BELONGS BESIDE `constellations` AND CANNOT SIT THERE. This list is in
+  // FOREIGN-KEY order so an importer walking it top to bottom never trips a
+  // reference, and a set carries `quote_fragment_id` into `fragments` — which
+  // appears well below `constellations`. So conceptual grouping loses to the
+  // ordering rule, as it must.
+  //
+  // ⚠ AND IT IS NOT RE-DERIVABLE. A playlist lives in Spotify and could be
+  // re-fetched; the TITLE, the chosen quote and the description are Michael's
+  // and exist nowhere else. Same argument as `fragment_feelings` above, and it
+  // is the reason a set is worth exporting rather than merely a pointer.
+  'sets',
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
   'daily_checkins',

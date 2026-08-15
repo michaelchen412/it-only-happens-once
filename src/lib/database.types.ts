@@ -975,6 +975,50 @@ export type Database = {
         }
         Relationships: []
       }
+      sets: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          playlist_url: string
+          quote_fragment_id: string | null
+          slug: string
+          sort: number
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          playlist_url: string
+          quote_fragment_id?: string | null
+          slug: string
+          sort?: number
+          status?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          playlist_url?: string
+          quote_fragment_id?: string | null
+          slug?: string
+          sort?: number
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sets_quote_fragment_id_fkey"
+            columns: ["quote_fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           created_at: string
