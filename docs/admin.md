@@ -610,7 +610,7 @@ The new song is created with no subjects, which is correct rather than an omissi
 
 **The 48 songs already here are not a head start.** They arrived as *paired media* — chosen because they went with an essay, not because of what they evoke — so they sit in *Not yet heard* and need the same one-by-one attention as anything new.
 
-### 6c · Pairing, from the song's side
+## 6c. Pairing, from the song's side
 
 **A pairing has two doors, and one write path** ([ADR 0034](adr/0034-a-relation-may-be-edited-from-either-end.md)). The writing sheet's Music tab answers *what song goes with this piece?*; the song sheet's Facts tab answers *what am I going to write about this?* Both call the same `songs.pair` against the same column. The second existed nowhere until 2026-08-12, and reaching the first meant closing the song sheet — **which destroys the iframe**, so the only route to the control ended the listening that produced the thought.
 
