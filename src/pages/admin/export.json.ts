@@ -44,27 +44,12 @@ import type { APIRoute } from 'astro';
  */
 export const TABLES = [
   'subjects',
-  // The vocabulary of feelings (plan 33 §1) — beside `subjects` because it is
-  // the same KIND of row and deliberately not the same table: a subject is what
-  // a piece is about, a feeling is what a song does to you.
-  //
-  // ⚠ ITS JOIN IS THE ONE ROW IN THIS EXPORT THAT CANNOT BE RE-DERIVED. A
-  // subject can be re-tagged from the text and a citation re-read off the page;
-  // `fragment_feelings` is a record of what a song did to somebody on a
-  // particular evening, and plan 33 ruling 1 rules out ever regenerating it —
-  // *"AI can't tell me what I feel."* Losing it is the one loss here that is
-  // permanent rather than expensive.
-  'feelings',
   'authors',
   'works',
   'constellations',
   'pages',
   'fragments',
   'fragment_subjects',
-  // After `feelings` above and `fragments` directly above, both of which it
-  // carries a key into, so an importer walking this list top to bottom can never
-  // trip it.
-  'fragment_feelings',
   'fragment_constellations',
   'fragment_versions',
   // ⚠ PRIVATE, AND THE ONLY THING IN THE CORPUS'S HALF THAT IS (ADR 0031).
@@ -85,8 +70,9 @@ export const TABLES = [
   //
   // ⚠ AND IT IS NOT RE-DERIVABLE. A playlist lives in Spotify and could be
   // re-fetched; the TITLE, the chosen quote and the description are Michael's
-  // and exist nowhere else. Same argument as `fragment_feelings` above, and it
-  // is the reason a set is worth exporting rather than merely a pointer.
+  // and exist nowhere else. That is the reason a set is worth exporting rather
+  // than merely a pointer — it is the argument `fragment_feelings` used to make
+  // from this list before plan 40 retired it.
   'sets',
   // --- HQ (private; never public, at any grain) ---------------------------
   'settings',
