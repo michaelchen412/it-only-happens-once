@@ -243,10 +243,11 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     const note = document.createElement('li');
     note.className = 'admin-hint mt-2 italic';
     // Subjects are deliberately absent, and saying so is cheaper than a reader
-    // later wondering whether the panel forgot: songs are not filed by subject
-    // in this corpus, they are filed by feeling (plan 33 §1) — in the Listening
-    // room, with the track playing.
-    note.textContent = 'It will be saved as a song and paired here. Give it its feelings in Listening.';
+    // later wondering whether the panel forgot: a song is not ABOUT anything
+    // (ADR 0031 took subjects off songs), and since plan 40 there is nothing
+    // else to file it under either — the sentence used to end "give it its
+    // feelings in Listening", which pointed at a room that no longer exists.
+    note.textContent = 'It will be saved as a song and paired here.';
     listEl.append(note);
   }
 
