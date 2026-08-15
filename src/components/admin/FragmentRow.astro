@@ -124,6 +124,26 @@ const cnLabel = cnNames.length
 const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
 
 /*
+  ⚠ A QUOTE IS CLAMPED SHORTER IN THE DRAWER THAN IN THE MANAGER, and the
+  asymmetry is the point rather than an oversight (Michael, 2026-08-15: *"in the
+  fragment browser quotes should not be completely displayed. They should
+  truncate after a certain length"* → two lines, browser only).
+
+  A quote has no title, so its BODY is its primary line — which means a row's
+  height is set by how long the quotation is, and three lines of one is a tall
+  row. That is a fair trade in `/admin/fragments`, where the table IS the room
+  and you are reading to find something. It is a bad one in the browser drawer,
+  where the table is a picker over a suite you are composing: you are scanning
+  for a piece you already have in mind, and every extra line is one fewer row on
+  screen at the moment you most want the list dense.
+
+  Two rather than one, because a single line of a quotation is often just its
+  run-up ("It is a truth universally acknowledged, that a single man in") and
+  tells you nothing about which quote it is.
+*/
+const quoteClamp = pick || pair ? 'line-clamp-2' : 'line-clamp-3';
+
+/*
   ⚠ QUOTES ONLY NOW (ADR 0031). Writing has always opened its own workshop from
   `data-writing`; a SONG now opens `SongSheet` from `data-song`, the same way and
   for the same reason — one editor per kind, named by an id rather than by a
@@ -204,11 +224,14 @@ const editorData =
   <td class="w-full max-w-0 py-2.5 pr-3 align-top">
     {
       trash ? (
-        <div class:list={r.type === 'quote' ? 'line-clamp-3 italic' : 'truncate'}>
+        /* Trash is manage-only, so this is always the three-line clamp — the
+           drawer never renders a trashed row. Written as `quoteClamp` anyway,
+           so the two never have to be kept in step by hand. */
+        <div class:list={r.type === 'quote' ? [quoteClamp, 'italic'] : 'truncate'}>
           <Highlighted text={primaryText} term={term} />
         </div>
       ) : r.type === 'quote' ? (
-        <button type="button" class="row-open line-clamp-3 max-w-full text-left italic">
+        <button type="button" class:list={['row-open max-w-full text-left italic', quoteClamp]}>
           <Highlighted text={primaryText} term={term} />
         </button>
       ) : (
