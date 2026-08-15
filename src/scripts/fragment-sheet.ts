@@ -284,9 +284,10 @@ const quoteSuggest = wireSubjectSuggest({
   what this taxonomy is for. The annotation is gone now too, so the last input
   that could have made a song's subjects meaningful went with it.
 
-  Songs are filed by FEELING, in /admin/listening, with the track playing — and
-  nothing proposes those, ever (plan 33 ruling 1). So no part of a song is
-  machine-taggable at all, which is a cleaner line than the one this replaced.
+  Songs were filed by FEELING, in /admin/listening, with the track playing, and
+  nothing ever proposed those (plan 33 ruling 1). Both are gone (plan 40) — so
+  no part of a song is machine-taggable, and now there is nothing on a song to
+  tag at all beyond the link and who played it.
 */
 
 // date: automatic unless the toggle is on
@@ -432,7 +433,7 @@ function toggleDelete(form: HTMLFormElement, show: boolean) {
 
 // --- New quote (the button lives in the list page) ---
 // ⚠ `[data-new]` USED TO CARRY A TYPE, and "song" was the other value. Songs
-// enter at /admin/listening now (ADR 0031), so every remaining one says quote —
+// enter from the essay that wanted them (plan 40), so every remaining one says quote —
 // the attribute is kept rather than renamed because the list pages, the
 // composer's browser and the deep-link handler all emit it.
 document.querySelectorAll<HTMLElement>('[data-new]').forEach((btn) => {

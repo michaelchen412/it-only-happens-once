@@ -32,17 +32,7 @@ import { attentionLabel, titlePrefix } from '../lib/hq/attention';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?:
-    | 'today'
-    | 'people'
-    | 'agenda'
-    | 'notes'
-    | 'fragments'
-    | 'listening'
-    | 'sets'
-    | 'constellations'
-    | 'library'
-    | 'about';
+  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'sets' | 'constellations' | 'library' | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -109,24 +99,6 @@ const nav = [
   // is that I have writing fragments and I have brain dumps."*
   { key: 'notes', label: 'Notes', href: '/admin/notes', icon: 'ph:note', hr: false },
   { key: 'fragments', label: 'Fragments', href: '/admin/fragments', icon: 'ph:stack', hr: true },
-  // LISTENING sits immediately after Fragments, in the same position Notes holds
-  // in the daily half and for the same reason: it is the FRONT of a pipeline. A
-  // song enters the corpus here, in one motion with the listening (plan 33 §3,
-  // ruling 1) — so this is to music what Notes is to writing, and putting it
-  // after the room its rows end up in would describe the flow backwards.
-  //
-  // ⚠ A NINTH ROW, IN A LIST WHOSE ARGUMENT IS THAT IT IS SHORT. The push
-  // toggle two blocks below is refused a row on exactly that ground, and the
-  // difference is worth stating rather than leaving to be re-litigated: that is
-  // one switch, and this is a place you go and stay — twenty songs in a sitting
-  // is what §3 sizes it for. A room you return to daily is what a nav row is.
-  { key: 'listening', label: 'Listening', href: '/admin/listening', icon: 'ph:music-notes', hr: false },
-  // ⚠ A TENTH ROW, AND IT IS TEMPORARY BY DESIGN. The note above refuses rows
-  // on the ground that this list is short, and it is right — but plan 40 retires
-  // Listening entirely in its phase 2, at which point this returns to nine.
-  // Both are here only for the window where songs still enter the old way and
-  // sets are being built. If Listening is still above this in a month, one of
-  // the two is not being used and that is the thing to act on.
   { key: 'sets', label: 'Sets', href: '/admin/sets', icon: 'ph:playlist', hr: false },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },

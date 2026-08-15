@@ -12,8 +12,8 @@
 // The callers own their verb; the drawer owns the browsing.
 //
 // ⚠ EVERY LOOKUP IS root.querySelector, NEVER document. /admin/fragments now
-// carries a manage-mode panel AND this drawer, and /admin/listening will carry
-// the drawer beside the song sheet — so a document-wide read of `.fb-panel`
+// carries a manage-mode panel AND this drawer, and a second surface could
+// always mount both again — so a document-wide read of `.fb-panel`
 // finds whichever came first in the DOM, which is a bug that looks like a
 // caching problem.
 import { wireFragmentPanel, type PanelHandle, type PanelOpts } from './fragment-panel';

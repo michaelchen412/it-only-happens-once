@@ -147,9 +147,11 @@ const SUBTITLES = {
                     <TypeMark type="quote" /> Quote
                   </button>
                   {/* ⚠ NO SONG, AND ITS ABSENCE IS THE DECISION (ADR 0031). A
-                      song enters the corpus at /admin/listening, in the same
-                      motion as the listening — plan 33's ruling 1 is that adding
-                      a song and sitting with it are THE SAME ACT, and a "New
+                      song enters the corpus from the ESSAY THAT WANTED IT —
+                      the writing sheet's Music tab, where a pasted link
+                      resolves and offers to create (plan 40). It used to enter
+                      at /admin/listening in the same motion as the listening,
+                      and that room is gone with the feelings it existed for. A "New
                       song" button on a management table is precisely the split
                       that ruling refuses: it would make a row first and a
                       decision about the music later, which is a queue of
@@ -283,7 +285,8 @@ const SUBTITLES = {
   />
   <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
   {
-    /* ⚠ THE SAME SHEET /admin/listening MOUNTS, not a copy (ADR 0031). A song
+    /* ⚠ THE ONLY PLACE THIS SHEET IS MOUNTED, since /admin/listening was
+      retired (plan 40 phase 2) — it used to be the second. A song
       row here opens THIS, through the `song:edit` seam in open-editor.ts — so
       the manager keeps LISTING songs, which is what search, trash and bulk
       publish are for, and stops EDITING them, which is what had two homes.
