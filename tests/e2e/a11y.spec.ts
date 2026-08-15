@@ -33,11 +33,12 @@ const ROOMS = [
   // Plan 38 · §1.5 found the roster search focusing invisibly — a Level A
   // failure that plan 19 walked past while counting 45 tab stops, because the
   // list below was a list of rooms and the check above was a check of tab ORDER.
-  // Two gaps, and only one of them was the room list. `/admin/listening` was
-  // simply never here; the other three shells this file still doesn't cover
+  // Two gaps, and only one of them was the room list. The room that was missing
+  // here has since been retired and `/admin/sets` took its place in the nav, so
+  // that is what this line covers now; the other three shells this file doesn't cover
   // (`constellations/[id]`, `people/[slug]`, `agenda/goals/[slug]`) need a real
   // id, so they need a fixture row rather than a line here.
-  '/admin/listening',
+  '/admin/sets',
 ];
 
 const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';

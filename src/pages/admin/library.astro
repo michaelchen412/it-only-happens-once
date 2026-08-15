@@ -15,7 +15,7 @@ import { Icon } from 'astro-icon/components';
 
 const supabase = Astro.locals.supabase;
 
-const [{ data: subjects }, { data: authors }, { data: works }, { data: feelings }] = await Promise.all([
+const [{ data: subjects }, { data: authors }, { data: works }] = await Promise.all([
   supabase.from('subjects').select('id, name, definition').order('name'),
   supabase.from('authors').select('id, name, note').order('name'),
   supabase.from('works').select('id, title, author_id, year, kind').order('title'),
@@ -24,12 +24,10 @@ const [{ data: subjects }, { data: authors }, { data: works }, { data: feelings 
   // ordering is a claim about the material (plan 33 §1). Alphabetising it here
   // would show a different vocabulary from the one the room shows, and the
   // Library is where the order is edited.
-  supabase.from('feelings').select('id, name, slug, sort').order('sort'),
 ]);
 
 // usage counts
 const { data: fs } = await supabase.from('fragment_subjects').select('subject_id');
-const { data: ff } = await supabase.from('fragment_feelings').select('feeling_id');
 const { data: frs } = await supabase.from('fragments').select('author_id, work_id').is('deleted_at', null);
 const tally = (rows: any[] | null, key: string) => {
   const m: Record<string, number> = {};
@@ -37,7 +35,6 @@ const tally = (rows: any[] | null, key: string) => {
   return m;
 };
 const subjCount = tally(fs, 'subject_id');
-const feelingCount = tally(ff, 'feeling_id');
 const authorCount = tally(frs, 'author_id');
 const workCount = tally(frs, 'work_id');
 
@@ -64,7 +61,6 @@ for (const row of shelved ?? []) {
    per row, serialized into a single <script type="application/json">. */
 const mergeOptions = {
   subject: (subjects ?? []).map((r) => ({ id: r.id, name: r.name })),
-  feeling: (feelings ?? []).map((r) => ({ id: r.id, name: r.name })),
   author: (authors ?? []).map((r) => ({ id: r.id, name: r.name })),
   work: (works ?? []).map((r) => ({ id: r.id, name: r.title })),
 };
@@ -74,7 +70,7 @@ const mergeOptions = {
   <div class="mx-auto max-w-5xl px-6 py-8">
     <PageHeader
       title="Library"
-      subtitle="The vocabularies the workshop shares — subjects (what a piece is about; their definitions feed the AI suggester), feelings (what a song does to you), authors and works (where it comes from). Edit in place, merge duplicates, or delete."
+      subtitle="The vocabularies the workshop shares — subjects (what a piece is about; their definitions feed the AI suggester), authors and works (where it comes from). Edit in place, merge duplicates, or delete."
     >
       {
         /* The export lives here rather than in the composing room: it's a
@@ -137,90 +133,6 @@ const mergeOptions = {
             <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
             <td class="px-3 py-2">
               <VocabActions entity="subject" id={s.id} name={s.name} />
-            </td>
-          </tr>
-        ))
-      }
-    </VocabTable>
-
-    {
-      /* FEELINGS (plan 33 §1) — the fourth vocabulary, and the one whose rows
-        behave differently from the other three.
-
-        ⚠ THE SLUG IS FROZEN AND THE NAME IS NOT. Every other row on this page
-        re-derives its slug from its name on save. A feeling's slug goes into a
-        public URL people send each other (`/blog?view=music&feeling=regretful`),
-        and moving one hard-404s every link already handed out — so a rename
-        changes the word and leaves the address alone, and the two are allowed to
-        drift apart forever. That is why the link is SHOWN in its own column: it
-        is the only place the drift is visible, and it is what a collision on a
-        new word will be about.
-
-        ⚠ MERGE MATTERS MORE HERE THAN ANYWHERE ELSE ON THIS PAGE. §1's size
-        discipline is the whole risk: the taxonomy dies by `wistful` and
-        `reminiscent` splitting one shelf in month three, not by anything the
-        unique index can catch. Merge is the tool for that, and the only exit
-        when a new word collides with a link a renamed feeling still owns. */
-    }
-    <VocabTable
-      title="Feelings"
-      count={(feelings ?? []).length}
-      columns={[
-        { label: 'Word' },
-        { label: 'Order', w: 'w-20' },
-        { label: 'Link' },
-        { label: 'Songs', w: 'w-14', right: true },
-        { label: 'Actions', w: 'w-64' },
-      ]}
-    >
-      <Fragment slot="lede">
-        <p class="text-base-content/50 mb-3 max-w-2xl font-sans text-sm">
-          The words a song is filed under, in the order the room reads them — dark to light. Keep it short: two words
-          for one shelf is how a vocabulary stops meaning anything.
-        </p>
-
-        {
-          /* Adding one here rather than mid-listen, when it is a considered
-        addition rather than something a track just did to you. */
-        }
-        <div class="mb-3 flex items-center gap-2">
-          <input
-            id="feeling-new"
-            placeholder="a new word…"
-            aria-label="New feeling"
-            class="input input-xs input-bordered w-44"
-          />
-          <button id="feeling-add" class="btn btn-primary btn-xs normal-case">Add</button>
-        </div>
-      </Fragment>
-      {
-        (feelings ?? []).map((f) => (
-          <tr
-            class="lib-row border-base-300 border-b align-top last:border-0"
-            data-entity="feeling"
-            data-id={f.id}
-            data-name={f.name}
-            data-uses={feelingCount[f.id] ?? 0}
-          >
-            <td class="px-3 py-2">
-              <input data-field="name" value={f.name} aria-label="Feeling" class="input input-xs input-bordered w-36" />
-            </td>
-            <td class="px-3 py-2">
-              <input
-                data-field="sort"
-                type="number"
-                value={f.sort}
-                aria-label="Position in the spectrum"
-                class="input input-xs input-bordered w-16"
-              />
-            </td>
-            {/* Not editable, and shown so the freeze is visible rather than
-                      surprising. A word renamed away from its link is the one
-                      state that can make a later addition fail. */}
-            <td class="text-base-content/45 px-3 py-2 font-mono text-xs">{f.slug}</td>
-            <td class="text-base-content/60 px-3 py-2 text-right">{feelingCount[f.id] ?? 0}</td>
-            <td class="px-3 py-2">
-              <VocabActions entity="feeling" id={f.id} name={f.name} />
             </td>
           </tr>
         ))

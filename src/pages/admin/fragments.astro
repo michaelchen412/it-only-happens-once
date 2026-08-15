@@ -51,12 +51,9 @@ const subjectNames = data.allSubjects.map((s) => s.name);
   rather than 404ing — you came here to write a quote, and the worst outcome of
   a stale link should be an unattributed one, not a dead end.
 */
-const [people, sharedBy, feelings] = await Promise.all([
+const [people, sharedBy] = await Promise.all([
   supabase.from('people').select('id, display_name').order('display_name'),
   allFragmentPeople(supabase),
-  // The vocabulary for the SongSheet mounted below (ADR 0031). Sixteen rows,
-  // and it rides along in a batch this page already makes.
-  supabase.from('feelings').select('id, name').order('sort'),
 ]);
 
 const personSlug = Astro.url.searchParams.get('person');
@@ -295,7 +292,7 @@ const SUBTITLES = {
       its own front door is mountable anywhere, where a page-level one would
       have forced either a second copy or a navigation out of the room. */
   }
-  <SongSheet feelings={feelings.data ?? []} people={people.data ?? []} sharedBy={sharedBy} />
+  <SongSheet people={people.data ?? []} sharedBy={sharedBy} />
 
   <script>
     import '../../scripts/admin-list';

@@ -15,7 +15,7 @@
 // ============================================================================
 import { fragments, songs } from './fragments';
 import { versions } from './versions';
-import { subjects, authors, works, feelings } from './vocabulary';
+import { subjects, authors, works } from './vocabulary';
 import { constellations } from './constellations';
 import { sets } from './sets';
 import { pages, contact } from './site';
@@ -37,10 +37,6 @@ export const server = {
   subjects,
   authors,
   works,
-  // The fourth vocabulary, and the only one whose slug is frozen (plan 33,
-  // ruling 6): it goes in a public URL people send each other, so a rename must
-  // not move the address. It also refuses collisions instead of suffixing.
-  feelings,
   constellations,
   // A curated listen (plan 40 §3) — beside `constellations` because it is the
   // same kind of object: a named, described, curated thing. Not a fragment.

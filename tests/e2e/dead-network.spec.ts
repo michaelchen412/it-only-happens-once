@@ -82,9 +82,16 @@ test.describe('the song sheet — the lookup that never answers', () => {
     // No handler for anything → every action aborts, which is what a dead
     // network looks like from the browser's side.
     await stubActions(page, {});
-    await page.goto('/admin/listening');
+    await page.goto('/admin/fragments');
     await hideDevToolbar(page);
-    await page.locator('#lst-new').click();
+    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
+    // sheet has no door left, because a song now enters from the essay that
+    // wanted it. The URL field and its debounced lookup still exist on an
+    // existing song's Facts tab, which is the surface this behaviour lives on
+    // now. `song:edit` is the documented row → editor seam.
+    await page.evaluate(() =>
+      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
+    );
     await expect(page.locator('#song-sheet')).toBeVisible();
 
     // `input`, not `change`: the paste bar debounces on input (350ms) so the
@@ -255,10 +262,17 @@ test.describe('the bulk bar', () => {
 */
 test.describe('a sheet is dismissible, and says what that costs', () => {
   test('the song sheet closes on an outside press when nothing is at stake', async ({ page }) => {
-    await page.goto('/admin/listening');
+    await page.goto('/admin/fragments');
     await hideDevToolbar(page);
     const sheet = page.locator('#song-sheet');
-    await page.locator('#lst-new').click();
+    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
+    // sheet has no door left, because a song now enters from the essay that
+    // wanted it. The URL field and its debounced lookup still exist on an
+    // existing song's Facts tab, which is the surface this behaviour lives on
+    // now. `song:edit` is the documented row → editor seam.
+    await page.evaluate(() =>
+      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
+    );
     await expect(sheet).toBeVisible();
 
     // Press the backdrop — the dialog element itself, outside its content box.
@@ -267,14 +281,25 @@ test.describe('a sheet is dismissible, and says what that costs', () => {
   });
 
   test('…and asks first once there is something to lose', async ({ page }) => {
-    await page.goto('/admin/listening');
+    await page.goto('/admin/fragments');
     await hideDevToolbar(page);
     const sheet = page.locator('#song-sheet');
-    await page.locator('#lst-new').click();
+    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
+    // sheet has no door left, because a song now enters from the essay that
+    // wanted it. The URL field and its debounced lookup still exist on an
+    // existing song's Facts tab, which is the surface this behaviour lives on
+    // now. `song:edit` is the documented row → editor seam.
+    await page.evaluate(() =>
+      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
+    );
     await expect(sheet).toBeVisible();
 
-    // One pressed word is unsaved work: the feelings are held until Save.
-    await page.locator('.sng-word').first().click();
+    // ⚠ TYPED TEXT IS THE UNSAVED WORK NOW. This used to press a feeling chip,
+    // which was held until Save and so was the cheapest possible dirty edit.
+    // The words are gone (plan 40); the title is the field that replaces them
+    // as "something to lose".
+    await sheet.getByRole('tab', { name: 'Facts' }).click();
+    await page.locator('#sng-song-title').fill('zzq dirty');
     await page.mouse.click(5, 5);
 
     // The sheet stays, and the confirm is what stands between the click and the

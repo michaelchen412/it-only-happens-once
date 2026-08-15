@@ -38,7 +38,6 @@ export interface SongSheetSeed {
   album: string;
   year: number | null;
   url: string;
-  feelingIds: string[];
   publicNote: string;
   privateNote: string;
   /**
@@ -67,7 +66,6 @@ const EMPTY: SongSheetSeed = {
   album: '',
   year: null,
   url: '',
-  feelingIds: [],
   publicNote: '',
   privateNote: '',
   paired: [],
@@ -78,7 +76,6 @@ const EMPTY: SongSheetSeed = {
 const sheet = document.getElementById('song-sheet') as HTMLDialogElement | null;
 /** Assigned by `wire()` below, which runs on import. */
 let loadSeed: ((seed: SongSheetSeed) => void) | null = null;
-let focusWords: (() => void) | null = null;
 
 /**
  * Open the sheet on a song, or empty for a new one.
@@ -91,11 +88,14 @@ export function openSongSheet(seed: Partial<SongSheetSeed> = {}): void {
   if (!sheet || !loadSeed) return;
   loadSeed({ ...EMPTY, ...seed });
   sheet.showModal();
-  // Focus follows the job: an empty sheet is waiting for a link, a loaded one
-  // is waiting for words. Anything else costs a reach for the mouse on the
-  // press this whole loop exists to keep cheap.
-  if (seed.id) focusWords?.();
-  else (document.getElementById('sng-url') as HTMLInputElement | null)?.focus();
+  // ⚠ FOCUS FOLLOWS THE JOB, and the job changed. An empty sheet is waiting
+  // for a link, so it still focuses the URL field. A LOADED one used to focus
+  // the first feeling chip, because pressing words was the loop this sheet was
+  // built for — plan 40 retired them, and there is now nothing on an existing
+  // song that you reliably came to type. So focus stays with the dialog and
+  // the reader chooses a tab, rather than being dropped into a title field
+  // they were probably not here to edit.
+  if (!seed.id) (document.getElementById('sng-url') as HTMLInputElement | null)?.focus();
 }
 
 /** Pull an existing song up by id — one round trip, everything the sheet shows. */
@@ -140,8 +140,6 @@ function wire(sheet: HTMLDialogElement) {
   const urlEl = el<HTMLInputElement>('sng-url');
   const playerEl = el('sng-player');
   const headingEl = el('sng-title');
-  const wordsEl = el('sng-words');
-  const feelCountEl = el('sng-feel-count');
   const notesMarkEl = el('sng-notes-mark');
   const songTitleEl = el<HTMLInputElement>('sng-song-title');
   const artistEl = el<HTMLInputElement>('sng-artist');
@@ -151,9 +149,6 @@ function wire(sheet: HTMLDialogElement) {
   const pairedNoneEl = el('sng-paired-none');
   const pairAddBtn = el<HTMLButtonElement>('sng-pair-add');
   const pairQueuedEl = el('sng-pair-queued');
-  const newWordEl = el<HTMLInputElement>('sng-newword');
-  const addWordBtn = el<HTMLButtonElement>('sng-addword');
-  const wordNoteEl = el('sng-wordnote');
   const saveBtn = el<HTMLButtonElement>('sng-save');
   const deleteBtn = el<HTMLButtonElement>('sng-delete');
   // The zone, not the button: Delete left the sticky footer for the foot of the
@@ -302,14 +297,8 @@ function wire(sheet: HTMLDialogElement) {
     });
   });
 
-  // --- the words -----------------------------------------------------------
-  const chips = () => [...wordsEl.querySelectorAll<HTMLButtonElement>('.sng-word')];
-  const selected = () => chips().filter((c) => c.getAttribute('aria-pressed') === 'true');
-
-  /** The two tab badges. A count on Feelings, a MARK on Notes — see below. */
+  /** The Notes badge — a MARK rather than a count, see below. */
   function paintBadges() {
-    const n = selected().length;
-    feelCountEl.textContent = n ? String(n) : '';
     // ⚠ A MARK RATHER THAN A COUNT, because "2" would be a lie about what is
     // there: the two notes are different documents with different readers, not
     // two of one thing. `··` says both, `·` says one, nothing says neither.
@@ -319,16 +308,6 @@ function wire(sheet: HTMLDialogElement) {
   // themselves — the same reason the quote sheet's editor does.
   pub.editor.on('update', () => (paintBadges(), dirty.touch()));
   priv.editor.on('update', () => (paintBadges(), dirty.touch()));
-
-  wordsEl.addEventListener('click', (e) => {
-    const chip = (e.target as HTMLElement).closest<HTMLButtonElement>('.sng-word');
-    if (!chip) return;
-    chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));
-    paintBadges();
-    // A word is held until Save, so pressing one IS an unsaved edit — unlike
-    // the constellation picker next door, which writes on the tick.
-    dirty.touch();
-  });
 
   // --- the player ----------------------------------------------------------
   /** ⚠ Replaces the frame rather than hiding it. See the file header. */
@@ -358,8 +337,7 @@ function wire(sheet: HTMLDialogElement) {
     cur = { ...seed };
     clearError();
     statusEl.textContent = '';
-    wordNoteEl.hidden = true;
-    tabs.select('feelings');
+    tabs.select('facts');
 
     headingEl.textContent = seed.id ? seed.title || '(untitled)' : 'New song';
     urlEl.value = seed.url;
@@ -369,8 +347,6 @@ function wire(sheet: HTMLDialogElement) {
     yearEl.value = String(seed.year ?? new Date().getFullYear());
     base = { title: seed.title, artist: seed.artist, album: seed.album, year: yearEl.value, url: seed.url };
 
-    const want = new Set(seed.feelingIds);
-    chips().forEach((c) => c.setAttribute('aria-pressed', String(want.has(c.dataset.feeling ?? ''))));
     // emitUpdate: false — TipTap fires `update` on setContent, and the badges
     // are repainted right below anyway; letting it fire would also arm any
     // future dirty-guard against words we put there ourselves.
@@ -395,7 +371,6 @@ function wire(sheet: HTMLDialogElement) {
     dirty.reset();
   }
   loadSeed = load;
-  focusWords = () => chips()[0]?.focus();
 
   // --- pasting a link ------------------------------------------------------
   async function lookup(url: string) {
@@ -421,7 +396,6 @@ function wire(sheet: HTMLDialogElement) {
       if (full) {
         load({ ...full, resolved: null });
         statusEl.textContent = 'Already in the corpus.';
-        focusWords?.();
         return;
       }
     }
@@ -443,8 +417,6 @@ function wire(sheet: HTMLDialogElement) {
         albumId: data.albumId ?? null,
       },
     });
-    // The lookup answered; the words are the next thing you do.
-    focusWords?.();
   }
 
   urlEl.addEventListener('input', () => {
@@ -459,48 +431,6 @@ function wire(sheet: HTMLDialogElement) {
     clearTimeout(lookupTimer);
     const value = urlEl.value.trim();
     if (value) void lookup(value);
-  });
-
-  // --- adding a word mid-listen --------------------------------------------
-  async function addWord() {
-    const name = newWordEl.value.trim();
-    if (!name) return;
-    wordNoteEl.hidden = true;
-    const fd = new FormData();
-    fd.set('name', name);
-    addWordBtn.disabled = true;
-    const { data, error } = await callAction(actions.feelings.create(fd));
-    addWordBtn.disabled = false;
-    if (error) {
-      // ⚠ Reported HERE, beside the field, not in the sheet-top alert. The two
-      // refusals this can give — "there is already a feeling called X" and "a
-      // feeling that used to be called X still owns that link" — are both about
-      // the word you just typed, and both are fixed by typing a different one.
-      wordNoteEl.textContent = formatActionError(error);
-      wordNoteEl.hidden = false;
-      return;
-    }
-    if (!data) return;
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className =
-      'sng-word rounded-field border-base-300 hover:border-base-content/40 border px-2.5 py-1 font-sans text-sm transition-colors';
-    chip.dataset.feeling = data.id;
-    // Pressed on arrival: you added it because this song needs it. Making you
-    // press it again would be the interface asking whether you meant it.
-    chip.setAttribute('aria-pressed', 'true');
-    chip.textContent = data.name;
-    wordsEl.append(chip);
-    newWordEl.value = '';
-    wordNoteEl.textContent = `“${data.name}” is at the bright end until the Library places it.`;
-    wordNoteEl.hidden = false;
-    paintBadges();
-  }
-  addWordBtn.addEventListener('click', () => void addWord());
-  newWordEl.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    void addWord();
   });
 
   // --- saving --------------------------------------------------------------
@@ -522,7 +452,6 @@ function wire(sheet: HTMLDialogElement) {
     const title = songTitleEl.value.trim();
     const artist = artistEl.value.trim();
     const url = urlEl.value.trim();
-    const ids = selected().map((c) => c.dataset.feeling!);
 
     if (!url) return showError('A song needs a link.');
     if (!title || !artist) {
@@ -571,14 +500,8 @@ function wire(sheet: HTMLDialogElement) {
 
     const songId = cur.id!;
 
-    // 3 · the relations. Two calls rather than one: they write different tables,
-    // either can fail alone, and the sentence for each failure is different.
-    const { error: feelErr } = await callAction(actions.songs.setFeelings({ song_id: songId, feeling_ids: ids }));
-    // ⚠ The row may exist by now even though its feelings do not. Say so rather
-    // than "failed": the song IS in the corpus and will be sitting in "Not yet
-    // heard", which is a different thing to go and fix.
-    if (feelErr) return stop(`${formatActionError(feelErr)} The song is saved; its words are not.`);
-
+    // 3 · the notes. A separate call because it writes a different table and
+    // fails with a different sentence — the song is real by now either way.
     const { error: noteErr } = await callAction(
       actions.songs.setNotes({
         song_id: songId,
@@ -591,7 +514,7 @@ function wire(sheet: HTMLDialogElement) {
     stop();
     dirty.reset(); // it is all in the database now
     close();
-    document.dispatchEvent(new CustomEvent('song:saved', { detail: { id: songId, title, artist, feelingIds: ids } }));
+    document.dispatchEvent(new CustomEvent('song:saved', { detail: { id: songId, title, artist } }));
   }
   saveBtn.addEventListener('click', () => void save());
 

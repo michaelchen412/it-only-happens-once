@@ -33,7 +33,6 @@ const SEED: SongForSheet = {
   album: 'Kind of Blue',
   year: 2026,
   url: 'https://open.spotify.com/track/0000000000000000000000',
-  feelingIds: [],
   publicNote: '',
   privateNote: '',
   paired: [{ id: ESSAY, title: 'A piece that already has it', status: 'draft' }],
@@ -67,7 +66,7 @@ async function openFacts(page: import('@playwright/test').Page, seed: SongForShe
       return { id: NEW_PIECE, slug: 'zzq-a-new-piece', updated_at: ISO };
     },
   });
-  await page.goto('/admin/listening');
+  await page.goto('/admin/fragments');
   await hideDevToolbar(page);
   // The documented row → editor seam (`scripts/open-editor.ts`): a row says
   // WHICH song it wants opened and never names a surface. Using it here means
@@ -95,63 +94,6 @@ test.describe('the song sheet’s paired list', () => {
     const { sheet } = await openFacts(page, { ...SEED, paired: [] });
     await expect(sheet.locator('#sng-paired-none')).toBeVisible();
     await expect(sheet.locator('#sng-pair-add')).toBeVisible();
-  });
-});
-
-test.describe('a song with no row yet (ruling 3)', () => {
-  /** The empty sheet — a link pasted nobody has saved, or nothing at all. */
-  async function openNew(page: import('@playwright/test').Page) {
-    const { pairs, created } = await openFacts(page);
-    await page.locator('#song-sheet [data-close]').first().click();
-    await page.locator('#lst-new').click();
-    const sheet = page.locator('#song-sheet');
-    await expect(sheet).toBeVisible();
-    await sheet.getByRole('tab', { name: 'Facts' }).click();
-    return { sheet, pairs, created };
-  }
-
-  test('a pick is held rather than written, and says so', async ({ page }) => {
-    const { sheet, pairs } = await openNew(page);
-    await sheet.locator('#sng-pair-add').click();
-    const drawer = page.locator('#pair-browser');
-    const free = drawer.locator('tr.fragment-row:not([data-paired])').first();
-    await expect(free).toBeVisible();
-    await free.locator('.row-open').click();
-
-    // ⚠ NOTHING IS WRITTEN. `songs.pair` needs a song_id and there isn't one.
-    expect(pairs).toHaveLength(0);
-    await expect(sheet.locator('#sng-paired li')).toHaveCount(1);
-    // And the wait is legible rather than looking like a press that did nothing.
-    await expect(sheet.locator('#sng-pair-queued')).toBeVisible();
-    await expect(sheet.locator('#sng-pair-queued')).toContainText('when you save');
-  });
-
-  test('unpairing a HELD pick actually drops it, instead of coming back on save', async ({ page }) => {
-    // ⚠ THE REGRESSION THIS FILE EXISTS FOR MOST. Unpair used to edit the
-    // sheet's own list and nothing else, so on an unsaved song the row vanished
-    // and `flush` wrote it anyway on the next Save — a pairing that returned
-    // after being removed. Every check in the repo was green through it.
-    const { sheet, pairs } = await openNew(page);
-    await sheet.locator('#sng-pair-add').click();
-    const drawer = page.locator('#pair-browser');
-    const free = drawer.locator('tr.fragment-row:not([data-paired])').first();
-    await expect(free).toBeVisible();
-    const id = (await free.getAttribute('data-id'))!;
-    await free.locator('.row-open').click();
-    await expect(sheet.locator('#sng-paired li')).toHaveCount(1);
-
-    await page.locator('#pair-browser [data-fb-close]').click();
-    await sheet
-      .locator('#sng-paired li')
-      .getByRole('button', { name: /^Unpair/ })
-      .click();
-    await expect(sheet.locator('#sng-paired li')).toHaveCount(0);
-    // The queue is empty, so there is nothing for the first Save to resurrect…
-    await expect(sheet.locator('#sng-pair-queued')).toBeHidden();
-    expect(pairs).toHaveLength(0);
-    // …and the picker no longer believes it is ours.
-    await sheet.locator('#sng-pair-add').click();
-    await expect(drawer.locator(`tr.fragment-row[data-id="${id}"]`)).not.toHaveAttribute('data-paired', '');
   });
 });
 
@@ -216,7 +158,7 @@ test.describe('the pairing picker', () => {
     const picked = drawer.locator(`tr.fragment-row[data-id="${id}"]`);
     await free.locator('.row-open').click();
 
-    // ⚠ NO WRITING SHEET. /admin/listening does not mount one, so the composer's
+    // ⚠ The Fragment Manager mounts a writing sheet too, so the composer's
     // "click opens the editor" convention would have opened nothing at all.
     await expect(page.locator('#writing-sheet')).toHaveCount(0);
     await expect.poll(() => pairs.length).toBe(1);

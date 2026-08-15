@@ -20,7 +20,7 @@
 // layer and the wording is reachable from a test.
 
 export interface DeleteCost {
-  entity: 'subject' | 'author' | 'work' | 'feeling';
+  entity: 'subject' | 'author' | 'work';
   /** Shown in quotes so the dialog names the row you actually clicked. */
   name?: string;
   /** Live fragments tagged with / naming / citing it. */
@@ -42,18 +42,16 @@ export function deleteWarning(c: DeleteCost): string {
     costs.push(
       c.entity === 'subject'
         ? `${plural(c.uses, 'fragment is', 'fragments are')} tagged with this`
-        : c.entity === 'author'
+        : // ⚠ THIS CHAIN ENDS IN `work` AS ITS DEFAULT, so a FOURTH entity added to
+          // the union above and not added here silently gets "N fragments cite
+          // this work" — a confidently wrong sentence, which is the exact fault
+          // this module exists to prevent. It has happened once: `feeling` was
+          // added to the union and fell through, and its spec (deleted with the
+          // vocabulary in plan 40) existed to pin that. Extend the chain in the
+          // same commit that extends the union.
+          c.entity === 'author'
           ? `${plural(c.uses, 'fragment names', 'fragments name')} this author`
-          : // ⚠ A FEELING'S COUNT IS THE ONE THAT CANNOT BE RE-DERIVED. A subject
-            // can be re-tagged from the text and a citation re-read off the page;
-            // what a song did to somebody on a particular evening cannot be
-            // recovered from anything but memory, and plan 33 ruling 1 forbids a
-            // model guessing at it. So the sentence says *filed under* — the
-            // shelf language the room is built in — and merge is the exit that
-            // keeps the links.
-            c.entity === 'feeling'
-            ? `${plural(c.uses, 'song is', 'songs are')} filed under this`
-            : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
+          : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
     );
   }
 

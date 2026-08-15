@@ -1,6 +1,6 @@
 import { actions } from 'astro:actions';
 import { confirmDialog } from './confirm-dialog';
-import { callAction, formatActionError, submitAction } from './action-error';
+import { submitAction } from './action-error';
 import { deleteWarning } from '../lib/library-delete';
 import { wireSheetDismiss } from './sheet-dismiss';
 
@@ -8,7 +8,6 @@ const A: Record<string, any> = {
   subject: actions.subjects,
   author: actions.authors,
   work: actions.works,
-  feeling: actions.feelings,
 };
 
 const err = document.getElementById('lib-error') as HTMLParagraphElement;
@@ -57,9 +56,8 @@ document.addEventListener('change', markDirty);
    last one (nothing else dirty) refreshes for you. All three survive.
 
    ⚠ THE RELOAD ITSELF IS NOT THE BUG AND MUST NOT BE "FIXED". A rename
-   changes the row, every "Merge into…" menu and the listening bench's chip
-   order at once — see the note on `createFeeling` below, which argues it at
-   length and is right. What was missing was the guard, not the refresh.
+   changes the row and every "Merge into…" menu at once, so the refresh is
+   what keeps them honest. What was missing was the guard, not the refresh.
 
    THE ALTERNATIVE THAT LOST IS SAVE-ALL — one Save writing every dirty row.
    It is friendlier and it is probably where this ends up, but it changes
@@ -109,9 +107,8 @@ document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
      re-enable one line down and this row's Save stayed disabled for the life
      of the page with nothing on screen. Same class
      [25](docs/plans/archive/25-the-save-survives.md) closed everywhere else,
-     and `callAction` was already imported into this file — used by
-     `createFeeling` forty lines below, under a comment explaining exactly
-     this. The paste reached the new handler and not the three old ones.
+     and the helper was already imported into this file. The paste reached the
+     new handler and not the three old ones.
 
      ⚠ DO NOT DELETE THESE AS REDUNDANT. `action-guard.test.ts` will stay
      green if you do; it cannot see this file. */
@@ -133,7 +130,7 @@ document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
       // rather than re-querying, so the number in the dialog is exactly the
       // number in the "Used" column beside the button you pressed.
       message: deleteWarning({
-        entity: row.dataset.entity as 'subject' | 'author' | 'work' | 'feeling',
+        entity: row.dataset.entity as 'subject' | 'author' | 'work',
         name: row.dataset.name,
         uses: Number(row.dataset.uses ?? 0),
         shelves: Number(row.dataset.shelves ?? 0),
@@ -259,37 +256,3 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
     if (res.ok && row) await reloadUnless(row);
   });
 }
-
-// ⚠ THE ONLY VOCABULARY ON THIS PAGE WITH A CREATE CONTROL, and the reason
-// is that it is the only one nothing else creates. A subject, author or work
-// comes into existence as a side effect of saving a fragment that names it;
-// a feeling is never implied by anything, so without this row the vocabulary
-// could only ever grow from the listening bench.
-//
-// It reloads on success rather than appending a row, because a new word
-// changes three things at once — the table, every "Merge into…" menu, and
-// the bench's chip order — and re-rendering all of that by hand is how two
-// of them end up disagreeing.
-const newFeeling = document.getElementById('feeling-new') as HTMLInputElement | null;
-const addFeeling = document.getElementById('feeling-add') as HTMLButtonElement | null;
-const createFeeling = async () => {
-  const name = newFeeling?.value.trim();
-  if (!newFeeling || !addFeeling || !name) return;
-  const fd = new FormData();
-  fd.set('name', name);
-  addFeeling.disabled = true;
-  // `callAction`, not a bare await: `astro:actions` THROWS on a dead
-  // network rather than returning `{ error }`, and the rejection would skip
-  // the line below — leaving the button disabled with nothing said, on the
-  // one control on this page that has no row to fall back to.
-  const { error } = await callAction(actions.feelings.create(fd));
-  addFeeling.disabled = false;
-  if (error) showErr(formatActionError(error));
-  else location.reload();
-};
-addFeeling?.addEventListener('click', () => void createFeeling());
-newFeeling?.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  e.preventDefault();
-  void createFeeling();
-});

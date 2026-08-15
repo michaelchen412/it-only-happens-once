@@ -2,11 +2,12 @@
 /*
   SongSheet — THE editor for a song, and the only one (docs/plans/37 §2, ADR 0031).
 
-  ⚠ IT REPLACES TWO EDITORS THAT WERE SPLIT BY FIELD, which is the defect it
-  exists to close. `/admin/listening` owned the feelings and could not touch the
+  ⚠ IT REPLACED TWO EDITORS THAT WERE SPLIT BY FIELD, which is the defect it
+  existed to close. `/admin/listening` owned the feelings and could not touch the
   metadata; `FragmentSheet`'s song form owned the metadata and knew nothing about
   feelings — so filing a song meant two surfaces, and neither could show you the
-  whole object. Michael, 2026-08-11: *"this division is really uncomfortable for
+  whole object. Both the feelings and that second room are gone (plan 40); what
+  survives is the one-sheet rule they argued for. Michael, 2026-08-11: *"this division is really uncomfortable for
   me, and I don't think it's a clean implementation. Ideally… we open up a sheet
   to edit all the fields, all in one place, albeit separated in tabs."*
 
@@ -19,13 +20,12 @@
   not charge; plan 37's exit condition (twenty songs in a sitting) is what judges
   whether that was worth it.
 
-  ⚠ AND NOTHING HERE PROPOSES A FEELING. The corpus tags SUBJECTS with a model
+  ⚠ AND NOTHING HERE IS MACHINE-TAGGABLE. The corpus tags SUBJECTS with a model
   (ADR-0007) because a subject is what a piece is about and that is legible from
-  the text. A feeling is not a property of the song — it is what happened in
-  Michael — so `songs.setFeelings` has no `suggestFeelings` beside it and this
-  sheet has no button that would call one. Michael, 2026-08-10: *"AI can't tell
-  me what I feel."* Since ADR 0031 also took subjects off songs, **no part of a
-  song is machine-taggable at all**, which is a cleaner line than the one it
+  the text. ADR 0031 took subjects off songs, and plan 40 took the feelings —
+  which were never proposable anyway, Michael 2026-08-10: *"AI can't tell me
+  what I feel."* So **no part of a song is machine-taggable at all**, and what
+  is left on one is the link, who played it, and what
   replaced.
 */
 import SharedByField from './SharedByField.astro';
@@ -37,13 +37,12 @@ import SheetError from './SheetError.astro';
 
 interface Props {
   /** The vocabulary, in `sort` order — dark to light. That order is a claim. */
-  feelings: { id: string; name: string }[];
   /** The roster, for "Shared by" — a song someone sent is its clearest case. */
   people?: { id: string; display_name: string }[];
   /** `fragment_id → person_id[]`, rendered once so opening needs no round trip. */
   sharedBy?: Record<string, string[]>;
 }
-const { feelings, people = [], sharedBy = {} } = Astro.props;
+const { people = [], sharedBy = {} } = Astro.props;
 const thisYear = new Date().getUTCFullYear();
 ---
 
@@ -97,29 +96,20 @@ const thisYear = new Date().getUTCFullYear();
           filled from `songs.lookup`, so Facts is the tab you open when the
           lookup got something wrong, not the one you pass through.
 
-          ⚠ AND THE NAMES ARE A TRIAD: Feelings / Facts / Notes — what it did to
-          you, what is true about it, what you want to say. "The song" sat here
-          first and said nothing; the word that replaced it states ADR 0031's
-          own claim in the interface, because the distinction the whole record
-          turns on is that A FEELING IS NOT A PROPERTY OF THE SONG AND A FACT
-          IS. It also picks up the quote sheet's vocabulary, where provenance is
-          already "the three facts". */
+          ⚠ THE NAMES WERE A TRIAD AND ARE NOW A PAIR: Facts / Notes — what is
+          true about it, and what you want to say. Feelings led, and its whole
+          job was to state ADR 0031's claim in the interface: a feeling is not a
+          property of the song and a fact is. Plan 40 retired the vocabulary, so
+          the distinction has nothing left to draw and the tab that drew it is
+          gone. "Facts" stays because it still picks up the quote sheet's
+          vocabulary, where provenance is already "the three facts". */
       }
       <button
         type="button"
         role="tab"
         class="admin-tab"
-        data-tab="feelings"
-        aria-selected="true"
-        aria-controls="sng-panel-feelings"
-      >
-        Feelings<span id="sng-feel-count" class="admin-tab__n"></span>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="admin-tab"
         data-tab="facts"
+        aria-selected="true"
         aria-selected="false"
         tabindex="-1"
         aria-controls="sng-panel-facts"
@@ -139,63 +129,8 @@ const thisYear = new Date().getUTCFullYear();
       </button>
     </div>
 
-    {/* ── FEELINGS ─────────────────────────────────────────────────────── */}
-    <div id="sng-panel-feelings" role="tabpanel" data-tabpanel="feelings" class="px-6 py-5">
-      {
-        /* Buttons, not checkboxes, and pressed rather than checked:
-          `aria-pressed` is the role for a toggle that changes a thing rather
-          than submitting a value, and it keeps the row reading as a row of WORDS
-          instead of a form. The order is `feelings.sort` — dark to light — which
-          is the spectrum's claim and not an alphabetisation. */
-      }
-      <div id="sng-words" class="flex flex-wrap gap-2">
-        {
-          feelings.map((f) => (
-            <button
-              type="button"
-              class="sng-word rounded-field border-base-300 hover:border-base-content/40 border px-2.5 py-1 font-sans text-sm transition-colors"
-              data-feeling={f.id}
-              aria-pressed="false"
-            >
-              {f.name}
-            </button>
-          ))
-        }
-      </div>
-
-      {
-        /* ADDING A WORD MID-LISTEN. Not a convenience: plan 33 §1 says the
-          vocabulary is *discovered by tagging, not by drafting*, and that is only
-          true if a word can be added without stopping the track. A sheet that
-          made you leave for the Library would fail on exactly the songs that
-          matter most — the ones whose feeling is not in the list yet.
-
-          ⚠ AND IT IS DELIBERATELY PLAIN. The counterweight is size discipline: a
-          prominent "+ new word" turns sixteen words into sixty by month three.
-          It types the whole word, it lands at the bright end of the spectrum
-          where it is visibly unplaced, and the Library is where it gets its
-          position. */
-      }
-      <div class="mt-4 flex flex-wrap items-center gap-2">
-        <input
-          id="sng-newword"
-          placeholder="a word that isn’t here…"
-          aria-label="Add a word to the vocabulary"
-          class="input input-xs input-bordered w-48 font-sans"
-        />
-        <button id="sng-addword" type="button" class="btn btn-ghost btn-xs normal-case">Add it</button>
-        <span id="sng-wordnote" hidden class="admin-hint italic"></span>
-      </div>
-    </div>
-
     {/* ── FACTS ────────────────────────────────────────────────────────── */}
-    <div
-      id="sng-panel-facts"
-      role="tabpanel"
-      data-tabpanel="facts"
-      hidden
-      class="flex flex-col gap-4 px-6 py-5 font-sans"
-    >
+    <div id="sng-panel-facts" role="tabpanel" data-tabpanel="facts" class="flex flex-col gap-4 px-6 py-5 font-sans">
       {
         /* Auto-filled from the lookup but editable: a five-artist track joins to
           "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans", which is
@@ -293,11 +228,11 @@ const thisYear = new Date().getUTCFullYear();
           existing song, i.e. it appeared beside Save exactly when there was
           something to lose.
 
-          ⚠ THE FOOT OF *FACTS*, NOT OF FEELINGS, and the tab is the decision.
-          Feelings is the fast loop this sheet was built for — paste, listen,
-          press the words, Save — and a delete control at the end of it is in
-          the path you take twenty times a week. Facts is where the song's
-          identity lives (title, artist, album, the pairing), so it is the end
+          ⚠ THE FOOT OF *FACTS*, and the tab was the decision when there were
+          three. Feelings was the fast loop this sheet was built for and a
+          delete control at the end of it sat in the path you took twenty times
+          a week. Facts is where the song's identity lives (title, artist,
+          album, the pairing), so it is the end
           of the thing being destroyed, and reaching it costs one deliberate tab
           press. That cost is the feature.
 
@@ -311,8 +246,7 @@ const thisYear = new Date().getUTCFullYear();
         class="border-base-300 mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
       >
         <p class="admin-hint">
-          Deleting removes this song, its feelings and its notes. The feeling vocabulary itself is untouched, and any
-          essay it was paired with keeps its own text.
+          Deleting removes this song and its notes. Any essay it was paired with keeps its own text.
         </p>
         <button id="sng-delete" type="button" class="btn btn-ghost btn-sm text-error normal-case">Delete</button>
       </div>
@@ -365,8 +299,8 @@ const thisYear = new Date().getUTCFullYear();
 
     {
       /* ONE SAVE, IN THE FOOTER, FOR THE WHOLE SHEET — and this deviates from
-        plan 37's table, which had feelings and notes applying immediately while
-        the metadata kept a Save.
+        plan 37's table, which had the feelings and notes applying immediately
+        while the metadata kept a Save.
 
         WHY IT CHANGED once it was laid out: "applies immediately" exists to stop
         a relation riding along with a COMPARE-AND-SET save that could lose a
@@ -389,9 +323,9 @@ const thisYear = new Date().getUTCFullYear();
         one that should have one. Every other sheet's primary action sits inline
         at the end of ITS FORM, because the form is the whole sheet — the quote
         sheet's second tab applies immediately and has nothing to save. Here one
-        Save commits all THREE tabs, so it belongs to the sheet rather than to
-        any panel: put it at the foot of Feelings and it reads as saving the
-        words only, and it disappears entirely the moment you open Notes.
+        Save commits BOTH tabs, so it belongs to the sheet rather than to any
+        panel: at the foot of either it would read as saving that panel only,
+        and would disappear the moment you opened the other.
 
         Checked against the others during the consistency pass (ADR 0032) rather
         than assumed — this is drift that earns itself, which is a different

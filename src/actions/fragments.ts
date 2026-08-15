@@ -933,61 +933,11 @@ export const songs = {
   }),
 
   /**
-   * Replace the feelings on a song (plan 33 §2). The whole set every time, not a
-   * diff — the bench's chips ARE the set, and sending what they say is the only
-   * version with no way to drift out of step with what is on screen.
-   *
-   * Applies IMMEDIATELY, like `pair` above and the constellation picker, and for
-   * the same reason: this is a relation, not a field of the document. It must not
-   * ride along with a save, because a song can be re-heard and re-tagged years
-   * after the row was written and there is nothing else on that screen to save.
-   *
-   * ⚠ NOTHING SUGGESTS THE FEELINGS, AND NOTHING MAY. Plan 33 ruling 1: *"AI
-   * can't tell me what I feel."* The corpus tags SUBJECTS with a model
-   * (ADR-0007) and that is fine, because a subject is what a piece is about and
-   * that is legible from the text. A feeling is not a property of the song; it is
-   * what happened in Michael, and a machine-proposed one would be a
-   * plausible-sounding guess in a field whose only value is that it is true.
-   * There is deliberately no `suggestFeelings` beside `suggestSubjects`.
-   */
-  setFeelings: defineAction({
-    input: z.object({ song_id: z.uuid(), feeling_ids: z.array(z.uuid()).max(40) }),
-    handler: async ({ song_id, feeling_ids }, ctx) => {
-      requireAdmin(ctx);
-      const sb = ctx.locals.supabase;
-      // `.eq('type', 'song')` for the same reason `pair` carries it: the FK
-      // cannot say "only a song", so the sentence lives here instead of a
-      // constraint name. An essay with feelings on it would be a category error
-      // the room would then have to filter out forever.
-      const { data: song } = await sb.from('fragments').select('id, type, deleted_at').eq('id', song_id).maybeSingle();
-      if (!song || song.deleted_at) throw fail('That song no longer exists.', 'NOT_FOUND');
-      if (song.type !== 'song') throw fail('Only a song carries feelings.', 'BAD_REQUEST');
-
-      const wanted = [...new Set(feeling_ids)];
-      // Delete-then-insert rather than a diff: the pair is the whole row, so
-      // there is no partial update to express, and both statements are keyed on
-      // the same fragment. ⚠ Not a transaction — if the insert failed after the
-      // delete the song would be left untagged, which is visible on the screen
-      // you are looking at and re-fixable in one click. A plpgsql function
-      // (as the merges use) would be the answer if this ever stops being true.
-      const { error: clearErr } = await sb.from('fragment_feelings').delete().eq('fragment_id', song_id);
-      if (clearErr) throw fail(clearErr.message);
-      if (wanted.length) {
-        const { error } = await sb
-          .from('fragment_feelings')
-          .insert(wanted.map((feeling_id) => ({ fragment_id: song_id, feeling_id })));
-        if (error) throw fail(error.message);
-      }
-      return { ok: true, count: wanted.length };
-    },
-  }),
-
-  /**
    * Everything the song sheet shows, in one read (plan 37 §2).
    *
    * ⚠ AN ACTION RATHER THAN DATA ATTRIBUTES ON THE ROW, and the choice is about
    * what a list is allowed to weigh. The listening bench used to carry title,
-   * artist, feelings and a pre-resolved embed on every `<li>`; the sheet needs
+   * artist and a pre-resolved embed on every `<li>`; the sheet needs
    * the album, the year, the private note, the public note and the paired essays
    * too, and putting those on every row would ship every note in the corpus to
    * open one of them. One round trip on open is cheaper than a page that grows
@@ -1005,9 +955,7 @@ export const songs = {
       const [{ data: song }, { data: priv }, { data: essays }] = await Promise.all([
         sb
           .from('fragments')
-          .select(
-            'id, type, title, body, attribution, source_url, details, occurred_at, deleted_at, fragment_feelings(feeling_id)',
-          )
+          .select('id, type, title, body, attribution, source_url, details, occurred_at, deleted_at')
           .eq('id', id)
           .maybeSingle(),
         // A separate read because it is a separate TABLE, and an admin-only one
@@ -1038,7 +986,6 @@ export const songs = {
         // conflate and mean different things; `saveSong`'s comment has the account.
         year: new Date(song.occurred_at).getUTCFullYear(),
         url: song.source_url ?? '',
-        feelingIds: (song.fragment_feelings ?? []).map((f) => f.feeling_id),
         publicNote: song.body ?? '',
         privateNote: priv?.notes ?? '',
         paired: (essays ?? []).map((e) => ({ id: e.id, title: e.title || '(untitled)', status: e.status })),

@@ -23,7 +23,7 @@
   VocabActions and the page.
 */
 interface Props {
-  /** "Subjects", "Feelings" — the plural, as a reader would say it. */
+  /** "Subjects", "Authors" — the plural, as a reader would say it. */
   title: string;
   /** How many rows, shown beside the title. */
   count: number;
@@ -43,10 +43,11 @@ const { title, count, columns } = Astro.props;
     <span class="text-base-content/40 text-sm">({count})</span>
   </h2>
   {
-    /* Whatever a vocabulary needs to say before its table. Only Feelings uses
-      it — a paragraph on keeping the list short, and the one create control on
-      this page — and it is a slot rather than a prop because that content is
-      markup with a live control in it, not a sentence. */
+    /* Whatever a vocabulary needs to say before its table. Unused since the
+      Feelings panel was retired (plan 40) — it carried a paragraph on keeping
+      the list short and the one create control on this page. Kept as a slot
+      rather than a prop because that content was markup with a live control in
+      it, and the next vocabulary that needs one will need the same. */
   }
   <slot name="lede" />
   {
