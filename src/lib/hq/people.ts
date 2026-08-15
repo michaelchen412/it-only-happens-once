@@ -112,7 +112,7 @@ export const daysToMonths = (days: number): number => Math.round(days / DAYS_PER
  * baked into anything cached, is an image that goes broken at a time nobody
  * will connect to the cause.
  */
-export const PHOTO_URL_TTL_SECONDS = 3600;
+const PHOTO_URL_TTL_SECONDS = 3600;
 
 /** The private bucket. Not `site` — see 12-people.md §7 and 10-hq.md §7c. */
 export const PHOTO_BUCKET = 'hq';

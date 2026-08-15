@@ -110,10 +110,20 @@ export async function homeTimezone(sb: SupabaseClient<Database>): Promise<string
   return tz;
 }
 
-/** Drop the cached zone — for tests, so one case cannot leak into the next. */
-export function resetTimezoneCache(): void {
-  tzCache = null;
-}
+/*
+  ⚠ `resetTimezoneCache()` LIVED HERE AND WAS REMOVED 2026-08-15 (plan 41 · §7),
+  because it was a seam for tests that were never written: `homeTimezone` above
+  is called by seven action modules and is exercised by **no test at all** —
+  `hq-time.test.ts` imports only this module's pure half. A test helper that
+  nothing calls provides no safety; it only reads as though something is covered.
+
+  ⚠ WHAT THAT LEAVES UNCOVERED IS WORTH KNOWING, because it is not nothing: the
+  TTL, and the rule one line above it that a FAILED READ IS NOT CACHED AS AN
+  ANSWER. That second rule exists to stop one blip pinning the fallback zone for
+  a minute, and it is exactly the kind of thing that gets refactored away by
+  someone tidying `if (raw)` into `if (tz)`. Reinstating this function is one
+  line, and whoever writes that test should.
+*/
 
 /**
  * Today, as a local date in `tz`.

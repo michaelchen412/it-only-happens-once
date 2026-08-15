@@ -193,7 +193,12 @@ export const CELL_ROWS = 3;
  * Seven columns at 320px leave a cell about 37px wide, and a fifth mark does not
  * fit in it. So a busy day spends one of its four on saying "and more".
  */
-export const CELL_DOTS = 4;
+/* Not exported, unlike `CELL_ROWS` above, and the asymmetry is the seam rather
+   than an inconsistency: the template uses `CELL_ROWS` directly to slice its
+   list, while the dot cap is reached only through `cellDots()` below — which
+   exists precisely so the "minus one for the overflow mark" arithmetic has one
+   home. Exporting the number invites a second copy of that subtraction. */
+const CELL_DOTS = 4;
 
 /**
  * The marks a cell shows: one per thing, capped, with the last one standing for

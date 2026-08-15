@@ -762,24 +762,11 @@ html.reader-open .sky-return {
   filter: drop-shadow(0 0 5px var(--lamp));
 }
 
-/* A song's annotation — Michael's words leading the stanza (ADR-0009). It takes
-   `.reading` for its prose typography, but a stanza sets FLUSH: the paragraph
-   margins `.reading` gives an article would push the first line off its mark in
-   the margin and leave a gap above the artist line. */
-.suite-note > :first-child {
-  margin-block-start: 0;
-}
-.suite-note > :last-child {
-  margin-block-end: 0;
-}
-
 /* one slow, even breath for every warming element (glow + hover). The
    `suite-cta` pair is NOT here — it carries its own 0.45s with an 80ms delay on
    the word, so the mark warms a beat ahead of it. */
 .suite-item blockquote,
 .suite-item figcaption,
-.suite-attrib,
-.suite-note,
 .sw-title,
 .sw-excerpt {
   transition:
@@ -795,17 +782,9 @@ html.reader-open .sky-return {
   color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
   text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
 }
-/* the attribution warms with its quote — same light, a step quieter.
-   `.suite-attrib` is the song's artist line: not a <figcaption>, same register. */
-.suite-item.is-lit figcaption,
-.suite-item.is-lit .suite-attrib {
+/* the attribution warms with its quote — same light, a step quieter. */
+.suite-item.is-lit figcaption {
   color: color-mix(in oklab, var(--lamp) 30%, color-mix(in oklab, var(--color-base-content) 58%, transparent));
-}
-/* the annotation warms as the stanza's own content — a shade under a quote's
-   blockquote, since it sets at prose size rather than in the quote's register */
-.suite-item.is-lit .suite-note {
-  color: color-mix(in oklab, var(--lamp) 18%, var(--color-base-content));
-  text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 14%, transparent);
 }
 .suite-item.is-lit .sw-title {
   color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
@@ -2023,9 +2002,9 @@ html.reader-open .sky-return {
    FIELD: ~26px of untouchable air above the first line and below the last, on
    top of whatever padding the field already had. Every editor read as three
    times more generous vertically than horizontally for no reason anyone chose.
-   The padding is the whole inset now. (`.jot-prose` and `.suite-note` have
-   carried the same two rules for the same reason; this puts them where every
-   editable surface gets them.) */
+   The padding is the whole inset now. (`.jot-prose` carries the same two rules
+   for the same reason; this puts them where every editable surface gets them.
+   `.suite-note` was the third and went with the song's annotation, 2026-08-15.) */
 .tiptap-doc > :first-child {
   margin-block-start: 0;
 }

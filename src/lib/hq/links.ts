@@ -242,19 +242,6 @@ export async function pickerOptions(sb: DB): Promise<{ works: WorkOption[]; frag
 }
 
 /**
- * Who shared this fragment — the reverse direction, for the editor's field.
- *
- * Archived people are INCLUDED here, unlike everywhere else a roster is
- * offered. Archiving removes somebody from the roster and from search (§3); it
- * does not un-give you the book. Dropping them would silently rewrite where a
- * quote came from, which is the one thing a provenance field must never do.
- */
-export async function peopleForFragment(sb: DB, fragmentId: string): Promise<string[]> {
-  const { data } = await sb.from('person_fragments').select('person_id').eq('fragment_id', fragmentId);
-  return (data ?? []).map((r) => r.person_id);
-}
-
-/**
  * The whole edge set as `fragment_id → person_id[]`, for the editor sheet.
  *
  * THE WHOLE TABLE, ON PURPOSE, rather than a lookup when a fragment is opened.
@@ -263,6 +250,15 @@ export async function peopleForFragment(sb: DB, fragmentId: string): Promise<str
  * round trip on every sheet open AND introduce a race — you can tick somebody
  * before the answer lands, and the answer would then quietly undo the tick.
  * Rendering it once removes the race rather than guarding it.
+ *
+ * ⚠ ARCHIVED PEOPLE ARE INCLUDED, unlike everywhere else a roster is offered,
+ * and the absence of a filter here is the decision rather than an oversight.
+ * Archiving removes somebody from the roster and from search (§3); it does not
+ * un-give you the book. Dropping them would silently rewrite where a quote came
+ * from, which is the one thing a provenance field must never do. *(Carried here
+ * 2026-08-15 from `peopleForFragment`, the per-fragment version this replaced —
+ * it had been dead since the whole-table read above was written, and the rule
+ * was the only thing left in it worth keeping.)*
  */
 export async function allFragmentPeople(sb: DB): Promise<Record<string, string[]>> {
   const { data } = await sb.from('person_fragments').select('fragment_id, person_id');

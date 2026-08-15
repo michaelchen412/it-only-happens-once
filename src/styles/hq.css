@@ -98,9 +98,6 @@
   background: var(--color-base-100);
   overflow: hidden;
 }
-.zone--ghost {
-  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
-}
 .zone__head {
   display: flex;
   align-items: center;
@@ -466,7 +463,6 @@ a.row__t:hover {
 .datebar button,
 .datebar summary,
 .zone__act,
-.row__tick,
 .stamp {
   cursor: pointer;
 }
