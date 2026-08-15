@@ -158,7 +158,8 @@ export function requireAdmin(ctx: { locals: App.Locals }): void {
  * Every table that addresses a row by slug. Each one is its own namespace —
  * a subject and a fragment may both be `forgiveness` and neither is wrong.
  */
-export type SluggedTable = 'fragments' | 'subjects' | 'authors' | 'works' | 'people' | 'goals' | 'constellations';
+export type SluggedTable =
+  'fragments' | 'subjects' | 'authors' | 'works' | 'people' | 'goals' | 'constellations' | 'sets';
 
 /**
  * A slug nobody else in `table` is using (data-model.md §6).

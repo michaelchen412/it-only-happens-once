@@ -17,6 +17,7 @@ import { fragments, songs } from './fragments';
 import { versions } from './versions';
 import { subjects, authors, works, feelings } from './vocabulary';
 import { constellations } from './constellations';
+import { sets } from './sets';
 import { pages, contact } from './site';
 import { checkin } from './checkin';
 import { people } from './people';
@@ -41,6 +42,9 @@ export const server = {
   // not move the address. It also refuses collisions instead of suffixing.
   feelings,
   constellations,
+  // A curated listen (plan 40 §3) — beside `constellations` because it is the
+  // same kind of object: a named, described, curated thing. Not a fragment.
+  sets,
   pages,
   contact,
   // HQ (ADR-0012). Private tables, same write path.

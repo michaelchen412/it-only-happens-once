@@ -32,7 +32,17 @@ import { attentionLabel, titlePrefix } from '../lib/hq/attention';
 interface Props {
   title?: string;
   /** Which top-nav item is active. */
-  active?: 'today' | 'people' | 'agenda' | 'notes' | 'fragments' | 'listening' | 'constellations' | 'library' | 'about';
+  active?:
+    | 'today'
+    | 'people'
+    | 'agenda'
+    | 'notes'
+    | 'fragments'
+    | 'listening'
+    | 'sets'
+    | 'constellations'
+    | 'library'
+    | 'about';
 }
 const { title = 'Observatory', active = 'today' } = Astro.props;
 const user = Astro.locals.user;
@@ -111,6 +121,13 @@ const nav = [
   // one switch, and this is a place you go and stay — twenty songs in a sitting
   // is what §3 sizes it for. A room you return to daily is what a nav row is.
   { key: 'listening', label: 'Listening', href: '/admin/listening', icon: 'ph:music-notes', hr: false },
+  // ⚠ A TENTH ROW, AND IT IS TEMPORARY BY DESIGN. The note above refuses rows
+  // on the ground that this list is short, and it is right — but plan 40 retires
+  // Listening entirely in its phase 2, at which point this returns to nine.
+  // Both are here only for the window where songs still enter the old way and
+  // sets are being built. If Listening is still above this in a month, one of
+  // the two is not being used and that is the thing to act on.
+  { key: 'sets', label: 'Sets', href: '/admin/sets', icon: 'ph:playlist', hr: false },
   { key: 'constellations', label: 'Constellations', href: '/admin/constellations', icon: 'ph:moon-stars', hr: false },
   { key: 'library', label: 'Library', href: '/admin/library', icon: 'ph:books', hr: false },
   { key: 'about', label: 'About page', href: '/admin/about', icon: 'ph:user-circle', hr: false },

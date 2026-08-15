@@ -205,6 +205,10 @@ export default defineConfig({
           'book-open',
           'quotes',
           'music-notes',
+          // The Sets row in the workshop nav (plan 40 §3). Distinct from
+          // `music-notes` above, which is Listening's — two nav rows sharing a
+          // mark is two rows you cannot tell apart at a glance.
+          'playlist',
           'article',
           // Push (21 · Phase 2). `bell` is the control that grants the building
           // standing permission to interrupt; `bell-slash` is the same control
