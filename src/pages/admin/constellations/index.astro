@@ -143,6 +143,27 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
                   are the ONLY reorder path, which is why they aren't simply
                   deleted. The sky's order gets fiddled with anywhere; the
                   composer's suite is built at a desk. */}
+              {/* ⚠ PUBLISH AND DELETE MOVED BEHIND THE ⋯ ON 2026-08-15, AND THE
+                  REASON IS THE PHONE. `.row-edit` reveals itself on hover for a
+                  pointer, but `@media (hover: none)` in admin.css keeps it at
+                  full opacity on touch — correctly, since there is no hover to
+                  reveal it with. So a phone showed FOUR controls on every row,
+                  permanently, two of which are the loudest things this page can
+                  do: unpublishing takes a constellation out of the public sky,
+                  and delete is delete. A list you scroll through with a thumb
+                  should not carry both under it at `btn-xs`.
+
+                  The two that stayed are the two that are cheap and reversible
+                  — and on touch they are the only reorder path there is, which
+                  is exactly what the note above says. Michael, 2026-08-15:
+                  *"lets keep for now."*
+
+                  ONE MENU FOR THE WHOLE LIST, positioned against the ⋯ that
+                  opened it — the same rule the colour picker below follows, and
+                  for the same reasons: a menu per row is N copies of the DOM for
+                  a thing only ever open once, and an absolutely-positioned one
+                  inside a list is either covered by the sticky header or clipped
+                  by an ancestor's overflow. */}
               <span class="row-edit flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
@@ -162,23 +183,24 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
                 >
                   <Icon name="ph:arrow-down" />
                 </button>
+                {/* `data-status` rides the trigger, not the row: the menu has to
+                    word its first item before it opens, and re-reading it from a
+                    button's text is one relabelling away from breaking. */}
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs font-sans normal-case"
-                  data-toggle-status={c.status}
-                  data-name={c.name}
+                  class="btn btn-ghost btn-xs"
+                  data-row-menu
+                  data-status={c.status}
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  title="More"
+                  aria-label={`More actions for ${c.name}`}
                 >
-                  {c.status === 'published' ? 'Unpublish' : 'Publish'}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-xs text-error"
-                  data-delete
-                  data-name={c.name}
-                  title="Delete"
-                  aria-label={`Delete ${c.name}`}
-                >
-                  <Icon name="ph:trash" />
+                  {/* Horizontal ⋯, deliberately, against the vertical ⋮⋮ grip
+                      three controls to the left. The two marks sit in the same
+                      row and the last thing this needs is a second thing that
+                      looks like a drag handle. */}
+                  <Icon name="ph:dots-three" />
                 </button>
               </span>
             </li>
@@ -186,6 +208,49 @@ const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, 
         </ul>
       )
     }
+
+    {
+      /* THE ROW MENU — one popover, reused by every row (see the ⋯ above).
+
+        `.pop` rather than a hand-rolled dropdown, for the reason written at
+        length over the colour picker below and again in `pop-anchor.ts`: it
+        renders in the TOP LAYER, so no ancestor's `overflow` clips it and no
+        z-index covers it, and `popover="auto"` brings Escape, light-dismiss and
+        one-open-at-a-time with it.
+
+        THE STATUS ROW IS WORDED AT OPEN TIME. One menu serving a list of mixed
+        drafts and published constellations cannot render "Unpublish" on the
+        server — it does not know which row you are about to press. The verb and
+        the icon are both set by `constellations-index.ts`.
+
+        ⚠ DELETE STAYS BEHIND ITS CONFIRM. Moving it into a menu makes it one
+        press further away, not one press safer — the menu is a tidiness fix,
+        and the dialog naming the constellation is still the thing standing
+        between a stray tap and a lost composition. */
+    }
+    <div id="cl-row-menu" popover class="pop" aria-label="Constellation actions">
+      {
+        /* BOTH GLYPHS SHIP, ONE IS HIDDEN. An `<Icon>` is inlined SVG at build
+          time, so the script cannot mint the other one on open — and the eye is
+          the half of this row that says which direction the flip goes. Two
+          elements and a `hidden` toggle is the whole cost.
+
+          The `<span>` wrappers are not decoration: `<Icon>`'s props are typed
+          and `hidden` is not among them, so the attribute has to land on an
+          element astro-icon doesn't own. ⚠ And they carry NO `display` class —
+          `contents` was the tempting one and it would have quietly beaten the
+          UA's `[hidden] { display: none }` on specificity, leaving both eyes on
+          screen. A bare span is blockified by `.pop__row`'s flex anyway. */
+      }
+      <button type="button" class="pop__row" data-act="status">
+        <span data-icon-publish><Icon name="ph:eye" /></span>
+        <span data-icon-unpublish hidden><Icon name="ph:eye-slash" /></span>
+        <span data-status-label>Publish</span>
+      </button>
+      <button type="button" class="pop__row pop__row--danger" data-act="delete">
+        <Icon name="ph:trash" /> Delete
+      </button>
+    </div>
 
     {
       /* THE COLOUR PICKER — one popover, reused by every row.

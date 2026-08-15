@@ -3,6 +3,7 @@ import { confirmDialog } from './confirm-dialog';
 import { wireRadioGroups } from './radio-group';
 import { callAction, formatActionError } from './action-error';
 import { wireListReorder } from './list-reorder';
+import { anchorPopover } from './pop-anchor';
 import { announceSkyChange } from './sky-changed';
 
 const errBox = document.getElementById('cl-error') as HTMLParagraphElement;
@@ -86,36 +87,102 @@ if (list) {
   });
 }
 
-list?.addEventListener('click', async (e) => {
+/**
+ * Publish ⇄ unpublish. Reloads rather than repainting: the status chip, the
+ * `n public` count under the name and the menu's own verb are three views of
+ * the flip, and re-deriving each by hand is three chances to disagree with the
+ * database on a page that changes once in a while.
+ */
+async function toggleStatus(row: HTMLElement, current: string) {
+  const next = current === 'published' ? 'draft' : 'published';
+  const { error } = await callAction(actions.constellations.setStatus(fieldForm(row.dataset.id!, 'status', next)));
+  if (error) return show(formatActionError(error));
+  location.reload();
+}
+
+/** Delete, behind the confirm that names what the composition costs. */
+async function removeRow(row: HTMLElement) {
+  const ok = await confirmDialog({
+    title: 'Delete constellation',
+    message: `Delete “${row.dataset.name}”? Its composition is lost; the fragments themselves are untouched.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  const fd = new FormData();
+  fd.set('id', row.dataset.id!);
+  const { error } = await callAction(actions.constellations.remove(fd));
+  if (error) return show(formatActionError(error));
+  location.reload();
+}
+
+list?.addEventListener('click', (e) => {
   const btn = (e.target as Element).closest('button');
   const row = (e.target as Element).closest('li[data-id]') as HTMLLIElement | null;
   if (!btn || !row) return;
-  const id = row.dataset.id!;
 
   if (btn.hasAttribute('data-color-btn')) return void openColors(btn as HTMLButtonElement, row);
+  if (btn.hasAttribute('data-row-menu')) return void openRowMenu(btn as HTMLButtonElement, row);
+});
 
-  if (btn.hasAttribute('data-toggle-status')) {
-    const next = btn.dataset.toggleStatus === 'published' ? 'draft' : 'published';
-    const { error } = await callAction(actions.constellations.setStatus(fieldForm(id, 'status', next)));
-    if (error) return show(formatActionError(error));
-    location.reload();
-    return;
-  }
+// ── the row menu: publish/unpublish and delete, one popover for the list ──
+//
+// ⚠ THESE TWO USED TO BE BUTTONS IN THE ROW. See index.astro for why they
+// moved — the short version is that `.row-edit` cannot hide on a touchscreen,
+// so a phone carried "unpublish" and "delete" under every line of the list.
+const rowMenu = document.getElementById('cl-row-menu');
+const statusRow = rowMenu?.querySelector<HTMLButtonElement>('[data-act="status"]');
+const statusLabel = rowMenu?.querySelector<HTMLElement>('[data-status-label]');
+// Both marks are in the DOM — an <Icon> is build-time SVG, so the one that
+// isn't wanted is hidden rather than created. See index.astro.
+const iconPublish = rowMenu?.querySelector<HTMLElement>('[data-icon-publish]');
+const iconUnpublish = rowMenu?.querySelector<HTMLElement>('[data-icon-unpublish]');
+/** Which row's ⋯ is open. One menu, many rows — the TaskSheet rule. */
+let menuRow: HTMLElement | null = null;
+let menuTrigger: HTMLButtonElement | null = null;
 
-  if (btn.hasAttribute('data-delete')) {
-    const ok = await confirmDialog({
-      title: 'Delete constellation',
-      message: `Delete “${row.dataset.name}”? Its composition is lost; the fragments themselves are untouched.`,
-      confirmLabel: 'Delete',
-      danger: true,
-    });
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set('id', id);
-    const { error } = await callAction(actions.constellations.remove(fd));
-    if (error) return show(formatActionError(error));
-    location.reload();
-  }
+if (rowMenu) anchorPopover(rowMenu, () => menuTrigger);
+
+function openRowMenu(trigger: HTMLButtonElement, row: HTMLElement) {
+  if (!rowMenu || !statusRow || !statusLabel) return;
+  menuRow = row;
+  menuTrigger = trigger;
+  // The verb depends on the row, so it cannot be server-rendered into a menu
+  // the whole list shares. `data-status` on the trigger is the source; reading
+  // the chip's text instead would be one relabelling away from breaking.
+  const published = trigger.dataset.status === 'published';
+  statusLabel.textContent = published ? 'Unpublish' : 'Publish';
+  statusRow.title = published ? 'Take it out of the public sky — it stays here as a draft' : 'Put it in the public sky';
+  if (iconPublish) iconPublish.hidden = published;
+  if (iconUnpublish) iconUnpublish.hidden = !published;
+  rowMenu.showPopover();
+  trigger.setAttribute('aria-expanded', 'true');
+  statusRow.focus();
+}
+
+rowMenu?.addEventListener('click', (e) => {
+  const act = (e.target as Element).closest<HTMLElement>('[data-act]')?.dataset.act;
+  const row = menuRow;
+  const published = menuTrigger?.dataset.status === 'published';
+  if (!act || !row) return;
+  // Close FIRST: both branches either open a confirm on top of this or reload
+  // the page out from under it, and a menu still on screen through either one
+  // is a menu that outlived the thing it was anchored to.
+  rowMenu.hidePopover();
+  if (act === 'status') void toggleStatus(row, published ? 'published' : 'draft');
+  if (act === 'delete') void removeRow(row);
+});
+
+rowMenu?.addEventListener('toggle', (e) => {
+  if ((e as ToggleEvent).newState === 'open') return;
+  // Escape and light-dismiss both land here — the same hand-back the colour
+  // picker does below, and for the same reason: focus returns to the ⋯ only if
+  // it was inside the menu, because otherwise you clicked elsewhere on purpose.
+  const wasInside = rowMenu.contains(document.activeElement);
+  menuTrigger?.setAttribute('aria-expanded', 'false');
+  if (wasInside) menuTrigger?.focus();
+  menuTrigger = null;
+  menuRow = null;
 });
 
 // ── colour: the row's own star is the control ───────────────────────────

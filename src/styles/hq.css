@@ -1711,6 +1711,16 @@ a.row__t:hover {
   background: color-mix(in oklch, var(--cn) 14%, transparent);
   font-weight: 600;
 }
+/* The destructive row in a menu of otherwise reversible ones. Colour only, and
+   only on the text — a filled red bar would make "delete" the loudest thing in
+   a popover you opened to do something else, which is how a menu teaches you to
+   aim carefully instead of reading. The confirm behind it is the real guard. */
+.pop__row--danger {
+  color: var(--color-error);
+}
+.pop__row--danger:hover {
+  background: color-mix(in oklch, var(--color-error) 10%, transparent);
+}
 .pop__tick {
   margin-left: auto;
   font-size: 0.875rem;

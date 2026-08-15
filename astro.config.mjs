@@ -216,6 +216,11 @@ export default defineConfig({
           // refused state — a device that was never asked is not an error.
           'bell',
           'bell-slash',
+          // The constellation row menu (2026-08-15). `eye` was already here for
+          // draft preview; `eye-slash` is its opposite in the one place both
+          // directions of the same flip are offered by one control — the menu
+          // words itself per row, so it needs the mark to match the verb.
+          'eye-slash',
         ],
         'simple-icons': [
           'github',

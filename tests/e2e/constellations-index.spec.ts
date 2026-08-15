@@ -192,7 +192,13 @@ test.describe('the sky’s order can be dragged', () => {
       .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id));
     // Pinned by id, not by index — the row is about to change position, and a
     // positional locator would re-resolve to whichever row took its place.
-    const button = page.locator(`#cl-list li[data-id="${ids[1]}"] [data-toggle-status]`);
+    //
+    // ⚠ `[data-row-menu]` since 2026-08-15. This used to grab `[data-toggle-status]`,
+    // which was a button in the row until Publish and Delete moved behind the ⋯
+    // (a phone showed all four permanently — see index.astro). Any focusable
+    // control inside the row serves this test; what it is actually asserting is
+    // that Alt+↑ moves the row and does NOT drop focus.
+    const button = page.locator(`#cl-list li[data-id="${ids[1]}"] [data-row-menu]`);
     await button.focus();
     await page.keyboard.press('Alt+ArrowUp');
 
