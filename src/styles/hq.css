@@ -2558,9 +2558,14 @@ a.row__t:hover {
   align-items: center;
   gap: 0.375rem;
 }
+/* ⚠ THE SIZE IS A VARIABLE BECAUSE THE MARK HAS TWO HOMES. It is the legend's
+   swatch here and, under 40rem, the dot inside a month cell — same glyph on
+   purpose, so the key at the top of the page explains the grid below it. A cell
+   at 390px is ~52px wide, which does not hold four 10px squares, so that context
+   sets its own `--lg-mark` rather than each site hard-coding a width. */
 .lg__m {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: var(--lg-mark, 0.625rem);
+  height: var(--lg-mark, 0.625rem);
   border-radius: 0.1875rem;
 }
 .lg__m--event {
@@ -2628,8 +2633,14 @@ a.row__t:hover {
 .cell--open {
   background: color-mix(in oklch, var(--color-primary) 6%, transparent);
 }
+/* ⚠ THE LINK AND THE NUMERAL ARE TWO ELEMENTS, and the split is what lets the
+   phone rules below stretch the target without stretching the today pill. The
+   anchor is the hit area; `.cell__d` is everything you can see. */
 .cell__n {
   align-self: flex-start;
+}
+.cell__d {
+  display: inline-block;
   font-family: var(--font-sans);
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
@@ -2637,15 +2648,60 @@ a.row__t:hover {
   padding: 0.0625rem 0.1875rem;
   border-radius: 999px;
 }
-.cell__n:hover {
+.cell__n:hover .cell__d {
   background: var(--color-base-200);
 }
-.cell--today .cell__n,
-.cell--today .cell__n:hover {
+.cell--today .cell__d,
+.cell--today .cell__n:hover .cell__d {
   background: var(--color-primary);
   color: var(--color-primary-content);
   font-weight: 700;
   padding: 0.0625rem 0.375rem;
+}
+
+/* One mark per thing on the day — the phone's version of the `.ev` rows, hidden
+   until the rows stop fitting. See `CELL_DOTS` in lib/hq/calendar.ts.
+   ⚠ The sizes are what fits SEVEN columns at 320px: 288px of grid minus the
+   cell padding leaves ~37px, and four 7px marks with 2px gaps come to 34. */
+.cell__dots {
+  display: none;
+  --lg-mark: 0.4375rem;
+  gap: 2px;
+}
+
+/* ⚠ THE MARKS ARE RE-CALIBRATED AT DOT SIZE, AND ONE OF THEM CHANGES SHAPE.
+   The legend's four are tuned for a 10px swatch on a line of 11px type; dropped
+   to 7px inside a cell, the two that carry no fill nearly vanish, and the dashed
+   birthday ring vanishes outright — a 1px dash at 7px is three specks.
+
+   FILL VS NO FILL SURVIVES UNTOUCHED, because that is the load-bearing
+   distinction this whole section is built on (*"fill means writable, and nothing
+   else uses fill"*): a dot you can act on is solid, a dot you cannot is a ring.
+   What does NOT survive is dashed-vs-solid as the way to tell the two rings
+   apart — so at this size HUE does that job instead, grey for Google's copy and
+   rose for a birthday. Nothing is lost: those two were already the only rings,
+   and they were already those two colours.
+
+   The legend keeps its own calibration. It is read once, at 10px, beside its
+   label; these are read at a glance, at 7px, with no label at all. */
+.cell__dots .lg__m--task {
+  background: color-mix(in oklch, var(--cn-amber) 45%, transparent);
+}
+.cell__dots .lg__m--mirror {
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.cell__dots .lg__m--birthday {
+  border: 1px solid color-mix(in oklch, var(--cn-rose) 85%, transparent);
+}
+/* "…and more", without a numeral nobody could read at this size: the same dot,
+   stretched. Deliberately in the base-content grey rather than in any kind's
+   colour — it stands for a mixture, and borrowing one source's hue to say
+   "several" would be the one dot on the grid that lies about what it is. */
+.cell__more-dot {
+  width: 0.5625rem;
+  height: var(--lg-mark, 0.4375rem);
+  border-radius: 0.1875rem;
+  background: color-mix(in oklch, var(--color-base-content) 38%, transparent);
 }
 .cell__more {
   align-self: flex-start;
@@ -2731,6 +2787,69 @@ a.row__t:hover {
 }
 
 /* ── the week: the same union with room for detail, never a second model ─── */
+/* ── the month grid on a phone (2026-08-15) ───────────────────────────────────
+   Seven columns cannot be made wide on a 390px screen, so the answer is not to
+   shrink the type further — it is to stop trying to print titles in 52px and
+   say the one thing a cell that size can say honestly. Measured before and
+   after: the old cell rendered a day number and about three characters of an
+   event before the ellipsis, six rows of it.
+
+   THREE MOVES, and they are one idea:
+     · the titles come off, the dots come on (`CELL_DOTS`)
+     · the cell gets shorter, because three rows of nothing was reserving 100px
+     · the whole cell becomes the tap target, because the day panel underneath
+       is now where the words are and a 20px numeral is a poor door to it
+
+   ⚠ NOTHING HERE IS JAVASCRIPT, and that is deliberate: this page renders every
+   control as a real link to `?day=` precisely so it works before a byte of it
+   runs. The dots ship in the HTML at every width and CSS decides which half of
+   the cell is showing — so there is no breakpoint the server has to guess at,
+   and rotating a phone cannot catch the grid in the wrong state. */
+@media (max-width: 40rem) {
+  .month__grid {
+    grid-auto-rows: minmax(3.5rem, auto);
+  }
+  .cell {
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    padding: 1.25rem 0.125rem 0.25rem; /* the top pays for the number above */
+  }
+  /* The titles, and the "+N more" that counted them. Both are the same claim —
+     "here is what is on this day" — and the day panel makes it properly. */
+  .cell .ev,
+  .cell__more {
+    display: none;
+  }
+  .cell__dots {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+  /* ⚠ THE ANCHOR FILLS THE CELL. It is transparent and it is a SIBLING of the
+     dots rather than their parent — an `<a>` may not contain an `<a>`, and the
+     `.ev` links are still in the DOM even though they are not rendered. Being
+     positioned, it paints over them, which is exactly the intent: one tap
+     anywhere in the square opens the day. */
+  .cell__n {
+    position: absolute;
+    inset: 0;
+    /* ⚠ `align-self` HAS TO BE UNDONE, and this cost a spec failure to find.
+       `inset: 0` is not enough on its own here: an absolutely-positioned child
+       of a flex container is aligned by Box Alignment within its
+       inset-modified containing block, so the base rule's
+       `align-self: flex-start` kept the box at its CONTENT height — 24.7px of
+       numeral inside a 56px cell — while the inline axis, which nothing had an
+       opinion about, stretched as intended. A tap target that is full width and
+       a fifth of the height looks exactly right in a screenshot. */
+    align-self: stretch;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 0.25rem;
+  }
+}
+
 .wk {
   display: grid;
   grid-template-columns: repeat(7, 1fr);

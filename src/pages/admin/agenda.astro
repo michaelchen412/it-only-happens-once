@@ -30,6 +30,7 @@ import { clockTime, dmd, fullDate, monthGrid, monthTitle, nextOccurrence, shiftM
 import {
   CELL_ROWS,
   KINDS,
+  cellDots,
   birthdayItem,
   byDay,
   byTime,
@@ -46,7 +47,40 @@ const { ymd: todayYmd } = Astro.locals.today;
 
 const anchor = parseYmd(Astro.url.searchParams.get('date')) ?? todayYmd;
 const openDay = parseYmd(Astro.url.searchParams.get('day'));
-const week = Astro.url.searchParams.get('view') === 'week';
+
+/*
+  ⚠ THE VIEW IS REMEMBERED, IN A COOKIE, AND THE MECHANISM IS THE POINT.
+
+  This room is server-rendered on purpose (see the header), so the choice has to
+  be known before the HTML is built. `localStorage` cannot do that: it would
+  mean painting Month, reading storage, and swapping to Week a frame later —
+  which is a flash on every arrival, on the page you reach most often from the
+  sidebar. A cookie is legible during the render, so the first paint is already
+  the right view.
+
+  It only ever decides a BARE `/admin/agenda` — the sidebar link, the home-screen
+  shortcut, a bookmark. An explicit `?view=` always wins and is what gets
+  written down, so a URL you send someone shows them what it showed you.
+
+  ⚠ AND THAT IS WHY `href` CARRIES `view` EVEN FOR MONTH, which it did not
+  before. Month used to be the absence of the parameter; with a cookie in play,
+  absence stopped meaning month and started meaning "whatever you last chose" —
+  so pressing Month while the cookie said week would have produced a link back
+  to week. Every URL on this page now names its view. Slightly noisier, and
+  unambiguous, which is the right trade for an address you can send.
+*/
+const VIEW_COOKIE = 'agenda-view';
+const viewParam = Astro.url.searchParams.get('view');
+if (viewParam === 'week' || viewParam === 'month') {
+  Astro.cookies.set(VIEW_COOKIE, viewParam, {
+    path: '/admin',
+    sameSite: 'lax',
+    httpOnly: true, // nothing in the browser reads it; the render does
+    secure: import.meta.env.PROD, // http on localhost would drop a secure cookie
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+const week = viewParam ? viewParam === 'week' : Astro.cookies.get(VIEW_COOKIE)?.value === 'week';
 
 // The 42 cells, Sunday-first — the same helper the date bar's popover uses.
 const cells = monthGrid(anchor);
@@ -150,7 +184,10 @@ const href = (params: Record<string, string | null>) => {
   const url = new URLSearchParams();
   const merged: Record<string, string | null> = {
     date: anchor === todayYmd ? null : anchor,
-    view: week ? 'week' : null,
+    // ⚠ NAMED EVEN WHEN IT IS MONTH — see the cookie note at the top of this
+    // file. `null` here used to mean month; it now means "ask the cookie", and
+    // those are different answers.
+    view: week ? 'week' : 'month',
     day: openDay,
     ...params,
   };
@@ -223,7 +260,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
            tolerating (plans/00-groundwork.md · Piece 9). */
       }
       <span slot="actions" class="pseg pseg--fit" role="group" aria-label="View">
-        <a class="pseg__b" href={href({ view: null })} aria-current={!week ? 'true' : undefined}>Month</a>
+        <a class="pseg__b" href={href({ view: 'month' })} aria-current={!week ? 'true' : undefined}>Month</a>
         <a class="pseg__b" href={href({ view: 'week' })} aria-current={week ? 'true' : undefined}>Week</a>
       </span>
       <button
@@ -333,9 +370,40 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     cell.ymd === openDay && 'cell--open',
                   ]}
                 >
-                  <a class="cell__n" href={href({ day: cell.ymd })}>
-                    {cell.day}
+                  {/* ⚠ THE NUMBER IS IN A `<span>` INSIDE THE LINK, and the
+                      nesting is what makes the phone version possible. Under
+                      40rem the anchor stretches to fill the whole cell (see
+                      hq.css) so a ~52px square is one tap target instead of a
+                      20px numeral in its corner; the span keeps the today pill
+                      the size of the number rather than the size of the cell.
+
+                      The accessible name carries the COUNT because the dots
+                      below are decorative and the titles are hidden at that
+                      width — without it, a screen reader on a phone would be
+                      told a date and nothing about whether anything is on it. */}
+                  <a
+                    class="cell__n"
+                    href={href({ day: cell.ymd })}
+                    aria-label={
+                      list.length
+                        ? `${fullDate(cell.ymd)} — ${list.length} thing${list.length === 1 ? '' : 's'}`
+                        : undefined
+                    }
+                  >
+                    <span class="cell__d">{cell.day}</span>
                   </a>
+                  {/* THE PHONE'S ROW OF EVENTS: one mark per thing, in the same
+                      glyph the legend above uses for that kind — so the key at
+                      the top of the page is literally the key to these. Hidden
+                      above 40rem, where the titles themselves fit. */}
+                  {list.length > 0 && (
+                    <span class="cell__dots" aria-hidden="true">
+                      {cellDots(list).shown.map((it) => (
+                        <i class:list={['lg__m', `lg__m--${it.kind}`]} />
+                      ))}
+                      {cellDots(list).more && <i class="cell__more-dot" />}
+                    </span>
+                  )}
                   {list.slice(0, CELL_ROWS).map((it) => (
                     <a
                       href={href({ day: cell.ymd })}

@@ -173,6 +173,43 @@ export function legendFor(items: CalendarItem[]): { kind: ItemKind; label: strin
 export const CELL_ROWS = 3;
 
 /**
+ * How many DOTS fit in a month cell before the rest become one "and more" mark.
+ *
+ * ⚠ THIS IS THE PHONE'S VERSION OF `CELL_ROWS`, and it exists because the rows
+ * above do not survive a narrow screen. Seven columns at 390px is ~52px each:
+ * measured on 2026-08-15, a cell held its day number and about three characters
+ * of one event title before the ellipsis. That is a grid you cannot read, six
+ * rows tall — Michael: *"that month view is not super optimized for this
+ * context."* So under 40rem the titles come off and the cell says only what a
+ * cell that size can honestly say — **something is on this day, and roughly how
+ * much** — while the day panel underneath carries the words. Which is the
+ * arrangement every phone calendar arrives at, and the panel was already built.
+ *
+ * Four, for `CELL_ROWS`' own reason turned sideways: five would wrap to a second
+ * line and make the row heights uneven, which is the jump that six-week rows and
+ * the three-row cap both exist to prevent.
+ *
+ * ⚠ IT IS FOUR MARKS, NOT FOUR DOTS PLUS AN OVERFLOW MARK — see `cellDots`.
+ * Seven columns at 320px leave a cell about 37px wide, and a fifth mark does not
+ * fit in it. So a busy day spends one of its four on saying "and more".
+ */
+export const CELL_DOTS = 4;
+
+/**
+ * The marks a cell shows: one per thing, capped, with the last one standing for
+ * the rest when there are more than fit.
+ *
+ * Returned as a pair rather than computed in the template because the "minus
+ * one for the overflow mark" arithmetic is exactly the kind that gets written
+ * differently the second time. `more` is a boolean, not a count: a numeral is
+ * unreadable at 7px, which is the whole reason the overflow is a shape.
+ */
+export function cellDots<T>(list: T[]): { shown: T[]; more: boolean } {
+  const more = list.length > CELL_DOTS;
+  return { shown: list.slice(0, more ? CELL_DOTS - 1 : CELL_DOTS), more };
+}
+
+/**
  * Everything mirrored from Google that touches `[from, to]` (13 · Piece 3).
  *
  * ⚠ CANCELLED ROWS ARE FILTERED HERE, NOT DELETED THERE. ADR-0014's mirror
