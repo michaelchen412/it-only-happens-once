@@ -34,16 +34,17 @@ export interface SubjectRef {
  *
  *   1. `paired_song_id` → a real `song` fragment. What the backfill promoted
  *      the 48 citable pairings to, and what the writing sheet's picker sets.
- *   2. `details.media` → the raw `{ provider, url }` Squarespace brought over.
- *      Only two rows still take this path — the imported *playlists*, which
- *      ADR-0009 forbids a song fragment from citing. It is a fallback, not a
- *      second write path: nothing in the app writes `details.media`.
+ *   2. `paired_playlist_url` → a Spotify PLAYLIST on the essay itself
+ *      (plan 40 §1b). Two rows take this path, and only they can: ADR-0009
+ *      forbids a song fragment from citing a playlist, so these never had a
+ *      song row to be promoted to. Until 2026-08-15 the same two rode the
+ *      Squarespace `details.media` shape, which is now gone from the database.
  *
- * The legacy path has no title and no artist, so its caption is empty and the
+ * The playlist path has no title and no artist, so its caption is empty and the
  * embed speaks for itself. That is fine for a playlist, which names itself.
  */
 export interface PairedMedia {
-  /** The song fragment's id, or null when this came from `details.media`. */
+  /** The song fragment's id, or null when this came from a paired playlist. */
   fragmentId: string | null;
   /** Empty on the legacy path — render no caption rather than a fake one. */
   title: string;
@@ -147,24 +148,31 @@ function sanitizeQuery(q: string): string {
  * supposed to see its own drafts (plan 01), and the boundary is the policy.
  *
  * THE RAW `paired_song_id` IS SELECTED TOO, and it is load-bearing. Without it,
- * a hidden song and a never-promoted essay look identical — both arrive as
- * `paired_song: null` — and `pairedMediaOf` would fall back to `details.media`,
- * which every one of the 48 promoted essays still carries. Unpublishing a song
- * would then keep playing it from the legacy URL. Found by probe, not by
- * reading: the embed correctly returned null and the page still showed a
- * player.
+ * a hidden song and an essay with no song look identical — both arrive as
+ * `paired_song: null` — and `pairedMediaOf` falls through to the second branch.
+ * When that branch read `details.media`, which all 48 promoted essays carried,
+ * unpublishing a song kept playing it from the legacy URL. Found by probe, not
+ * by reading: the embed correctly returned null and the page still showed a
+ * player. The branch now reads `paired_playlist_url`, which only two rows have,
+ * so the fall-through has almost nothing to find — but the guard stays, because
+ * "almost nothing" is not the property worth relying on.
  */
 export const PAIRED_SELECT =
-  'paired_song_id, paired_song:paired_song_id(id, title, attribution, source_url, deleted_at), details';
+  'paired_song_id, paired_song:paired_song_id(id, title, attribution, source_url, deleted_at), paired_playlist_url';
 
 /**
- * Shape of what PAIRED_SELECT adds to a row. `details` is `unknown` on purpose:
- * its four callers each have a different idea of that column's type (the
- * generated `Json`, `Record<string, unknown>`, and PostgREST's inference), and
- * the read below is a runtime shape check anyway. Narrowing it here would only
- * force a cast at every call site.
+ * Shape of what PAIRED_SELECT adds to a row.
+ *
+ * ⚠ IT USED TO END IN `details`, TYPED `unknown`, because four callers each had
+ * a different idea of that column's type and the read was a runtime shape check
+ * anyway. That looseness was load-bearing in a way nobody intended: `unknown`
+ * overlaps with everything, so a caller could satisfy this interface WITHOUT
+ * carrying the pairing at all and still compile. `composer-suite`'s
+ * `PlacedFragment` did exactly that — it declared `details` and not
+ * `paired_song_id`, and only worked because the query fetched the field the
+ * type never mentioned. Naming a real column here made the compiler say so.
  */
-interface PairedRow {
+export interface PairedRow {
   paired_song_id?: string | null;
   paired_song?: {
     id: string;
@@ -173,7 +181,7 @@ interface PairedRow {
     source_url: string | null;
     deleted_at: string | null;
   } | null;
-  details?: unknown;
+  paired_playlist_url?: string | null;
 }
 
 /**
@@ -184,12 +192,18 @@ interface PairedRow {
  *   1. `paired_song_id` set → the song row is the ONLY truth. If the embed came
  *      back null (RLS hid an unpublished song) or the row is soft-deleted, the
  *      answer is NO PAIRING. It must not fall through.
- *   2. `paired_song_id` null → this essay was never promoted, so the legacy
- *      `details.media` is all there is. Two imported playlists live here.
+ *   2. `paired_song_id` null → the essay may carry a PLAYLIST instead
+ *      (`paired_playlist_url`, plan 40 §1b). Two do. A playlist is not a song
+ *      and never had a row: ADR 0009 forbids a song fragment from citing one.
  *
- * Falling through from 1 to 2 is the bug this shape exists to prevent: all 48
- * promoted essays still carry `details.media` pointing at the same track, so
- * unpublishing a song would have gone on playing it from the legacy URL.
+ * Falling through from 1 to 2 is the bug this shape exists to prevent — an
+ * unpublished song must not go on playing from a second source.
+ *
+ * ⚠ BRANCH 2 USED TO READ `details.media`, the shape Squarespace brought over,
+ * and it was the last reader of it anywhere. That was worse in a way worth
+ * recording: all 48 promoted essays ALSO carried a `details.media` copy of the
+ * same track, so the fallback was one missed `return` away from playing a
+ * withdrawn song. A column that only these two rows have cannot do that.
  */
 export function pairedMediaOf(row: PairedRow): PairedMedia | null {
   if (row.paired_song_id) {
@@ -204,9 +218,10 @@ export function pairedMediaOf(row: PairedRow): PairedMedia | null {
       url: song.source_url,
     };
   }
-  const media = (row.details as { media?: { url?: string } } | null)?.media;
-  if (media?.url) {
-    return { fragmentId: null, title: '', artist: null, url: media.url };
+  if (row.paired_playlist_url) {
+    // No title and no artist: a playlist's name lives inside the embed, and
+    // inventing a caption here is what ADR 0009's retired annotation did.
+    return { fragmentId: null, title: '', artist: null, url: row.paired_playlist_url };
   }
   return null;
 }

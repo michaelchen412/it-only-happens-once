@@ -38,6 +38,19 @@ export type PlacedFragment = {
   authors: { name: string; slug: string } | null;
   works: { title: string } | null;
   fragment_subjects: { subjects: SubjectRef | null }[] | null;
+  // ⚠ DECLARED, BECAUSE THE QUERY HAS ALWAYS FETCHED THEM. `PAIRED_SELECT` is
+  // spliced into the constellation read, so these arrive on every placed row —
+  // this type simply never said so, and `pairedMediaOf(f)` type-checked through
+  // an `unknown` overlap rather than because the shapes matched.
+  paired_song_id?: string | null;
+  paired_song?: {
+    id: string;
+    title: string | null;
+    attribution: string | null;
+    source_url: string | null;
+    deleted_at: string | null;
+  } | null;
+  paired_playlist_url?: string | null;
 };
 
 /** A `fragment_constellations` row, joined to its fragment. */

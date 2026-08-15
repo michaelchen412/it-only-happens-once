@@ -540,6 +540,7 @@ export type Database = {
           id: string
           is_self: boolean
           occurred_at: string
+          paired_playlist_url: string | null
           paired_song_id: string | null
           published_at: string | null
           slug: string
@@ -562,6 +563,7 @@ export type Database = {
           id?: string
           is_self?: boolean
           occurred_at?: string
+          paired_playlist_url?: string | null
           paired_song_id?: string | null
           published_at?: string | null
           slug: string
@@ -584,6 +586,7 @@ export type Database = {
           id?: string
           is_self?: boolean
           occurred_at?: string
+          paired_playlist_url?: string | null
           paired_song_id?: string | null
           published_at?: string | null
           slug?: string

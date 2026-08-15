@@ -83,10 +83,10 @@ export function parseSpotifyEmbed(url: string): SpotifyEmbed | null {
  * Spotify album (ADR-0009 — "albums become a small extension, not a new idea"),
  * or one YouTube video.
  *
- * A PLAYLIST is still not a song, on either provider: a playlist belongs to a
- * constellation as its `score_url`. That rule is what keeps the two remaining
- * imported playlist pairings on the `details.media` fallback path rather than
- * becoming fragments — see `PairedMedia` in `blog.ts`.
+ * A PLAYLIST is still not a song, on either provider: it belongs to a
+ * constellation as its `score_url`, or to a single essay as its
+ * `paired_playlist_url` (plan 40 §1b). That rule is what kept the two imported
+ * playlist pairings out of `fragments` — see `PairedMedia` in `blog.ts`.
  */
 export type SongRef =
   { provider: 'spotify'; kind: 'track' | 'album'; id: string } | { provider: 'youtube'; kind: 'video'; id: string };
