@@ -28,11 +28,18 @@
 */
 import type { SuiteItem } from '../lib/constellations';
 import QuoteReveal from './QuoteReveal.astro';
+import { renderMarkdown } from '../lib/markdown';
 
 interface Props {
   item: SuiteItem;
 }
 const { item } = Astro.props;
+
+// The third of the three surfaces that render a quote body, and it renders it
+// the same way the other two do — see QuoteArticle for the contract. The suite
+// is where an unhonoured `\` would have been loudest: a stanza is set at
+// display size with nothing else on the line.
+const quoteHtml = item.kind === 'quote' ? renderMarkdown(item.quote.body, { breaks: true }) : '';
 ---
 
 {
@@ -61,9 +68,10 @@ const { item } = Astro.props;
     */
     <figure>
       <a href={`/blog/${item.quote.slug}`} data-read={item.quote.slug} class="block">
-        <blockquote class="prose-measure text-[1.35rem] leading-[1.5] font-light whitespace-pre-line sm:text-[1.6rem]">
-          {item.quote.body}
-        </blockquote>
+        <blockquote
+          class="quote-body prose-measure text-[1.35rem] leading-[1.5] font-light sm:text-[1.6rem]"
+          set:html={quoteHtml}
+        />
       </a>
       {item.quote.attribution && (
         <figcaption class="text-base-content/50 mt-3 font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]">

@@ -26,6 +26,7 @@ import Reveal from './Reveal.astro';
 import FragmentStrip from './FragmentStrip.astro';
 import Highlighted from './admin/Highlighted.astro';
 import { MIN_SEARCH } from '../lib/search-highlight';
+import { renderMarkdown } from '../lib/markdown';
 import type { QuoteItem } from '../lib/blog';
 
 interface Props {
@@ -34,6 +35,18 @@ interface Props {
 }
 const { item, term = '' } = Astro.props;
 const searching = term.trim().length >= MIN_SEARCH;
+
+// ⚠ MARKDOWN, AND HIGHLIGHTED INSIDE THE RENDER — see QuoteArticle for why the
+// body is rendered at all, and `renderMarkdown`'s `highlight` option for why the
+// marking cannot happen afterwards.
+//
+// This is the ONLY surface on the site that renders a full body AND highlights
+// it: an essay card highlights its `lede`, which is already a `toPlainText`
+// projection (blog.ts), so the question never came up there. Passing the term
+// down instead of wrapping the output in `<Highlighted>` is what keeps the
+// escaping promise — every segment is escaped on its own, exactly as that
+// component does it, and the attribution below still goes through it unchanged.
+const bodyHtml = renderMarkdown(item.body, { breaks: true, highlight: searching ? term : undefined });
 
 // ⚠ The attribution is a control when there is ANYTHING behind it — a citation,
 // or the rest of that author's lines. Until 2026-08-10 the feed offered only the
@@ -105,9 +118,7 @@ const authorHref = item.author ? `/blog?view=quotes&author=${item.author.slug}` 
   */
   }
   <a href={`/blog/${item.slug}`} data-read={item.slug} class="quote-line block">
-    <blockquote class="font-serif text-[1.35rem] leading-[1.5] font-light whitespace-pre-line">
-      {searching ? <Highlighted text={item.body} term={term} /> : item.body}
-    </blockquote>
+    <blockquote class="quote-body font-serif text-[1.35rem] leading-[1.5] font-light" set:html={bodyHtml} />
   </a>
   {
     item.attribution && (

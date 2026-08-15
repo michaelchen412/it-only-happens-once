@@ -721,6 +721,54 @@
     font-size: 0.9rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
   }
+
+  /* ------------------------------------------------------------------------
+     A RENDERED QUOTE BODY — `.reading`'s much smaller sibling, and here for the
+     same stated reason: markdown-rendered content styling itself with no
+     per-element classes. Worn by the three surfaces that set a quote (the
+     permalink, the feed card, a suite stanza), which keep their own type ramp
+     on the `<blockquote>` and get only the block rhythm from here.
+
+     ⚠ IT IS NOT `.reading`, and must not become it. That class carries an
+     ESSAY's furniture — headings, lists, rules, images, its own font-size and
+     line-height — and a quote has none of those and sets its own scale per
+     surface (2.6rem on a permalink, 1.35rem in the feed). Wearing `.reading`
+     would overwrite the ramp with body copy and the ramp is the design.
+
+     ⚠ WHY THE ZERO MARGIN. Until the body was rendered these blockquotes held
+     raw text under `whitespace-pre-line`, so the first line began flush with
+     the element's own box. `marked` wraps every line in a `<p>`, and a `<p>`
+     arrives with margins — so without this the quote would drop away from its
+     own top edge on all three surfaces, which is a layout change nobody asked
+     for and the reason this block exists at all. */
+  .quote-body p {
+    margin-block: 0;
+  }
+  /* A blank line in the source was ONE blank line on screen under `pre-line`.
+     `1lh` is that same line, exactly, at whatever size the surface set — which
+     an `em` value cannot be, since the three ramps disagree. The `em` above it
+     is the fallback for anything without `lh`, not a second opinion. */
+  .quote-body p + p {
+    margin-block-start: 1.4em;
+    margin-block-start: 1lh;
+  }
+  /* Emphasis inside a quotation, which is standard for quoted matter and is now
+     reachable: the corpus has none today, and every one of these lines existed
+     as a latent leak (`**bold**` printed its asterisks) before the render. */
+  .quote-body em {
+    font-style: italic;
+  }
+  /* 500 rather than `.reading`'s 600: a quote is set at `font-light`, and the
+     jump from 300 to 600 at 2.6rem reads as a different typeface rather than as
+     emphasis. */
+  .quote-body strong {
+    font-weight: 500;
+  }
+  .quote-body a {
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-underline-offset: 3px;
+  }
 }
 
 /* Semantic shadow color per theme (no raw `black` at call sites). */

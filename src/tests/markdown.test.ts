@@ -73,6 +73,81 @@ describe('renderMarkdown — the notes pile’s line breaks', () => {
   });
 });
 
+// A quote body is Markdown too (data-model §4), and for a long time the three
+// public quote surfaces printed it raw instead — which is how the corpus's one
+// TipTap-authored hard break shipped a visible `\` to the blog. The rule these
+// pin is the one that was missing: the BACKSLASH IS THE SPELLING, NEVER THE
+// TEXT. It has to hold for the CRLF the July import carries as well as for the
+// bare newline the editor writes today.
+describe('renderMarkdown — a quote body reaches the page as words', () => {
+  it('never leaves the hard break’s backslash in the output', () => {
+    for (const src of [
+      'treat yourself.\\\nThe internal golden rule.',
+      'treat yourself.\\\r\nThe internal golden rule.',
+    ]) {
+      const html = renderMarkdown(src, { breaks: true });
+      expect(html).not.toMatch(/\\/);
+      expect(html.match(/<br\s*\/?>/g)).toHaveLength(1);
+    }
+  });
+
+  it('resolves the escapes TipTap writes around ordinary punctuation', () => {
+    // The serializer escapes anything that could read as syntax. Printed raw,
+    // these reached the reader as backslashes too — the same bug, quieter.
+    expect(renderMarkdown('a literal \\* star', { breaks: true })).toMatch(/a literal \* star/);
+    expect(renderMarkdown('snake\\_case', { breaks: true })).toMatch(/snake_case/);
+  });
+});
+
+// The feed's quote card is the ONE surface that renders a full body and
+// highlights a search term in it (an essay card highlights its `lede`, which is
+// already flattened). Marking has to happen inside the render for the reasons
+// `RenderOptions.highlight` gives; these pin what that buys and what it costs.
+describe('renderMarkdown — search highlighting', () => {
+  const hl = (md: string, term: string) => renderMarkdown(md, { breaks: true, highlight: term });
+
+  it('marks every hit with the same markup Highlighted.astro emits', () => {
+    const html = hl('The golden rule, and the internal rule', 'rule');
+    expect(html.match(/<mark class="hl">rule<\/mark>/g)).toHaveLength(2);
+  });
+
+  it('marks across a hard break and around emphasis', () => {
+    expect(hl('the rule\\\nanother rule', 'rule').match(/<mark/g)).toHaveLength(2);
+    const em = hl('treat *others* as you would treat yourself', 'treat');
+    expect(em).toMatch(/<em>others<\/em>/);
+    expect(em.match(/<mark/g)).toHaveLength(2);
+  });
+
+  it('escapes each segment on its own, so a body cannot smuggle markup past it', () => {
+    const html = hl('rule <img src=x onerror=alert(1)> rule', 'rule');
+    expect(html).not.toMatch(/onerror/i);
+    expect(html.match(/<mark/g)).toHaveLength(2);
+  });
+
+  it('leaves an entity beside a hit intact — the case that breaks marking HTML after the fact', () => {
+    // `&` must still be an entity, and both apostrophes must be INSIDE their
+    // mark. Slicing the rendered HTML at raw-text offsets cuts `&amp;` in half;
+    // marking at the token level never sees an encoded string at all.
+    const html = hl("don't & won't", "n'");
+    expect(html).toMatch(/&amp;/);
+    expect(html.match(/<mark class="hl">n'<\/mark>/g)).toHaveLength(2);
+  });
+
+  it('ignores a term below MIN_SEARCH, matching the DB filter and the debounce', () => {
+    expect(hl('a rule', 'r')).not.toMatch(/<mark/);
+    expect(hl('a rule', '  ')).not.toMatch(/<mark/);
+  });
+
+  // ⚠ THE REGRESSION THIS FILE EXISTS FOR. `marked.use()` is global and
+  // permanent, so building the marking renderer that way would leave one
+  // reader's search term highlighted in every essay the server rendered
+  // afterwards. A fresh instance per call is what makes that impossible.
+  it('does not leak the term into the next render', () => {
+    hl('the rule', 'rule');
+    expect(renderMarkdown('the rule', { breaks: true })).not.toMatch(/<mark/);
+  });
+});
+
 // ⚠ A GOAL'S NOTES LEAN ON THIS, so it stops being incidental and becomes a
 // promise. `goals.notes` is where a routine gets written down, and a routine
 // written down is one keystroke from `- [ ]` — which would put a checklist on

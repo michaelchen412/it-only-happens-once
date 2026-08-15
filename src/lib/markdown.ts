@@ -7,9 +7,10 @@
 // so the whole site's safety shouldn't rest on one uncontrolled sink — a stray
 // <script>/onerror/`javascript:` must never reach a reader. Callers wrap the
 // output in `.reading` so it picks up the article typography from app.css.
-import { marked } from 'marked';
+import { Marked, marked, type RendererObject, type Tokens } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 import { countWords, minutesForWords } from './reading';
+import { MIN_SEARCH, highlight } from './search-highlight';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -22,8 +23,11 @@ const SANITIZE: sanitizeHtml.IOptions = {
     a: ['href', 'title', 'name', 'target', 'rel'],
     img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
     code: ['class'],
+    // The search highlight below, and only that — `allowedClasses` pins the
+    // value, so an authored `<mark class="anything-else">` still loses it.
+    mark: ['class'],
   },
-  allowedClasses: { code: ['language-*', 'lang-*'] },
+  allowedClasses: { code: ['language-*', 'lang-*'], mark: ['hl'] },
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: { img: ['http', 'https', 'data'] },
 };
@@ -41,12 +45,65 @@ export interface RenderOptions {
    * (what TipTap serializes) renders as one `<br>` either way.
    */
   breaks?: boolean;
+  /**
+   * Wrap every occurrence of this term in `<mark class="hl">` — the same markup
+   * `Highlighted.astro` emits, so a highlighted body and a highlighted
+   * attribution read as one result. Below `MIN_SEARCH` it is ignored, which
+   * matches the DB filter and the client debounce.
+   *
+   * ⚠ WHY THIS LIVES INSIDE THE RENDERER AND NOT AFTER IT. The obvious shape is
+   * to render first and mark the HTML afterwards, and it is wrong twice over:
+   * the offsets you would be slicing at are in ENCODED space, so a match beside
+   * an entity cuts `&amp;` in half, and a naive text-node walk has to un-escape
+   * and re-escape user text — the one thing `Highlighted` was built never to do
+   * ("only the `<mark>` element is real markup"). Marking at the token level
+   * keeps both properties: the offsets come from the RAW text, where they are
+   * honest, and each segment is escaped on its own, so no author's characters
+   * ever pass through a decode step.
+   *
+   * The cost, stated: a match that straddles a mark boundary — `treat` across
+   * `*treat* others` — is two tokens and highlights as neither. That is the
+   * same limit every HTML-aware highlighter has, and it fails by showing you an
+   * unmarked hit rather than by breaking the markup.
+   */
+  highlight?: string;
+}
+
+/** Marked's own escaping rule, applied per segment (see `highlight` above). */
+const escapeText = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/**
+ * A `text` renderer that marks `term` and otherwise behaves exactly like the
+ * stock one — the two guard clauses are Marked v18's own (`Renderer.prototype
+ * .text`), and dropping either would swallow every inline child token.
+ */
+function markingRenderer(term: string): RendererObject {
+  return {
+    text(token: Tokens.Text | Tokens.Escape): string {
+      if ('tokens' in token && token.tokens) return this.parser.parseInline(token.tokens);
+      if ('escaped' in token && token.escaped) return token.text;
+      return highlight(token.text, term)
+        .map((s) => (s.hit ? `<mark class="hl">${escapeText(s.text)}</mark>` : escapeText(s.text)))
+        .join('');
+    },
+  };
 }
 
 /** Markdown string → sanitized HTML string (for `set:html`). Empty in → empty out. */
 export function renderMarkdown(md: string | null | undefined, opts: RenderOptions = {}): string {
   if (!md || !md.trim()) return '';
-  const html = marked.parse(md, { async: false, breaks: opts.breaks ?? false }) as string;
+  const breaks = opts.breaks ?? false;
+  const term = opts.highlight?.trim() ?? '';
+  // ⚠ A FRESH INSTANCE PER HIGHLIGHTED CALL, never `marked.use(…)`. `use` is
+  // global and permanent: one search would leave its own term marking every
+  // essay rendered by every later request this server handles.
+  const html =
+    term.length >= MIN_SEARCH
+      ? (new Marked({ gfm: true, breaks }).use({ renderer: markingRenderer(term) }).parse(md, {
+          async: false,
+        }) as string)
+      : (marked.parse(md, { async: false, breaks }) as string);
   return sanitizeHtml(html, SANITIZE);
 }
 

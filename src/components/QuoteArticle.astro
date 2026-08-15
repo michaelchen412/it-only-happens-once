@@ -51,6 +51,7 @@
 */
 import Reveal from './Reveal.astro';
 import FragmentStrip from './FragmentStrip.astro';
+import { renderMarkdown, toPlainText } from '../lib/markdown';
 // Aliased: the type and this component share a name, and the shadow silently
 // widened `page` to `any` — every callback below lost its parameter types.
 import type { QuotePage as QuotePageData } from '../lib/quote-page';
@@ -74,10 +75,27 @@ const constellations = inConstellation
   ? page.constellations.filter((c) => c.slug !== inConstellation)
   : page.constellations;
 
+// ⚠ THE BODY IS MARKDOWN AND IS RENDERED AS SUCH — data-model §4, ADR-0003:
+// `fragments.body` is "Markdown: full essay / full quote text". This surface
+// used to print the raw string inside `whitespace-pre-line`, which is the one
+// reader of that column that did not honour its own contract. It mostly looked
+// fine, because a quote rarely carries a mark — until the corpus's one
+// TipTap-authored hard break shipped its `\` to the page (the serializer spells
+// a line break `\` + newline; `marked` swallows it, `pre-line` printed it).
+//
+// `breaks: true` matches the editor that writes here (`mountMiniEditor`), so a
+// poem's line breaks survive without the backslash showing — the same pairing
+// the notes pile uses, and the same one `renderMarkdown`'s own option documents.
+const bodyHtml = renderMarkdown(quote.body, { breaks: true });
+
 // The type ramps DOWN as the line grows. A six-word aphorism at essay size looks
 // lost; a stanza at display size overruns the screen. Three steps, chosen
 // against the real corpus (30 → 843 characters, mean 189).
-const len = quote.body.length;
+//
+// Measured on the WORDS, not the source: `**` and an escaped `\*` are two
+// characters each that a reader never sees, and the ramp is about how much line
+// there is to look at.
+const len = toPlainText(quote.body).length;
 const size =
   len < 90
     ? 'text-[2rem] sm:text-[2.6rem]'
@@ -109,9 +127,10 @@ const authorHref = author ? `/blog?view=quotes&author=${author.slug}` : null;
 }
 <div class="quote-article">
   <figure>
-    <blockquote class:list={['text-base-content font-serif leading-[1.42] font-light whitespace-pre-line', size]}>
-      {quote.body}
-    </blockquote>
+    <blockquote
+      class:list={['quote-body text-base-content font-serif leading-[1.42] font-light', size]}
+      set:html={bodyHtml}
+    />
 
     {
       quote.attribution && (
