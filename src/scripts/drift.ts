@@ -1,4 +1,4 @@
-// The two drift dismissals (docs/plans/12-people.md §8).
+// The two drift dismissals (docs/plans/archive/12-people.md §8).
 //
 // One tap each, no dialog. Neither is destructive and neither is hard to
 // reverse — "Reached out" writes an entry you can edit or delete from the

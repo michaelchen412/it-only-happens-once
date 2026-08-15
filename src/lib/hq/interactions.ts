@@ -1,4 +1,4 @@
-// The log's vocabulary and its one derivation (docs/plans/12-people.md §6, §8).
+// The log's vocabulary and its one derivation (docs/plans/archive/12-people.md §6, §8).
 //
 // Separate from `./people.ts` because they are two tables with two lifetimes:
 // a person is a standing record you set once, an interaction is a stream you

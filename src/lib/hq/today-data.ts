@@ -1,5 +1,5 @@
 // What Today and the tasks room ASK FOR, separated from what they decide
-// (docs/plans/00-groundwork.md · Piece 3).
+// (docs/plans/archive/00-groundwork.md · Piece 3).
 //
 // ⚠ WHY THIS IS NOT IN `today.ts`. That module holds the RULES — `announces`,
 // `progressLabel`, `PAST_DUE_CAP` — and opens by promising **NO SUPABASE

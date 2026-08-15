@@ -1,5 +1,5 @@
 // ============================================================================
-// The log (docs/plans/12-people.md §6, ADR-0012).
+// The log (docs/plans/archive/12-people.md §6, ADR-0012).
 //
 // Two actions, because there are two motions: writing an entry down and taking
 // one back. Both run on `ctx.locals.supabase`, the caller's session client, so

@@ -1,4 +1,4 @@
-// Client logic for TaskSheet.astro (docs/plans/13-agenda.md §3a, §4).
+// Client logic for TaskSheet.astro (docs/plans/archive/13-agenda.md §3a, §4).
 //
 // TWO LIVE MECHANICS, and they are the work of this piece — neither is
 // decoration. Effort→lead and recurrence are rules whose whole effect is

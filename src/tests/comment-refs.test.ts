@@ -58,7 +58,49 @@ const LOCAL_ONLY = new Set(['design.md', 'vision.md', 'about-michael.md']);
  * that is how ADRs are cited from code.
  */
 const REF =
-  /(?:docs\/adr\/\d{4}-[a-z0-9-]+\.md|adr\/\d{4}-[a-z0-9-]+\.md|docs\/[a-z-]+\.md|src\/[A-Za-z0-9/_.[\]-]+\.(?:ts|astro|css)|scripts\/[a-z0-9_-]+\.mjs|supabase\/migrations\/[0-9A-Za-z_*]+\.sql|tests\/e2e\/[A-Za-z0-9.-]+\.ts|(?:design|vision|about-michael)\.md)/g;
+  /(?:docs\/adr\/\d{4}-[a-z0-9-]+\.md|adr\/\d{4}-[a-z0-9-]+\.md|docs\/plans\/(?:archive\/)?[A-Za-z0-9._-]+\.md|docs\/[a-z-]+\.md|src\/[A-Za-z0-9/_.[\]-]+\.(?:ts|astro|css)|scripts\/[a-z0-9_-]+\.mjs|supabase\/migrations\/[0-9A-Za-z_*]+\.sql|tests\/e2e\/[A-Za-z0-9.-]+\.ts|(?:design|vision|about-michael)\.md)/g;
+
+/**
+ * The plans folder, which is git-ignored and cited from more of `src/` than
+ * anything else in this pattern.
+ *
+ * ⚠ IT WAS INVISIBLE TO THIS FILE FOR AS LONG AS THIS FILE HAS EXISTED, and the
+ * reason is one character: the `docs/[a-z-]+\.md` alternative above matches
+ * `plans` and then wants `.md`, finds `/`, and gives up. So a citation like
+ * `docs/plans/archive/13-agenda.md` never matched, and **no plan citation had
+ * ever been checked** — while the header above says the paths named in `src/`
+ * comments still exist. The test was not wrong about what it checks; it read as
+ * broader coverage than it had, which is the same failure as a stale doc.
+ *
+ * *(That example is itself the check working: this comment first named the
+ * pre-archive path, and the widened pattern failed on its own file.)*
+ *
+ * ⚠ WHAT THE WIDENED PATTERN FOUND ON ITS FIRST RUN: **67 citations across 65
+ * files pointing at plans that had been ARCHIVED out from under them** — not
+ * merely unreachable for a stranger, but broken on Michael's own disk. Plans
+ * 00–16 moved to `archive/` on 2026-08-01 and 2026-08-04 and the comments
+ * citing them were never repointed. `13-agenda.md` alone was cited 25 times.
+ */
+const PLANS = 'docs/plans/';
+
+/**
+ * ⚠ CHECKED WHERE THE FOLDER EXISTS, SKIPPED WHERE IT CANNOT — which is a
+ * deliberately different answer from `LOCAL_ONLY` below, and a better one where
+ * it is available.
+ *
+ * The three files in `LOCAL_ONLY` are cited by name from anywhere, so there is
+ * no way to tell "absent because git-ignored" from "absent because renamed".
+ * `docs/plans/` is a whole directory: its presence is one `existsSync`, so the
+ * check can simply run on the machine that has it and stand down on the machine
+ * that does not.
+ *
+ * The asymmetry only fails in the safe direction. Vercel checks out the
+ * repository, where this folder does not exist, so there the check is inert and
+ * **cannot fail a build** — which is the hazard `LOCAL_ONLY`'s note is about.
+ * Locally it runs, inside `verify`, in front of the one person who can fix what
+ * it finds.
+ */
+const plansPresent = fs.existsSync(path.join(ROOT, PLANS));
 
 /** Every `.ts` / `.astro` under `src/`, recursively. */
 function sources(dir: string): string[] {
@@ -114,13 +156,30 @@ describe('the paths named in src/ comments still exist', () => {
     expect(all.length).toBeGreaterThan(40);
   });
 
+  /** Is this reference one this machine is in a position to check? */
+  const checkable = (ref: string) => {
+    if (LOCAL_ONLY.has(ref)) return false;
+    if (ref.startsWith(PLANS)) return plansPresent;
+    return true;
+  };
+
   it('every referenced path resolves', () => {
     const broken = all
-      .filter(({ ref }) => !LOCAL_ONLY.has(ref))
+      .filter(({ ref }) => checkable(ref))
       .filter(({ ref }) => !existsAllowingGlob(resolve(ref)))
       .map(({ ref, from }) => `${ref}  ← named in ${from}`);
 
     expect(broken, `These comments point at files that no longer exist:\n  ${broken.join('\n  ')}\n`).toEqual([]);
+  });
+
+  it.runIf(plansPresent)('sees the plan citations, now that the pattern can match them', () => {
+    // ⚠ THE VACUOUS-PASS GUARD FOR THE NEW ALTERNATIVE SPECIFICALLY. The
+    // assertion above is per-reference, so a `docs/plans/…` branch that stopped
+    // matching would take this whole category back out of the check while every
+    // test stayed green — which is precisely the state this file was in until
+    // 2026-08-15. The floor sits under the 11 distinct paths counted that day.
+    const plans = all.filter(({ ref }) => ref.startsWith(PLANS));
+    expect(plans.length, `the ${PLANS} branch of REF has stopped matching anything`).toBeGreaterThan(5);
   });
 
   it('the local-only skips are still local-only, and still exist as a category', () => {
@@ -132,5 +191,13 @@ describe('the paths named in src/ comments still exist', () => {
     for (const name of LOCAL_ONLY) {
       expect(ignore, `${name} is exempted from the path check but is no longer git-ignored`).toContain(name);
     }
+
+    // ⚠ AND THE PLANS FOLDER'S EXEMPTION HAS TO EARN ITSELF THE SAME WAY. The
+    // `plansPresent` skip above is justified by exactly one fact — that Vercel's
+    // checkout does not contain this folder. If it is ever committed, the skip
+    // stops being a safety measure and becomes a hole, and these citations
+    // should be checked everywhere like any other. This is the line that
+    // notices.
+    expect(ignore, `${PLANS} is skipped on the deploy but is no longer git-ignored`).toContain(PLANS);
   });
 });

@@ -1,5 +1,5 @@
 // The brief — what you last knew, at the moment you need it
-// (docs/plans/12-people.md §2a).
+// (docs/plans/archive/12-people.md §2a).
 //
 // ⚠ THIS IS THE PIECE THAT PAYS THE LOGGING BACK, and §2a says why it matters
 // more than any other line on Today: *"logging stops being deposits into a void

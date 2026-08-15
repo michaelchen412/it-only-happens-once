@@ -1,4 +1,4 @@
-// The roster's vocabulary and its derivations (docs/plans/12-people.md).
+// The roster's vocabulary and its derivations (docs/plans/archive/12-people.md).
 //
 // Everything a person surface needs that is NOT a query and NOT a date format —
 // dates live in `./dates.ts`, and the two people pages share this so a rule can

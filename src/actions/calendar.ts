@@ -1,5 +1,5 @@
 // The Google mirror's one write path — and it only ever writes OUR side
-// (docs/plans/13-agenda.md §2 and §8; ADR-0014).
+// (docs/plans/archive/13-agenda.md §2 and §8; ADR-0014).
 //
 // ⚠ THERE IS NO SCHEDULER IN THIS REPO, and this piece does not add one. The
 // plan called for `events.watch` push channels renewed on a schedule; the

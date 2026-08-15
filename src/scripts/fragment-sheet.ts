@@ -128,7 +128,7 @@ workCombo.addEventListener('combo:change', () => {
 });
 quoteWhere.addEventListener('input', refreshPreview);
 
-// ═══ THE DERIVED LINE (docs/plans/17a-quote-matrix.md, src/lib/provenance.ts) ══
+// ═══ THE DERIVED LINE (docs/plans/archive/17a-quote-matrix.md, src/lib/provenance.ts) ══
 //
 // THREE HANDLERS DIED HERE, and their absence is the point of the rebuild:
 //

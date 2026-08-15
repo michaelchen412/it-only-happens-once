@@ -1,5 +1,5 @@
 // ============================================================================
-// The two drift dismissals (docs/plans/12-people.md §8, ADR-0012).
+// The two drift dismissals (docs/plans/archive/12-people.md §8, ADR-0012).
 //
 // Their own namespace rather than a split across `people` and `interactions`,
 // because they are ONE control with two buttons: they sit side by side on the

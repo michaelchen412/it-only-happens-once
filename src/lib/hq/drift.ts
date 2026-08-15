@@ -1,4 +1,4 @@
-// Drift — the observation, never the verdict (docs/plans/12-people.md §8).
+// Drift — the observation, never the verdict (docs/plans/archive/12-people.md §8).
 //
 // This is the piece that pays the logging back, and it is also the one most
 // able to make HQ into the thing 10-hq.md §3 forbids. The principle is load-

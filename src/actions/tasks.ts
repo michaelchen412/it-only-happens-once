@@ -1,5 +1,5 @@
 // ============================================================================
-// Tasks (docs/plans/13-agenda.md §3, §3a, §4; ADR-0013).
+// Tasks (docs/plans/archive/13-agenda.md §3, §3a, §4; ADR-0013).
 //
 // Four actions, because there are four motions: writing a task down, answering
 // for one, taking that answer back, and throwing the task away. All run on

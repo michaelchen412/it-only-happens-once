@@ -1,4 +1,4 @@
-// The Google mirror's rules, with no Google in them (docs/plans/13-agenda.md §2;
+// The Google mirror's rules, with no Google in them (docs/plans/archive/13-agenda.md §2;
 // ADR-0014).
 //
 // Everything here is pure so it can be tested against the shapes the live

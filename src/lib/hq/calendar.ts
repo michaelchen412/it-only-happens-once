@@ -1,4 +1,4 @@
-// The calendar's union (docs/plans/13-agenda.md §5).
+// The calendar's union (docs/plans/archive/13-agenda.md §5).
 //
 // ⚠ FOUR SOURCES ON ONE GRID, AND ONLY TWO OF THEM ARE WRITABLE. That is the
 // whole design problem of this surface, and §5's answer is that authority is

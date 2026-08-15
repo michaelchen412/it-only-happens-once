@@ -124,6 +124,24 @@ carries it directly, and why
 argument that had been governing the Sky from inside `design.md` an address a
 stranger can reach.
 
+**A fourth is a whole folder, and it is the one you will actually meet.**
+`docs/plans/` holds the working notes each piece of this was built from — one
+file per stretch of work — and it is git-ignored for the same reason: they are
+thinking, not documentation, and `docs/` is where what shipped gets written
+down. **Comments throughout `src/` cite them by path**, so a reader will hit
+`(docs/plans/archive/13-agenda.md §3a)` in a file and find nothing there. That
+is the same intended state as the three above, at a larger scale — and where it
+matters, the argument has been given a public address instead: that is what the
+[ADRs](docs/adr/) are for, and the index says when one is owed.
+
+The citations are still held to being *internally* honest.
+[`comment-refs.test.ts`](src/tests/comment-refs.test.ts) checks that every path
+named in a comment resolves, and checks the plan paths too wherever the folder
+is present — so the references rot on the author's machine, in front of the one
+person who can repair them, rather than quietly. It found 67 of them pointing at
+plans that had been archived out from under them the first time it was allowed
+to look.
+
 ## Licence
 
 Two, because this repository holds two different kinds of work:

@@ -1,4 +1,4 @@
-// The morning check-in (docs/plans/11-checkin.md §5, ADR-0012).
+// The morning check-in (docs/plans/archive/11-checkin.md §5, ADR-0012).
 //
 // ONE ACTION, BECAUSE THERE IS ONE MOTION. The check-in is not a form that gets
 // submitted — it is one row per local date, upserted as you go. The phone

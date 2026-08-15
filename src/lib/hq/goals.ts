@@ -1,4 +1,4 @@
-// Goals — intentions, not projects (docs/plans/13-agenda.md §4a).
+// Goals — intentions, not projects (docs/plans/archive/13-agenda.md §4a).
 //
 // The whole file is shaped by one distinction: **a goal is a direction, not a
 // scoped deliverable.** *Get back in shape. Finish the Sky.* That is why there

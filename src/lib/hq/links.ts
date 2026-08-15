@@ -1,4 +1,4 @@
-// The one seam with the corpus (docs/plans/12-people.md §5).
+// The one seam with the corpus (docs/plans/archive/12-people.md §5).
 //
 // Everything the Shared zone and the link picker need, in one module so the
 // profile and the fragment editor can never disagree about what a link means.

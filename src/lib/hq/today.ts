@@ -1,4 +1,4 @@
-// Today, assembled (docs/plans/13-agenda.md §6; 10-hq.md §10c and §10f).
+// Today, assembled (docs/plans/archive/13-agenda.md §6; 10-hq.md §10c and §10f).
 //
 // The rules that decide WHAT IS ON THE PAGE, separated from the page so they can
 // be tested and so no zone invents its own answer. Every one of them is a

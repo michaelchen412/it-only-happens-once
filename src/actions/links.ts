@@ -1,5 +1,5 @@
 // ============================================================================
-// Person ↔ corpus links (docs/plans/12-people.md §5, ADR-0012).
+// Person ↔ corpus links (docs/plans/archive/12-people.md §5, ADR-0012).
 //
 // The seam, and the only place HQ writes rows that reference the public half of
 // the database. Five actions in two directions, because §5 is explicit that

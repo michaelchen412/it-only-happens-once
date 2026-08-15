@@ -1,5 +1,5 @@
 // ============================================================================
-// Goals (docs/plans/13-agenda.md §4a).
+// Goals (docs/plans/archive/13-agenda.md §4a).
 //
 // Three actions: writing an intention down, moving it between the four
 // statuses, and — rarely — deleting one outright. All run on the caller's

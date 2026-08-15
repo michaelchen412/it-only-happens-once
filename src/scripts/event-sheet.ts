@@ -1,4 +1,4 @@
-// Client logic for EventSheet.astro (docs/plans/13-agenda.md §5).
+// Client logic for EventSheet.astro (docs/plans/archive/13-agenda.md §5).
 //
 // ONE SHEET, MANY EVENTS — so the row carries its own JSON and this fills the
 // form on open, the same arrangement TaskSheet uses and for the same reason: a

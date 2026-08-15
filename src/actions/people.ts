@@ -1,5 +1,5 @@
 // ============================================================================
-// People mutations (docs/plans/12-people.md, ADR-0012).
+// People mutations (docs/plans/archive/12-people.md, ADR-0012).
 //
 // Four actions, because there are four separate motions, and keeping them
 // separate is what lets each one send only what it owns:

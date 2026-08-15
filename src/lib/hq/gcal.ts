@@ -1,5 +1,5 @@
 // The Google Calendar client — read-only, and structurally so
-// (docs/plans/13-agenda.md §2; ADR-0014).
+// (docs/plans/archive/13-agenda.md §2; ADR-0014).
 //
 // ⚠ SERVER ONLY. `astro:env/server` is imported below, exactly as `media.ts`
 // does for Spotify. Nothing in `src/scripts/` may import this file.

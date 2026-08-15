@@ -1,5 +1,5 @@
 // ============================================================================
-// HQ-native events, and person tags (docs/plans/13-agenda.md §5 and §2).
+// HQ-native events, and person tags (docs/plans/archive/13-agenda.md §5 and §2).
 //
 // Three actions: writing an event down, removing it, and tagging somebody on
 // one. All run on the caller's session client, so RLS does the real work.

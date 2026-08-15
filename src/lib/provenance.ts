@@ -1,7 +1,7 @@
 // ============================================================================
 // Quote provenance — three facts in, two strings out.
 //
-// THE SPECIFICATION IS docs/plans/17a-quote-matrix.md. Fourteen cases are
+// THE SPECIFICATION IS docs/plans/archive/17a-quote-matrix.md. Fourteen cases are
 // enumerated there and every one of them is a test in src/tests/provenance.test.ts.
 // If you are about to add a branch to this file, add the row to the matrix first;
 // the last time this logic grew a special case it was a regex that guessed

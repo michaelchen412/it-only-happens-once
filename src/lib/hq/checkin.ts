@@ -1,4 +1,4 @@
-// The check-in's vocabulary and its arithmetic (docs/plans/11-checkin.md §3).
+// The check-in's vocabulary and its arithmetic (docs/plans/archive/11-checkin.md §3).
 //
 // ONE IMPLEMENTATION, THREE READERS: the server renders the summary from these,
 // the browser renders the live line from these, and vitest checks them. Two

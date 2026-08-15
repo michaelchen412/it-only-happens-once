@@ -1,4 +1,4 @@
-// The one way anything in HQ computes "today" (docs/plans/11-checkin.md §2).
+// The one way anything in HQ computes "today" (docs/plans/archive/11-checkin.md §2).
 //
 // THE BUG THIS FILE EXISTS TO PREVENT. Postgres `timestamptz` has no notion of
 // a day, and neither does a `Date`. "Today" is a LOCAL DATE — the one you woke

@@ -1,4 +1,4 @@
-// Disposition, in the room (docs/plans/13-agenda.md §4; 10-hq.md §10f;
+// Disposition, in the room (docs/plans/archive/13-agenda.md §4; 10-hq.md §10f;
 // ADR-0013).
 //
 // THE ROW STAYS, and that is the whole interaction. One click ticks a task off

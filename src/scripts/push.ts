@@ -1,6 +1,6 @@
 /*
   push — subscribing this device, and keeping the subscription alive
-  (docs/plans/21-push.md · Phase 2, ADR-0019).
+  (docs/plans/archive/21-push.md · Phase 2, ADR-0019).
 
   ⚠ NO SERVICE WORKER IS REGISTERED HERE, AND THAT IS THE DESIGN, NOT AN
   OMISSION. Declarative Web Push subscribes from the PAGE via

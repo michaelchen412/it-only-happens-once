@@ -1,4 +1,4 @@
-// Reading a task out of a sentence (docs/plans/14-capture.md §6). Server-only —
+// Reading a task out of a sentence (docs/plans/archive/14-capture.md §6). Server-only —
 // it holds the API-key path and must never be imported client-side.
 //
 // REUSES THE ADR-0007 PATTERN, deliberately and exactly: Claude Haiku 4.5,

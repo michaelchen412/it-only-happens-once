@@ -1,4 +1,4 @@
-// The two invisible rules of a task, in one place (docs/plans/13-agenda.md §3,
+// The two invisible rules of a task, in one place (docs/plans/archive/13-agenda.md §3,
 // §3a, §4).
 //
 // Everything here is pure and takes local-date strings, so the SAME functions

@@ -1,4 +1,4 @@
-// HQ's date and time registers (docs/plans/10-hq.md §10d).
+// HQ's date and time registers (docs/plans/archive/10-hq.md §10d).
 //
 // Two registers, deliberately, because they answer different questions:
 //

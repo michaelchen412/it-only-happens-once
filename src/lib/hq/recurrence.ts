@@ -1,4 +1,4 @@
-// Recurrence rules for tasks (docs/plans/13-agenda.md §4, ADR-0013).
+// Recurrence rules for tasks (docs/plans/archive/13-agenda.md §4, ADR-0013).
 //
 // ⚠ WHY RRULE AT ALL, AND WHY NOT `rrule.js`. Settled 2026-08-03, and §4's
 // warning is the reason it had to be settled BEFORE the migration: changing the

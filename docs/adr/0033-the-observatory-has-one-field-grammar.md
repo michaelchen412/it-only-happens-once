@@ -58,7 +58,7 @@ passed. Every label here is under 18.66px, so none of them qualifies for the 3:1
 large-text exemption.
 
 The thresholds are not invented for this record. [Plan
-19](../../docs/plans/19-one-chair.md) derived them by measurement — dusk crosses
+19](../../docs/plans/archive/19-one-chair.md) derived them by measurement — dusk crosses
 4.5:1 at 55% opacity, paper not until 65% — which is why its ink ramp pairs steps
 by the **ratio** they hit rather than by the opacity they share.
 
@@ -157,7 +157,7 @@ none of it was visible from the decision:
 
 - **`.admin-hint` stays.** 71 uses across 29 files, most of them general small
   print rather than field hints, and at 45% it fails AA everywhere. That is
-  [plan 19 · Piece 5](../../docs/plans/19-one-chair.md)'s ink ramp, not this
+  [plan 19 · Piece 5](../../docs/plans/archive/19-one-chair.md)'s ink ramp, not this
   decision.
 
 **What would falsify this.** If a form appears whose labels genuinely need to be

@@ -1,5 +1,5 @@
 // The quote matrix, executable. Every row of the table in
-// docs/plans/17a-quote-matrix.md is a case here, in the same order and with the
+// docs/plans/archive/17a-quote-matrix.md is a case here, in the same order and with the
 // same numbering, so the specification and the tests can be read side by side.
 //
 // ⚠ This is the file that stops the rule from acquiring special cases. The

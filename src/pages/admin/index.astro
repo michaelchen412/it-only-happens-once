@@ -321,7 +321,7 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       /* The configured zone always wins; a device somewhere else gets a quiet
         note and nothing more. A silent switch mid-trip corrupts the sleep
         series exactly at the boundary — doubling or skipping a day — and does
-        it invisibly (docs/plans/11-checkin.md §2). */
+        it invisibly (docs/plans/archive/11-checkin.md §2). */
     }
     <p id="tz-note" hidden class="admin-hint mb-4 text-xs" data-tz={tz}></p>
 
@@ -410,7 +410,7 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     // mirror immediately and never waits on the network.
     import '../../scripts/calendar-sync';
 
-    // The travel note (docs/plans/11-checkin.md §2). Client-side because the
+    // The travel note (docs/plans/archive/11-checkin.md §2). Client-side because the
     // server has no business asking what the device thinks the zone is — and
     // this is the ONLY thing on the page the browser's zone is allowed to
     // influence: a sentence. It never moves the day.

@@ -1,5 +1,5 @@
 // Client logic for GoalSheet.astro, and the status control on the goal page
-// (docs/plans/13-agenda.md §4a).
+// (docs/plans/archive/13-agenda.md §4a).
 //
 // Two things live here, because they are two ways of doing the same thing: the
 // sheet (where a goal is written down or edited) and the four-way segmented

@@ -1,5 +1,5 @@
 // ============================================================================
-// Web push subscriptions (docs/plans/21-push.md · Phase 2, ADR-0019).
+// Web push subscriptions (docs/plans/archive/21-push.md · Phase 2, ADR-0019).
 //
 // ⚠ THE WRITE PATH FOR THE ONLY FEATURE THAT CAN INTERRUPT MICHAEL. Everything
 // else in this folder edits things he came and asked to see; a row written here

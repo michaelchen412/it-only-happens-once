@@ -1,5 +1,5 @@
 // Wiring for a SharedByField instance — the corpus's side of the person link
-// (docs/plans/12-people.md §5). See the component for the design rationale.
+// (docs/plans/archive/12-people.md §5). See the component for the design rationale.
 //
 // The contract is deliberately IDENTICAL to constellation-picker.ts, because it
 // is the same problem: a relationship, applied immediately, except on a
