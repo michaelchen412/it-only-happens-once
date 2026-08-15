@@ -154,6 +154,34 @@ export async function closeWithExit(dialog: HTMLDialogElement, opts: { onCancell
  * is already open, so the guard is not politeness — without it, the reopen path
  * above is an exception rather than a sheet.
  *
+ * ⚠ IT ALSO DECIDES WHERE FOCUS LANDS, AND THAT IS NOT A SIDE ERRAND. Left to
+ * itself, `showModal()` focuses the first focusable descendant — which in every
+ * sheet in this building is `SheetHeader`'s ✕, because the header is the first
+ * thing in the markup. So opening a document to read it announced "Close" and
+ * ringed it. Michael, 2026-08-15: *"if I open up a sheet, I will see this ugly
+ * blue outline on the X button to close the sheet… Why is that UI element
+ * highlighted?"* Measured on the writing sheet, after any keyboard use:
+ * `activeElement` = `button[aria-label="Close"]`, `:focus-visible` = true,
+ * `outline: rgb(16,16,16) auto 1px` — the browser's own ring, on the one
+ * control in the sheet that does nothing but leave it.
+ *
+ * The fix is not to hide the ring; it is to stop pointing it at the exit. Focus
+ * goes to the DIALOG, which is what the WAI-ARIA authoring practices prescribe
+ * when the first focusable thing is not the thing you came for — a screen
+ * reader then announces the sheet's own name and role rather than "Close,
+ * button", and there is nothing ringed because a modal filling the screen needs
+ * no ring to say where you are (see admin.css).
+ *
+ * `tabindex` is set here rather than in twenty markup files because it is a
+ * consequence of this function's choice, not a property of any one sheet: a
+ * `<dialog>` is not focusable on its own.
+ *
+ * ⚠ AND `[autofocus]` STILL WINS. `showModal()` honours it, and a sheet that
+ * genuinely opens INTO a field should say so declaratively; stealing focus back
+ * to the container would break exactly the sheets that had thought about this.
+ * The imperative `.focus()` calls that several sheets make on the line after
+ * this one win for the same reason — they run later.
+ *
  * There is no `returnValue` parameter on the close side for the same reason
  * there is no `show()` (non-modal) here: every dialog in this building is
  * modal, and the two that carry a `returnValue` (`confirm-dialog`,
@@ -162,5 +190,8 @@ export async function closeWithExit(dialog: HTMLDialogElement, opts: { onCancell
  */
 export function openDialog(dialog: HTMLDialogElement): void {
   delete dialog.dataset.closing;
-  if (!dialog.open) dialog.showModal();
+  if (dialog.open) return;
+  if (!dialog.hasAttribute('tabindex')) dialog.tabIndex = -1;
+  dialog.showModal();
+  if (!dialog.querySelector('[autofocus]')) dialog.focus();
 }

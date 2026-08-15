@@ -161,13 +161,22 @@ test.describe('focus is visible where it lands', () => {
   //
   // ⚠ AN OUTLINE WITH `style: none` IS NOT AN OUTLINE, and normalising that away
   // is what keeps this spec honest (2026-08-15). app.css gained a site-wide
-  // `:focus-visible` ring that day; every control that answers focus its own way
-  // still overrides it, but several do so with the `outline-style` LONGHAND —
-  // which leaves the ring's colour and width applied to an outline that is not
-  // drawn. Compared raw, those two properties change on focus for every field on
-  // the page, and this test would have reported "something changed" for all of
-  // them forever after. It would still have been green. It would have been
-  // measuring the cascade rather than the reader.
+  // `:focus-visible` ring that day. Almost every control that answers focus its
+  // own way overrides it with the `outline` SHORTHAND, which resets style, width
+  // and colour together and leaves nothing behind — so this mattered to exactly
+  // one field, measured across all eleven rooms rather than assumed:
+  //
+  //     /admin/fragments · input[name=q] — the manager's search box
+  //     before: none 3px oklch(0.91 …)   after: none 2px oklab(0.76 … / 0.7)
+  //
+  // `outline-style` is `none` on both sides; only the width and colour moved,
+  // because the field sits inside a daisyUI `.input` wrapper that owns the
+  // border and blanks the inner outline. Raw, that reads as "something changed
+  // on focus" — and it would have, for a ring that is never drawn, on the ONE
+  // field in the building whose real focus answer lives on its parent. That is
+  // the `:focus-within` pattern this comment praises three paragraphs up, and
+  // this spec exists because that same box once had no answer at all. Measuring
+  // the cascade instead of the reader is how it would stop noticing again.
   for (const route of ROOMS) {
     test(route, async ({ page }) => {
       await settle(page, route);

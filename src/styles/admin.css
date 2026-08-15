@@ -27,6 +27,20 @@ dialog,
   color: var(--color-base-content);
   background: var(--color-base-100);
 }
+/* ⚠ THE SHEET ITSELF IS FOCUSED ON OPEN, AND MUST NOT BE RINGED. `openDialog`
+   puts focus on the dialog rather than on the ✕ that happens to be first in the
+   markup (scripts/dialog-close.ts has the whole account) — and app.css's
+   site-wide `:focus-visible` would otherwise draw a 2px ring around a
+   full-height drawer, which is the same distraction one step larger.
+   This is the narrow, legitimate case for suppressing it: the ring exists to
+   say WHERE you are, and a modal covering the screen behind a dimmed backdrop
+   has already said it. Every focusable thing INSIDE the sheet keeps its own. */
+.modal-dialog:focus,
+.modal-dialog:focus-visible,
+.drawer-dialog:focus,
+.drawer-dialog:focus-visible {
+  outline: none;
+}
 /* ⚠ `display`/`overlay` ARE LISTED ON `[open]`, NOT ON THE RESTING STATE, and
    every dialog rule in this file now follows that shape. A transition runs from
    the property list of the state being moved TO — so listing them under `[open]`
@@ -1938,15 +1952,24 @@ html.reader-open .sky-return {
   outline: none;
 }
 
-/* Consistent keyboard focus ring on custom interactive elements. */
-.type-badge:focus-visible,
-.sort-header:focus-visible,
-.row-edit:focus-visible,
-.tt-btn:focus-visible,
-.row-open:focus-visible,
-.theme-toggle:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
-  outline-offset: 2px;
+/* ⚠ THE RING ITSELF MOVED TO `app.css` (2026-08-15) — this is only its CORNERS.
+   These six were an opt-in list of who got a designed focus ring, which meant
+   every control nobody remembered to add fell through to the browser's default
+   blue. The ring is now one rule at element specificity for the whole site, so
+   there is no list to forget to join.
+
+   What is left here is the one thing that could not move: an outline follows
+   the element's `border-radius`, and these six have no shape of their own —
+   they are text and glyphs with no border and no background — so without this
+   their ring is a hard rectangle. Setting the radius unconditionally rather
+   than under `:focus-visible` because on an element with nothing painted, the
+   radius IS only ever the ring's corners. */
+.type-badge,
+.sort-header,
+.row-edit,
+.tt-btn,
+.row-open,
+.theme-toggle {
   border-radius: var(--radius-field);
 }
 

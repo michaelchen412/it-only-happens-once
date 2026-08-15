@@ -183,6 +183,36 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* ── THE FOCUS RING, ONCE, FOR EVERYTHING ──────────────────────────────────
+     Michael, 2026-08-15: *"I keep noticing this ugly blue highlight… if I open
+     up a sheet, I will see this ugly blue outline on the X button to close the
+     sheet… It's not only kind of garish but it's just drawing attention away
+     from the user."*
+
+     ⚠ THE RING WAS NEVER OURS. `admin.css` has had a designed one since the
+     workshop was built, but as an OPT-IN LIST of six class names — so every
+     control nobody remembered to add fell through to the browser's default.
+     Measured on the writing sheet's ✕: `outline: rgb(16,16,16) auto 1px`, which
+     is Chrome's own two-tone ring and reads blue. A rule that has to be
+     re-remembered at each new control is a rule that is off by default, and
+     that is the actual complaint — not that focus is visible.
+
+     ⚠ IT IS AT ELEMENT SPECIFICITY, DELIBERATELY, so anything with its own
+     answer still wins. Four controls in `hq.css` reply to focus by moving a
+     BORDER to `--color-primary` rather than by drawing a ring (`.search`,
+     `.logbox`, and the two time fields), and each clears `outline` to do it.
+     Those are decisions, and `a11y.spec.ts` has a spec that would fail if this
+     rule flattened them.
+
+     `:focus-visible` and never `:focus`, so a mouse press on a button does not
+     ring it — which is the other half of "the vast majority of users will never
+     need that". What this file must never do is `outline: none` with nothing
+     put back: that is WCAG 2.4.7 and it has already been shipped here once. */
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+    outline-offset: 2px;
+  }
+
   /* long-form measure. never let a line of prose run past this. */
   .prose-measure {
     max-width: 68ch;
