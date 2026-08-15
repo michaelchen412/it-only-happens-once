@@ -37,8 +37,16 @@ const SEED: SongForSheet = {
   embed: { src: '', height: 0, allow: '' },
 };
 
-/** Open the song sheet on SEED and cross to Facts, where the pairing lives. */
-async function openFacts(page: import('@playwright/test').Page, seed: SongForSheet = SEED) {
+/**
+ * Open the song sheet on SEED, where the pairing lives.
+ *
+ * ⚠ IT USED TO CROSS TO A `Facts` TAB, AND THE TAB IS GONE ON PURPOSE.
+ * `a song is not a fragment` deleted `songs.setNotes` and with it the Notes
+ * pane, which left this sheet with ONE panel — so the tab strip went too, on the
+ * rule that a strip over a single pane says there is somewhere else to go. The
+ * pairing is simply on screen when the sheet opens now.
+ */
+async function openSheet(page: import('@playwright/test').Page, seed: SongForSheet = SEED) {
   const pairs: { fragment_id: string; song_id?: string }[] = [];
   const created: Record<string, string>[] = [];
   await stubActions(page, {
@@ -70,13 +78,12 @@ async function openFacts(page: import('@playwright/test').Page, seed: SongForShe
   await page.evaluate((id) => document.dispatchEvent(new CustomEvent('song:edit', { detail: { id } })), SONG);
   const sheet = page.locator('#song-sheet');
   await expect(sheet).toBeVisible();
-  await sheet.getByRole('tab', { name: 'Facts' }).click();
   return { sheet, pairs, created };
 }
 
 test.describe('the song sheet’s paired list', () => {
   test('lists each piece with its status and its own Unpair', async ({ page }) => {
-    const { sheet } = await openFacts(page);
+    const { sheet } = await openSheet(page);
     const row = sheet.locator('#sng-paired li');
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('A piece that already has it');
@@ -87,7 +94,7 @@ test.describe('the song sheet’s paired list', () => {
   });
 
   test('the door is there even with nothing paired — it is a door, not a summary', async ({ page }) => {
-    const { sheet } = await openFacts(page, { ...SEED, paired: [] });
+    const { sheet } = await openSheet(page, { ...SEED, paired: [] });
     await expect(sheet.locator('#sng-paired-none')).toBeVisible();
     await expect(sheet.locator('#sng-pair-add')).toBeVisible();
   });
@@ -95,7 +102,7 @@ test.describe('the song sheet’s paired list', () => {
 
 test.describe('the pairing picker', () => {
   test('opens on top of the sheet and offers WRITING ONLY', async ({ page }) => {
-    const { sheet } = await openFacts(page);
+    const { sheet } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
 
     const drawer = page.locator('#pair-browser');
@@ -114,7 +121,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('has no cart — one foreign key is not a multi-select', async ({ page }) => {
-    const { sheet } = await openFacts(page);
+    const { sheet } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     await expect(drawer.locator('tr.fragment-row').first()).toBeVisible();
@@ -124,7 +131,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('drops the type segments and the quote-only filters', async ({ page }) => {
-    const { sheet } = await openFacts(page);
+    const { sheet } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     await expect(drawer.locator('tr.fragment-row').first()).toBeVisible();
@@ -139,7 +146,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('a row click pairs instead of opening an editor (ruling 5)', async ({ page }) => {
-    const { sheet, pairs } = await openFacts(page);
+    const { sheet, pairs } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     // A row nothing else holds, so the pick is not a collision.
@@ -168,7 +175,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('a pick that would steal another song’s slot names it first (ruling 2)', async ({ page }) => {
-    const { sheet, pairs } = await openFacts(page);
+    const { sheet, pairs } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     await expect(drawer.locator('tr.fragment-row').first()).toBeVisible();
@@ -199,7 +206,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('offers to start a piece that does not exist yet, titled with what you typed', async ({ page }) => {
-    const { sheet } = await openFacts(page);
+    const { sheet } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     await expect(drawer.locator('tr.fragment-row').first()).toBeVisible();
@@ -212,7 +219,7 @@ test.describe('the pairing picker', () => {
   });
 
   test('creating it is one saveWriting, as a DRAFT, then the pair (rulings 6 and 7)', async ({ page }) => {
-    const { sheet, pairs, created } = await openFacts(page);
+    const { sheet, pairs, created } = await openSheet(page);
     await sheet.locator('#sng-pair-add').click();
     const drawer = page.locator('#pair-browser');
     await expect(drawer.locator('tr.fragment-row').first()).toBeVisible();

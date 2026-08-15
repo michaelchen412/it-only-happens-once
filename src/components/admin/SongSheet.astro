@@ -74,6 +74,32 @@ const { people = [], sharedBy = {} } = Astro.props;
           class="w-full font-sans"
         />
       </label>
+      {
+        /* ⚠ THE PLAYER IS A DIV THE SCRIPT FILLS, AND REMOVING THE IFRAME IS THE
+          ONLY PAUSE WE HAVE. A cross-origin frame cannot be controlled from
+          outside — no API, no postMessage we own. So closing the sheet, loading
+          a different song, and saving all DESTROY the frame, and that is what
+          stops the sound. Anything that "hides" a player instead of removing it
+          leaves music playing in a room you have left.
+
+          ⚠ RESTORED 2026-08-15, HAVING BEEN LOST AS COLLATERAL. `a song is not a
+          fragment` collapsed the Notes tab and the tab strip out of this sheet —
+          both deliberate, both explained in that commit — and this div went with
+          them in the same deletion, unmentioned. It was not a decision: the
+          action still computes `embed` through `songEmbed()`, `SongSheetSeed`
+          still declares it, and `raisePlayer` still runs on every load. What the
+          removal produced was `playerEl.replaceChildren()` on `null` — thrown
+          inside `loadSeed`, which `openSongSheet` calls BEFORE it opens the
+          dialog, so the sheet stopped opening at all. Silent: `#song-sheet`
+          stayed in the DOM and stayed hidden. Nine specs went red and read as a
+          test problem.
+
+          And plan 39 is why it has to come back rather than the code coming out:
+          this player being the only pause is the premise of the whole pairing
+          workstream — *"the existing route is only walkable by stopping the
+          listening that produced the thought."* */
+      }
+      <div id="sng-player" class="mt-4 empty:mt-0"></div>
       {/* ── FACTS ────────────────────────────────────────────────────────── */}
       <div id="sng-panel-facts" role="tabpanel" data-tabpanel="facts" class="flex flex-col gap-4 px-6 py-5 font-sans">
         {

@@ -127,7 +127,26 @@ if (sheet) {
 }
 
 function wire(sheet: HTMLDialogElement) {
-  const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  /*
+    ⚠ IT THROWS ON A MISSING ID, AND IT USED TO LIE ABOUT ONE. This was
+    `document.getElementById(id) as T` — a cast that promises the element exists
+    and hands back `null` when it doesn't, so TypeScript sees `HTMLElement` and
+    the failure surfaces later, somewhere else, as a null dereference.
+
+    That is exactly how `#sng-player` cost an afternoon: the div came out of the
+    markup, this kept "finding" it, and `raisePlayer` blew up inside `loadSeed`
+    — which runs BEFORE `openDialog`, so the sheet silently stopped opening at
+    all. Nine specs went red pointing at the pairing picker, which was fine.
+
+    Every id below is a contract with `SongSheet.astro`. Breaking one should say
+    which one, at wire time, in the console — not produce a sheet that no longer
+    opens for reasons three call frames away.
+  */
+  const el = <T extends HTMLElement>(id: string): T => {
+    const node = document.getElementById(id);
+    if (!node) throw new Error(`SongSheet: #${id} is missing from the markup — the script and the sheet disagree.`);
+    return node as T;
+  };
   const urlEl = el<HTMLInputElement>('sng-url');
   const playerEl = el('sng-player');
   const headingEl = el('sng-title');

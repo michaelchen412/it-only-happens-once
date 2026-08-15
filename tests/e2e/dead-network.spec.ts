@@ -298,7 +298,10 @@ test.describe('a sheet is dismissible, and says what that costs', () => {
     // which was held until Save and so was the cheapest possible dirty edit.
     // The words are gone (plan 40); the title is the field that replaces them
     // as "something to lose".
-    await sheet.getByRole('tab', { name: 'Facts' }).click();
+    // ⚠ NO `Facts` TAB CLICK ANY MORE. `a song is not a fragment` deleted
+    // `songs.setNotes` and with it the sheet's Notes pane — which left ONE
+    // panel, so the tab strip went too (a strip over a single pane says there
+    // is somewhere else to go). The field is simply on screen now.
     await page.locator('#sng-song-title').fill('zzq dirty');
     await page.mouse.click(5, 5);
 
