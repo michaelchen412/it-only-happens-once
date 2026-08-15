@@ -234,6 +234,55 @@ test.describe('the pile', () => {
     }
   });
 
+  test('the WORDS edit in place too — the pencil is the label, not the only door', async ({ page }) => {
+    // ⚠ THE COMPLAINT THIS SHIPPED FOR, 2026-08-15. Michael: *"I try to click
+    // the text to edit it but I didn't realise I actually had to press the
+    // pencil icon. I think notes need to be fast and responsive, and clicking
+    // into the note should already be able to start editing it."* The room
+    // exists so a thought costs fifteen seconds; reaching it through a 16px
+    // glyph in the card's foot is not that.
+    await stubActions(page, {});
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    await card.locator('[data-text]').click();
+    await expect(card.locator('#dump-shell')).toBeVisible();
+    await expect(card.locator('#dump-shell [contenteditable="true"]')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(card.locator('[data-text]')).toBeVisible();
+  });
+
+  test('selecting a card’s text does not open the editor', async ({ page }) => {
+    // ⚠ THE GUARD THAT MAKES THE ABOVE LIVEABLE. Dragging across a sentence to
+    // copy it ends with a click on the card, so without this every copy would
+    // fold the card into an editor and drop the selection doing it.
+    await stubActions(page, {});
+    const card = page.locator('.dump').first();
+    test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
+
+    const text = card.locator('[data-text]');
+    // ⚠ THE RECT OF THE RENDERED LINE, not of `[data-text]` itself. That element
+    // carries `0.875rem 1rem` of padding, so a drag along the top of its box
+    // runs through empty space and selects nothing — which is exactly what the
+    // canary below caught on the first run of this test.
+    const line = (await text.locator('p, li').first().boundingBox()) ?? (await text.boundingBox())!;
+    const y = line.y + line.height / 2;
+    await page.mouse.move(line.x + 2, y);
+    await page.mouse.down();
+    await page.mouse.move(line.x + Math.max(40, line.width * 0.6), y, { steps: 12 });
+    await page.mouse.up();
+
+    // ⚠ A CANARY, NOT A FORMALITY. Without it a drag that selected nothing —
+    // wrong coordinates, an empty card — passes the two assertions below for
+    // the wrong reason, and this file would report a guard it never exercised.
+    expect(
+      await page.evaluate(() => window.getSelection()?.toString().length ?? 0),
+      'the drag selected nothing, so this test proves nothing',
+    ).toBeGreaterThan(0);
+    await expect(card.locator('#dump-shell')).toHaveCount(0);
+    await expect(text).toBeVisible();
+  });
+
   test('the pencil edits in place — no sheet, no navigation', async ({ page }) => {
     await stubActions(page, {});
     const card = page.locator('.dump').first();

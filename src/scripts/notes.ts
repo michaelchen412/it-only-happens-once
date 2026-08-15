@@ -536,8 +536,38 @@ if (undoBar) {
 
   /* ── wiring ─────────────────────────────────────────────────────────────── */
 
+  /*
+   * ⚠ THE WORDS ARE THE CONTROL, and the pencil is the label for it.
+   *
+   * Michael, 2026-08-15: *"I try to click the text to edit it but I didn't
+   * realise I actually had to press the pencil icon. I think notes need to be
+   * fast and responsive, and clicking into the note should already be able to
+   * start editing it."* He is describing the thing this room was built for — a
+   * dump costs fifteen seconds — being two gestures away from itself, because
+   * the only door was a 16px glyph in the foot of the card.
+   *
+   * So the rendered text opens the editor. THREE GUARDS, and each one is a real
+   * gesture this would otherwise eat:
+   *
+   *  · A SELECTION IS NOT A CLICK. Dragging across a sentence to copy it ends
+   *    with a click event on the card, and without this every copy would fold
+   *    the card into an editor and drop the selection doing it. `isCollapsed`
+   *    is the question — "did this press select anything" — and it is asked of
+   *    the live selection rather than tracked across pointerdown/up, because the
+   *    browser already knows.
+   *  · A LINK IS A LINK. A dump can contain one, and following it must not be
+   *    reinterpreted as "edit the note that mentions it".
+   *  · `more` STILL EXPANDS. It is a `<button>` inside the text's own region, so
+   *    without an early return the same click would expand AND open — leaving
+   *    you in an editor for a reason you did not ask for.
+   *
+   * The pencil stays. It is the affordance that says the words are editable at
+   * all before you have discovered that they are, it is the keyboard path, and
+   * it is the only one of the two that also CLOSES the card.
+   */
   pile?.addEventListener('click', async (e) => {
-    const el = (e.target as Element).closest<HTMLElement>('[data-edit], [data-more], [data-file], [data-delete]');
+    const target = e.target as Element;
+    const el = target.closest<HTMLElement>('[data-edit], [data-more], [data-file], [data-delete], [data-text]');
     if (!el) return;
     const card = el.closest<HTMLElement>('[data-note]');
     if (!card) return;
@@ -548,6 +578,14 @@ if (undoBar) {
       text.classList.remove('dump__text--clamped');
       text.dataset.expanded = 'true';
       el.hidden = true;
+      return;
+    }
+
+    if (el.hasAttribute('data-text')) {
+      if (editing === card) return; // already open — the click is inside the editor
+      if (target.closest('a')) return; // following a link the dump contains
+      if (!window.getSelection()?.isCollapsed) return; // selecting, not opening
+      enterEdit(card);
       return;
     }
 
