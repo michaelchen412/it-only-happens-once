@@ -389,7 +389,20 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
       ...new Set(rows.map((r) => r.paired_song_id).filter((id): id is string => !!id && id !== p.pairedSong)),
     ];
     if (others.length) {
-      const { data: songs } = await supabase.from('fragments').select('id, title').in('id', others);
+      /*
+        ⚠ `songs`, NOT `fragments`, AND IT READ `fragments` UNTIL 2026-08-15.
+        These ids come from `paired_song_id`, which ADR 0035 repointed at a table
+        of its own — so this went on looking for songs among the writing and the
+        quotes, found none, and left `songTitleById` empty.
+
+        ⚠ AND IT FAILED SILENTLY, which is what makes it worse than the crash in
+        `fragments.get` next door. No error, no empty state: the picker just
+        stopped naming what a pick would take, so `pairedToOther` fell back to
+        `''` and every row rendered a plain ＋ instead of "Replace «song»". Plan
+        39 ruling 2 exists precisely to stop that — *"the steal is legible before
+        the press"* — and a green build said nothing.
+      */
+      const { data: songs } = await supabase.from('songs').select('id, title').in('id', others);
       for (const s of songs ?? []) songTitleById[s.id] = s.title || '(untitled)';
     }
   }

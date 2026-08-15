@@ -157,8 +157,24 @@ describe('queryFragmentList — marking what is already paired', () => {
     const db = fakeDb({ fragments: { data: rows } }, { record: true });
     await queryFragmentList(db.client, params({ pairable: true, pairedSong: 'song-a' }));
     // Only song-b is looked up: w1 is ours (pairedIds says so) and w3 is free.
-    const lookup = db.ops('fragments').find((o) => o.method === 'in');
+    /*
+      ⚠ FROM `songs`, AND THIS ASSERTION USED TO SAY `fragments` — which is how
+      the drift survived ADR 0035 for a day. A song WAS a fragment when this was
+      written, so the table was right; the ADR moved them and this test went on
+      passing, because a fake DB answers whatever table you ask it about. It was
+      not a test that missed the bug. It was a test that PINNED it: green, and
+      asserting the query against a table the ids had left.
+
+      That is the failure mode worth naming — a stub records the call you made,
+      not the schema you made it against. Which table this reads is exactly the
+      fact worth asserting, so the assertion stays; it just has to name the one
+      the foreign key points at. `fragment-open.spec.ts` is the other half, and
+      it runs against the real schema for this reason.
+    */
+    const lookup = db.ops('songs').find((o) => o.method === 'in');
     expect(lookup?.args).toEqual(['id', ['song-b']]);
+    // And nothing goes looking for a song among the writing any more.
+    expect(db.ops('fragments').some((o) => o.method === 'in')).toBe(false);
   });
 
   it('asks nothing about other songs outside pair mode', async () => {

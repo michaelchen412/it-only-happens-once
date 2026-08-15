@@ -24,6 +24,9 @@ import {
   optInt,
   optUuid,
 } from './_shared';
+// ⚠ THE ONE DEFINITION OF "how you select a paired song", and this action is
+// here because it used to carry a second one. See `get` below.
+import { PAIRED_SELECT, type PairedRow } from '../lib/blog';
 
 type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 
@@ -525,26 +528,44 @@ export const fragments = {
     input: z.object({ id: z.uuid() }),
     handler: async ({ id }, ctx) => {
       requireAdmin(ctx);
+      /*
+        ⚠ `PAIRED_SELECT`, NOT A SECOND COPY OF IT, AND THE COPY IS WHY THIS
+        BROKE. This handler hand-rolled its own embed —
+        `paired_song:paired_song_id(id, title, attribution, deleted_at)` — while
+        `lib/blog.ts` has exported the canonical one all along, used by the feed,
+        the permalink and the composer. So when ADR 0035 moved songs out of
+        `fragments` into a table of their own, the sweep updated the constant and
+        every reader of it, and could not see this. `songs` has `artist`, not
+        `attribution`, and has no `deleted_at` at all — a song has no bin — so
+        PostgREST rejected the select outright and the WHOLE ROW came back as an
+        error. Michael, 2026-08-15: *"Why am I getting 'That fragment no longer
+        exists' when I try to open in fragment browser? data is fine in
+        database."* The data was fine. The query was not.
+
+        A duplicated select string is a duplicated schema assumption, and this
+        one had no way to be told the schema had changed. Now there is one.
+      */
       const { data, error } = await ctx.locals.supabase
         .from('fragments')
         .select(
-          'id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id), paired_song:paired_song_id(id, title, attribution, deleted_at)',
+          `id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id), ${PAIRED_SELECT}`,
         )
         .eq('id', id)
-        .single();
-      if (error || !data) throw fail('That fragment no longer exists', 'NOT_FOUND');
-      // The Music tab shows what's paired without a second round trip. A
-      // soft-deleted song reads as no pairing — same rule as pairedMediaOf.
-      const song = data.paired_song as {
-        id: string;
-        title: string | null;
-        attribution: string | null;
-        deleted_at: string | null;
-      } | null;
-      const paired =
-        song && !song.deleted_at
-          ? { id: song.id, title: song.title ?? '(untitled)', artist: song.attribution ?? '' }
-          : null;
+        .maybeSingle();
+      /*
+        ⚠ THE TWO FAILURES ARE TOLD APART, and conflating them is what turned a
+        one-line schema slip into a debugging session. This read `error || !data`
+        and answered both with "That fragment no longer exists" — so a rejected
+        QUERY reported itself as a missing ROW, sending the reader to look at a
+        database that was perfectly healthy. `maybeSingle` gives zero rows as
+        `data: null` with no error, which is what lets these be two branches:
+        say what the server said when the server said something.
+      */
+      if (error) throw fail(error.message);
+      if (!data) throw fail('That fragment no longer exists', 'NOT_FOUND');
+      // The Music tab shows what's paired without a second round trip.
+      const song = (data as PairedRow).paired_song;
+      const paired = song ? { id: song.id, title: song.title ?? '(untitled)', artist: song.artist ?? '' } : null;
       return {
         paired,
         constellationIds: (data.fragment_constellations ?? []).map((l) => l.constellation_id),

@@ -119,6 +119,28 @@ setup('mint an admin session and find fixtures', async () => {
     .limit(1)
     .maybeSingle();
 
+  /*
+    An essay that actually CARRIES A SONG. Discovered like everything else here,
+    and it earns a fixture of its own rather than "open rows until one has a
+    pairing": the manager sorts by `updated_at`, the corpus has 48 pairings
+    across ~50 essays, and whether a paired one lands in the first screenful is
+    luck. A spec that walks the table until it finds one is a spec that skips
+    silently on the day the ordering changes — which is the day it is needed.
+
+    ⚠ THIS IS THE SHAPE ADR 0035 BROKE. `paired_song_id` points at `songs` now,
+    not at a song-shaped `fragments` row, and the admin's `get` went on asking
+    that embed for `attribution` and `deleted_at` — columns the new table does
+    not have. `fragment-open.spec.ts` is what would have caught it.
+  */
+  const { data: pairedEssay } = await service
+    .from('fragments')
+    .select('id, slug')
+    .eq('type', 'writing')
+    .not('paired_song_id', 'is', null)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+
   // The fragment browser is mounted in the constellation composer, not on
   // /admin — so reaching it needs a real constellation to open.
   const { data: constellation } = await service.from('constellations').select('id').limit(1).maybeSingle();
@@ -189,6 +211,7 @@ setup('mint an admin session and find fixtures', async () => {
         draftSlug: draft?.slug ?? null,
         draftStatus: draft?.status ?? null,
         publishedSlug: published?.slug ?? null,
+        pairedEssayId: pairedEssay?.id ?? null,
         constellationId: constellation?.id ?? null,
         composedConstellationId: composed,
         draftConstellationSlug: draftConstellation?.slug ?? null,

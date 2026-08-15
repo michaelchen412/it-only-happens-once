@@ -54,6 +54,15 @@ const OPT_OUTS: Record<string, string> = {
     'it, and the failure path in writing-sheet.ts opens an inert error shell with the hash ' +
     'CLEARED — so with the call refused the spec fails on a URL assertion, reporting a broken ' +
     'bounce when the bounce was fine. Named rather than lifted: this spec still cannot write.',
+  'fragment-open.spec.ts':
+    'One named READ, `fragments.get`. It exists because stubbing that call is exactly what hid ' +
+    'the bug: every other spec that opens an editor stubs it, so NOTHING had ever executed the ' +
+    'real query — and when ADR 0035 moved songs to their own table, `get` went on asking the ' +
+    '`paired_song` embed for `attribution` and `deleted_at`, PostgREST rejected the select, and ' +
+    'the suite stayed green while the sheet answered "That fragment no longer exists". A stub ' +
+    'cannot prove a SELECT matches the schema, because a stub is the thing standing in for it. ' +
+    'Named rather than lifted: this spec still cannot write, and `get` is a read behind ' +
+    '`requireAdmin`.',
   'library.spec.ts':
     'Merge deliberately destroys a row and remaps its links. A stub can prove which action was ' +
     'called but not that the survivor keeps the shelf link with its note — the thing 26 · §1 ' +
