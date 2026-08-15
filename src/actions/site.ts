@@ -23,6 +23,35 @@ import { fail, requireAdmin } from './_shared';
 const TURNSTILE_TIMEOUT_MS = 5_000;
 const RESEND_TIMEOUT_MS = 10_000;
 
+/**
+ * One line, from something a stranger typed.
+ *
+ * ⚠ TWO PLACES BELOW PUT `name` WHERE A NEWLINE MEANS SOMETHING, and Zod's
+ * `.trim()` only ever touched the ends of it.
+ *
+ *   · **The subject is a header**, and a header ends at its first newline. The
+ *     Resend SDK hands the message over as JSON rather than assembling SMTP
+ *     text, so it is very probably encoding this already — but *very probably*
+ *     is not a property to rest on for the one field on this site that an
+ *     unauthenticated stranger controls, and the fix is a `replace`.
+ *   · **The body's `From:` line is the half that actually bites**, and it does
+ *     not depend on any SMTP subtlety. A name of `Bob\nFrom: ceo@example.com`
+ *     renders a second, forged `From:` in the plain text Michael reads — a
+ *     small phishing surface aimed at exactly one person, who has no reason to
+ *     suspect the line.
+ *
+ * The message body itself is NOT run through this: its newlines are the message.
+ *
+ * Exported for `actions-pure.test.ts` and for nothing else — the same trade that
+ * file's header already makes for `recurrenceOf` and its neighbours.
+ */
+export const oneLine = (s: string) =>
+  s
+    // eslint-disable-next-line no-control-regex -- the point is the control characters
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 /** Verify a Cloudflare Turnstile token server-side. Returns false on any failure. */
 async function verifyTurnstile(secret: string, token: string, ip?: string): Promise<boolean> {
   try {
@@ -163,12 +192,15 @@ export const contact = {
       const from = getSecret('CONTACT_FROM_EMAIL') || 'It Only Happens Once <onboarding@resend.dev>';
 
       const resend = new Resend(resendKey);
+      // `oneLine` on the name at both sites — see its note. `email` needs none:
+      // it has already been through `z.email()`, which no newline survives.
+      const who = oneLine(input.name);
       const send = resend.emails.send({
         from,
         to,
         replyTo: input.email,
-        subject: `New message from ${input.name}`,
-        text: `From: ${input.name} <${input.email}>${ip ? `\nIP: ${ip}` : ''}\n\n${input.message}`,
+        subject: `New message from ${who}`,
+        text: `From: ${who} <${input.email}>${ip ? `\nIP: ${ip}` : ''}\n\n${input.message}`,
       });
 
       // ⚠ A RACE, NOT A SIGNAL, AND THAT IS THE SDK'S LIMIT RATHER THAN A

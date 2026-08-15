@@ -30,6 +30,37 @@ const SANITIZE: sanitizeHtml.IOptions = {
   allowedClasses: { code: ['language-*', 'lang-*'], mark: ['hl'] },
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: { img: ['http', 'https', 'data'] },
+  transformTags: {
+    /**
+     * A link that opens a new tab hands that tab a `window.opener` back to this
+     * page, and the opened site can then navigate its opener somewhere else —
+     * reverse tabnabbing. `noopener` severs that reference.
+     *
+     * ⚠ ONLY WHEN `target` IS SET, and that is the whole shape of this. Markdown
+     * cannot emit `target`, so this can only ever fire on raw HTML written into
+     * a body — which makes it defense-in-depth exactly like the allowlist above,
+     * and means the ordinary link every essay is full of stays untouched rather
+     * than carrying an attribute it has no use for.
+     *
+     * ⚠ `noopener` AND NOT `noreferrer`, WHICH IS A DECISION RATHER THAN AN
+     * OMISSION. `noreferrer` additionally strips the `Referer` header, and this
+     * site already answers that question one layer up: `src/middleware.ts` sets
+     * `Referrer-Policy: strict-origin-when-cross-origin` on every response, on
+     * the stated reasoning that a reader arriving at Spotify from a
+     * constellation should hand over the origin and not the path. Quietly making
+     * a subset of links stricter than the site's own policy would put the answer
+     * in two places and let them disagree.
+     *
+     * Any `rel` the author wrote is kept — this adds to the set rather than
+     * replacing it, so `rel="nofollow"` survives with `noopener` beside it.
+     */
+    a: (tagName, attribs) => {
+      if (!attribs.target) return { tagName, attribs };
+      const rel = new Set((attribs.rel ?? '').split(/\s+/).filter(Boolean));
+      rel.add('noopener');
+      return { tagName, attribs: { ...attribs, rel: [...rel].join(' ') } };
+    },
+  },
 };
 
 export interface RenderOptions {

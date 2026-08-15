@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { recurrenceOf } from '../actions/tasks';
 import { assertBirthday } from '../actions/people';
 import { firstWords, yearToISO } from '../actions/fragments';
+import { oneLine } from '../actions/site';
 
 /** The editor's payload, as `recurrenceOf` receives it after validation. */
 type TaskInput = Parameters<typeof recurrenceOf>[0];
@@ -209,4 +210,36 @@ describe('yearToISO', () => {
   // it belongs to plan 30, so it is written down here rather than fixed in a
   // plan about test coverage. **No assertion pins the broken behaviour** — a
   // test asserting a bug is a trap for whoever fixes it.
+});
+
+// ── the contact form's one line ──────────────────────────────────────────────
+//
+// The only field on this site an UNAUTHENTICATED stranger controls, and it lands
+// in two places where a newline means something: the mail subject (a header ends
+// at its first newline) and the body's `From:` line.
+describe('oneLine — a stranger’s name cannot forge a line', () => {
+  it('collapses a newline, so a name cannot add a second From: line', () => {
+    // The actual attack: the plain text Michael reads would otherwise carry a
+    // forged sender on its own line, aimed at exactly one person who has no
+    // reason to suspect it.
+    expect(oneLine('Bob\nFrom: ceo@example.com')).toBe('Bob From: ceo@example.com');
+  });
+
+  it('collapses a carriage return too — CRLF is the header separator', () => {
+    expect(oneLine('Bob\r\nBcc: someone@example.com')).toBe('Bob Bcc: someone@example.com');
+  });
+
+  it('takes out other control characters, not just the line breaks', () => {
+    expect(oneLine('Bo\u0000b')).toBe('Bo b');
+  });
+
+  it('leaves an ordinary name exactly as typed', () => {
+    // Including the ones with punctuation and non-ASCII letters, which is most
+    // names — this must not become a name filter.
+    expect(oneLine('Zoë O’Brien-Smith')).toBe('Zoë O’Brien-Smith');
+  });
+
+  it('collapses runs of whitespace and trims, so a padded name still reads', () => {
+    expect(oneLine('  Ada   Lovelace  ')).toBe('Ada Lovelace');
+  });
 });

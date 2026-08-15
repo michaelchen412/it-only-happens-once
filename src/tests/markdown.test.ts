@@ -30,6 +30,38 @@ describe('renderMarkdown — what must never survive', () => {
   });
 });
 
+// A link that opens a new tab hands it a `window.opener` back to this page, and
+// the opened site can navigate its opener elsewhere — reverse tabnabbing.
+// Markdown cannot emit `target`, so this only ever fires on raw HTML in a body,
+// which is the same defense-in-depth argument as the allowlist above.
+describe('renderMarkdown — a link that opens a tab cannot reach back', () => {
+  it('adds rel="noopener" to an anchor that sets target', () => {
+    const html = renderMarkdown('<a href="https://example.com" target="_blank">out</a>');
+    expect(html).toMatch(/rel="[^"]*noopener/);
+  });
+
+  it('leaves an ordinary link alone — no target, nothing to sever', () => {
+    // The case every essay is full of. A rel here would be noise on hundreds of
+    // links to buy nothing.
+    expect(renderMarkdown('[out](https://example.com)')).not.toMatch(/rel=/);
+  });
+
+  it('keeps a rel the author already wrote, rather than replacing it', () => {
+    const html = renderMarkdown('<a href="https://example.com" target="_blank" rel="nofollow">out</a>');
+    expect(html).toMatch(/nofollow/);
+    expect(html).toMatch(/noopener/);
+  });
+
+  it('does not add noreferrer — Referrer-Policy owns that, in middleware', () => {
+    // ⚠ Deliberate, and pinned so a later "harden it further" edit has to argue
+    // with this line: the site answers the referrer question once, for every
+    // response, as `strict-origin-when-cross-origin`. Making a subset of links
+    // stricter here would put that answer in two places.
+    const html = renderMarkdown('<a href="https://example.com" target="_blank">out</a>');
+    expect(html).not.toMatch(/noreferrer/);
+  });
+});
+
 describe('renderMarkdown — what must survive', () => {
   it('keeps ordinary prose formatting', () => {
     const html = renderMarkdown('A *stressed* word and a [link](https://example.com).');
