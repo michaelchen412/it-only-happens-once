@@ -14,7 +14,8 @@
   Quotes and writing are retrieval over a shared subject taxonomy and share the
   rail because they are the same KIND of room. Music is filtered by a different
   vocabulary — feelings, not subjects — in a different act, and the words are the
-  page. So `?view=music` renders `MusicRoom` full width with no rail at all.
+  page. So `?view=music` renders the SETS full width with no rail at all —
+  curated listens (plan 40), where the room used to be.
 
   Search mirrors the admin (docs/search.md): a debounced fetch-and-swap of
   #blog-feed (see scripts/blog-feed.ts) with match highlighting, gated at
@@ -28,18 +29,12 @@ import PostCard from '../../components/PostCard.astro';
 import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
 import QuoteArticle from '../../components/QuoteArticle.astro';
-import MusicRoom from '../../components/MusicRoom.astro';
+import MusicSets from '../../components/MusicSets.astro';
 import { Icon } from 'astro-icon/components';
-import {
-  attachNeighbourhoods,
-  listMusicRoom,
-  listWriting,
-  listQuotes,
-  listSubjects,
-  neighbourhoodsFor,
-} from '../../lib/blog';
+import { attachNeighbourhoods, listWriting, listQuotes, listSubjects, neighbourhoodsFor } from '../../lib/blog';
 
-import { parseFeelings } from '../../lib/music-room';
+import { resolveSet } from '../../lib/music-sets';
+import { listSets } from '../../lib/sets';
 import { MIN_SEARCH } from '../../lib/search-highlight';
 
 const supabase = Astro.locals.supabase;
@@ -49,52 +44,37 @@ const view = raw === 'quotes' ? 'quotes' : raw === 'music' ? 'music' : 'writing'
 const type = view === 'quotes' ? 'quote' : 'writing';
 
 /*
-  ⚠ THE MUSIC ROOM IS BUILT AND THE TAB SAYS "SOON" UNTIL THIS NUMBER, and that
-  is §9 rather than an unfinished edge. *"The room is only as good as its
-  density. At 30 songs most combinations return nothing, and a spectrum that
-  keeps saying 'nothing holds all of that at once' teaches a visitor that the
-  vocabulary is decoration."* Ruling 2 turned that from a feeling into something
-  you can query: a song qualifies when it carries at least one feeling.
+  ⚠ THE TAB WAITS UNTIL THERE IS SOMETHING BEHIND IT, and the reason is now a
+  much smaller one than it used to be. The room's gate was `MUSIC_THRESHOLD =
+  40`, arguing about DENSITY: *"at 30 songs most combinations return nothing,
+  and a spectrum that keeps saying 'nothing holds all of that at once' teaches a
+  visitor that the vocabulary is decoration."* That argument retires with the
+  room (plan 40) — a set is curated rather than combined, so seven of them say
+  exactly as much as seventy would.
 
-  So the ROUTE always works — `/blog?view=music` renders whatever qualifies, and
-  is how the room gets judged — and only the TAB waits.
-
-  ⚠ FORTY, NOT THE HUNDRED THIS PLAN PROPOSED. Michael's call, 2026-08-11. It is
-  §9's OTHER number and the more defensible one: *"the room must be beautiful at
-  40 songs, not merely at 400"* is the design constraint the whole room was built
-  under, so opening at the size it was designed for is consistent, where a
-  hundred was a guess at when it would feel abundant. A hundred also had a cost
-  the plan did not price — months of listening during which the room exists,
-  works, and is reachable by nobody who does not already know the URL.
+  What survives is the shape: the ROUTE always works, so `/blog?view=music` can
+  be judged before it is announced, and only the TAB waits. It now waits on one
+  published set rather than forty tagged songs.
 */
-const MUSIC_THRESHOLD = 40;
-
-const room = view === 'music' ? await listMusicRoom(supabase) : null;
+const sets = view === 'music' ? await listSets(supabase) : null;
 
 /*
-  ⚠ DEDUPED, BECAUSE THE QUESTION IS "HOW MANY SONGS", NOT "HOW MANY LINKS".
-  `count: 'exact'` on `fragment_feelings` would count ROWS — a song wearing five
-  words would be five — so the tab would open at roughly a fifth of the songs it
-  is meant to wait for. PostgREST has no `count(distinct)`, so the ids come back
-  and a Set answers it.
-
-  The limit is explicit rather than PostgREST's silent 1000 (see
-  `export.json.ts` for the backup this same default truncated). One `uuid`
-  column, and the number only has to be right in the neighbourhood of the
-  threshold.
-
   Asked on EVERY view, because the tab is about the corpus rather than about the
   page you are standing on — and paid for once a minute rather than once a
   request, since this route already carries `s-maxage=60`.
-*/
-const { data: feelingLinks } = await supabase.from('fragment_feelings').select('fragment_id').limit(4000);
-const qualifying = new Set((feelingLinks ?? []).map((l) => l.fragment_id)).size;
-const musicOpen = qualifying >= MUSIC_THRESHOLD;
 
-// `?feeling=regretful,hopeful` — comma-joined and stacking, exactly as subjects
-// do. Resolved against the vocabulary so a deleted or merged word drops out
-// rather than emptying the room; see `parseFeelings`.
-const selectedFeelings = room ? parseFeelings(params.get('feeling'), room.vocabulary) : [];
+  `head: true` so it is a count and not a page of rows: the tab needs to know
+  whether the number is zero, never what is in them.
+*/
+const { count: publishedSets } = await supabase
+  .from('sets')
+  .select('id', { count: 'exact', head: true })
+  .eq('status', 'published');
+const musicOpen = (publishedSets ?? 0) > 0;
+
+// `?set=<slug>` — ONE set open, never a combination. A stale link falls back to
+// the first rather than to an empty pane; see `resolveSet`.
+const selectedSet = sets ? resolveSet(params.get('set'), sets) : '';
 // Subjects STACK (AND). Comma-joined in the URL: ?subject=uncertainty,emotion.
 const selectedSubjects = Array.from(
   new Set(
@@ -297,8 +277,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       {
         /* ⚠ STILL A WORD RATHER THAN A LINK, AND THE ROOM BEHIND IT IS BUILT.
           That is §9, not an unfinished edge: a room whose combinations mostly
-          return nothing teaches a visitor that the vocabulary is decoration, so
-          it is not announced until the corpus can carry it. `MUSIC_THRESHOLD`
+          not announced until there is one published set behind it. The gate
           above is the one line that changes. */
       }
       {
@@ -311,7 +290,20 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
     </nav>
 
     {/* ─────────  MUSIC: a third REGISTER, so no rail and no feed  ───────── */}
-    {view === 'music' && room && <MusicRoom room={room} selected={selectedFeelings} />}
+    {view === 'music' && sets && sets.length > 0 && <MusicSets sets={sets} selected={selectedSet} />}
+    {
+      /* The route works before the tab opens (see the gate above), so this is
+        the state Michael sees while filling the room and a stranger following
+        an early link sees once. Same register as the room's own empty state. */
+      view === 'music' && sets && sets.length === 0 && (
+        <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+          <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
+          <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
+            The playlists collect here one at a time, as they are made.
+          </p>
+        </div>
+      )
+    }
 
     {
       /* ⚠ NOT `hidden` — NOT RENDERED AT ALL. The rail and the feed are the two
@@ -563,9 +555,9 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 
 <script>
   import '../../scripts/blog-feed';
-  // The room takes ownership of a field the server already rendered correctly —
+  // The sets take ownership of a pane the server already rendered correctly —
   // it returns immediately on any page without one, so the two text views pay
   // nothing but the import.
-  import { wireMusicRoom } from '../../scripts/music-room';
-  wireMusicRoom();
+  import { wireMusicSets } from '../../scripts/music-sets';
+  wireMusicSets();
 </script>
