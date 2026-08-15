@@ -475,11 +475,16 @@ function setView(v: string, persist = true) {
   if (persist)
     try {
       localStorage.setItem(VIEW_KEY, v);
+      // Swallowed: remembering which view you left the composer in is a
+      // convenience, and `localStorage` throws where site data is blocked.
+      // Failing to persist a preference must never fail the click that set it.
     } catch {}
 }
 for (const b of viewBtns) b.addEventListener('click', () => setView(b.dataset.view!));
 try {
   if (localStorage.getItem(VIEW_KEY) === 'read') setView('read', false);
+  // The read half of the same preference, swallowed for the same reason: no
+  // stored view simply means the default one.
 } catch {}
 
 // The pencil in the stanza's margin — writing still READS on click (the

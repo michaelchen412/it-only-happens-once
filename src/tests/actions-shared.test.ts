@@ -9,7 +9,7 @@
 // database and RLS, and faking those would only test the fake.
 //
 // `astro:actions` is a virtual module; see src/tests/stubs/astro-actions.ts.
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   blankToUndef,
   constellationStatus,
@@ -165,6 +165,16 @@ describe('the two status vocabularies', () => {
 });
 
 describe('fail', () => {
+  // Every case here constructs a fault or two, and `fail` now writes those to
+  // `console.error` on purpose. Spied rather than left to print, so the suite's
+  // output still means something — and so the last block can assert on it.
+  let logged: unknown[][];
+  beforeEach(() => {
+    logged = [];
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void logged.push(args));
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it('defaults to a 500 and carries the message', () => {
     const e = fail('Something broke');
     expect(e.message).toBe('Something broke');
@@ -176,6 +186,33 @@ describe('fail', () => {
     expect(fail('nope', 'FORBIDDEN').status).toBe(403);
     expect(fail('bad', 'BAD_REQUEST').status).toBe(400);
     expect(fail('gone', 'NOT_FOUND').status).toBe(404);
+  });
+
+  // ⚠ A SERVER FAULT IS LOGGED, A REFUSAL IS NOT (plan 41 · §6). The rule is
+  // worth pinning in both directions: losing the first puts this layer back to
+  // where a broken query looked from the server like a quiet afternoon, and
+  // losing the second buries it under every validation message a form produces.
+  it('logs a server fault, with the message and a stack to find it by', () => {
+    fail('Postgres said no');
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0][0])).toContain('Postgres said no');
+    expect(String(logged[0][0])).toContain('INTERNAL_SERVER_ERROR');
+    // The second frame of the stack is whoever called `fail`, which is how a
+    // log line names a file without any handler naming itself.
+    expect(String(logged[0][1])).toContain('actions-shared.test.ts');
+  });
+
+  it('logs an upstream timeout too — the contact form depends on it', () => {
+    fail('Sorry — the message didn’t send.', 'GATEWAY_TIMEOUT');
+    expect(logged).toHaveLength(1);
+  });
+
+  it('says nothing for a refusal, which is the answer working', () => {
+    fail('Not authorized.', 'FORBIDDEN');
+    fail('That doesn’t look like a URL', 'BAD_REQUEST');
+    fail('No such fragment', 'NOT_FOUND');
+    fail('Five active goals already', 'CONFLICT');
+    expect(logged).toEqual([]);
   });
 });
 

@@ -88,6 +88,10 @@ const { title = 'It Only Happens Once', description, transitions = false, image,
     <script is:inline>
       try {
         document.documentElement.dataset.theme = localStorage.getItem('theme') === 'paper' ? 'paper' : 'dusk';
+        // Swallowed on purpose: `localStorage` THROWS in Safari's private mode
+        // and wherever site data is blocked, and the cost of that is a reader
+        // who gets the default theme instead of their chosen one. Letting it
+        // escape an is:inline script in <head> would cost them the page.
       } catch {}
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -131,6 +135,8 @@ const { title = 'It Only Happens Once', description, transitions = false, image,
       document.addEventListener('astro:after-swap', () => {
         try {
           document.documentElement.dataset.theme = localStorage.getItem('theme') === 'paper' ? 'paper' : 'dusk';
+          // Same swallow, same reason as the head script above: no storage
+          // means the default theme, never a broken navigation.
         } catch {}
       });
     </script>

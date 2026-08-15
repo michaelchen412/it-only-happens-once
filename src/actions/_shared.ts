@@ -115,10 +115,63 @@ export const fragmentStatus = z.enum(['note', 'draft', 'published']).default('dr
 export const CONSTELLATION_STATUSES = ['draft', 'published'] as const;
 export const constellationStatus = z.enum(CONSTELLATION_STATUSES).default('draft');
 
+/**
+ * The codes that mean **something broke**, as opposed to **the answer is no**.
+ *
+ * The distinction is the whole of the logging rule below, and it maps to the
+ * HTTP families it is named after: a 5xx is this application failing at its job
+ * and nobody outside can act on it; a 4xx is a refusal working exactly as
+ * designed, and the person who caused it is already reading the sentence.
+ */
+const SERVER_FAULT = new Set([
+  'INTERNAL_SERVER_ERROR',
+  'NOT_IMPLEMENTED',
+  'BAD_GATEWAY',
+  'SERVICE_UNAVAILABLE',
+  'GATEWAY_TIMEOUT',
+]);
+
+/**
+ * The one constructor for every refusal and every fault in this layer.
+ *
+ * ⚠ A SERVER FAULT IS LOGGED HERE, AND A REFUSAL IS NOT — plan 41 · §6.
+ *
+ * Before this, **a production failure had nowhere to go.** There were four
+ * `console.error` calls in the entire server tree, all for model calls, and
+ * everything else failed into a sentence on the reader's screen and vanished.
+ * The most common shape in this layer by a distance is
+ * `if (error) throw fail(error.message)` — a Postgres error, converted to a
+ * user sentence, never recorded: **144 of the calls here take that default.**
+ * So a broken query, a policy that started refusing, a column that moved,
+ * looked from the server exactly like a quiet afternoon.
+ *
+ * ⚠ WHY HERE AND NOT AT THE 144 CALL SITES, which is what §6 first proposed:
+ * one edit cannot be applied to 143 of them. The failure mode of a convention
+ * that has to be re-remembered at every new site is written all over this
+ * codebase — it is why `action-error.ts` exists, and why `requireAdmin` is
+ * mandatory rather than judged per action. A rule with 144 chances to be
+ * forgotten is not a rule.
+ *
+ * ⚠ AND THE STACK IS THE PART THAT MAKES IT USEFUL. The message is a sentence
+ * written for a stranger — "Couldn't save that" names nothing a maintainer can
+ * search for. The stack's second frame is the `throw fail(…)` that produced it,
+ * so the log line carries the file and line without any handler having to name
+ * itself.
+ *
+ * ⚠ IT IS `console.error`, DELIBERATELY, AND NOTHING MORE. Vercel retains
+ * function logs, so this is findable; it does not ALERT, and nobody is told.
+ * That gap is real and was accepted rather than overlooked — closing it means a
+ * reporting dependency inside the server bundle, which means the `noExternal`
+ * closure question, which is a decision rather than a detail.
+ */
 export const fail = (
   message: string,
   code: ConstructorParameters<typeof ActionError>[0]['code'] = 'INTERNAL_SERVER_ERROR',
-) => new ActionError({ code, message });
+) => {
+  const error = new ActionError({ code, message });
+  if (SERVER_FAULT.has(code)) console.error(`[action] ${code}: ${message}`, error.stack);
+  return error;
+};
 
 /**
  * Guard an action to the authenticated admin. `role` lives in app_metadata,
