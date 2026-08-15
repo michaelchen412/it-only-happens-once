@@ -1,6 +1,13 @@
 # 0031 — A song carries a feeling, not an idea
 
-Status: **Accepted** *(2026-08-11 — written as Proposed in the morning and
+Status: **Superseded** by [ADR 0035](0035-a-set-is-a-listen-you-can-take-away.md)
+*(2026-08-15)* — the feelings vocabulary was retired after **one song out of 48
+was ever tagged in seventeen days**, and the public note after **one was ever
+written**. The Consequences below named that measurement as what would falsify
+this, and it did. The text stands as written; nothing here is edited to look
+right in hindsight.
+
+Originally: **Accepted** *(2026-08-11 — written as Proposed in the morning and
 accepted the same day, with the seven commits that make every ruling below true
 in the code. The one claim still unproven is what a **public** note gets used
 for; that is a measurement, not a decision, and the Consequences say what would

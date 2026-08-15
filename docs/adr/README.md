@@ -98,7 +98,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0006](0006-composer-editor-tiptap.md) | Composer editor is TipTap (ProseMirror) with a fixed toolbar; stores Markdown | Accepted |
 | [0007](0007-ai-subject-tagging.md) | AI subject suggestions via Claude Haiku 4.5 (structured output, human-in-loop, privacy) | Accepted |
 | [0008](0008-provenance-and-facets.md) | Authors/works as optional query facets, decoupled from display (the "Bible rule") | Accepted — display half superseded by 0017 |
-| [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted — the annotated-fragment role superseded by 0031 |
+| [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted — the annotated-fragment role superseded by 0031, then retired by 0035; the score and the pairing stand |
 | [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |
 | [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Accepted |
 | [0012](0012-hq-is-a-private-second-domain.md) | HQ is a private second domain in the same app — its own tables, no `anon` policy | Accepted |
@@ -120,10 +120,11 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0028](0028-the-e2e-suite-is-read-only-against-live.md) | The e2e suite runs against the live project; read-only is a fixture that blocks `/_actions/**` by default, and branching is refused with three named triggers | Accepted |
 | [0029](0029-a-writing-stanza-sits-on-a-page.md) | A writing stanza sits on a page and the page has no left edge, so the drawn figure passes through it; quotes and songs stay typeset | Accepted |
 | [0030](0030-the-page-carries-the-masthead.md) | The top bar is a running head with no accent and no hairline, the room's own switch is the masthead, and the footer is an address block rather than an ending | Accepted |
-| [0031](0031-a-song-carries-a-feeling-not-an-idea.md) | A song carries a feeling, not an idea: no subjects, never a suite stanza, filed by feeling, and the annotation becomes a public note and a private one | Accepted |
+| [0031](0031-a-song-carries-a-feeling-not-an-idea.md) | A song carries a feeling, not an idea: no subjects, never a suite stanza, filed by feeling, and the annotation becomes a public note and a private one | **Superseded by [0035](0035-a-set-is-a-listen-you-can-take-away.md)** — 1 song of 48 was ever tagged |
 | [0032](0032-a-sheet-is-dismissible-and-says-what-that-costs.md) | Every sheet is dismissible by its backdrop and must answer what that costs — nothing (it applies or flushes) or something (so it guards, on all three gestures); a test enforces it | Accepted |
 | [0033](0033-the-observatory-has-one-field-grammar.md) | One field grammar for every admin form — `.f__k` carrying `.admin-label`'s register at an ink that passes AA in both themes; the geometry converges, the domain hues never do | Accepted |
 | [0034](0034-a-relation-may-be-edited-from-either-end.md) | The invariant is one write **path**, not one control — a relation may be edited from either end, where the question it answers actually arises; and where the cardinality is asymmetric, the end that can take another row's slot must say so | Accepted |
+| [0035](0035-a-set-is-a-listen-you-can-take-away.md) | A set is a listen you can take away: one curated playlist, one quote, one description, replacing the feelings room — a constellation is where an idea is worked out, a set is where a feeling is isolated | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all
