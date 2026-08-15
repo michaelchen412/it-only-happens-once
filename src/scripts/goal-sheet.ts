@@ -10,7 +10,7 @@
 // Greying out `Active` would say "no" without saying why, on a control whose
 // whole point is that letting go is a visible, dignified move.
 import { actions } from 'astro:actions';
-import { wireRadioGroups } from './radio-group';
+import { options, pick, picked, wireRadioGroups } from './radio-group';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
@@ -48,14 +48,34 @@ if (sheet && form) {
     errorEl.hidden = !message;
   };
 
-  const group = (attr: string) => Array.from(form.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`));
-  const pick = (attr: string, value: string) =>
-    group(attr).forEach((b) => b.setAttribute('aria-checked', String(b.dataset[attr] === value)));
-  const picked = (attr: string, fallback: string) =>
-    group(attr).find((b) => b.getAttribute('aria-checked') === 'true')?.dataset[attr] ?? fallback;
+  /*
+    ⚠ `goal-status`, NOT `goalStatus`, AND THE DIFFERENCE WAS A LIVE BUG.
 
-  group('horizon').forEach((b) => b.addEventListener('click', () => pick('horizon', b.dataset.horizon!)));
-  group('goalStatus').forEach((b) => b.addEventListener('click', () => pick('goalStatus', b.dataset.goalStatus!)));
+    These three used to be local copies that queried `[data-${attr}]` and read
+    `el.dataset[attr]` — two spellings of one name. `GoalSheet.astro` writes
+    `data-goal-status`, whose dataset key is `goalStatus`, so no single string
+    could satisfy both and this file passed the camel one. `[data-goalStatus]`
+    matches case-insensitively as `data-goalstatus`, which nothing renders, so
+    the group was EMPTY: no click handler was ever bound, `pick` set nothing,
+    and `picked('goalStatus', 'active')` fell through to its fallback on every
+    save.
+
+    So editing any goal wrote `status: 'active'` — silently reactivating one you
+    had paused, achieved or let go, while the sheet went on showing the real
+    status, because that comes from the server's `aria-checked`. The screen and
+    the write disagreed, which is the failure `requireAdmin`'s note calls worse
+    than a refusal.
+
+    The shared versions in `radio-group.ts` take the attribute exactly as the
+    markup spells it and never touch `dataset`, so the two spellings that made
+    this possible no longer exist.
+  */
+  options(form, 'horizon').forEach((b) =>
+    b.addEventListener('click', () => pick(form, 'horizon', b.getAttribute('data-horizon')!)),
+  );
+  options(form, 'goal-status').forEach((b) =>
+    b.addEventListener('click', () => pick(form, 'goal-status', b.getAttribute('data-goal-status')!)),
+  );
 
   document.querySelectorAll<HTMLElement>('[data-open-goal-sheet], [data-edit-goal]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -104,8 +124,8 @@ if (sheet && form) {
           name: nameInput.value.trim(),
           why: whyInput.value.trim(),
           notes: notesInput.value.trim(),
-          horizon: picked('horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
-          status: picked('goalStatus', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
+          horizon: picked(form, 'horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
+          status: picked(form, 'goal-status', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
         }),
       { button: submitBtn, busy: 'Saving…', onError: showError },
     );

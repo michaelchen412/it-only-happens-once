@@ -16,7 +16,7 @@
 // `aria-checked`, the date lives in the date input. There is no JavaScript copy
 // of the form beside the form.
 import { actions } from 'astro:actions';
-import { wireRadioGroups } from './radio-group';
+import { options, pick, picked, wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
@@ -109,12 +109,9 @@ if (sheet && form) {
     errorEl.hidden = !message;
   };
 
-  // ── segmented controls ────────────────────────────────────────────────────
-  const group = (attr: string) => Array.from(form.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`));
-  const pick = (attr: string, value: string) =>
-    group(attr).forEach((b) => b.setAttribute('aria-checked', String(b.dataset[attr] === value)));
-  const picked = (attr: string, fallback: string) =>
-    group(attr).find((b) => b.getAttribute('aria-checked') === 'true')?.dataset[attr] ?? fallback;
+  // The segmented-control triad lives in `radio-group.ts` now, beside the
+  // wiring that owns the `aria-checked` contract — see the note there for the
+  // dataset-spelling bug the move removed the possibility of.
 
   // ── the two live mechanics ────────────────────────────────────────────────
 
@@ -130,8 +127,8 @@ if (sheet && form) {
     const due = dueInput.value;
     if (!due) return;
     const lead = leadFor({
-      effort: picked('effort', 'sitting') as Effort,
-      priority: picked('prio', 'normal') as Priority,
+      effort: picked(form, 'effort', 'sitting') as Effort,
+      priority: picked(form, 'prio', 'normal') as Priority,
       lead_days: overrideOn.checked ? Math.max(0, Number(overrideN.value) || 0) : null,
     });
     const line = leadLine(due, lead, today);
@@ -145,7 +142,7 @@ if (sheet && form) {
   };
 
   const paintRepeat = () => {
-    const mode = picked('rep', 'none');
+    const mode = picked(form, 'rep', 'none');
     form.querySelectorAll<HTMLElement>('[data-rep-panel]').forEach((p) => {
       p.hidden = p.dataset.repPanel !== mode;
     });
@@ -171,7 +168,7 @@ if (sheet && form) {
     form.querySelectorAll<HTMLElement>('[data-dated]').forEach((el) => (el.hidden = !has));
     anytime.hidden = !has || !!timeInput.value;
     timeInput.disabled = !has;
-    if (!has) pick('rep', 'none');
+    if (!has) pick(form, 'rep', 'none');
   };
 
   const repaint = () => {
@@ -190,10 +187,10 @@ if (sheet && form) {
     notesInput.value = '';
     dueInput.value = '';
     timeInput.value = '';
-    pick('effort', 'sitting');
-    pick('prio', 'normal');
-    pick('rep', 'none');
-    pick('unit', 'weeks');
+    pick(form, 'effort', 'sitting');
+    pick(form, 'prio', 'normal');
+    pick(form, 'rep', 'none');
+    pick(form, 'unit', 'weeks');
     overrideOn.checked = false;
     overrideN.disabled = true;
     overrideN.value = '3';
@@ -212,19 +209,19 @@ if (sheet && form) {
     notesInput.value = row.notes ?? '';
     dueInput.value = row.due_on ?? '';
     timeInput.value = row.due_time ? row.due_time.slice(0, 5) : '';
-    pick('effort', row.effort);
-    pick('prio', row.priority);
+    pick(form, 'effort', row.effort);
+    pick(form, 'prio', row.priority);
     if (row.lead_days != null) {
       overrideOn.checked = true;
       overrideN.disabled = false;
       overrideN.value = String(row.lead_days);
     }
     if (row.recur_mode === 'after_completion') {
-      pick('rep', 'after');
+      pick(form, 'rep', 'after');
       everyInput.value = String(row.recur_every ?? 2);
-      pick('unit', row.recur_unit ?? 'weeks');
+      pick(form, 'unit', row.recur_unit ?? 'weeks');
     } else if (row.recur_mode === 'fixed') {
-      pick('rep', 'fixed');
+      pick(form, 'rep', 'fixed');
       // Resolved on the server by generating all six rules and comparing — not
       // by parsing `BYDAY=-1FR` back, which is one more thing that can be
       // subtly wrong. No match leaves the first preset selected rather than
@@ -289,8 +286,8 @@ if (sheet && form) {
     if (p) {
       dueInput.value = p.due_on?.value ?? '';
       timeInput.value = timeValue(p.due_time);
-      if (p.effort) pick('effort', p.effort.value);
-      if (p.priority) pick('prio', p.priority.value);
+      if (p.effort) pick(form, 'effort', p.effort.value);
+      if (p.priority) pick(form, 'prio', p.priority.value);
 
       // ⚠ THE LEAD IS A PAIR, AND FILLING ONLY THE NUMBER DOES NOTHING. The
       // override is a checkbox AND a count; without the tick, `leadDays` is
@@ -307,7 +304,7 @@ if (sheet && form) {
       // the model was given the preset names as an enum rather than asked for
       // an RRULE it could invent.
       if (p.recurrence) {
-        pick('rep', 'fixed');
+        pick(form, 'rep', 'fixed');
         presetSel.value = p.recurrence.value;
       }
 
@@ -366,10 +363,18 @@ if (sheet && form) {
   });
 
   // ── wiring ────────────────────────────────────────────────────────────────
-  group('effort').forEach((b) => b.addEventListener('click', () => (pick('effort', b.dataset.effort!), paintLead())));
-  group('prio').forEach((b) => b.addEventListener('click', () => (pick('prio', b.dataset.prio!), paintLead())));
-  group('unit').forEach((b) => b.addEventListener('click', () => pick('unit', b.dataset.unit!)));
-  group('rep').forEach((b) => b.addEventListener('click', () => (pick('rep', b.dataset.rep!), paintRepeat())));
+  options(form, 'effort').forEach((b) =>
+    b.addEventListener('click', () => (pick(form, 'effort', b.getAttribute('data-effort')!), paintLead())),
+  );
+  options(form, 'prio').forEach((b) =>
+    b.addEventListener('click', () => (pick(form, 'prio', b.getAttribute('data-prio')!), paintLead())),
+  );
+  options(form, 'unit').forEach((b) =>
+    b.addEventListener('click', () => pick(form, 'unit', b.getAttribute('data-unit')!)),
+  );
+  options(form, 'rep').forEach((b) =>
+    b.addEventListener('click', () => (pick(form, 'rep', b.getAttribute('data-rep')!), paintRepeat())),
+  );
 
   dueInput.addEventListener('input', repaint);
   timeInput.addEventListener('input', () => (anytime.hidden = !!timeInput.value));
@@ -389,7 +394,7 @@ if (sheet && form) {
     e.preventDefault();
     showError(null);
 
-    const repeat = picked('rep', 'none') as 'none' | 'after' | 'fixed';
+    const repeat = picked(form, 'rep', 'none') as 'none' | 'after' | 'fixed';
     // The disable/label/format/restore lifecycle is `submitAction` now
     // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
     // CLOSES this sheet rather than replacing the page — and it is reopened for
@@ -402,12 +407,12 @@ if (sheet && form) {
           notes: notesInput.value.trim(),
           dueOn: dueInput.value,
           dueTime: timeInput.value,
-          priority: picked('prio', 'normal') as Priority,
-          effort: picked('effort', 'sitting') as Effort,
+          priority: picked(form, 'prio', 'normal') as Priority,
+          effort: picked(form, 'effort', 'sitting') as Effort,
           leadDays: overrideOn.checked ? overrideN.value : '',
           repeat,
           every: repeat === 'after' ? everyInput.value : '',
-          unit: repeat === 'after' ? (picked('unit', 'weeks') as 'days' | 'weeks' | 'months') : undefined,
+          unit: repeat === 'after' ? (picked(form, 'unit', 'weeks') as 'days' | 'weeks' | 'months') : undefined,
           preset: repeat === 'fixed' ? (presetSel.value as (typeof PRESETS)[number]) : undefined,
           goalId: goalSel?.value ?? '',
         }),

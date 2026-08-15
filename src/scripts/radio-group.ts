@@ -83,3 +83,47 @@ export function wireRadioGroup(root: HTMLElement): void {
 export function wireRadioGroups(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[role="radiogroup"]').forEach(wireRadioGroup);
 }
+
+// ── reading and writing a segmented control's value ─────────────────────────
+//
+// The three below were a verbatim triad at the top of `goal-sheet.ts` and
+// `task-sheet.ts` — both of which already imported `wireRadioGroups` from here,
+// which is what made two copies of "what is this control set to?" worth
+// removing. They live beside the wiring that owns the `aria-checked` contract,
+// because they are the other half of it.
+//
+// ⚠ THEY TAKE THE ATTRIBUTE SUFFIX AS IT IS WRITTEN IN THE MARKUP — `effort`,
+// `prio`, `goal-status` — AND NEVER TOUCH `dataset`. THAT IS THE WHOLE POINT OF
+// MOVING THEM, and it is not a stylistic preference: the copies did
+// `querySelectorAll('[data-' + attr + ']')` and `el.dataset[attr]`, which need
+// the name in TWO different spellings. `data-goal-status` is `dataset.goalStatus`
+// — kebab in one, camel in the other — so a single `attr` string cannot be
+// right for both, and `goal-sheet.ts` had been passing the camel one to both
+// since it was written. In an HTML document `[data-goalStatus]` is matched
+// case-insensitively as `data-goalstatus`, which is not an attribute that
+// exists anywhere in this codebase, so that group silently selected NOTHING.
+// See the commit that moved these for what it cost. `getAttribute` needs only
+// the one spelling and cannot drift from it.
+
+/** The options in a segmented control, in DOM order. */
+export const options = (root: ParentNode, attr: string): HTMLButtonElement[] =>
+  Array.from(root.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`));
+
+/** Check exactly the option whose value is `value`, and uncheck the rest. */
+export const pick = (root: ParentNode, attr: string, value: string): void =>
+  options(root, attr).forEach((b) => b.setAttribute('aria-checked', String(b.getAttribute(`data-${attr}`) === value)));
+
+/**
+ * What the control is set to, or `fallback` if nothing is.
+ *
+ * ⚠ THE FALLBACK IS LOAD-BEARING AND IT IS ALSO THE FAILURE MODE. A group that
+ * selects nothing — a typo'd attribute, a control that did not render — is
+ * indistinguishable here from a group nobody has touched, and both answer
+ * `fallback`. That is right for the second case and silent for the first, which
+ * is exactly how the `goal-status` bug reached production: the sheet showed the
+ * status the server had rendered while this returned `'active'` to the save.
+ */
+export const picked = (root: ParentNode, attr: string, fallback: string): string =>
+  options(root, attr)
+    .find((b) => b.getAttribute('aria-checked') === 'true')
+    ?.getAttribute(`data-${attr}`) ?? fallback;
