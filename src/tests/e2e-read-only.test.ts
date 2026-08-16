@@ -110,6 +110,56 @@ describe('the e2e suite is read-only by construction', () => {
     expect(why!.length, `${file}'s OPT_OUTS entry should say why, not just name the file`).toBeGreaterThan(40);
   });
 
+  /**
+   * ⚠ ADR 0028's TRIGGER 3, WITH A METER — and the meter measures the thing the
+   * trigger is about, which the trigger's own wording could not.
+   *
+   * 0028 says branching reopens when "the `allowActions` allowlist reach[es]
+   * roughly five entries — at which point the exception is the rule." That was
+   * written when every opt-out was the same kind of thing. It is not:
+   *
+   *   · An opt-out that can WRITE is what the guard exists to bound.
+   *   · An opt-out naming only READS behind `requireAdmin` does not weaken
+   *     read-only at all — the suite is still entirely read-only with six of
+   *     them — and it buys the only thing that checks a `select` against the
+   *     real schema.
+   *
+   * So [ADR 0037](../../docs/adr/0037-a-seeded-write-is-throwaway-gated-and-swept.md)
+   * splits them and this counts them apart. Raising the write ceiling is a
+   * decision about database branching; raising the read one is not.
+   */
+  it('the write-capable allowlist has not quietly become the rule (ADR 0028 · trigger 3)', () => {
+    const unbounded: string[] = [];
+    const reads = new Set<string>();
+
+    for (const file of SPECS) {
+      const src = fs.readFileSync(path.join(DIR, file), 'utf8');
+      for (const m of src.matchAll(/allowActions\(\s*page\s*(?:,\s*\[([^\]]*)\])?\s*\)/g)) {
+        // No name list means every action on that page — the write-capable form.
+        if (!m[1]) unbounded.push(file);
+        else for (const name of m[1].match(/'([^']+)'/g) ?? []) reads.add(name.replace(/'/g, ''));
+      }
+    }
+
+    expect(
+      unbounded,
+      `More than one spec lifts the guard WITHOUT naming what it may call, which is the form that ` +
+        `can write. ADR 0028's trigger 3 fires here, not on the named reads — reopening it means ` +
+        `the database-branching decision, not another entry.`,
+    ).toHaveLength(1);
+
+    // ⚠ A REAL CEILING, NOT `toHaveLength(reads.size)`, which the first draft
+    // of this assertion was — a comparison of a number with itself, green for
+    // any allowlist of any size. The same vacuous shape this file's opening
+    // guard exists to catch, written into the guard.
+    expect(
+      reads.size,
+      `The named-read allowlist has grown past what ADR 0037 bounded it at (${[...reads].sort().join(', ')}). ` +
+        `Each entry should be a read behind requireAdmin that some spec actually DRIVES — ` +
+        `allowActions permits, it does not cause, so an entry with no spec behind it is inert.`,
+    ).toBeLessThanOrEqual(6);
+  });
+
   it('lists no opt-out that has since been deleted or stopped needing one', () => {
     // The allowlist rots in the other direction too: a spec that no longer
     // reaches the server should lose its permission rather than keep it out of

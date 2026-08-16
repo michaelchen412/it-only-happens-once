@@ -5,6 +5,13 @@ plan 27 (`docs/plans/archive/27-the-nets.md`) §3 and
 plan 31 (`docs/plans/31-the-first-two-minutes.md`) §4. Accepted rather than
 Proposed because the fixture shipped 2026-08-09 and the refusal it depends on
 was taken 2026-08-10.)*
+
+⚠ **Trigger 2 below has since fired, and the answer is
+[ADR 0037](0037-a-seeded-write-is-throwaway-gated-and-swept.md).** A pointer
+only: nothing here is reversed, and the Consequences' *"Today none does"* is
+left standing as what was true on the day it was written. 0037 also draws a
+distinction this record could not — trigger 3 counts opt-outs that can **write**,
+not ones that name only reads.
 Date: 2026-08-10
 
 ## Context
