@@ -52,12 +52,26 @@ const { subjects, constellations = [] } = Astro.props;
     <input type="hidden" name="id" />
     <input type="hidden" name="body" id="ws-body-field" />
 
-    {/* command row + formatting toolbar (always visible; the document scrolls) */}
-    <div class="border-base-300 bg-base-100/95 shrink-0 border-b">
+    {
+      /* The command row (always visible; the document scrolls).
+
+        ⚠ THE FORMATTING TOOLBAR USED TO BE INSIDE THIS BOX and is now a sibling
+        of the scroller — see `#ws-toolbar` below, which is what lets a phone
+        put it under the document instead of over it. */
+    }
+    {
+      /* ⚠ THE TWO RULE WEIGHTS ARE THE OLD ONES, SWAPPED ONTO THEIR NEW OWNERS.
+        When the toolbar lived inside this box, the LIGHT rule was its own
+        `border-t` (chrome dividing from chrome) and the STRONG one was this
+        box's `border-b` (chrome dividing from the document). Pulling the
+        toolbar out would have inverted that by accident — strong between the
+        two chrome strips, light against the document — so each border moved to
+        whichever element now sits at that boundary. Desktop is pixel-identical;
+        the phone re-strengthens this one, where it IS the chrome/document
+        boundary (admin.css). */
+    }
+    <div id="ws-chrome" class="border-base-300/60 bg-base-100/95 shrink-0 border-b">
       <div id="ws-command-row" class="flex items-center gap-3 px-6 py-2">
-        <button type="button" data-ws-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
-          >✕</button
-        >
         {
           /* The word "WRITING" used to sit here permanently (docs/plans/16 ·
             Piece 1). A title field and a rich text editor are directly below
@@ -197,7 +211,17 @@ const { subjects, constellations = [] } = Astro.props;
             look at now (docs/plans/01), so this button is not a published-only
             affordance any more. The script relabels it View ↗ / Preview ↗. */
         }
-        <a id="ws-view-link" href="#" target="_blank" hidden class="btn btn-ghost btn-sm normal-case">View ↗</a>
+        {
+          /* The label is its own span so a phone can drop it and keep the ↗.
+            The alternative was hiding the whole control below `sm`, and it lost:
+            checking your work is MORE common on a phone, not less, and the arrow
+            alone is a complete affordance once the words beside it are gone.
+            `writing-sheet.ts` writes the word here rather than into the anchor —
+            it was setting `textContent`, which would have eaten the arrow. */
+        }
+        <a id="ws-view-link" href="#" target="_blank" hidden class="btn btn-ghost btn-sm normal-case"
+          ><span id="ws-view-label">View</span> ↗</a
+        >
 
         {
           /* THE ROW HOLDS TWO ACTIONS AND A DOOR (docs/plans/16 · Piece 1).
@@ -293,11 +317,47 @@ const { subjects, constellations = [] } = Astro.props;
             >
           </div>
         </div>
+
+        {
+          /* ⚠ THE ✕ MOVED HERE FROM THE HEAD OF THE ROW (2026-08-17), and it was
+            drift rather than a decision: every other sheet in the building goes
+            through `SheetHeader`, which is `justify-between` with the ✕ last.
+            This row is not a header — it never used the component — so it kept
+            the placement whoever wrote it first happened to use, and it was the
+            only ✕ in the admin on the left.
+
+            THE DIVIDER IS NOT ORNAMENT. On the right, the exit is suddenly
+            adjacent to Publish… and Save changes, and on a phone that is a
+            thumb's width from "leave" to "publish". The rule plus its margins
+            is the gap that makes them two targets instead of one strip. */
+        }
+        <span class="bg-base-300 ml-1 h-5 w-px shrink-0" aria-hidden="true"></span>
+        <button
+          type="button"
+          data-ws-close
+          class="text-base-content/50 hover:text-base-content shrink-0"
+          aria-label="Close">✕</button
+        >
       </div>
-      {/* wrapped (not given an id) so EditorToolbar stays shared-as-is */}
-      <div id="ws-toolbar">
-        <EditorToolbar class="border-base-300/60 border-t px-6 py-1.5" image />
-      </div>
+    </div>
+
+    {
+      /* ⚠ A SIBLING OF THE SCROLLER, NOT PART OF THE CHROME BLOCK — and the move
+        out is the whole point (2026-08-17). Below `sm` this is `order`ed BELOW
+        the document, so it docks above the keyboard where your thumbs already
+        are, which is the one strip of chrome that genuinely earns its place
+        while you type. `CaptureDialog` had reached the same conclusion for the
+        same reason and said so in its own markup: "Under the box, never over
+        it."
+
+        DOM ORDER STAYS DESKTOP ORDER, and the phone is the one that gets the
+        visual/tab mismatch. That is the right way round: `order` cannot move tab
+        order, and a keyboard user — who is on the desktop layout — should not
+        tab from the command row into a toolbar sitting at the far end of the
+        page. A touch user has no tab order to disagree with. */
+    }
+    <div id="ws-toolbar" class="border-base-300 bg-base-100/95 shrink-0 border-b">
+      <EditorToolbar class="px-6 py-1.5" image />
     </div>
 
     {

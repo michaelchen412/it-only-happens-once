@@ -1786,17 +1786,77 @@ html.scroll-locked .sky-return {
   flex: none;
 }
 
-/* Below `sm` the row becomes two lines rather than scrolling sideways, for the
-   same reason: a top bar you have to swipe hides its own Save button. The
-   reservations above are what make wrapping safe — without them the row would
-   re-flow mid-sentence, which is the original complaint wearing a different
-   hat. */
-#ws-command-row {
-  flex-wrap: wrap;
-}
-@media (min-width: 40rem) {
+/* ── The phone (2026-08-17) ─────────────────────────────────────────────────
+   ⚠ THIS ROW USED TO WRAP BELOW `sm`, and the argument for wrapping was sound
+   at the time: a top bar you have to swipe hides its own Save button, so two
+   lines beat a sideways scroll. What it did not question was whether all of
+   that content had to be up there at all. Michael, on a phone: *"the 2nd row of
+   the toolbar with the saving indicator etc is not worth keeping there (the
+   goal here is to keep the sticky toolbar as lean as possible)."*
+
+   So the wrap is gone and what wrapped is gone with it. The row sheds rather
+   than relocating — a second line spent on autosave telling you it is working
+   is the same cost whether it sits above the document or below it.
+
+   Nothing here touches the desktop, which has the room and loses nothing. */
+@media (max-width: 39.999rem) {
+  /* Tighter than the desktop's `px-6 gap-3`: at 390px those two alone were
+     ~130px of the row, and every pixel they give back goes to the tab strip,
+     which is the only thing here that gets narrower rather than dropping out. */
   #ws-command-row {
-    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  /* LENGTH IS A DESKTOP CONCERN. It is a thing you consult while shaping a
+     piece, at a screen, not a thing you need beside your thumb — and it is the
+     single widest reservation in the row (120px, permanently). */
+  #ws-count {
+    display: none;
+  }
+
+  /* ⚠ SILENT WHILE IT IS WORKING. Autosave succeeding is not news: it is the
+     contract of the surface, stated once by the resting sentence nobody rereads.
+     What IS news is the two states that already carry a class — `text-error`
+     (it failed) and `text-warning` (saved somewhere else, or held as a version)
+     — so those keep their words, and their reserved width, and appear in an
+     `aria-live` region that now speaks only when something happened.
+
+     `CaptureDialog` argues the same thing one step further ("never pre-fill a
+     status element with the success case"); this is that rule applied to a
+     status element that had already been pre-filled with it. */
+  #ws-status-text:not(.text-error):not(.text-warning),
+  #ws-spinner {
+    display: none;
+  }
+
+  /* The word goes, the ↗ stays — the control survives at a third of the width. */
+  #ws-view-label {
+    display: none;
+  }
+
+  /* ⚠ THE TOOLBAR GOES TO THE BOTTOM, and this is the one thing here that moves
+     rather than leaves. Formatting is the chrome you reach for WHILE typing, so
+     on a phone it belongs against the keyboard rather than at the far end of the
+     screen from your thumbs — which is also why the drawer had to learn where
+     the keyboard is first (`--kb`, `.drawer-dialog`). Docking it to a sheet that
+     still ran under the keyboard would have hidden it completely.
+
+     `order: 1` alone is enough: everything else in the form is either `order: 0`
+     (the command row, the scroller) or out of flow (`BackToTop` is absolute, and
+     the nested dialogs are `display: none` until they enter the top layer), so
+     this lands last. The border flips with it — it divides from the document
+     above now, not from the one below. */
+  #ws-toolbar {
+    order: 1;
+    border-top: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+    border-bottom: 0;
+  }
+  /* With the toolbar gone from up here, the command row IS the boundary between
+     the chrome and the document, so it takes the strong rule the toolbar was
+     carrying for that job on the desktop. */
+  #ws-chrome {
+    border-bottom-color: var(--color-base-300);
   }
 }
 

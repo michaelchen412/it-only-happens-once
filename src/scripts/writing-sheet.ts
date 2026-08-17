@@ -215,6 +215,9 @@ const publishedActions = document.getElementById('ws-actions-published')!;
 const saveChangesBtn = document.getElementById('ws-save-changes') as HTMLButtonElement;
 const discardBtn = document.getElementById('ws-discard') as HTMLButtonElement;
 const viewLink = document.getElementById('ws-view-link') as HTMLAnchorElement;
+/** The WORD inside the link, so the ↗ beside it survives a relabel — and so a
+ *  phone can drop the word and keep the arrow (see WritingSheet.astro). */
+const viewLabel = document.getElementById('ws-view-label') as HTMLElement;
 const deleteBtn = document.getElementById('ws-delete') as HTMLButtonElement;
 /** Delete's home since plan 16: the foot of the document, below a rule. */
 const deleteZone = document.getElementById('ws-delete-zone') as HTMLElement;
@@ -317,7 +320,9 @@ function updateViewLink(slug: string) {
   viewLink.hidden = !show;
   if (!show) return;
   viewLink.href = `/blog/${slug}`;
-  viewLink.textContent = isPublished() ? 'View ↗' : 'Preview ↗';
+  // The label only — writing to the anchor's own `textContent` would replace the
+  // ↗ along with the word, which is the half a phone keeps.
+  viewLabel.textContent = isPublished() ? 'View' : 'Preview';
   viewLink.title = isPublished() ? '' : 'Opens the real public page — only you can see it until it’s published';
 }
 
