@@ -121,6 +121,13 @@ dialog,
 .modal-dialog {
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-box);
+  /* ⚠ NO `--kb` HANDLING ON THIS RULE, DELIBERATELY — see `#cap-dialog` in
+     hq.css, which opts in. Lifting a centred modal clear of the keyboard also
+     requires capping its height, and a global cap is not safe here: several of
+     these size an inner scroller in `vh` (the notes file picker, MergeDialog),
+     so a dialog suddenly shorter than its own contents would spill them past a
+     rounded border rather than scroll. The capture box is the one modal you
+     TYPE into, so it is the one that has earned the geometry. */
   opacity: 0;
   scale: 0.97;
   transition:
@@ -145,8 +152,18 @@ dialog,
 
 /* Right-hand drawer — slides in from the edge. */
 .drawer-dialog {
-  height: 100%;
-  max-height: 100%;
+  /* ⚠ WAS `100%`, WHICH IS THE LARGE VIEWPORT AND NOT THE VISIBLE ONE
+     (2026-08-17). A modal dialog's containing block is the initial one, so
+     `100%` meant the whole window including the strip the phone's browser
+     chrome and keyboard sit over — the drawer's own foot, and therefore the
+     foot of the document scrolling inside it, lived underneath both.
+
+     `dvh` answers the first half (browser chrome) and CANNOT answer the second:
+     a software keyboard does not resize the layout viewport, so `100dvh` is the
+     same number with the keyboard up. `--kb` is the measured remainder
+     (scripts/keyboard-inset.ts), 0 on every desktop and on a phone at rest. */
+  height: calc(100dvh - var(--kb, 0px));
+  max-height: calc(100dvh - var(--kb, 0px));
   margin: 0 0 0 auto; /* pin to the right */
   border-left: 1px solid var(--color-base-300);
   box-shadow: -8px 0 30px -12px color-mix(in oklab, var(--shadow-color) 40%, transparent);
@@ -1670,6 +1687,23 @@ html.scroll-locked .sky-return {
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
   color: color-mix(in oklab, var(--color-primary) 85%, transparent);
+}
+
+/* ── The writing sheet's document scroller ──────────────────────────────────
+   The drawer around this is sized to the VISIBLE window now (`.drawer-dialog`
+   subtracts `--kb`), which is what makes the caret reachable at the foot of a
+   piece at all. This is the second half: where the browser aims when it scrolls
+   the caret into view.
+
+   Without it, "into view" means flush against the bottom edge of this box —
+   which, with a keyboard up, is one pixel above the keyboard. The line you are
+   typing is technically visible and practically unreadable, and the next line
+   pushes it under. `scroll-padding-block-end` moves the target up by the same
+   6rem the panels already carry as `pb-24`, so the runway that exists in the
+   layout is the runway the scroll actually uses. The two numbers are a pair;
+   changing one alone is what makes this feel broken again. */
+#ws-scroll {
+  scroll-padding-block-end: 6rem;
 }
 
 /* ── The writing sheet's command row: stillness while you type ──────────────

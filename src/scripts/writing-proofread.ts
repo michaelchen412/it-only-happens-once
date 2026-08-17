@@ -242,7 +242,10 @@ export function wireProofread(deps: ProofreadDeps): ProofreadPanel {
   // other callers anchor to controls that sit still; this one anchors to a word in
   // the column whose entire job is to scroll. A popover pointing at empty space is
   // worse than one that shut itself.
-  sheet.querySelector('.grow.overflow-y-auto')?.addEventListener('scroll', closePop, { passive: true });
+  // (`#ws-scroll`, not the class list it happens to carry — that selector was
+  // written twice, here and in the BackToTop mount, and both were one Tailwind
+  // tidy away from silently matching nothing.)
+  sheet.querySelector('#ws-scroll')?.addEventListener('scroll', closePop, { passive: true });
 
   // The chip counts down as marks are applied, ignored, or go stale under an edit.
   editor.on('transaction', () => {

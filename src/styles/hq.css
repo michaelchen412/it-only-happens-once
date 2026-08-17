@@ -3281,7 +3281,44 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   bottom: 5.5rem;
 }
 
+/* ⚠ THE ONE MODAL THAT KNOWS ABOUT THE KEYBOARD (2026-08-17), because it is the
+   one modal whose whole purpose is typing into it. Michael, on a phone: *"just
+   seems a bit janky on mobile since a lot of the screen is taken up by the
+   keyboard."*
+
+   The UA centres a modal with auto margins against the WHOLE window, keyboard
+   included, so half the box was behind it. Lifting by half the keyboard's
+   height re-centres it in the strip that is actually left — `translate` rather
+   than pinning a margin, because the auto margins are what does the centring
+   and replacing one of them with a fixed value would snap the box to an edge
+   the moment `--kb` went back to 0. This composes with them and is inert at
+   rest, on every desktop and on a phone with nothing focused.
+
+   The cap comes WITH the lift and is not optional: translate alone pushes a
+   tall dialog's head off the top of the screen instead of its foot off the
+   bottom, which is the same bug upside down. */
+#cap-dialog {
+  translate: 0 calc(var(--kb, 0px) / -2);
+  max-height: calc(100dvh - var(--kb, 0px) - 2rem);
+}
+/* ⚠ `[open]` IS LOAD-BEARING, NOT TIDINESS. The UA hides a closed dialog with
+   `display: none`, and `#cap-dialog { display: flex }` would out-specify it —
+   the capture box would be on screen, permanently, on every admin page.
+
+   The column exists so the cap above has something to squeeze. Without it the
+   dialog is shorter than its contents and `overflow: visible` spills them past
+   the rounded border; with it, `.cap-box` is the flexible item and gives up its
+   height first, which is right — it is the only part of this dialog that
+   scrolls, and the toolbar and foot are the parts you still need to reach. It
+   also means no magic number reserving room for them. */
+#cap-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
 .cap-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* or the shell refuses to shrink and the cap does nothing */
   padding: 0.25rem;
 }
 /* ⚠ WAS A PLAIN TEXTAREA UNTIL 2026-08-06, and that was a rule with a reason —
@@ -3293,6 +3330,13 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
    second frame inside it is chrome. Now the SCROLLER around the editor. */
 .cap-box {
   width: 100%;
+  /* The resting size is still the `min()` — a jot box taller than 26rem is a
+     piece, not a jot. `flex` lets it go SMALLER than that when the dialog is
+     capped (a keyboard up on a short phone), and `min-height: 0` is what makes
+     that permitted at all: a flex item's floor is its content by default, which
+     for a scroller is the entire jot. */
+  flex: 0 1 auto;
+  min-height: 0;
   max-height: min(60vh, 26rem);
   overflow-y: auto;
   /* ⚠ THE OTHER HALF OF THE SCROLL LOCK (2026-08-17), and the half the root

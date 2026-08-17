@@ -300,8 +300,18 @@ const { subjects, constellations = [] } = Astro.props;
       </div>
     </div>
 
-    {/* Document */}
-    <div class="grow overflow-y-auto overscroll-contain">
+    {
+      /* Document.
+
+        ⚠ IT HAS AN ID NOW, AND THAT IS A FIX (2026-08-17). `BackToTop` below
+        named this element with the selector `#wsheet .grow.overflow-y-auto` — a
+        stringly-typed dependency on a Tailwind class list, which meant any
+        reflow of these utilities silently broke back-to-top with nothing
+        failing anywhere. `#ws-scroll` is the same contract written down.
+
+        The scroll runway lives in admin.css, against the id. */
+    }
+    <div id="ws-scroll" class="grow overflow-y-auto overscroll-contain">
       <div id="ws-panel-doc" role="tabpanel" data-tabpanel="doc" class="mx-auto w-full max-w-2xl px-6 pt-10 pb-24">
         <input
           name="title"
@@ -447,7 +457,7 @@ const { subjects, constellations = [] } = Astro.props;
         <ol id="ws-ver-list" class="space-y-2"></ol>
       </div>
     </div>
-    <BackToTop scroller="#wsheet .grow.overflow-y-auto" inDialog />
+    <BackToTop scroller="#ws-scroll" inDialog />
 
     {
       /* ONE POPOVER, EVERY MARK (docs/plans/22 · Piece 5). `anchorPopover` takes

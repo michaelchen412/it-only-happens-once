@@ -453,6 +453,15 @@ const nav = [
     // VIEWPORT, belongs to the window and not to any room.
     import '../scripts/nav-progress';
 
+    // A fourth fact about the window rather than about a room: how much of it
+    // the software keyboard is covering right now (`--kb`). Every sheet in the
+    // building is sized against it, and the writing sheet is the one that made
+    // it necessary — a drawer running to the foot of the window puts its own
+    // scroll runway under the keyboard, so the caret has nowhere to be lifted
+    // to. Mounted here because a layout cannot know which room will open a
+    // sheet, and a room that had to opt in would be the room that forgot.
+    import '../scripts/keyboard-inset';
+
     // ⚠ MOUNTED FROM THE LAYOUT FOR A REASON THE OTHERS DO NOT HAVE. Its
     // `sync()` re-asserts this device's push subscription on every admin load,
     // and with no service worker that is the ONLY chance the app gets to notice
