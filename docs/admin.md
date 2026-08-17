@@ -40,7 +40,9 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin/fragments#edit=<id>` / `#new-writing`, which auto-open the sheet. A hash never reaches the server, so those links are updated at every *producer* rather than redirected; `/admin` keeps a client-side bounce for old ones. |
 | **Constellations index** | `/admin/constellations` | Every constellation, draft + published: create (a "pile" is just a draft), publish/unpublish, reorder the sky's authored order, delete (placements cascade; fragments untouched). |
 | **The composer** | `/admin/constellations/[id]` | The composing room (design.md §13): the suite in two views over one sequence — **Compose** (dense rows; drag or Alt+↑/↓ to reorder, ✕ unplaces) and **Read** (the public stanzas verbatim, drafts included) — plus the constellation's name/slug/colour/visibility/description/score, the three tests as quiet gauges, Preview → the real public page (drafts render for the admin only). One **Add** button opens the fragment browser. **The settings card, reworked 2026-08-11:** visibility is a **switch** beside the URL (not a select), and it saves with the card rather than on flip — so the line under it says *"It joins/leaves the sky when you press Save"* until you do, and a chip beside the page title mirrors it. Under that sits the **publish preflight** — *"2 of the 6 placed are drafts — a reader would see 4"* — the one fact the room could not see before, recomputed in the browser after every unplace. The description is a **rich field** (the same bold/italic mini editor a quote body uses; stored as Markdown, carried into the form by a hidden input). The score is `type="url"` with an **Open ↗** that follows what you type. **⌘/Ctrl+S saves** — swallowed while any sheet is open, so it can never save the constellation behind the fragment you are editing. |
-| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin/fragments` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite **in place** — nothing on this path navigates (§2a). |
+| **Fragment browser** | large slide-over on the composer | A mini Fragment Manager: the *same* toolbar + table as `/admin/fragments` (served by the `/admin/fragments-panel` partial in `mode=pick`). Rows already in this constellation render **dimmed and unselectable**; everything else places via a per-row ＋ or checkbox-select + "Place N". Its own Add ▾ creates fragments that auto-place (`body[data-place-in]`). Closing after any placement refreshes the suite **in place** — nothing on this path navigates (§2a). **It serves three rooms now** — see §2d. |
+| **Sets** | `/admin/sets` | The curated listens (§17). Rows in authored order — title, status chip, drag-or-Alt reorder — with **one `New` in the header** and a **⋯** holding Publish/Unpublish, *Open on Spotify* and Delete. The title is the edit affordance; everything else happens in the **set sheet**. It was seven open `<form>`s until 2026-08-17 ([ADR 0038](adr/0038-a-private-admin-surface-may-require-javascript.md)). |
+| **Set sheet** | slide-over, `/admin/sets` | Six fields — title, playlist, quote, description, visibility, address. The description is the **same mini editor** the quote body uses (the public page has always rendered it as Markdown). Visibility is a **form-bound switch**; the list's ⋯ is the click-is-commit half, which is the constellations shape. The quote is chosen in the **epigraph picker** (§2d), and the pick is **held on the form until Save** — an epigraph is a column on the set, not a relation. |
 
 **The fragment → constellation view** (added 2026-07-24). The composer answers *what is in this constellation*; these answer *where does this fragment live* — the same join read from the other end:
 
@@ -51,6 +53,110 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 - **A toggle applies immediately** — membership is a relationship, not a field on the fragment, so it needs no save and is instantly reversible. Two consequences worth knowing: membership events are excluded from both sheets' dirty guards (otherwise closing warns about "unsaved edits" that were already written, and the writing sheet kicks off a spurious autosave), and a fragment that doesn't exist yet queues its ticks and flushes them the moment the first save mints an id — which *replaces* the old implicit `data-place-in` behavior with a pre-ticked box you can see and untick.
 - The same full-description treatment appears in the bulk menu, and the browser sheet's header names the constellation you're composing into. **Everywhere a fragment can be assigned, you can read what you're assigning it to.**
 - **Bulk elevate** from the selection bar. "Remove from" lists only constellations the selection actually belongs to, read off each row's `data-constellations`. With a cart (§2b) a selected row may not be on screen, and its memberships are then unknown — the list **under-offers**, which is the safe direction.
+
+### 2d. The four verbs — one index, and the rules it implies
+
+*Graduated from `plans/42` on 2026-08-17, after the batches it prescribes were
+built. It is here rather than in a plan because it describes what the building
+does; the argument for each change is in the code, at the control.*
+
+⚠ **The rules are written as PREDICTORS, the way §4a is.** The value is that a
+surface which does not exist yet has an answer before anyone argues about it, and
+that a surface which *contradicts* one either changes or writes down why in the
+file. Four consistency passes had each taken a horizontal slice — the exit
+([ADR 0032](adr/0032-a-sheet-is-dismissible-and-says-what-that-costs.md)), field
+geometry ([ADR 0033](adr/0033-the-observatory-has-one-field-grammar.md)), the
+error channel, the sheet shell — and none had asked what a *verb* costs.
+
+**CREATE — the door, and what it opens.** One primary in `PageHeader`'s actions
+slot, repeated inside `EmptyState`'s slot, opening a drawer — **unless the create
+needs exactly one field**, which folds away inline (the constellations index, and
+the picker's `＋ New constellation` that copies it).
+
+⚠ **What the door is CALLED: it names the noun only when the page around it does
+not.** Tasks, Goals and People carry an `h1` and say *New* / *Add*; the calendar
+has no heading naming an event, so it says *New event*; the fragment manager
+makes two kinds and puts the nouns on the menu items. `/admin/constellations` is
+redundant with its own `h1` and is a known exception. *Add* is for a thing
+joining something that already exists — a person, a placement, a shelf link;
+*New* is for a thing the room brings into being. The rule lives in
+[`PageHeader.astro`](../src/components/admin/PageHeader.astro).
+
+**EDIT — it opens from the thing itself.** A whole row (the fragment table), the
+title (tasks, sets, the calendar's *event* rows), the name (constellations), or a
+pencil on the block it edits (the profile's blocks, a timeline entry, a note
+card). ⚠ **No pencil sits on every row announcing itself** — the calendar's day
+panel carried one until 2026-08-17, and its four row *kinds* are why the fix was
+per-kind: a mirrored row's title links to Google, a birthday stays inert.
+
+**DELETE — apart from the benign controls, and it says what it takes.** The rule
+is a zone at the END of the thing it destroys, below a rule, with a line naming
+what survives ([`WritingSheet`](../src/components/admin/WritingSheet.astro), the
+quote and song sheets, the composer, the profile's Archive).
+
+⚠ **The footer variant is legal when the form does not scroll** — a short record
+has no "end of the object" distinct from its footer, so the zone buys ceremony
+and no separation. Task, goal and event take it. **The price is that a footer
+Delete must say IRREVERSIBILITY in its confirm**, because nothing on screen says
+it first: all three are hard `.delete()` calls with no trash tier, which makes
+them the least ceremonious deletes in the building and the only unrecoverable
+ones. The boundary is stated in [`scripts/sheet.ts`](../src/scripts/sheet.ts).
+
+**Everything destructive goes through `confirmDialog`**, and **every confirm
+label names its verb** — Delete · Discard · Archive · Put back · Promote · Merge ·
+Unlink · Unpublish · Replace · Empty trash · Keep both · Delete forever. Thirty
+labels, not one bare "Confirm".
+
+**Two exits, and the split is deliberate.** Every HQ sheet carries a Cancel
+beside its Save; the three corpus sheets carry only the ✕. A corpus sheet is wide
+and its primary is full-width, so a Cancel beside `Save quote` would read as a
+second primary; an HQ sheet is a short form where *abandon* is a real intention.
+⚠ This is **not** the column ADR 0032 settled — that record's table has exactly
+these columns minus this one. Do not add Cancels to make the halves match.
+
+**A primary names what it commits** — *Save quote*, *Save song*, *Save set*,
+*Add task*, *Save changes*. ⚠ **A bare `Save` is legal when the surface commits
+exactly one object and something above it names that object**: the composer's
+sits beside the constellation's own name, `/admin/about` is one object on a
+titled page, and the Library's per-row Save sits beside the name input it writes.
+
+**And a save says it is working** — `submitAction`'s `busy` label, or a stated
+reason not to (a trash glyph and one word, where the disabled state is the whole
+signal). The confirmation is usually **the sheet closing**.
+
+### 2e. The picker that serves three rooms
+
+`FragmentBrowser` is one drawer in three modes, and **the instinct while reading
+it will be to make them symmetrical; don't.**
+
+| | `pick` | `pair` | `epigraph` |
+|---|---|---|---|
+| Room | the composer | the song sheet | the set sheet |
+| Writes | `constellations.place` | `songs.pair` | ⚠ **nothing** |
+| Offers | everything but notes/trash | writing only | published quotes only |
+| Cart | ✅ (a cart, §2b) | — | — |
+| Add ▾ | ✅ | — | — |
+| Create bar | — | ✅ *write about «term»* | — |
+| Author/work filters | ✅ | ⚠ **withheld** | ✅ **kept** |
+| Type segments | ✅ | — | — |
+
+- **`epigraph` writes nothing, and that is the deep difference.** A placement and
+  a pairing are **relations** — join rows, instantly reversible, so they apply on
+  touch (§4a). A set's epigraph is a **scalar column**, so the pick is held on the
+  sheet's form and rides its Save. That is also what lets an unsaved *new* set
+  carry a quote.
+- ⚠ **Author and work are withheld from `pair` and kept in `epigraph`, and the
+  reason is the corpus rather than the picker.** Both facets are empty on a piece
+  of Michael's own writing, so in a writing-only list every option would answer
+  nothing — which is worse than a dead control, it is one that answers "no
+  results" and reads as an empty corpus. A quotes-only list is *exactly* what
+  those two facets describe. Pinned by `tests/e2e/set-epigraph.spec.ts` so a
+  later tidy-up cannot fold them into one rule.
+- **`pair` and `epigraph` have no cart** — one foreign key and one column are
+  neither of them a multi-select. ⚠ `FragmentRow`'s `<td>` and the panel's `<th>`
+  must agree or every row shifts one cell left.
+- **The create bar is `pair`'s alone.** It starts a draft essay and pairs the song
+  to it — a sentence the other two cannot finish.
 
 ### 2b. The selection is a cart
 
@@ -1099,3 +1205,48 @@ Beside it sit the active goals' observations (§14), which keep their own cold-s
 ### Today reads; the rooms write
 
 A row's title is plain text here, where in the tasks room it opens the sheet. An event's title is a link to the day panel. **No `TaskSheet`, no `EventSheet`, no TipTap** — this is the page opened on a phone at 7am, and the editors stay in the rooms that need them. The only writes on the page are the tick and drift's two dismissals, and both reuse their room's script verbatim.
+
+## 17. Sets — a curated listen
+
+*The music page's contents (plan 40 §3). A set is one Spotify playlist, one
+quote and one description, and its whole proposition is that somebody can SAVE
+it into their own library — which is why it has no page of its own, no subjects,
+and no feed entry. `design.md`'s division of labour: **a constellation is where
+an idea is worked out; a set is where a feeling is isolated.***
+
+**The room is `/admin/sets`** — rows in authored order, `New` in the header, and
+the ⋯ menu described in §2. Six fields in the sheet, and three of them are worth
+knowing:
+
+- **The description is Markdown, edited as Markdown.** `MusicSets.astro` has
+  always rendered it through `renderMarkdown`; until 2026-08-17 only the editor
+  refused, which made it the one prose field in the building where what you typed
+  and what shipped were different languages. It uses the same mini editor the
+  quote body and the constellation description do ([ADR 0006](adr/0006-composer-editor-tiptap.md),
+  [ADR 0018](adr/0018-notes-use-the-composer-editor.md)).
+- **The quote is chosen in the epigraph picker** (§2e), and ⚠ **the pick is held
+  on the form until Save** — an epigraph is a column on the set, not a relation,
+  so it cannot apply on touch the way a membership does (§4a).
+- ⚠ **Visibility has two controls on two screens, and that is the constellations
+  shape.** A form-bound switch in the sheet, which saves with the card and says so
+  in words until you press Save; and a click-is-commit Publish/Unpublish in the
+  list row's ⋯. Plan 41 · §5a's finding was two controls for one fact on **one**
+  screen — these are two screens, and the one thing they share is that
+  **`sets.setStatus` is the only writer of that column.** `sets.save` does not
+  name it, and `src/tests/actions-sets.test.ts` keeps it that way.
+
+⚠ **A set hard-deletes, where the corpus soft-deletes**, and the reason is at the
+action: a set is a title, a sentence and a link, the playlist on Spotify is
+untouched, and the quote stays in the corpus. There is nothing here a minute of
+retyping cannot restore, so a `deleted_at` column would be a bin nobody opens.
+
+⚠ **The epigraph picker offers PUBLISHED quotes only**, which is narrower than
+`checkQuote` allows — that refuses a binned quote and permits a draft one, since
+you may be writing both at once. The picker is narrower on purpose: a set's
+epigraph is the first thing a reader meets on the music page, so offering a draft
+would invite a pick whose words the public cannot see. **The picker offers what is
+safe; the action refuses what is wrong.**
+
+**The room was seven open `<form>`s until 2026-08-17** — one page-scoped commit
+unit that discarded unsaved text in every other card on any POST. See
+[ADR 0038](adr/0038-a-private-admin-surface-may-require-javascript.md).

@@ -127,6 +127,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0035](0035-a-set-is-a-listen-you-can-take-away.md) | A set is a listen you can take away: one curated playlist, one quote, one description, replacing the feelings room — a constellation is where an idea is worked out, a set is where a feeling is isolated | Accepted |
 | [0036](0036-a-reload-is-how-the-observatory-tells-the-truth.md) | After a write, an admin surface re-derives by reloading, and patches only where a reload would destroy something the page holds — the database is the only model | Accepted |
 | [0037](0037-a-seeded-write-is-throwaway-gated-and-swept.md) | A spec may create rows in the live project only if all five hold: flagged off by default, `zzz-e2e-throwaway` prefix, `afterEach` sweep, service key under `tests/` only, real control driven through the admin's own session. Extends [0028](0028-the-e2e-suite-is-read-only-against-live.md) | Accepted |
+| [0038](0038-a-private-admin-surface-may-require-javascript.md) | A private single-user admin surface may require JavaScript; progressive enhancement is not on its own a reason to keep a page-scoped form. Scoped to `/admin` — it does not touch the public side | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all
