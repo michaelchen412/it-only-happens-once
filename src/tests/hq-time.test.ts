@@ -11,15 +11,17 @@
 //
 // Fixed instants throughout, never `new Date()` — a clock-dependent test is a
 // test that fails on one morning a year and is then deleted.
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import {
   FALLBACK_TIMEZONE,
   clockIn,
   daysBetween,
   deviceZoneNote,
+  homeTimezone,
   isValidTimezone,
   localToday,
   parseYmd,
+  resetTimezoneCache,
   shiftYmd,
   utcToZonedTime,
   utcToZonedYmd,
@@ -246,5 +248,86 @@ describe('deviceZoneNote', () => {
     expect(note).toContain(TOKYO);
     expect(note).toContain(LA);
     expect(note).toMatch(/still counted/);
+  });
+});
+
+// ── the cached zone (plan 41, closing §7's own loose end) ────────────────────
+//
+// ⚠ `homeTimezone` IS CALLED BY SEVEN ACTION MODULES AND BY MIDDLEWARE ON EVERY
+// ADMIN REQUEST, and until now by no test at all. That gap was found by deleting
+// `resetTimezoneCache` as an unused export — the helper was a seam for tests
+// nobody had written. Writing them is what put it back.
+//
+// Two rules live in those fifteen lines and both are quiet enough to lose:
+// the TTL, and that a FAILED READ IS NOT CACHED AS AN ANSWER.
+describe('homeTimezone — the bounded cache', () => {
+  /** `settings` answering with whatever row the case needs. */
+  const db = (row: { home_timezone: string } | null) =>
+    ({
+      from: () => ({
+        select: () => ({ limit: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }),
+      }),
+    }) as unknown as Parameters<typeof homeTimezone>[0];
+
+  /** Counts the reads, so "was it cached?" is answerable rather than inferred. */
+  const counting = (row: { home_timezone: string } | null) => {
+    let reads = 0;
+    const client = {
+      from: () => ({
+        select: () => ({
+          limit: () => ({
+            maybeSingle: async () => {
+              reads++;
+              return { data: row, error: null };
+            },
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof homeTimezone>[0];
+    return { client, reads: () => reads };
+  };
+
+  beforeEach(() => resetTimezoneCache());
+
+  it('reads the configured zone', async () => {
+    expect(await homeTimezone(db({ home_timezone: 'America/New_York' }))).toBe('America/New_York');
+  });
+
+  it('reads `settings` once, then reuses the answer', async () => {
+    const { client, reads } = counting({ home_timezone: 'America/New_York' });
+    await homeTimezone(client);
+    await homeTimezone(client);
+    await homeTimezone(client);
+    // Middleware calls this in front of every admin page, serially, before
+    // `loadAttention` can start — the 55–65ms this cache exists to remove.
+    expect(reads(), 'the zone was re-read inside the TTL').toBe(1);
+  });
+
+  it('⚠ does NOT cache a failed read, so one blip cannot pin the fallback', async () => {
+    // `data` is null both when the row says nothing and when the request FAILED,
+    // and the two are indistinguishable here. Caching either would turn a
+    // transient error into a minute of the wrong city — which is the bug this
+    // module's header promises to prevent, arrived at from underneath.
+    const { client, reads } = counting(null);
+    expect(await homeTimezone(client)).toBe(FALLBACK_TIMEZONE);
+    expect(await homeTimezone(client)).toBe(FALLBACK_TIMEZONE);
+    expect(reads(), 'a failed read was cached as though it were an answer').toBe(2);
+  });
+
+  it('refuses a nonsense zone in the column and falls back', async () => {
+    // A numeric offset is the case `isValidTimezone` exists for: `Intl` accepts
+    // it, and it is wrong for half of every year.
+    expect(await homeTimezone(db({ home_timezone: '-08:00' }))).toBe(FALLBACK_TIMEZONE);
+  });
+
+  it('⚠ but a REFUSED zone still counts as an answer and is cached', async () => {
+    // Deliberate, and the asymmetry is the point: the column was read
+    // successfully, so there is no blip to protect against — only a bad value,
+    // which will still be bad in a minute. Re-reading it every request would pay
+    // for nothing.
+    const { client, reads } = counting({ home_timezone: '-08:00' });
+    await homeTimezone(client);
+    await homeTimezone(client);
+    expect(reads()).toBe(1);
   });
 });

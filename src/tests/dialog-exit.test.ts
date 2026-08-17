@@ -71,7 +71,25 @@ function strip(src: string): string {
 const NOT_DIALOGS: Record<string, string> = {
   bitmap: 'An ImageBitmap in scripts/upload.ts — `close()` releases its memory, nothing is on screen.',
   handle: 'The ShellHandle in scripts/browser-shell.ts, whose own `close()` calls closeWithExit.',
+  ui: 'The Sheet from scripts/sheet.ts (plan 41 · §4), whose own `close()` resets the dirty tracker and then calls closeWithExit — same shape as `handle` above.',
 };
+
+/*
+  ⚠ THREE NETS NEEDED WIDENING FOR ONE CHANGE, and the pattern is worth naming
+  because it will happen again. `wireSheet` absorbed four call literals at once,
+  and each was the marker some test used to find its subjects:
+
+    · this file matched `.close(` — `ui.close()` reads as a raw dialog close;
+    · `sheet-dismiss.test.ts` matched `openDialog(` to FIND sheets at all, so
+      seven of them would have dropped out of the checked set while its count
+      assertion passed on the dozen non-sheet dialogs left;
+    · its own header already records the same thing happening in 2026-08-15,
+      when the marker moved from `.showModal()` to `openDialog()`.
+
+  A detector that keys on a literal is a detector that a good refactor silently
+  narrows. The habit that catches it: after moving a call behind a helper, grep
+  the tests for the literal you just moved.
+*/
 
 /** `dialog-close.ts` IS the exit — it is the definition, not a call site. */
 const OWNER = 'dialog-close.ts';

@@ -10,24 +10,27 @@
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
-import { closeWithExit, openDialog } from './dialog-close';
-import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
-import { sheetError } from './sheet-error';
+import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
 const form = document.querySelector<HTMLFormElement>('#event-form');
 
 if (sheet && form) {
-  /** Every gesture that leaves this sheet routes through `requestClose` below. */
-  const dirty = dirtyTracker(sheet);
-
-  // BY ROLE, NOT BY THE NAME SOMEBODY GAVE IT (plan 29 · §6 + plan 38 · §3).
-  // Twenty distinct element ids existed for this one job across the admin, which
-  // is the reason there were 35 copies of the markup — every new sheet had to
-  // mint a twenty-first. `SheetError.astro` owns the markup and this finds it
-  // without needing to know what it is called.
-  const errorEl = sheetError(sheet);
+  /* The tracker, the error line, the three ways out and the native `close`
+     teardown are `wireSheet` now (plan 41 · §4). */
+  const ui = wireSheet(sheet, {
+    noun: 'This event',
+    // ⚠ ABANDONING THE SHEET FORGETS THE DUMP IT WAS OPENED FOR. Without
+    // this, closing on a note and later saving an unrelated row from the
+    // same page would consume a thought nobody filed — a deletion caused by
+    // a save that had nothing to do with it. Reached by Escape and the
+    // backdrop too, which is why it hangs off `close` rather off the ✕.
+    onClose: () => {
+      filingNote = null;
+      setKindBar(null);
+    },
+  });
   const pageError = document.querySelector<HTMLElement>('[data-event-error]');
   const heading = document.querySelector<HTMLElement>('#event-sheet-title')!;
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
@@ -54,12 +57,6 @@ if (sheet && form) {
   }
 
   let editing: string | null = null;
-
-  const showError = (message: string | null) => {
-    if (!errorEl) return;
-    errorEl.textContent = message ?? '';
-    errorEl.hidden = !message;
-  };
 
   /** `all day` beside the empty time — one word, in place, never a sentence. */
   const syncAllDay = () => {
@@ -133,13 +130,13 @@ if (sheet && form) {
   // prevent, reintroduced by a change that looks unrelated. The `.then` is the
   // same ordering, expressed in the only way that still holds.
   const setKindBar = mountKindBar(form, (detail, to) => {
-    void closeWithExit(sheet).then(() =>
-      document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })),
-    );
+    void ui
+      .close()
+      .then(() => document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })));
   });
 
   const open = (row?: EventRow, on?: string) => {
-    showError(null);
+    ui.showError(null);
     if (row) fill(row);
     else {
       reset();
@@ -147,8 +144,8 @@ if (sheet && form) {
       // August means an event in August.
       dateInput.value = on || (form.dataset.today ?? '');
     }
-    dirty.reset(); // populating is not editing — see dirtyTracker
-    openDialog(sheet!);
+    ui.dirty.reset(); // populating is not editing — see dirtyTracker
+    ui.open();
     titleInput.focus();
   };
 
@@ -194,32 +191,6 @@ if (sheet && form) {
     if (raw) open(JSON.parse(raw) as EventRow);
   });
 
-  /*
-    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
-    sheet answered only the first for its whole life — clicking away did
-    nothing at all, which reads as stuck and sends the reader to the browser's
-    Back button, where far more is lost than the sheet would have cost.
-  
-    It GUARDS because it has something to lose: an explicit-save form holds
-    everything typed into it until the button is pressed. The confirm cannot
-    fire on a sheet nobody edited — the tracker is reset after every populate —
-    so this costs nothing on the common path.
-  */
-  async function requestClose() {
-    if (dirty.get() && !(await confirmDiscard('This event'))) return;
-    dirty.reset();
-    // `!` because a hoisted `async function` cannot inherit the narrowing
-    // from the `if (sheet && …)` around it — the same reason this file already
-    // writes `sheet!` at its other exits.
-    void closeWithExit(sheet!);
-  }
-  wireSheetDismiss(sheet, requestClose);
-  // Abandoning the sheet forgets the dump it was opened for — otherwise saving
-  // an unrelated event later would consume a thought nobody filed.
-  sheet.addEventListener('close', () => {
-    filingNote = null;
-    setKindBar(null);
-  });
   startInput.addEventListener('input', syncAllDay);
   form.addEventListener('change', (e) => {
     if ((e.target as HTMLElement).classList.contains('ep-check')) syncWho();
@@ -235,7 +206,7 @@ if (sheet && form) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    showError(null);
+    ui.showError(null);
     // The disable/label/format/restore lifecycle is `submitAction` now
     // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
     // CLOSES this sheet rather than replacing the page — and it is reopened for
@@ -254,7 +225,7 @@ if (sheet && form) {
             .filter((c) => c.checked)
             .map((c) => c.value),
         }),
-      { button: submitBtn, busy: 'Saving…', onError: showError, reusable: true },
+      { button: submitBtn, busy: 'Saving…', onError: ui.showError, reusable: true },
     );
     if (!res.ok) return;
 
@@ -266,7 +237,7 @@ if (sheet && form) {
     if (filingNote) {
       const noteId = filingNote;
       filingNote = null;
-      void closeWithExit(sheet!);
+      void ui.close();
       document.dispatchEvent(
         new CustomEvent('hq:note-filed', {
           detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: res.data?.id } },
@@ -295,7 +266,7 @@ if (sheet && form) {
       // where the eye already is — and echoed on the page behind it, in case
       // the sheet goes anyway.
       onError: (m) => {
-        showError(m);
+        ui.showError(m);
         if (pageError) {
           pageError.textContent = 'Couldn’t delete that event.';
           pageError.hidden = false;

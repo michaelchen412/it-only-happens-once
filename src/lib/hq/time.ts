@@ -110,20 +110,26 @@ export async function homeTimezone(sb: SupabaseClient<Database>): Promise<string
   return tz;
 }
 
-/*
-  ⚠ `resetTimezoneCache()` LIVED HERE AND WAS REMOVED 2026-08-15 (plan 41 · §7),
-  because it was a seam for tests that were never written: `homeTimezone` above
-  is called by seven action modules and is exercised by **no test at all** —
-  `hq-time.test.ts` imports only this module's pure half. A test helper that
-  nothing calls provides no safety; it only reads as though something is covered.
-
-  ⚠ WHAT THAT LEAVES UNCOVERED IS WORTH KNOWING, because it is not nothing: the
-  TTL, and the rule one line above it that a FAILED READ IS NOT CACHED AS AN
-  ANSWER. That second rule exists to stop one blip pinning the fallback zone for
-  a minute, and it is exactly the kind of thing that gets refactored away by
-  someone tidying `if (raw)` into `if (tz)`. Reinstating this function is one
-  line, and whoever writes that test should.
-*/
+/**
+ * Drop the cached zone.
+ *
+ * ⚠ IT EXISTS FOR `hq-time.test.ts` AND NOTHING ELSE, and it was DELETED on
+ * 2026-08-15 before being put back the same day — which is the useful half of
+ * the story. It was removed as an unused export, correctly: `homeTimezone` was
+ * called by seven action modules and exercised by no test at all, so this was a
+ * seam for tests nobody had written, and a helper nothing calls provides no
+ * safety. It only reads as though something is covered.
+ *
+ * The right answer was never "keep the dead helper" or "delete it and move on"
+ * — it was to write the test the helper was made for, which is what put it
+ * back. What that test pins is small and easy to lose: the TTL, and the rule
+ * that A FAILED READ IS NOT CACHED AS AN ANSWER, which stops one blip pinning
+ * the fallback zone for a minute and is exactly what a tidy-up of `if (raw)`
+ * into `if (tz)` would quietly remove.
+ */
+export function resetTimezoneCache(): void {
+  tzCache = null;
+}
 
 /**
  * Today, as a local date in `tz`.

@@ -9,8 +9,7 @@ import { actions } from 'astro:actions';
 import { wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
-import { closeWithExit, openDialog } from './dialog-close';
-import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { wireSheet } from './sheet';
 import { sheetError } from './sheet-error';
 
 type Mode = 'work' | 'fragment';
@@ -50,8 +49,18 @@ const clearError = () => {
 };
 
 if (sheet && personId) {
-  /** Every gesture that leaves this sheet routes through `requestClose` below. */
-  const dirty = dirtyTracker(sheet);
+  /*
+    The tracker, the three ways out and the discard confirm are `wireSheet` now
+    (plan 41 · §4).
+
+    ⚠ ITS `showError` IS DELIBERATELY UNUSED HERE, and the two-target pair above
+    stays exactly as it is. This file writes into the SHEET's line for a failed
+    link and the ZONE's for a failed unlink, because the unlink control is not
+    in the sheet — `links.spec.ts` asserts each sentence lands where the reader
+    is looking. `wireSheet` knows about one line; collapsing both onto it would
+    put a zone failure inside a dialog nobody has open.
+  */
+  const ui = wireSheet(sheet, { noun: 'This link' });
 
   const search = sheet.querySelector<HTMLInputElement>('[data-link-search]')!;
   const noteInput = sheet.querySelector<HTMLInputElement>('[data-link-note]')!;
@@ -129,32 +138,10 @@ if (sheet && personId) {
       search.value = '';
       noteInput.value = '';
       setMode('work');
-      dirty.reset(); // populating is not editing — see dirtyTracker
-      openDialog(sheet);
+      ui.open(); // populate first — `open` forgets the fill. See `Sheet.open`.
       search.focus();
     }),
   );
-
-  /*
-    ⚠ THE ✕, ESCAPE AND THE BACKDROP ALL MEAN "I WANT OUT" (ADR 0032). This
-    sheet answered only the first for its whole life — clicking away did
-    nothing at all, which reads as stuck and sends the reader to the browser's
-    Back button, where far more is lost than the sheet would have cost.
-  
-    It GUARDS because it has something to lose: an explicit-save form holds
-    everything typed into it until the button is pressed. The confirm cannot
-    fire on a sheet nobody edited — the tracker is reset after every populate —
-    so this costs nothing on the common path.
-  */
-  async function requestClose() {
-    if (dirty.get() && !(await confirmDiscard('This link'))) return;
-    dirty.reset();
-    // `!` because a hoisted `async function` cannot inherit the narrowing
-    // from the `if (sheet && …)` around it — the same reason this file already
-    // writes `sheet!` at its other exits.
-    void closeWithExit(sheet!);
-  }
-  wireSheetDismiss(sheet, requestClose);
 
   saveBtn.addEventListener('click', async () => {
     if (!picked) return;

@@ -23,8 +23,8 @@ import { callAction, formatActionError, submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireSharedBy } from './shared-by';
 import { type ResolvedSong, createSong } from './song-create';
-import { closeWithExit, openDialog } from './dialog-close';
-import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
+import { openDialog } from './dialog-close';
+import { wireSheet } from './sheet';
 import { wirePairBrowser, type PairedPiece } from './pair-browser';
 import { sheetError } from './sheet-error';
 
@@ -78,6 +78,10 @@ let loadSeed: ((seed: SongSheetSeed) => void) | null = null;
 export function openSongSheet(seed: Partial<SongSheetSeed> = {}): void {
   if (!sheet || !loadSeed) return;
   loadSeed({ ...EMPTY, ...seed });
+  // ⚠ `openDialog` DIRECTLY, NOT `ui.open()`, AND ONLY HERE. This function is
+  // module scope — the host pages call it — while `ui` lives inside the
+  // `if (sheet)` block below. It loses nothing: `loadSeed` above already clears
+  // the error line and resets the tracker, which is all `ui.open()` adds.
   openDialog(sheet);
   // ⚠ FOCUS FOLLOWS THE JOB, and the job changed. An empty sheet is waiting
   // for a link, so it still focuses the URL field. A LOADED one used to focus
@@ -174,7 +178,17 @@ function wire(sheet: HTMLDialogElement) {
     confirm without reading it. The feelings are NOT ignored: they look like the
     same kind of control and are not, because this sheet holds them until Save.
   */
-  const dirty = dirtyTracker(sheet, '[data-sby="song"]');
+  const ui = wireSheet(sheet, {
+    noun: 'This song',
+    ignore: '[data-sby="song"]',
+    // ⚠ ON `close`, NOT IN `requestClose`. Every path out — the ✕, Escape, the
+    // backdrop, a save, a delete — ends in the native `close`, and the frame has
+    // to go on ALL of them. Hanging this off one handler is how a song ends up
+    // playing behind a sheet that is no longer there, with no control left
+    // anywhere to stop it. ⚠ And removing the iframe IS the pause: a
+    // cross-origin frame cannot be controlled from outside (SongSheet.astro).
+    onClose: () => playerEl.replaceChildren(),
+  });
   const sharedByRoot = sheet.querySelector<HTMLElement>('[data-sby="song"]');
   const sharedBy = sharedByRoot ? wireSharedBy(sharedByRoot) : null;
   const sharedByMap = JSON.parse(sheet.dataset.sharedBy || '{}') as Record<string, string[]>;
@@ -343,7 +357,7 @@ function wire(sheet: HTMLDialogElement) {
     // ⚠ LAST, AND AFTER EVERYTHING ABOVE. Populating the fields fires `input`
     // like any other write, so a sheet nobody has touched would otherwise open
     // already dirty and guard on the way out.
-    dirty.reset();
+    ui.dirty.reset();
   }
   loadSeed = load;
 
@@ -467,8 +481,8 @@ function wire(sheet: HTMLDialogElement) {
     const songId = cur.id!;
 
     stop();
-    dirty.reset(); // it is all in the database now
-    close();
+    ui.dirty.reset(); // it is all in the database now
+    void ui.close();
     document.dispatchEvent(new CustomEvent('song:saved', { detail: { id: songId, title, artist } }));
   }
   saveBtn.addEventListener('click', () => void save());
@@ -495,35 +509,19 @@ function wire(sheet: HTMLDialogElement) {
     });
     if (!res.ok) return;
     const gone = cur.id;
-    close();
+    void ui.close();
     document.dispatchEvent(new CustomEvent('song:deleted', { detail: { id: gone } }));
   });
 
-  // --- closing -------------------------------------------------------------
-  function close() {
-    void closeWithExit(sheet);
-  }
-  /**
-   * ⚠ THIS SHEET HAS THE MOST TO LOSE OF ANY OF THEM (ADR 0032), which is why
-   * it guards rather than dismissing freely: two rich-text notes, a set of
-   * feelings and four metadata fields, none of which are written until Save.
-   * It shipped with no guard AND no backdrop dismiss, and the second of those
-   * was hiding the first.
-   */
-  async function requestClose() {
-    if (dirty.get() && !(await confirmDiscard('This song'))) return;
-    dirty.reset();
-    close();
-  }
-  // `data-close`, the default — SongSheet used to spell its ✕ `data-sng-close`
-  // and pass the selector in by hand, which is a second name for the one thing
-  // ADR 0032 made uniform. `SheetHeader` emits the standard attribute now
-  // (plan 29 · §6), so this argument is gone with it.
-  wireSheetDismiss(sheet, requestClose);
-  // ⚠ ON `close`, NOT IN `requestClose`. Every path out — the ✕, Escape, the
-  // backdrop, a save, a delete — ends in the native `close` event, and the
-  // frame has to go on ALL of them. Hanging this off one handler is how a song
-  // ends up playing behind a sheet that is no longer there, with no control
-  // left anywhere to stop it.
-  sheet.addEventListener('close', () => playerEl.replaceChildren());
+  /*
+    ⚠ THIS SHEET HAS THE MOST TO LOSE OF ANY OF THEM (ADR 0032), which is why it
+    guards rather than dismissing freely: two rich-text notes, a set of feelings
+    and four metadata fields, none of which are written until Save. It shipped
+    with no guard AND no backdrop dismiss, and the second was hiding the first.
+    All of that is `wireSheet` now (plan 41 · §4).
+
+    ⚠ ITS `showError` IS UNUSED HERE and the local pair above stays: this is the
+    tallest sheet in the building, so a failure has to SCROLL to be read, and
+    `wireSheet` does not scroll.
+  */
 }
