@@ -21,7 +21,6 @@
 */
 import { Icon } from 'astro-icon/components';
 import EditorToolbar from './EditorToolbar.astro';
-import TypeMark from './TypeMark.astro';
 import PublishDialog from './PublishDialog.astro';
 import LinkDialog from './LinkDialog.astro';
 import AltTextDialog from './AltTextDialog.astro';
@@ -66,14 +65,24 @@ const { subjects, constellations = [] } = Astro.props;
             did do one real job: it flipped to "Note", which is the one thing
             about this drawer you cannot see by looking at it. So the word goes
             and the FLIP stays, as a chip that appears only for a note.
-            TypeMark already carries an sr-only "Writing", so the dialog keeps
-            its accessible name without the visible word. */
+
+            ⚠ THIS WAS A <TypeMark>, AND STOPPED BEING ONE ON 2026-08-17, when
+            writing lost its glyph (TYPE_META). TypeMark went on rendering the
+            accessible name correctly — but as an EMPTY box inside a `gap-1.5`
+            flex row, which pushed "Note" 6px right of where the row's own
+            padding puts everything else. There is no column to reserve here:
+            a heading is not a row, nothing below it needs holding off a
+            margin, so the honest replacement is the sr-only text alone.
+
+            It has to stay SOMETHING: `aria-labelledby="ws-heading"` on the
+            dialog points at this element, so an empty one would leave a
+            near-fullscreen drawer with no accessible name at all. */
         }
         <span
           id="ws-heading"
-          class="text-base-content/40 flex shrink-0 items-center gap-1.5 font-sans text-xs tracking-widest uppercase"
+          class="text-base-content/40 flex shrink-0 items-center font-sans text-xs tracking-widest uppercase"
         >
-          <TypeMark type="writing" />
+          <span class="sr-only">writing</span>
           <span id="ws-heading-label" hidden>Note</span>
         </span>
 

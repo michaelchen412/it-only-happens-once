@@ -129,19 +129,24 @@ const SUBTITLES = {
                       write one now, from any room. A piece can still be sent
                       DOWN to the pile: that is the bulk bar's "Make notes",
                       which is a demotion rather than a second front door. */}
+                  {/* `w-3` on both marks, and it is load-bearing now that
+                      writing has no glyph (TYPE_META, 2026-08-17): the mark is
+                      a COLUMN here, not an inline character, so the two labels
+                      keep a common left edge instead of "Writing" sliding a
+                      quote-mark's width to the left of "Quote". */}
                   <button
                     data-new-writing
                     role="menuitem"
                     class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
                   >
-                    <TypeMark type="writing" /> Writing
+                    <TypeMark type="writing" class="w-3 text-center" /> Writing
                   </button>
                   <button
                     data-new="quote"
                     role="menuitem"
                     class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
                   >
-                    <TypeMark type="quote" /> Quote
+                    <TypeMark type="quote" class="w-3 text-center" /> Quote
                   </button>
                   {/* ⚠ NO SONG, AND ITS ABSENCE IS THE DECISION (ADR 0031). A
                       song enters the corpus from the ESSAY THAT WANTED IT —

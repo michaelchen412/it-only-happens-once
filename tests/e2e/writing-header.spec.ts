@@ -173,10 +173,15 @@ test.describe('what the row carries', () => {
   test('the word WRITING is gone but the Note flip survives', async ({ page }) => {
     await openPublished(page);
     await expect(page.locator('#ws-heading-label')).toBeHidden();
-    // The visible word is gone: what's left in the row is the mark alone.
-    await expect(page.locator('#ws-heading')).toHaveText('▤writingNote');
-    // …and the dialog still has an accessible name, from TypeMark's own
-    // sr-only label rather than from the word that was removed.
+    // Nothing VISIBLE is left in the heading at all, as of 2026-08-17: the word
+    // went in plans/16 and the `▤` went with the glyph itself (TYPE_META). Both
+    // strings this matches are non-visual — `writing` is sr-only, `Note` is
+    // `hidden` until the flip — which is the assertion, not a quirk of it.
+    await expect(page.locator('#ws-heading')).toHaveText('writingNote');
+    // …and the dialog still has an accessible name. This is the ONLY thing
+    // providing it — `aria-labelledby` points here — so a future tidy that
+    // deletes an "empty-looking" span fails this line rather than shipping an
+    // unnamed near-fullscreen drawer.
     await expect(page.locator('#ws-heading .sr-only')).toHaveText('writing');
   });
 });

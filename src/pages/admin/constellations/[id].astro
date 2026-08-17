@@ -555,7 +555,22 @@ const VIS_HINT = {
                 data-writing={s.type === 'writing' ? s.id : undefined}
               >
                 <div class="flex w-6 shrink-0 flex-col items-center gap-1">
-                  <span class="suite-mark text-base-content/35 font-serif text-base select-none" aria-hidden="true">
+                  {/* `min-h-6` reserves this box's line, and it is required
+                      rather than tidy: writing has no glyph as of 2026-08-17
+                      (TYPE_META), so without it the span collapses to zero
+                      height while the column's `gap-1` stays — which would
+                      hoist the row number a line on every writing stanza and
+                      leave the numbers in a suite disagreeing about their own
+                      baseline. 1.5rem is `text-base`'s line box, i.e. exactly
+                      what the glyph occupied on a quote row.
+
+                      (This is NOT the `.suite-mark` the figure is drawn from —
+                      `drawLine()` measures `#suite .suite-item` on the public
+                      page, whose gutter has been empty since 2026-08-07.) */}
+                  <span
+                    class="suite-mark text-base-content/35 min-h-6 font-serif text-base select-none"
+                    aria-hidden="true"
+                  >
                     {TYPE_META[s.type].glyph}
                   </span>
                   <span data-num class="text-base-content/30 font-sans text-[0.65rem] tabular-nums" aria-hidden="true">

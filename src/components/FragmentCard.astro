@@ -51,8 +51,21 @@ const cfg = { ...TYPE_META[type], ...CARD };
     className,
   ]}
 >
+  {
+    /* The glyph is conditional because writing no longer has one (TYPE_META,
+      2026-08-17) and this header lays out with `gap` — an empty span would
+      indent the word "writing" past every "quote" beside it in the grid. The
+      label was always the thing saying what the card is; the mark only ever
+      repeated it in a second alphabet. */
+  }
   <header class="flex items-center gap-2">
-    <span class:list={['text-sm', cfg.tone]} aria-hidden="true">{cfg.glyph}</span>
+    {
+      cfg.glyph && (
+        <span class:list={['text-sm', cfg.tone]} aria-hidden="true">
+          {cfg.glyph}
+        </span>
+      )
+    }
     <Label variant="chrome" as="span">{cfg.label}</Label>
   </header>
 

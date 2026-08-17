@@ -1,14 +1,26 @@
 ---
 /*
-  TypeMark — a fragment's signature mark (▤ ” ♪) with its type name for screen
-  readers. ONE implementation, so every admin surface reads the same way.
+  TypeMark — a fragment's signature mark with its type name for screen readers.
+  ONE implementation, so every admin surface reads the same way.
 
   The mark is NOT colour-coded (changed 2026-07-24, design.md §14 resolved).
-  The three glyphs already distinguish type unambiguously by SHAPE, which made
-  the colour redundant — and colour was needed for something it can only mean
-  once: WHICH CONSTELLATION a fragment belongs to. So the division of labour is
-  now shape = what kind of thing this is, colour = which way of seeing it
-  belongs to. Keeping both would have put two colour languages on every row.
+  The glyphs already distinguish type unambiguously by SHAPE, which made the
+  colour redundant — and colour was needed for something it can only mean once:
+  WHICH CONSTELLATION a fragment belongs to. So the division of labour is now
+  shape = what kind of thing this is, colour = which way of seeing it belongs
+  to. Keeping both would have put two colour languages on every row.
+
+  ⚠ ONE GLYPH LEFT: `”` for a quote, nothing for writing (2026-08-17 — the full
+  argument is at TYPE_META). So on most rows this component now renders an
+  EMPTY box, and that is deliberate rather than a degenerate case: the span is
+  the gutter that holds every text column off the margin, and dropping it would
+  make a row's left edge depend on its type. Callers that want the mark to
+  disappear entirely — the ones laying out with `gap` rather than a fixed
+  column — test `TYPE_META[type].glyph` and skip this component.
+
+  The sr-only label is unconditional, and matters more now than it did: it is
+  the ONLY thing distinguishing the two types for a screen reader, and it is
+  what gives the writing sheet's <dialog> its accessible name.
 */
 import { TYPE_META, type FragmentType } from '../../lib/fragments-display';
 

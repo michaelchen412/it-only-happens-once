@@ -4,8 +4,29 @@
 // `tone` is retained for any surface that still wants a per-type accent, but
 // the admin no longer uses it: the glyph SHAPE carries type, and colour was
 // reassigned to constellation membership (see TypeMark.astro, design.md §14).
+
+// ⚠ WRITING HAS NO GLYPH, AND THE EMPTY STRING IS THE DECISION (2026-08-17).
+// `▤` was a mark that only ever confirmed the default. The argument for a
+// shape-per-type held while there were THREE kinds and no one of them was the
+// norm; a song left for a table of its own (ADR 0035, above) and that collapsed
+// the vocabulary to two, at which point one mark distinguishes both. `”` says
+// quote; nothing says writing — and "nothing" is the honest rendering of a
+// distinction the eye makes anyway from the italic body and the missing title.
+//
+// The alternative that lost: keep both and shrink `▤`. Rejected because size is
+// not the complaint — a mark that never varies is not carrying information at
+// any size, and on a phone it was spending gutter the text column needed.
+//
+// The public suite reached the same verdict first, for the same reason and in
+// its own words (ConstellationSuite.astro, 2026-08-07): the glyphs "answered a
+// question nobody asked". This makes the rest of the corpus agree with it.
+//
+// ⚠ EMPTY, NOT REMOVED. Consumers with a reserved gutter (FragmentRow's `w-6`
+// cell, the composer's suite column) render TypeMark's span either way and stay
+// aligned; the three INLINE sites — the count badge, the public card header,
+// the Add ▾ menus — skip the mark themselves rather than inherit a stray gap.
 export const TYPE_META = {
-  writing: { glyph: '▤', label: 'writing', tone: 'text-accent' },
+  writing: { glyph: '', label: 'writing', tone: 'text-accent' },
   quote: { glyph: '”', label: 'quote', tone: 'text-secondary' },
 } as const;
 

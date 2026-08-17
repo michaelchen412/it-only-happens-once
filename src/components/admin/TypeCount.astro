@@ -1,11 +1,17 @@
 ---
 /*
-  TypeCount — "▤ 5 writing" as a proper badge. Replaces the old cryptic
-  "mix ” 6 ▤ 5 ♪ 1" run-on: each type gets its own labelled pill in its own
-  color, so the mix of a constellation is legible at a glance.
+  TypeCount — "5 writing" as a proper badge. Replaces the old cryptic
+  "mix ” 6 ▤ 5 ♪ 1" run-on: each type gets its own labelled pill, so the mix of
+  a constellation is legible at a glance.
+
+  The pill spells the type out, which is why it is one of the sites that DROPS
+  the mark rather than reserving space for it (TYPE_META, 2026-08-17): a glyph
+  beside the word it stands for was the redundancy at its most literal, and
+  `.admin-stat` lays out with `gap`, so an empty mark would leave the writing
+  pill wearing 0.35rem of lopsided padding no other pill has.
 */
 import TypeMark from './TypeMark.astro';
-import { typeCountLabel, type FragmentType } from '../../lib/fragments-display';
+import { TYPE_META, typeCountLabel, type FragmentType } from '../../lib/fragments-display';
 
 interface Props {
   type: FragmentType;
@@ -20,7 +26,7 @@ const { type, count, title } = Astro.props;
 ---
 
 <span class:list={['admin-stat', count === 0 && 'opacity-50']} title={title} data-type-count={type}>
-  <TypeMark type={type} />
+  {TYPE_META[type].glyph && <TypeMark type={type} />}
   <b class="admin-stat__n">{count}</b>
   <span class="admin-stat__label">{typeCountLabel(type, count)}</span>
 </span>

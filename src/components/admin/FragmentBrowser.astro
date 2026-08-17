@@ -139,19 +139,22 @@ const pick = mode === 'pick';
               role="menu"
               aria-label="Add a fragment"
             >
+              {/* `w-3` on both marks — the mark is a COLUMN here rather than an
+                  inline character, so the two labels keep a common left edge
+                  now that writing has no glyph (TYPE_META, 2026-08-17). */}
               <button
                 data-new-writing
                 role="menuitem"
                 class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
               >
-                <TypeMark type="writing" /> Writing
+                <TypeMark type="writing" class="w-3 text-center" /> Writing
               </button>
               <button
                 data-new="quote"
                 role="menuitem"
                 class="add-item flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
               >
-                <TypeMark type="quote" /> Quote
+                <TypeMark type="quote" class="w-3 text-center" /> Quote
               </button>
               {/* NO SONG, and its absence is the decision rather than an omission
                   (ADR 0031). This menu makes a fragment *to place in this suite*,

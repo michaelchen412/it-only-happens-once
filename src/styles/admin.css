@@ -1365,7 +1365,9 @@ html.reader-open .sky-return {
   color: var(--color-primary);
 }
 
-/* Count badge — "▤ 5 writing". The mark keeps its type color inside. */
+/* Count badge — "5 writing", "” 3 quotes". The mark keeps its type color inside
+   on the types that still have one; writing carries no glyph and TypeCount
+   omits the element rather than let this `gap` open in front of the number. */
 .admin-stat {
   display: inline-flex;
   align-items: baseline;
