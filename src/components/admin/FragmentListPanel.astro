@@ -36,6 +36,9 @@ const { data, params: p, mode = 'manage' } = Astro.props;
 // mean to keep.
 const view = mode === 'manage' ? p.view : 'list';
 const pair = mode === 'pair';
+const epigraph = mode === 'epigraph';
+/** The two pickers that write ONE value — no cart, no select-all (FragmentRow). */
+const single = pair || epigraph;
 const COLUMNS = [
   { field: 'title', label: 'Fragment', align: 'left', cls: 'w-full', sortable: true },
   { field: 'status', label: 'Status', align: 'left', cls: 'hidden sm:table-cell', sortable: false },
@@ -70,7 +73,10 @@ const COLUMNS = [
         one type, so every segment would report the same number as All and
         pressing any of them would change nothing. A control whose options are
         indistinguishable is not a narrow control, it is a dead one. */
-      !pair && (
+      /* ⚠ AND DEAD IN THE EPIGRAPH PICKER FOR THE SAME REASON — `quotable` pins
+        the corpus to published quotes, so every segment would report the number
+        All reports. */
+      !single && (
         <div class="seg" role="radiogroup" aria-label="Filter by type">
           <button
             type="button"
@@ -133,6 +139,15 @@ const COLUMNS = [
         every option would return nothing, which is worse than a dead control:
         it is a control that answers, and answers "no results", and reads as an
         empty corpus. (Subjects stay: writing carries those.) */
+      /* ⚠ `!pair`, NOT `!single` — and this is the one place the two single-select
+        pickers genuinely differ. Author and work are PROVENANCE, and the note
+        above is about a writing-only list, where both selects would answer
+        every option with nothing. The epigraph picker is quotes-only, which is
+        exactly the corpus those two facets describe: "the Marcus Aurelius one",
+        "the one from Meditations" is how you find a quote you half remember.
+        Withheld from one picker and kept in the other, because the reason was
+        never "a picker is narrow" — it was "these two fields are empty on
+        writing". */
       !pair && (
         <>
           <select
@@ -241,7 +256,7 @@ const COLUMNS = [
                     can only ever mean "the last one you ticked" is a control
                     lying about what it does. FragmentRow drops the matching
                     <td>; the two must agree or every row shifts one cell left. */}
-                {!pair && (
+                {!single && (
                   <th scope="col" class="w-8 px-3 py-2">
                     <input type="checkbox" class="checkbox checkbox-xs select-all" aria-label="Select all" />
                   </th>
@@ -303,7 +318,7 @@ const COLUMNS = [
                     scope="col"
                     class="text-base-content/60 px-3 py-2 text-right font-sans text-xs font-normal tracking-wide uppercase"
                   >
-                    <span class="sr-only">{pair ? 'Pair' : 'Place'}</span>
+                    <span class="sr-only">{pair ? 'Pair' : epigraph ? 'Use as the epigraph' : 'Place'}</span>
                   </th>
                 )}
                 {view === 'trash' && (

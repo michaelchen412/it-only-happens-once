@@ -36,32 +36,17 @@ import { embedForUrl } from '../../lib/media';
 import { jsonForScript } from '../../lib/serialize';
 
 const sb = Astro.locals.supabase;
-const [rows, { data: quoteRows }] = await Promise.all([
-  listSetsAdmin(sb),
-  sb
-    .from('fragments')
-    .select('id, body, attribution')
-    .eq('type', 'quote')
-    .eq('status', 'published')
-    .is('deleted_at', null)
-    .order('attribution'),
-]);
+const rows = await listSetsAdmin(sb);
 
 /*
-  ⚠ RENDERED ONCE, NOT ONCE PER CARD. The old page put this list inside every
-  set's form AND in the New form — seven sets × 77 quotes was 616 `<option>`
-  elements for a control that is only ever open once, which is the same O(n²)
-  shape plan 38 · §1.2 deleted from the Library. One sheet, one list.
+  ⚠ THE 77-QUOTE QUERY IS GONE (plan 42 · §4.D.4). This page used to fetch every
+  published quote to build a `<select>`'s options. The picker is
+  `FragmentBrowser` now, which fetches its own rows through the fragments-panel
+  partial when the drawer opens — so the room loads nothing it might not use.
 
-  The label is still a truncation of the body plus the attribution, and it is
-  still not good enough — picking a quote by its opening clause is what §4.D.4's
-  `FragmentBrowser` mode exists to replace. Carried across unchanged so the
-  finding stays visible.
+  What it DOES need is the words of the quote each set already cites, so the
+  sheet can show the line rather than an id. `listSetsAdmin` already joins it.
 */
-const quotes = (quoteRows ?? []).map((q) => ({
-  id: q.id,
-  label: `${(q.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 70)}${(q.body ?? '').length > 70 ? '…' : ''} — ${q.attribution ?? 'unattributed'}`,
-}));
 
 /** Everything the sheet needs, which is the COLUMNS rather than what the row shows. */
 const payload = (s: (typeof rows)[number]) =>
@@ -71,6 +56,8 @@ const payload = (s: (typeof rows)[number]) =>
     slug: s.slug,
     playlist_url: s.playlist_url,
     quote_fragment_id: s.quote_fragment_id,
+    quote_text: s.quote?.body ?? '',
+    quote_cite: s.quote?.attribution ?? '',
     description: s.description ?? '',
     status: s.status,
   });
@@ -204,7 +191,7 @@ const payload = (s: (typeof rows)[number]) =>
     </button>
   </div>
 
-  <SetSheet quotes={quotes} />
+  <SetSheet />
 
   <script>
     import '../../scripts/sets-index';

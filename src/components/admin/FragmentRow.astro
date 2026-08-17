@@ -95,6 +95,14 @@ const workId = r.work_id ?? '';
 const trash = mode === 'manage' && view === 'trash';
 const pick = mode === 'pick';
 const pair = mode === 'pair';
+// The set sheet's epigraph picker (plan 42 · §4.D.4). ⚠ IT MARKS NOTHING, which
+// is the difference from its two neighbours: `pick` dims what is already placed
+// and `pair` dims what is already paired, because both are MEMBERSHIPS you can
+// hold many of. A set cites exactly one quote — `quote_fragment_id` is a scalar
+// — so there is no "already in the target" state to render, only a swap.
+const epigraph = mode === 'epigraph';
+/** The two pickers that write ONE value — no cart, no select-all. */
+const single = pair || epigraph;
 // "Already in the target" — placed for a constellation, paired for a song. One
 // name because every use below is the same question, and writing both conditions
 // at each of the five sites is how the two modes drift apart.
@@ -209,7 +217,11 @@ const editorData =
   data-constellations={constellations.map((c) => c.id).join(',')}
 >
   {
-    !pair && (
+    /* ⚠ NO CART IN EITHER SINGLE-SELECT PICKER, and the panel's matching <th>
+       has to agree or every row shifts one cell left. `pair` writes one foreign
+       key and `epigraph` writes one scalar column, so "select four of these" is
+       a sentence neither can finish. */
+    !single && (
       <td class="w-8 px-3 py-2.5 align-top" data-noedit>
         <input
           type="checkbox"
@@ -401,6 +413,18 @@ const editorData =
             ＋
           </button>
         )}
+      </td>
+    )
+  }
+  {
+    epigraph && (
+      <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
+        {/* One verb, and it is not ＋. Picking here REPLACES whatever the set
+            cites, the way the writing sheet's Music tab replaces a pairing —
+            so the control says Use rather than implying it adds to a list. */}
+        <button type="button" class="btn btn-ghost btn-xs font-sans normal-case" data-act="epigraph" data-id={r.id}>
+          Use
+        </button>
       </td>
     )
   }

@@ -71,6 +71,15 @@ function strip(src: string): string {
 const NOT_DIALOGS: Record<string, string> = {
   bitmap: 'An ImageBitmap in scripts/upload.ts — `close()` releases its memory, nothing is on screen.',
   handle: 'The ShellHandle in scripts/browser-shell.ts, whose own `close()` calls closeWithExit.',
+  // ⚠ THE SAME OBJECT UNDER THE NAME ITS CONSUMERS ACTUALLY USE. `handle` above
+  // is what `browser-shell.ts` calls it INSIDE itself; every file that wires one
+  // — fragment-browser, pair-browser, epigraph-browser — binds it as `shell`.
+  // The epigraph picker is simply the first to close the drawer from a consumer
+  // rather than from a dismissal, which is what surfaced the gap. Keyed by
+  // receiver name, this list needs both spellings or it exempts the definition
+  // and catches the call sites.
+  shell:
+    'A ShellHandle in a FragmentBrowser consumer — the same object as `handle`, whose `close()` calls closeWithExit.',
   ui: 'The Sheet from scripts/sheet.ts (plan 41 · §4), whose own `close()` resets the dirty tracker and then calls closeWithExit — same shape as `handle` above.',
 };
 

@@ -38,7 +38,7 @@ import BackToTop from '../BackToTop.astro';
 
 interface Props {
   /** Which room this instance serves. See the header. */
-  mode?: 'pick' | 'pair';
+  mode?: 'pick' | 'pair' | 'epigraph';
   /** The dialog's own id — the ONE id in here, so two can coexist on a page. */
   id?: string;
   /** pick only: the target constellation. */
@@ -52,13 +52,33 @@ interface Props {
 }
 const {
   mode = 'pick',
-  id = mode === 'pair' ? 'pair-browser' : 'fbrowser',
+  id = mode === 'pair' ? 'pair-browser' : mode === 'epigraph' ? 'epigraph-browser' : 'fbrowser',
   constellation,
   constellationName = '',
   constellationDescription,
   constellationColor,
 } = Astro.props;
 const pick = mode === 'pick';
+/*
+  ⚠ mode="epigraph" — THE SET SHEET'S QUOTE PICKER (plan 42 · §4.D.4). The third
+  room to use this drawer, and the narrowest: published quotes only, one pick,
+  no cart, no editors, no Add ▾.
+
+  IT EXISTS BECAUSE OF WHAT THE TABLE ALREADY RENDERS. A set's epigraph used to
+  be chosen from a `<select>` whose options were the first 70 characters of the
+  body joined to an attribution — so you picked a quote by its opening clause,
+  from a control that showed 616 `<option>` elements across the page. This table
+  sets a quote the way the corpus does: italic, clamped, with its citation line
+  beneath. The finding was never "the select is long"; it was that a quote does
+  not fit in one.
+
+  ⚠ AND IT IS A THIRD MODE RATHER THAN A GENERALISED `pair`, per this file's own
+  warning against making its modes symmetrical. They are not: `pair` writes a
+  foreign key on the SONG side of a many-to-one and confirms a steal; this
+  writes a scalar column on the set and can only ever swap.
+*/
+const epigraph = mode === 'epigraph';
+const pair = mode === 'pair';
 ---
 
 <dialog
@@ -74,17 +94,25 @@ const pick = mode === 'pick';
     <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">
         {
+          /* ⚠ ONE HEADING, THREE VERBS — and it is a three-way branch rather
+            than a ternary plus a second block, because that shape renders TWO
+            `<h2>`s carrying the SAME id the dialog's `aria-labelledby` points
+            at. Valid JSX, passes `astro check`, and names the drawer twice.
+
+            The name is filled at open time in two of the three: one drawer
+            serves every song the song sheet loads and every set the set sheet
+            loads. The VERB is the whole difference between the modes, and a
+            picker that says the wrong one is how you end up believing you
+            placed something in a suite. */
           pick ? (
             <h2 id={`${id}-title`} class="font-display truncate text-xl">
               Add to <span class="fb-cname text-primary">{constellationName}</span>
             </h2>
+          ) : epigraph ? (
+            <h2 id={`${id}-title`} class="font-display truncate text-xl">
+              Quote for <span class="fb-cname text-primary" />
+            </h2>
           ) : (
-            /* ⚠ THE SONG IS NAMED IN THE HEADING, and it is filled at open time
-              rather than rendered: one drawer serves every song the sheet
-              opens. "Pair … with a piece" rather than "Add to" because the
-              verb is the whole difference between the two modes, and a picker
-              that says the wrong verb is how you end up believing you placed
-              something in a suite. */
             <h2 id={`${id}-title`} class="font-display truncate text-xl">
               Pair <span class="fb-cname text-primary" /> with a piece
             </h2>
@@ -100,7 +128,13 @@ const pick = mode === 'pick';
           title={pick ? constellationDescription : undefined}
           hidden={pick && !constellationDescription}
         >
-          {pick ? constellationDescription : 'One piece at a time. Anything already holding another song will say so.'}
+          {
+            pick
+              ? constellationDescription
+              : epigraph
+                ? 'Published quotes only — it leads the open set, above your description.'
+                : 'One piece at a time. Anything already holding another song will say so.'
+          }
         </p>
       </div>
       {
@@ -223,10 +257,18 @@ const pick = mode === 'pick';
         before the real thing. A bar below the list is that ordering, and it is
         the same corner of the drawer where pick keeps its own verb.
 
-        It types nothing twice: the search term IS the title. */
+        It types nothing twice: the search term IS the title.
+
+        ⚠ `pair`, NOT `!pick` — narrowed when the epigraph mode arrived (plan 42
+        · §4.D.4). `!pick` meant "the other mode" while there were two, and a
+        third made it wrong rather than merely loose: this bar starts a DRAFT
+        ESSAY and pairs the song to it, which is a sentence the set sheet's
+        picker cannot finish. Its equivalent — "this quote isn't written down
+        yet" — is a different flow with a different editor, and offering the
+        wrong one is worse than offering none. */
     }
     {
-      !pick && (
+      pair && (
         <footer
           class="fb-createbar border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
           hidden

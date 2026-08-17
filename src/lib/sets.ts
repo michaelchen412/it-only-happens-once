@@ -11,7 +11,7 @@
 import type { DB } from '../actions/_shared';
 import type { MusicSet } from './music-sets';
 
-/** A set as the workshop sees it — drafts included, quote unresolved. */
+/** A set as the workshop sees it — drafts included. */
 export interface SetRow {
   id: string;
   slug: string;
@@ -19,6 +19,19 @@ export interface SetRow {
   description: string;
   playlist_url: string;
   quote_fragment_id: string | null;
+  /**
+   * The cited quote's own words and line, for the sheet's summary — so the
+   * epigraph field can show WHAT is cited rather than that something is
+   * (plan 42 · §4.D.4).
+   *
+   * ⚠ UNFILTERED, UNLIKE `listSets`'s. That one drops a quote unless it is
+   * itself published and undeleted, because a reader must never meet a draft.
+   * This is the workshop: if a set cites a quote that has since been
+   * unpublished or binned, the editor is exactly where that has to be VISIBLE
+   * rather than silently blank. `checkQuote` refuses a binned one on the next
+   * save, which is the moment to find out.
+   */
+  quote: { body: string | null; attribution: string | null } | null;
   status: string;
   sort: number;
 }
@@ -101,8 +114,20 @@ export async function listSets(supabase: DB): Promise<MusicSet[]> {
 export async function listSetsAdmin(supabase: DB): Promise<SetRow[]> {
   const { data } = await supabase
     .from('sets')
-    .select('id, slug, title, description, playlist_url, quote_fragment_id, status, sort')
+    // ⚠ ONE STRING LITERAL, NEVER A CONCATENATION — the reason is spelled out
+    // over `listSets` above: supabase-js infers the row type from the select
+    // TEXT, so a concatenation widens it to `string` and every column comes back
+    // as `GenericStringError`. Prettier will not split it; leave it long.
+    // prettier-ignore
+    .select(
+      'id, slug, title, description, playlist_url, quote_fragment_id, status, sort, quote:fragments!sets_quote_fragment_id_fkey(body, attribution)',
+    )
     .order('sort')
     .order('created_at');
-  return (data ?? []) as SetRow[];
+  // PostgREST answers a to-one embed as an object, but the generated types
+  // allow an array — the same normalisation `listSets` does one function up.
+  return (data ?? []).map((s) => ({
+    ...s,
+    quote: (Array.isArray(s.quote) ? s.quote[0] : s.quote) ?? null,
+  })) as SetRow[];
 }

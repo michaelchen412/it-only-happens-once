@@ -16,6 +16,7 @@ import { actions } from 'astro:actions';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { mountMiniEditor } from './rich-editor';
+import { wireEpigraphBrowser } from './epigraph-browser';
 import { wireSheet } from './sheet';
 
 const sheet = document.querySelector<HTMLDialogElement>('#set-sheet');
@@ -28,7 +29,11 @@ if (sheet && form) {
   const titleEl = form.querySelector<HTMLInputElement>('input[name="title"]')!;
   const urlEl = form.querySelector<HTMLInputElement>('input[name="playlist_url"]')!;
   const slugEl = form.querySelector<HTMLInputElement>('input[name="slug"]')!;
-  const quoteEl = form.querySelector<HTMLSelectElement>('[data-quote]')!;
+  const quoteId = form.querySelector<HTMLInputElement>('[data-quote-id]')!;
+  const quoteNone = form.querySelector<HTMLElement>('[data-quote-none]')!;
+  const quoteText = form.querySelector<HTMLElement>('[data-quote-text]')!;
+  const quoteCite = form.querySelector<HTMLElement>('[data-quote-cite]')!;
+  const quoteClear = form.querySelector<HTMLButtonElement>('[data-quote-clear]')!;
   const descValue = form.querySelector<HTMLInputElement>('[data-desc-value]')!;
   const statusEl = form.querySelector<HTMLInputElement>('[data-status]')!;
   const statusWord = document.getElementById('set-status-word')!;
@@ -70,9 +75,41 @@ if (sheet && form) {
     slug: string;
     playlist_url: string;
     quote_fragment_id: string | null;
+    /** The cited quote's words and citation, for the sheet's summary. */
+    quote_text?: string;
+    quote_cite?: string;
     description: string;
     status: string;
   }
+
+  /** The one place the epigraph's three elements are kept in step. */
+  function paintQuote(id: string, text: string, cite: string) {
+    quoteId.value = id;
+    const has = !!id;
+    quoteNone.hidden = has;
+    quoteText.hidden = !has;
+    quoteCite.hidden = !has || !cite;
+    quoteClear.hidden = !has;
+    quoteText.textContent = text;
+    quoteCite.textContent = cite ? `— ${cite}` : '';
+  }
+
+  const epigraphs = wireEpigraphBrowser(document.getElementById('epigraph-browser') as HTMLDialogElement, {
+    onPicked: (q) => {
+      paintQuote(q.id, q.label, q.attribution);
+      // A hidden input's value set in script fires no `input` event, so the
+      // exit guard would not know this sheet had anything to lose.
+      ui.dirty.touch();
+    },
+  });
+
+  form.querySelector<HTMLButtonElement>('[data-quote-pick]')!.addEventListener('click', () => {
+    epigraphs.open({ setName: titleEl.value.trim() });
+  });
+  quoteClear.addEventListener('click', () => {
+    paintQuote('', '', '');
+    ui.dirty.touch();
+  });
 
   function fill(row: SetRow | null) {
     editing = row?.id ?? null;
@@ -83,7 +120,11 @@ if (sheet && form) {
     titleEl.value = row?.title ?? '';
     urlEl.value = row?.playlist_url ?? '';
     slugEl.value = row?.slug ?? '';
-    quoteEl.value = row?.quote_fragment_id ?? '';
+    // ⚠ THE SUMMARY IS THE ROW'S OWN WORDS, not a re-query. The list page
+    // serialises the quote's text and citation onto each set for exactly this,
+    // so reopening a saved set shows the line it cites without a round trip —
+    // and an unsaved pick shows what you just pressed, from the same shape.
+    paintQuote(row?.quote_fragment_id ?? '', row?.quote_text ?? '', row?.quote_cite ?? '');
     descValue.value = row?.description ?? '';
     // ⚠ `emitUpdate: false` — the trap every editor in this admin names: TipTap
     // v3 fires `update` from `setContent`, which would arm the dirty guard on a

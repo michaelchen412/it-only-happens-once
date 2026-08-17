@@ -68,6 +68,20 @@ export interface FragmentListParams {
    */
   pairable: boolean;
   /**
+   * epigraph mode: published QUOTES only, and — like `pairable` — it is a fact
+   * about the surface rather than a filter the reader chose.
+   *
+   * ⚠ IT PINS `status` AS WELL AS `type`, WHICH `pairable` DOES NOT, and the
+   * asymmetry is the two actions' own. `songs.pair` accepts a draft essay: the
+   * pairing is private until the essay publishes. `sets.save` runs `checkQuote`,
+   * which refuses a quote in the bin and allows a draft one only because "you
+   * may well be writing both at once" — but a set's epigraph is the FIRST thing
+   * a reader meets on the music page, so offering a draft here would invite a
+   * pick whose words the public cannot see. Narrower than the action allows, on
+   * purpose: the picker offers what is safe, the action refuses what is wrong.
+   */
+  quotable: boolean;
+  /**
    * pair mode: mark rows already paired to THIS song. The sibling of
    * `constellation` above, and it needs no query of its own — `paired_song_id`
    * is a column on the row, so the marking is a read of what we already have.
@@ -103,6 +117,7 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     constellation: (sp.get('constellation') || '').trim() || null,
     membership,
     pairable: false, // the pair picker turns it on; fragments-panel.astro, never the URL
+    quotable: false, // ditto — the epigraph picker, and never a crafted URL
     pairedSong: (sp.get('song') || '').trim() || null,
 
     filtered:
@@ -136,7 +151,7 @@ export interface ConstellationRefLite {
  * `FragmentListPanel` and `FragmentRow` — which is what it was, and adding a
  * third value to two copies is exactly the drift plans/29 · §3 named.
  */
-export type PanelMode = 'manage' | 'pick' | 'pair';
+export type PanelMode = 'manage' | 'pick' | 'pair' | 'epigraph';
 
 export interface FragmentListData {
   rows: FragmentRowT[];
@@ -287,7 +302,10 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
     const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
     const working = live.neq('status', 'note') as T;
-    return (p.pairable ? working.eq('type', 'writing') : working) as T;
+    if (p.pairable) return working.eq('type', 'writing') as T;
+    // Both pins, because a published quote is the whole of what a set may cite.
+    if (p.quotable) return working.eq('type', 'quote').eq('status', 'published') as T;
+    return working as T;
   };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort

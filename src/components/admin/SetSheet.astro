@@ -52,15 +52,10 @@
   deriving those from what is on screen is how a form and a row come to disagree.
 */
 import { Icon } from 'astro-icon/components';
+import FragmentBrowser from './FragmentBrowser.astro';
 import MiniEditor from './MiniEditor.astro';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
-
-interface Props {
-  /** Published quotes, for the epigraph picker. */
-  quotes: { id: string; label: string }[];
-}
-const { quotes } = Astro.props;
 ---
 
 <dialog id="set-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="set-sheet-title">
@@ -83,26 +78,42 @@ const { quotes } = Astro.props;
       </label>
 
       {
-        /* ⚠ STILL A `<select>`, AND IT IS THE ONE THING THIS SHEET DOES NOT FIX
-          (plan 42 · §4.D.4). The right answer is `FragmentBrowser` in a third
-          mode — published quotes, single-select, with the create bar retargeted
-          — and it is a bigger piece than the rest of this file. Carried across
-          unchanged rather than quietly improved, so the finding stays open and
-          visible instead of looking done.
+        /* ⚠ THE `<select>` IS GONE (plan 42 · §4.D.4). It listed every published
+          quote as its first 70 characters joined to an attribution — so you
+          picked a line by its opening clause — and the old page rendered that
+          list once per card PLUS once in the New form: 616 `<option>` elements
+          for a control only ever open once, the same O(n²) shape plan 38 · §1.2
+          deleted from the Library.
 
-          What DID change: it is rendered ONCE here instead of once per card
-          plus once in the New form. Seven sets × 77 quotes was 616 `<option>`
-          elements for a control only ever open once — the same O(n²) shape
-          plan 38 · §1.2 deleted from the Library. */
+          `FragmentBrowser` in `mode="epigraph"` shows a quote the way the corpus
+          does: whole, italic, with its citation beneath, searchable, and
+          filterable by author and work — which are exactly the two facets a
+          quote has and a writing does not (see FragmentListPanel's note on why
+          the pair picker withholds them and this one keeps them).
+
+          ⚠ THE PICK IS HELD, NOT WRITTEN. A constellation membership and a song
+          pairing are RELATIONS and apply on touch; a set's epigraph is a scalar
+          column on the set, so it rides the card's own Save. That is also what
+          lets an unsaved NEW set carry a quote. */
       }
-      <label class="f mt-4">
+      <div class="f mt-4">
         <span class="f__k">Quote <span>— optional</span></span>
-        <select name="quote_fragment_id" data-quote>
-          <option value="">None</option>
-          {quotes.map((q) => <option value={q.id}>{q.label}</option>)}
-        </select>
+        <input type="hidden" name="quote_fragment_id" data-quote-id />
+        <div class="rounded-field border-base-300 flex items-start gap-2 border px-3 py-2">
+          <div class="min-w-0 flex-1">
+            <p class="f__h italic" data-quote-none>Nothing chosen — the set opens on your description.</p>
+            <blockquote class="font-serif text-sm leading-snug" data-quote-text hidden></blockquote>
+            <p class="admin-hint mt-0.5 text-xs" data-quote-cite hidden></p>
+          </div>
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <button type="button" class="btn btn-ghost btn-xs normal-case" data-quote-pick>Choose…</button>
+            <button type="button" class="btn btn-ghost btn-xs text-error normal-case" data-quote-clear hidden>
+              Clear
+            </button>
+          </div>
+        </div>
         <span class="f__h">It leads the open set, above your description.</span>
-      </label>
+      </div>
 
       {
         /* ⚠ A MINI EDITOR, NOT A TEXTAREA (plan 42 · §4.D.5). `MusicSets.astro`
@@ -179,6 +190,15 @@ const { quotes } = Astro.props;
       <button type="submit" class="btn btn-primary btn-sm font-sans normal-case" data-submit>Save set</button>
     </div>
   </form>
+
+  {
+    /* ⚠ A SIBLING OF THE FORM, NOT A CHILD — the rule `SongSheet` states about
+      its own pair drawer: a <dialog> nested inside another <dialog> inherits the
+      parent's `display: none` when the parent is closed, and the top layer does
+      not care about DOM depth anyway. Inside the `<form>` it would also nest a
+      form's worth of controls in the card's own FormData. */
+  }
+  <FragmentBrowser mode="epigraph" />
 </dialog>
 
 <script>
