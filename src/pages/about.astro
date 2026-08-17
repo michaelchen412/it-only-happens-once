@@ -39,7 +39,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Label from '../components/Label.astro';
 import ContactForm from '../components/ContactForm.astro';
 import { renderMarkdown } from '../lib/markdown';
-import { parseSpotifyEmbed, spotifyEmbedHeight, spotifyEmbedSrc } from '../lib/media';
+import { embedForUrl } from '../lib/media';
 
 const supabase = Astro.locals.supabase;
 const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
@@ -67,12 +67,23 @@ const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const cacheBust = page?.updated_at ? new Date(page.updated_at).getTime() : 0;
 const portraitUrl = me.portrait ? `${SUPABASE_URL}/storage/v1/object/public/site/${me.portrait}?v=${cacheBust}` : '';
 
-const embed = siteName.spotify_url ? parseSpotifyEmbed(siteName.spotify_url) : null;
-const embedSrc = embed ? spotifyEmbedSrc(embed) : '';
-const embedHeight = embed ? spotifyEmbedHeight(embed.kind) : 352;
+/*
+  The name-origin album (docs/admin.md §5's About builder writes `spotify_url`).
+
+  ⚠ THIS PAGE WAS ALREADY CORRECT AND IS ROUTED THROUGH `embedForUrl` ANYWAY
+  (plan 42 · §5). It called `spotifyEmbedHeight` properly and spelled the full
+  permission list out inline — which is the problem: that string was a fourth
+  hand-written copy of `SPOTIFY_ALLOW`, and the two files that hand-wrote a
+  SHORTER version of it are exactly the two this plan is here to fix. A correct
+  copy is still a copy, and it is the one a later edit reads as the precedent.
+
+  One helper returns `{ src, height, allow }` together, so the three facts
+  cannot drift apart again in any of the five places that render a player.
+*/
+const embed = siteName.spotify_url ? embedForUrl(siteName.spotify_url) : null;
 
 const hasMe = !!(meBodyHtml || portraitUrl);
-const hasSite = !!(siteBodyHtml || blurbHtml || embedSrc);
+const hasSite = !!(siteBodyHtml || blurbHtml || embed);
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
 ---
@@ -175,24 +186,40 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 
               {siteBodyHtml && <div class="reading mt-8" set:html={siteBodyHtml} />}
 
-              {(blurbHtml || embedSrc) && (
+              {(blurbHtml || embed) && (
                 <div class="mt-12">
                   <Label as="h3">About the Name</Label>
                   <div class="rounded-box border-base-300 bg-base-200 mt-4 border p-6">
                     {blurbHtml && <div class="reading" set:html={blurbHtml} />}
-                    {embedSrc && (
-                      <iframe
-                        src={embedSrc}
-                        title="Spotify player"
-                        width="100%"
-                        height={embedHeight}
-                        style="border-radius:12px;border:0"
-                        class:list={[blurbHtml && 'mt-5']}
-                        loading="lazy"
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        allowfullscreen
-                      />
-                    )}
+                    {embed &&
+                      (embed.height === null ? (
+                        <div
+                          class:list={['aspect-video overflow-hidden', blurbHtml && 'mt-5']}
+                          style="border-radius:12px"
+                        >
+                          <iframe
+                            class="h-full w-full"
+                            src={embed.src}
+                            title="Player"
+                            style="border:0"
+                            loading="lazy"
+                            allow={embed.allow}
+                            allowfullscreen
+                          />
+                        </div>
+                      ) : (
+                        <iframe
+                          src={embed.src}
+                          title="Spotify player"
+                          width="100%"
+                          height={embed.height}
+                          style="border-radius:12px;border:0"
+                          class:list={[blurbHtml && 'mt-5']}
+                          loading="lazy"
+                          allow={embed.allow}
+                          allowfullscreen
+                        />
+                      ))}
                   </div>
                 </div>
               )}

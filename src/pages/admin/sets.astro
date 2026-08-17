@@ -27,7 +27,7 @@ import PageHeader from '../../components/admin/PageHeader.astro';
 import StatusChip from '../../components/admin/StatusChip.astro';
 import EmptyState from '../../components/admin/EmptyState.astro';
 import { listSetsAdmin } from '../../lib/sets';
-import { parseSpotifyEmbed, spotifyEmbedSrc } from '../../lib/media';
+import { embedForUrl } from '../../lib/media';
 
 /*
   ⚠ REDIRECT AFTER A SUCCESSFUL POST, always. Without it a refresh resubmits the
@@ -104,7 +104,28 @@ const FIELD = 'input input-sm input-bordered w-full font-sans';
     <ul class="flex flex-col gap-6">
       {
         rows.map((s, i) => {
-          const ref = parseSpotifyEmbed(s.playlist_url);
+          /*
+            ⚠ `embedForUrl`, NOT A HAND-WRITTEN FRAME (plan 42 · §5). This
+            preview carried `height="152"` — the TRACK height — for a PLAYLIST
+            whose frame is 352, and **no `allow` attribute at all**, so the one
+            control it exists to offer (press play, is this the right playlist?)
+            was the one most likely not to work. `lib/media.ts` records why:
+            Chrome blocks `autoplay`/`encrypted-media` in a cross-origin frame
+            unless the EMBEDDER delegates them, and it fails per-profile, so it
+            reads as "the embed is broken" rather than "the attribute is
+            missing".
+
+            The gate is now the embed itself rather than a separate parse: a URL
+            that cannot be embedded shows no player and no Open link, which is
+            one answer instead of two that could disagree.
+
+            ⚠ THE HEIGHT IS THE CANONICAL 352 AND THE PUBLIC PAGE RENDERS 480
+            (`MusicSets.astro`, chosen at the bench). Matching that is plan 42 ·
+            §4.D.6 and belongs with the sheet rebuild, not here — this commit
+            fixes what was WRONG, and the remaining gap is a deliberate
+            difference between a preview and the page.
+          */
+          const ref = embedForUrl(s.playlist_url);
           return (
             <li class="border-base-300 rounded-box border p-5">
               <div class="mb-4 flex items-start justify-between gap-4">
@@ -206,17 +227,30 @@ const FIELD = 'input input-sm input-bordered w-full font-sans';
                 </div>
               </form>
 
-              {ref && (
-                <iframe
-                  class="mt-4"
-                  src={spotifyEmbedSrc(ref)}
-                  width="100%"
-                  height="152"
-                  loading="lazy"
-                  title={s.title}
-                  style="border-radius: var(--radius-box); border: 0"
-                />
-              )}
+              {ref &&
+                (ref.height === null ? (
+                  <div class="mt-4 aspect-video overflow-hidden" style="border-radius: var(--radius-box)">
+                    <iframe
+                      class="h-full w-full"
+                      src={ref.src}
+                      loading="lazy"
+                      allow={ref.allow}
+                      title={s.title}
+                      style="border: 0"
+                    />
+                  </div>
+                ) : (
+                  <iframe
+                    class="mt-4"
+                    src={ref.src}
+                    width="100%"
+                    height={ref.height}
+                    loading="lazy"
+                    allow={ref.allow}
+                    title={s.title}
+                    style="border-radius: var(--radius-box); border: 0"
+                  />
+                ))}
 
               <form
                 method="POST"
