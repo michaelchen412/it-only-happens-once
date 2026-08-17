@@ -1,3 +1,5 @@
+import { lockScroll, unlockScroll } from './scroll-lock';
+
 // `afterDialogClose(dialog)` — resolve once a closing <dialog> has finished
 // animating out.
 //
@@ -190,8 +192,46 @@ export async function closeWithExit(dialog: HTMLDialogElement, opts: { onCancell
  */
 export function openDialog(dialog: HTMLDialogElement): void {
   delete dialog.dataset.closing;
+  lockScroll(dialog);
   if (dialog.open) return;
   if (!dialog.hasAttribute('tabindex')) dialog.tabIndex = -1;
   dialog.showModal();
   if (!dialog.querySelector('[autofocus]')) dialog.focus();
+}
+
+/* ── The scroll lock, wired once for every dialog in the building ────────────
+   (2026-08-17.) `showModal()` was doing this job on desktop and only appearing
+   to: the spec does not require a modal dialog to freeze the document, and iOS
+   Safari does not, so on a phone the page behind the capture box scrolled under
+   your thumb. Reader.astro had solved it properly a week earlier and was the
+   only surface that had.
+
+   ⚠ RELEASED ON `close`, NOT IN `closeWithExit`, and Reader.astro is where that
+   reasoning was first written down: `close` is the one event meaning "this is
+   now shut" no matter WHO shut it, and there is at least one route we do not
+   control — Chromium's close watcher fires `cancel` only while the press still
+   carries user activation, so a second Escape during a slide-out closes the
+   dialog directly, past every handler a sheet installed. Anything keyed on our
+   own exit path leaks the lock there, and a leaked lock is a page that will not
+   scroll with nothing on screen to explain it.
+
+   Capture phase because `close` does not bubble — a capturing listener still
+   sees it on the way down. One listener at the document, rather than one per
+   dialog, so a sheet added later inherits this by existing.
+
+   The pairing is deliberately lopsided: locking is explicit (`openDialog`),
+   unlocking is automatic. A dialog cannot forget to release something it never
+   asked for. */
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'close',
+    (e) => {
+      const t = e.target;
+      if (t instanceof HTMLDialogElement) unlockScroll(t);
+    },
+    true,
+  );
+  // `<html>` persists across a view transition, so a lock held by a dialog that
+  // is about to be swapped away would follow the reader to the next page.
+  document.addEventListener('astro:before-swap', () => unlockScroll());
 }

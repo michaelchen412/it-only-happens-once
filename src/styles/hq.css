@@ -3295,6 +3295,13 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   width: 100%;
   max-height: min(60vh, 26rem);
   overflow-y: auto;
+  /* ⚠ THE OTHER HALF OF THE SCROLL LOCK (2026-08-17), and the half the root
+     lock cannot reach. `html.scroll-locked` stops the page scrolling on its own
+     account; it does not stop THIS box handing a scroll onward when it runs out
+     of its own, and a jot long enough to scroll is exactly when a thumb keeps
+     going. `contain` ends the chain here — the box scrolls to its end and the
+     gesture stops, rather than continuing into the page underneath. */
+  overscroll-behavior: contain;
 }
 .cap-shell .jot-prose {
   min-height: 8.5rem; /* the old textarea's floor, so the box opens the same size */

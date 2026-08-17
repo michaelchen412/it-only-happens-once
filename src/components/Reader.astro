@@ -47,24 +47,20 @@ import BackToTop from './BackToTop.astro';
   // on close); false when we arrived already pointing at it (deep link / refresh).
   let openedViaTrigger = false;
 
-  // Lock page scroll without shifting the layout: measure the scrollbar we're
-  // about to hide and pad the page by exactly that width. (scrollbar-gutter was
-  // unreliable across browsers, so we compensate explicitly.)
+  // ⚠ THE SCROLL LOCK USED TO LIVE HERE, as two local functions, and it moved to
+  // `scripts/scroll-lock.ts` on 2026-08-17 — unchanged in behaviour, and now
+  // applied by `openDialog`/`close` to every modal rather than to this one.
+  // It was right the whole time; it was just the only surface that had it, and
+  // on a phone that showed (the admin's capture box scrolled the page behind
+  // it). Nothing in this file calls it any more: opening locks, `close` unlocks,
+  // and both of those already run through `dialog-close.ts`.
   //
-  // ⚠ THE LOCK IS HELD THROUGH THE SLIDE-OUT and dropped after it, which is why
-  // `close()` waits rather than releasing on a timer. Drop it while the drawer
-  // is still moving and the frozen feed gets its scrollbar back and reflows
-  // sideways BEHIND it — a jump at the exact moment the eye is following
-  // something leave.
-  function lockScroll() {
-    const sbw = window.innerWidth - document.documentElement.clientWidth;
-    document.documentElement.style.setProperty('--reader-sbw', `${sbw}px`);
-    document.documentElement.classList.add('reader-open');
-  }
-  function unlockScroll() {
-    document.documentElement.classList.remove('reader-open');
-    document.documentElement.style.removeProperty('--reader-sbw');
-  }
+  // The property this file established, and which the shared version keeps: THE
+  // LOCK IS HELD THROUGH THE SLIDE-OUT and dropped after it, which is why
+  // `closeWithExit` waits rather than releasing on a timer. Drop it while the
+  // drawer is still moving and the frozen feed gets its scrollbar back and
+  // reflows sideways BEHIND it — a jump at the exact moment the eye is
+  // following something leave.
 
   /**
    * ⚠ TWO SOURCES, AND THE SECOND ONE EXISTS BECAUSE INERT IS NOT FREE.
@@ -120,7 +116,6 @@ import BackToTop from './BackToTop.astro';
     d.dataset.readerSlug = slug;
     const scroll = d.querySelector('.reader-scroll');
     if (scroll) scroll.scrollTop = 0;
-    lockScroll();
   }
 
   async function open(slug: string): Promise<boolean> {
@@ -154,7 +149,10 @@ import BackToTop from './BackToTop.astro';
 
   function close() {
     const d = reader();
-    if (!d || !d.open) return unlockScroll();
+    // Nothing to release on the way out any more: the lock is keyed on the
+    // dialog and dropped by the shared `close` listener, so a reader that is
+    // already shut is already unlocked.
+    if (!d || !d.open) return;
     if (d.dataset.closing) return; // already sliding out; don't restart it
     delete d.dataset.readerSlug;
     // ⚠ THE SHEET STAYS OPEN WHILE IT LEAVES. `d.close()` here would be the
@@ -275,18 +273,21 @@ import BackToTop from './BackToTop.astro';
       e.preventDefault();
       dismiss();
     });
-    // ⚠ THE SCROLL-LOCK COMES OFF HERE, on the one event that means "this sheet
-    // is now shut" no matter who shut it. Releasing it inside close() instead
+    // ⚠ THE TEARDOWN HANGS OFF `close`, on the one event that means "this sheet
+    // is now shut" no matter who shut it. Doing it inside close() instead
     // covers only the paths we control, and the browser has at least one of its
     // own: Chromium's close watcher fires `cancel` only while the press still
     // carries user activation, so a SECOND Escape during the slide-out closes
     // the dialog directly, past the handler above. That is a fine outcome — you
     // pressed Escape twice, the sheet goes — but the teardown has to notice.
     // Keying on `close` makes every route out land in the same place.
+    //
+    // That argument outgrew this file: `dialog-close.ts` now releases the SCROLL
+    // LOCK from the same event, at the document, for every dialog. What is left
+    // here is the state only the reader has.
     d.addEventListener('close', () => {
       delete d.dataset.closing;
       delete d.dataset.readerSlug;
-      unlockScroll();
     });
   }
 
@@ -301,8 +302,9 @@ import BackToTop from './BackToTop.astro';
     bindDialog();
     void sync();
   });
-  // <html> persists across view transitions — never leak the scroll lock.
-  document.addEventListener('astro:before-swap', unlockScroll);
+  // (`<html>` persists across view transitions and must never carry the scroll
+  // lock into the next page. That guard moved to `dialog-close.ts` with the
+  // lock itself — it was never specific to the reader.)
   bindDialog();
   void sync(); // first load
 </script>

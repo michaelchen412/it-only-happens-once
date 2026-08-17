@@ -162,7 +162,7 @@ for (const how of ['button', 'escape', 'backdrop'] as const) {
     expect(exit.hash).toBe('');
     // The lock is held THROUGH the slide and dropped after: released early and
     // the feed reflows sideways behind a still-moving drawer.
-    expect(exit.htmlClass).not.toContain('reader-open');
+    expect(exit.htmlClass).not.toContain('scroll-locked');
   });
 }
 
@@ -264,7 +264,7 @@ test('reopening mid-slide keeps the new sheet, not the one that was leaving', as
       open: d.open,
       closing: d.dataset.closing ?? null,
       slug: d.dataset.readerSlug ?? null,
-      locked: document.documentElement.classList.contains('reader-open'),
+      locked: document.documentElement.classList.contains('scroll-locked'),
       chars: d.querySelector('.reader-inner')?.textContent?.trim().length ?? 0,
     };
   }, first);
@@ -301,14 +301,18 @@ test('a second Escape during the slide still tears everything down', async ({ pa
   const after = await page.evaluate(() => ({
     open: (document.getElementById('site-reader') as HTMLDialogElement).open,
     closing: (document.getElementById('site-reader') as HTMLElement).dataset.closing ?? null,
-    locked: document.documentElement.classList.contains('reader-open'),
-    padded: document.documentElement.style.paddingRight,
+    locked: document.documentElement.classList.contains('scroll-locked'),
+    // The scrollbar compensation is a CUSTOM PROPERTY, not an inline
+    // `padding-right` — `html.scroll-locked` is what turns it into padding. The
+    // old assertion read `style.paddingRight`, which this code never sets, so it
+    // passed whether or not the lock cleaned up after itself.
+    padded: document.documentElement.style.getPropertyValue('--scrollbar-w'),
     hash: location.hash,
   }));
 
   expect(after.open).toBe(false);
   expect(after.closing).toBeNull();
   expect(after.locked, 'the page was left unscrollable with no sheet open').toBe(false);
-  expect(after.padded).toBe('');
+  expect(after.padded, 'the scrollbar compensation outlived the lock that needed it').toBe('');
   expect(after.hash).toBe('');
 });

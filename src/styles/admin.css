@@ -172,11 +172,21 @@ dialog,
    sheet on desktop (a comfortable reading width), a full-screen sheet on phones.
    Reused by the blog now and the constellation views later.
    ------------------------------------------------------------------------- */
-html.reader-open {
-  overflow: hidden; /* freeze the feed behind the reader */
-  /* Pad by the now-hidden scrollbar's width (measured in Reader.astro) so the
+/* ⚠ THIS WAS `html.reader-open` UNTIL 2026-08-17, and the rename is the change.
+   The lock is no longer the Reader's private arrangement — `openDialog` applies
+   it to every modal in the building (scripts/scroll-lock.ts), because
+   `showModal()` only appeared to be doing this and stopped appearing to on a
+   phone. A rule named after one of its ~20 callers would have read as a bug at
+   every other call site. */
+html.scroll-locked {
+  overflow: hidden; /* freeze whatever is behind the dialog */
+  /* Pad by the now-hidden scrollbar's width (measured in scroll-lock.ts) so the
      page doesn't jump sideways. The strip sits under the backdrop, so unseen. */
-  padding-right: var(--reader-sbw, 0px);
+  padding-right: var(--scrollbar-w, 0px);
+  /* iOS does not treat `overflow: hidden` on the root as the last word — a
+     touch that starts on the backdrop can still rubber-band the document
+     underneath. This is the half of the lock that only phones need. */
+  overscroll-behavior: none;
 }
 .reader {
   width: min(44rem, 100vw);
@@ -670,8 +680,14 @@ html.reader-open {
   z-index: 5;
 }
 
-html.reader-open .back-to-top:not(.back-to-top--in-sheet),
-html.reader-open .sky-return {
+/* A page-level floating control has nothing to offer while a modal is over it:
+   the thing it scrolls is frozen. Renamed with the lock (2026-08-17), and the
+   rule got BROADER in the process — it used to fire for the public Reader alone
+   and now covers every sheet, which is what it always meant. The page's own ✕
+   and the sky's ✦ sit BELOW the top layer, so without this they show through as
+   two controls that look live and do nothing. */
+html.scroll-locked .back-to-top:not(.back-to-top--in-sheet),
+html.scroll-locked .sky-return {
   opacity: 0;
   pointer-events: none;
 }
