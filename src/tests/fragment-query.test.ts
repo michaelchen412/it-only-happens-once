@@ -65,18 +65,19 @@ describe('parseListParams — filters', () => {
   });
 });
 
-describe('parseListParams — the two picker scopes', () => {
-  // ⚠ NEITHER IS A URL PARAM, AND THAT IS THE PROPERTY UNDER TEST (plan 39 · §2).
-  // `placeable` and `pairable` are properties of the ROOM — a song cannot go in
-  // a suite, a quote cannot be paired — and `fragments-panel.astro` sets them.
-  // If either ever became readable from the query string, a crafted URL would
-  // widen or narrow a picker in a way its own page never intended, and the
-  // failure would be silent: a picker offering rows the action then refuses.
-  it('never lets the URL set either scope', () => {
-    for (const qs of ['placeable=1', 'pairable=1', 'placeable=true&pairable=true', 'mode=pair', 'mode=pick']) {
-      const p = parseListParams(new URLSearchParams(qs));
-      expect(p.placeable).toBe(false);
-      expect(p.pairable).toBe(false);
+describe('parseListParams — the pair picker scope', () => {
+  // ⚠ IT IS NOT A URL PARAM, AND THAT IS THE PROPERTY UNDER TEST (plan 39 · §2).
+  // `pairable` is a property of the ROOM — a quote cannot be paired — and
+  // `fragments-panel.astro` sets it. If it ever became readable from the query
+  // string, a crafted URL would widen the picker in a way its own page never
+  // intended, and the failure would be silent: rows offered that the action
+  // then refuses.
+  //
+  // (`placeable` was tested alongside it until 2026-08-17 and is gone — see
+  // `queryFragmentList` for why it had to be removed rather than corrected.)
+  it('never lets the URL set the scope', () => {
+    for (const qs of ['pairable=1', 'pairable=true', 'placeable=1', 'mode=pair', 'mode=pick']) {
+      expect(parseListParams(new URLSearchParams(qs)).pairable).toBe(false);
     }
   });
 
@@ -103,31 +104,53 @@ describe('queryFragmentList — what each picker is allowed to offer', () => {
   it('offers writing ONLY when pairing — a quote is something songs.pair refuses', async () => {
     const db = fakeDb({}, { record: true });
     await queryFragmentList(db.client, params({ pairable: true }));
-    expect(typeOps(db)).toContain('eq:writing');
-    expect(typeOps(db)).not.toContain('neq:song');
+    // The DISTINCT set, because `scoped` is applied twice on purpose — once to
+    // the row query and once to the per-type counts, so a badge can never
+    // disagree with the rows under it. Asserting the set rather than
+    // `toContain` still fails if any OTHER type predicate appears.
+    expect([...new Set(typeOps(db))]).toEqual(['eq:writing']);
   });
 
-  it('still only excludes songs when placing — a quote IS a suite stanza', async () => {
-    const db = fakeDb({}, { record: true });
-    await queryFragmentList(db.client, params({ placeable: true }));
-    expect(typeOps(db)).toContain('neq:song');
-    expect(typeOps(db)).not.toContain('eq:writing');
-  });
-
-  it('constrains neither in the manager', async () => {
+  it('constrains type NOWHERE else — including the composer picker', async () => {
+    // ⚠ THIS TEST IS THE INVERSE OF THE ONE IT REPLACED, and the reversal is the
+    // bug. It used to assert `neq:song` was present when placing, which pinned a
+    // filter comparing `fragment_type` to a label ADR 0035 had already deleted
+    // from the enum — Postgres raises 22P02 on that rather than matching
+    // nothing, so the composer's browser returned zero rows for two days.
+    //
+    // It stayed green because `fakeDb` RECORDS operations instead of executing
+    // them: a fake accepts any literal, so the one thing that could have failed
+    // here — the value being real — was the one thing not under test. Asserting
+    // the EXACT list is what keeps a resurrected type filter from slipping back
+    // in beside a `toContain`.
     const db = fakeDb({}, { record: true });
     await queryFragmentList(db.client, params());
     expect(typeOps(db)).toEqual([]);
   });
 
-  it('narrows to writing even if both scopes are somehow set', async () => {
-    // Belt and braces on a state the partial cannot produce today. The failure
-    // it guards is the widening one: pairable losing to placeable would put
-    // quotes in the pair picker.
-    const db = fakeDb({}, { record: true });
-    await queryFragmentList(db.client, params({ placeable: true, pairable: true }));
-    expect(typeOps(db)).toContain('eq:writing');
-    expect(typeOps(db)).not.toContain('neq:song');
+  // ⚠ THE GUARD THE OTHER THREE COULD NOT BE. Each of them names the literal it
+  // expects, so each is only ever as current as the day it was written — which
+  // is exactly how `neq:song` survived its own type being deleted. This one
+  // names none: whatever predicate any scope produces, its VALUE has to be a
+  // kind that still exists, and `FRAGMENT_TYPES` is derived from `TYPE_META`, so
+  // deleting a kind there makes this fail without anyone remembering to come
+  // back here.
+  //
+  // It is deliberately blunt about scopes it does not know about: `params` is
+  // spread over every boolean the interface has, so a scope added later is
+  // covered the moment it exists rather than when someone writes its test.
+  it('never filters on a kind the vocabulary no longer has', async () => {
+    const scopes = [params(), params({ pairable: true }), params({ view: 'trash' })];
+    for (const p of scopes) {
+      const db = fakeDb({}, { record: true });
+      await queryFragmentList(db.client, p);
+      for (const op of typeOps(db)) {
+        const value = op.split(':')[1];
+        expect(FRAGMENT_TYPES as readonly string[], `queried type=${value}, which is not a fragment kind`).toContain(
+          value,
+        );
+      }
+    }
   });
 });
 

@@ -15,6 +15,7 @@ import type { createSupabaseServerClient } from './supabase';
 import type { QuoteItem } from './blog';
 import { revealOf } from './provenance';
 import { toPlainText } from './markdown';
+import type { FragmentType } from './fragments-display';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -25,8 +26,15 @@ const RELATED_SHOWN = 8;
 
 export interface QuoteNeighbour {
   slug: string;
-  /** `writing` renders its title; a quote renders its opening words. */
-  type: 'writing' | 'quote' | 'song';
+  /** `writing` renders its title; a quote renders its opening words.
+   *
+   *  ⚠ `FragmentType`, not a third hand-written copy of the kinds — this said
+   *  `'writing' | 'quote' | 'song'` until 2026-08-17, two days after ADR 0035
+   *  removed songs from the union and from the database enum. A stale literal
+   *  union is inert until something branches on it, and then it is a dead arm
+   *  nobody can reach; the same habit in `fragment-query.ts` took the composer's
+   *  picker down for those two days. */
+  type: FragmentType;
   title: string | null;
   body: string;
   attribution: string | null;

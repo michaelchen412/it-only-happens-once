@@ -9,6 +9,7 @@ import type { WritingItem, QuoteItem, SubjectRef } from './blog';
 import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { revealOf } from './provenance';
+import type { FragmentType } from './fragments-display';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
 
@@ -142,7 +143,9 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
   for (const r of rows ?? []) {
     const f = r.fragments as unknown as {
       id: string;
-      type: 'writing' | 'quote' | 'song';
+      // `FragmentType`, not the kinds written out again — the literal union
+      // here still listed `song` two days after ADR 0035 deleted it.
+      type: FragmentType;
       slug: string;
       title: string | null;
       body: string | null;

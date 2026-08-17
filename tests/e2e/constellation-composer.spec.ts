@@ -14,6 +14,7 @@
 // that would need a seeded corpus to be true.
 import type { Page } from '@playwright/test';
 import { expect, test, fixtures, formFields, hideDevToolbar, stubActions } from './fixtures';
+import { FRAGMENT_TYPES } from '../../src/lib/fragments-display';
 
 /** Every action the composer can fire, answered locally. Anything not named
  *  here is aborted rather than passed through — that is what keeps the live
@@ -93,11 +94,23 @@ test.describe('the ✕ unplaces without reloading', () => {
   test('the mass-noun rule survives the trip to the client', async ({ page }) => {
     await stubComposer(page);
     await openComposer(page);
-    // "writing" never pluralises whatever the count; quote/song do. The rule is
-    // the server's, and after an unplace it has to be the client's too.
+    // "writing" never pluralises whatever the count; every other kind does. The
+    // rule is the server's, and after an unplace it has to be the client's too.
+    //
+    // ⚠ THE LIST IS DERIVED, AND THAT IS THE BUG THIS TEST ITSELF SHIPPED. It
+    // read `['quote', 'song']` until 2026-08-17 — a hand-written copy of a
+    // vocabulary that `fragments-display.ts` exists to own — so when ADR 0035
+    // took songs out of the union on 2026-08-15 this spec went on waiting for a
+    // `[data-type-count="song"]` badge that can no longer be rendered, and timed
+    // out for two days. Exactly the failure the comment on `FRAGMENT_TYPES`
+    // predicts about writing the kinds out again.
+    //
+    // The pluralisation stays hand-written on purpose: importing `typeCountLabel`
+    // would make this compare the rule to itself. The LIST is what must not be
+    // maintained by hand; the RULE is what this test is for.
     await rows(page).first().locator('[data-unplace]').click();
     await expect(page.locator('[data-type-count="writing"] .admin-stat__label')).toHaveText('writing');
-    for (const t of ['quote', 'song']) {
+    for (const t of FRAGMENT_TYPES.filter((t) => t !== 'writing')) {
       const n = Number(await page.locator(`[data-type-count="${t}"] .admin-stat__n`).textContent());
       await expect(page.locator(`[data-type-count="${t}"] .admin-stat__label`)).toHaveText(n === 1 ? t : `${t}s`);
     }

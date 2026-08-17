@@ -24,10 +24,14 @@ const mode = modeParam === 'pick' || modeParam === 'pair' ? modeParam : 'manage'
 const params = parseListParams(Astro.url.searchParams);
 if (mode === 'pick') {
   params.view = 'list'; // trash never reaches the picker
-  // A song is never a suite stanza (ADR 0031) — it accompanies a constellation
-  // as a score or through an essay's pairing, both relations rather than
-  // membership. The picker must not offer what `constellations.place` refuses.
-  params.placeable = true;
+  // ⚠ `params.placeable = true` STOOD HERE AND EMPTIED THIS PICKER (fixed
+  // 2026-08-17). It meant "no songs" (ADR 0031), but ADR 0035 had already taken
+  // songs out of `fragment_type`, so the filter it produced compared the column
+  // to an enum label that no longer exists — which Postgres answers with an
+  // error, not an empty match. Every fragment vanished from the composer's
+  // browser. There is nothing to replace it with: both remaining kinds ARE
+  // suite stanzas, so the picker's scope is now simply "not trash, not a note",
+  // which the shared `scoped` already applies.
   params.pairedSong = null; // paired-marking is a pair-mode concern
 } else if (mode === 'pair') {
   params.view = 'list'; // ditto — nor does trash reach this one

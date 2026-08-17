@@ -47,26 +47,24 @@ export interface FragmentListParams {
    * not answer before. Distinct from `constellation`, which only marks rows.
    */
   membership: string | null;
-  /**
-   * Only fragments that may be PLACED in a suite — the composer's browser
-   * ([ADR 0031](../../docs/adr/0031-a-song-carries-a-feeling-not-an-idea.md)).
-   *
-   * ⚠ NOT A URL PARAM, and deliberately not one. This is a property of the
-   * ROOM rather than a filter the reader chose — a song is not something you
-   * have filtered out of the picker, it is something that cannot go in a suite
-   * at all. `fragments-panel.astro` sets it in pick mode, the way it already
-   * pins `view` to 'list' there.
+  /*
+   * (`placeable` was here until 2026-08-17 — the composer picker's "no songs"
+   * scope from ADR 0031. ADR 0035 took songs out of `fragment_type` entirely,
+   * which left it selecting every remaining kind AND throwing on the enum. See
+   * `scoped` in `queryFragmentList` for what that cost.)
    */
-  placeable: boolean;
   /**
    * Only fragments that may be PAIRED to a song — the song sheet's own picker
-   * (plan 39 · §2). Narrower than `placeable`, which still admits a quote:
+   * (plan 39 · §2). It admits writing only, where a suite takes either kind:
    * `songs.pair` writes `paired_song_id` on a row it filters to
    * `type = 'writing'`, so a quote here would be an offer the action declines.
    *
-   * ⚠ NOT A URL PARAM, for the same reason `placeable` isn't, and the reason is
-   * worth keeping in both places: a quote is not something you have filtered out
-   * of this picker, it is something that cannot be paired at all.
+   * ⚠ NOT A URL PARAM, and deliberately not one. This is a property of the ROOM
+   * rather than a filter the reader chose: a quote is not something you have
+   * filtered out of this picker, it is something that cannot be paired at all.
+   * `fragments-panel.astro` sets it in pair mode, the way it already pins `view`
+   * to 'list' there. Were it readable from the query string, a crafted URL could
+   * widen the picker into offering rows `songs.pair` then refuses.
    */
   pairable: boolean;
   /**
@@ -104,8 +102,7 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     workSlug,
     constellation: (sp.get('constellation') || '').trim() || null,
     membership,
-    placeable: false, // the picker turns it on; see the field's comment
-    pairable: false, // ditto — fragments-panel.astro sets both, never the URL
+    pairable: false, // the pair picker turns it on; fragments-panel.astro, never the URL
     pairedSong: (sp.get('song') || '').trim() || null,
 
     filtered:
@@ -262,24 +259,35 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // is simply gone from the interface; the row survives in the database and in
   // the nightly backup, which is the right amount of ceremony for scratch.
   //
-  // ⚠ AND SONGS ARE OUT OF THE PICKER FOR THE SAME REASON, not a different one
-  // (ADR 0031). A song is never a suite stanza: music accompanies a
-  // constellation through `score_url` or through an essay's `paired_song_id`,
-  // both of which are RELATIONS rather than membership. Excluding it HERE
-  // rather than in the list query is what keeps the badge above each column
-  // honest — filter the rows in one place and the counts in another, and the
-  // picker ends up offering a segment that leads to nothing.
+  // ⚠⚠ THE PICKER USED TO EXCLUDE SONGS HERE (`p.placeable` → `neq('type',
+  // 'song')`, ADR 0031) AND THAT LINE TOOK THE COMPOSER'S BROWSER DOWN
+  // COMPLETELY — found 2026-08-17, broken since 2026-08-15.
   //
-  // ⚠ AND PAIRING NARROWS IT FURTHER, in the same place and for the same reason
-  // (plan 39 · §2). `songs.pair` writes `paired_song_id` on a row it filters to
-  // `type = 'writing'`, so a quote in that picker is an offer the action
-  // declines — one step worse than the song case above, because a quote looks
-  // like a perfectly reasonable thing to pair music to until you press it.
+  // ADR 0035 moved songs to a table of their own, and the migration dropped
+  // `song` from the `fragment_type` ENUM. Postgres does not treat an unknown
+  // enum label in a comparison as "matches nothing"; it raises `22P02 invalid
+  // input value for enum fragment_type: "song"` and the whole SELECT dies. So
+  // the picker returned no rows AT ALL — every type badge read 0, and there was
+  // no way to add any fragment to any constellation.
+  //
+  // Nothing went red. The filter's unit test asserted against a recording fake
+  // that happily accepts a literal no database would, so it pinned the presence
+  // of `neq:song` as CORRECT while production threw on it; `astro check` sees a
+  // string; and the two e2e specs that DID catch it (`constellation-cell`,
+  // `admin-layout.mobile`) were read as fixture-flake. The lesson is the one
+  // `TYPE_META` already states: a kind written out by hand is a copy that cannot
+  // be revoked. `placeable` is gone rather than corrected, because with songs out
+  // of the union it selected everything — both remaining kinds are suite stanzas.
+  //
+  // ⚠ PAIRING STILL NARROWS, and its literal is safe because `writing` is a
+  // value the enum actually has (plan 39 · §2). `songs.pair` writes
+  // `paired_song_id` on a row it filters to `type = 'writing'`, so a quote in
+  // that picker is an offer the action declines — and a quote looks like a
+  // perfectly reasonable thing to pair music to until you press it.
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
     const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
     const working = live.neq('status', 'note') as T;
-    if (p.pairable) return working.eq('type', 'writing') as T;
-    return (p.placeable ? working.neq('type', 'song') : working) as T;
+    return (p.pairable ? working.eq('type', 'writing') : working) as T;
   };
 
   // main query — drafts first (status asc: draft < published), then the chosen sort

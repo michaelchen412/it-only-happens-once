@@ -16,7 +16,7 @@ import { revealOf } from './provenance';
 import { pairedMediaOf, type SubjectRef } from './blog';
 import type { SuiteItem } from './constellations';
 import { publicShapeHint, suiteHints } from './suite-shape';
-import type { FragmentType } from './fragments-display';
+import { FRAGMENT_TYPES, type FragmentType } from './fragments-display';
 
 /** One placed fragment, as this admin query returns it. */
 export type PlacedFragment = {
@@ -190,7 +190,18 @@ export function suiteStats(suite: ReturnType<typeof buildSuite>) {
   // drift. That argument is why this function is here too.
   const placedCount = suite.length;
   const subjectSpread = new Set(suite.flatMap((s) => s.subjects)).size;
-  const mix = { writing: 0, quote: 0, song: 0 } as Record<FragmentType, number>;
+  // ⚠ DERIVED FROM `FRAGMENT_TYPES`, AND IT HAD TO BECOME SO. This was written
+  // out as `{ writing: 0, quote: 0, song: 0 }`, and the `as Record<FragmentType,
+  // number>` beside it is what let that survive ADR 0035: the cast ASSERTS the
+  // shape rather than checking it, so removing `song` from the union — the
+  // change whose whole purpose was to make the compiler find every surface that
+  // assumed otherwise — could not see this line. It carried a dead `song: 0`
+  // into every stat pass for two days, and nothing anywhere went red.
+  //
+  // `Object.fromEntries` needs the cast for its own reason (it is typed
+  // `Record<string, T>`), but it can no longer be WRONG about which keys exist:
+  // a fourth kind added to `TYPE_META` appears here by construction.
+  const mix = Object.fromEntries(FRAGMENT_TYPES.map((t) => [t, 0])) as Record<FragmentType, number>;
   for (const s of suite) mix[s.type]++;
   const { size: sizeHint, spread: spreadHint } = suiteHints(placedCount, subjectSpread);
   // A NOTE COUNTS AS A DRAFT HERE, because the only question this asks is "would
