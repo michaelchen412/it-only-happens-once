@@ -28,6 +28,7 @@
   is left on one is the link, who played it, and what
   replaced.
 */
+import { Icon } from 'astro-icon/components';
 import SharedByField from './SharedByField.astro';
 import FragmentBrowser from './FragmentBrowser.astro';
 import BackToTop from '../BackToTop.astro';
@@ -162,8 +163,9 @@ const { people = [], sharedBy = {} } = Astro.props;
           <ul id="sng-paired" class="flex flex-col gap-1"></ul>
           <p id="sng-paired-none" class="f__h italic">Nothing yet.</p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
+            {/* `ph:plus`, not the `＋` character (plan 42 · §4.B.5). */}
             <button id="sng-pair-add" type="button" class="btn btn-ghost btn-xs gap-1 normal-case">
-              ＋ Pair with a piece
+              <Icon name="ph:plus" /> Pair with a piece
             </button>
             {
               /* ⚠ OFFERED, NOT DISABLED, WHILE THE SONG IS UNSAVED (plan 39 ·

@@ -41,6 +41,7 @@
 
   `scope` namespaces the ids so the two editor sheets can each hold one.
 */
+import { Icon } from 'astro-icon/components';
 import { toPlainText } from '../../lib/markdown';
 
 interface Props {
@@ -128,8 +129,12 @@ const words = new Map(constellations.map((c) => [c.id, toPlainText(c.description
   </p>
 
   <div class="cn-footer border-base-300 mt-2 border-t pt-2">
-    <button type="button" class="cn-new-btn btn btn-ghost btn-xs font-sans normal-case">
-      <span aria-hidden="true">＋</span> New constellation
+    {
+      /* `ph:plus`, not the `＋` character — one representation per affordance
+        (plan 42 · §4.B.5). Every create door in the building draws this icon. */
+    }
+    <button type="button" class="cn-new-btn btn btn-ghost btn-xs gap-1 font-sans normal-case">
+      <Icon name="ph:plus" /> New constellation
     </button>
     {
       /* Same fold-away shape as /admin/constellations' own create form, so the

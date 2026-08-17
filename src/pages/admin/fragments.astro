@@ -215,7 +215,7 @@ const SUBTITLES = {
                 {/* The full description (4-line cap): you're about to elevate a
                     whole selection, so "what is this constellation for" should
                     be readable here, not hidden behind a hover. */}
-                <p class="admin-label px-3 pt-1.5">Add to</p>
+                <p class="sec__k px-3 pt-1.5">Add to</p>
                 {data.allConstellations.map((c) => (
                   <button role="menuitem" class="add-item block w-full px-3 py-2 text-left" data-cn-add={c.id}>
                     <span class="block truncate text-sm leading-snug">{c.name}</span>
@@ -226,7 +226,7 @@ const SUBTITLES = {
                     )}
                   </button>
                 ))}
-                <p id="bulk-cn-remove-label" class="admin-label border-base-300 mt-1 border-t px-3 pt-2" hidden>
+                <p id="bulk-cn-remove-label" class="sec__k border-base-300 mt-1 border-t px-3 pt-2" hidden>
                   Remove from
                 </p>
                 {data.allConstellations.map((c) => (

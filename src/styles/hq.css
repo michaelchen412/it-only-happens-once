@@ -141,6 +141,28 @@
   background: var(--color-base-200);
   color: var(--color-base-content);
 }
+/* ⚠ 44px ON TOUCH, AND THE DRAWING STAYS 28px (plan 42 · §4.B.3).
+   `.dump__act` — the notes pile's identical glyph button — has been 2.75rem
+   since it was written, with a comment saying so; this one was 1.75rem. Same
+   control, same job (edit or delete the row it sits on), two sizes, and **the
+   smaller one is the one carrying Delete on the profile timeline** — a page
+   docs/admin.md §12 says is opened from a phone.
+
+   Both clear WCAG 2.5.8's 24px floor, so neither was a violation; only
+   `.dump__act` met 2.5.5's 44px. The fix is the pointer-free half only:
+
+   ⚠ DESKTOP IS PIXEL-IDENTICAL, deliberately. Growing the box everywhere would
+   push `.zone__head`'s row taller on the surface where a mouse already hits a
+   28px target reliably, and this file cannot be checked by a test — so the
+   change is confined to the devices that need it and cannot regress the ones
+   that don't. The BOX grows; the glyph inside does not, because `place-items:
+   center` keeps it centred in whatever it is given. */
+@media (hover: none) {
+  .zone__act {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
 /* ⚠ A TOGGLE IN THE ACTION SLOT HAS TO LOOK PRESSED. The pin on a goal's header
    is the first one, and `aria-pressed` on its own changes nothing a sighted
    reader can see — the state would have lived entirely in the accessibility
@@ -151,6 +173,21 @@
   background: color-mix(in oklch, var(--cn-amber) 20%, transparent);
   color: color-mix(in oklch, var(--cn-amber) 68%, var(--color-base-content));
 }
+/* ⚠ THE NAME SURVIVED A RENAME PROPOSAL, AND THE REASON IS WORTH KEEPING (plan
+   42 · §4.C.5). It was flagged as "outgrown its name" because it appears on
+   buttons that are NOT inside a `.zone` — the People header, every HQ sheet
+   footer — which is the same shape of defect ADR 0033 recorded against
+   `.admin-label`, and that one WAS renamed in this pass.
+
+   The difference: `.admin-label` had stopped describing what it does (it labels
+   nothing; it heads a group). This one still does. It carries no colour of its
+   own — `var(--cn)` comes from a `cn-*` class — so it belongs to the ZONE
+   SYSTEM'S palette wherever it is mounted, and `zone__` names the system rather
+   than the element it sits in. Renaming 21 call sites to say the same thing
+   differently is churn, and docs/admin.md §1 now states the rule in words.
+
+   ⚠ What that rule settles, so it is not re-asked: `btn-primary` on the corpus
+   surfaces is NOT a hole in the domain-hue axis. Those rooms have no zones. */
 .zone__cta {
   background: var(--cn);
   color: var(--color-base-100);

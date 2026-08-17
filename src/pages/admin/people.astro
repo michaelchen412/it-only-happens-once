@@ -179,7 +179,7 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
 
           {sections.map((section) => (
             <section class="mb-6" data-section data-roster-part>
-              <h2 class="admin-label mb-2">
+              <h2 class="sec__k mb-2">
                 {section.label}{' '}
                 <span class="opacity-50" data-count>
                   {section.members.length}
@@ -247,7 +247,7 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
 
           {archived.length > 0 && (
             <details class="border-base-300 mt-8 border-t pt-4">
-              <summary class="admin-label cursor-pointer">
+              <summary class="sec__k cursor-pointer">
                 Archived <span class="opacity-50">{archived.length}</span>
               </summary>
               <div class="pgrid mt-3 opacity-70">

@@ -24,6 +24,7 @@
   round trip to wait for. An endpoint earns itself when the list outgrows the
   page, not before.
 */
+import { Icon } from 'astro-icon/components';
 import { jsonForScript } from '../../lib/serialize';
 
 interface Props {
@@ -60,8 +61,15 @@ const { options } = Astro.props;
         /* `.search--w` and not `.search`: the roster's fixed 9rem would strand
           this field at a third of the dialog. Same pair LinkSheet uses. */
       }
+      {
+        /* ⚠ `<Icon>`, NOT THE `⌕` CHARACTER IT USED TO BE (plan 42 · §4.B.5).
+          Every other search field in the building — the roster's, LinkSheet's —
+          renders `ph:magnifying-glass`; this one rendered a font glyph, so the
+          same affordance came out at a different weight and metric depending on
+          which room you were in. One representation per affordance. */
+      }
       <label class="search search--w">
-        <span class="text-base-content/40" aria-hidden="true">⌕</span>
+        <Icon name="ph:magnifying-glass" class="opacity-45" />
         <input type="search" id="merge-q" placeholder="Search…" autocomplete="off" aria-label="Search for a target" />
       </label>
     </div>

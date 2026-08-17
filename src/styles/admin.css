@@ -1435,19 +1435,48 @@ html.scroll-locked .sky-return {
 }
 
 /* Field label + helper text for admin forms. */
-.admin-label {
+/* ⚠ THIS IS ADR 0033'S LAST OPEN ITEM, CLOSED (plan 42 · §4.C.1). That record
+   converged the field grammar and said so about what it left behind:
+
+     "⚠ It still needs a name and an ink — at 50% it fails AA like everything
+      else did, and 'admin-label' now describes none of what it does. Open."
+     "`.admin-hint` stays. 71 uses across 29 files… at 45% it fails AA
+      everywhere."
+
+   ⚠ AND THE MEASUREMENT THAT MADE THIS CHEAP: both were already GEOMETRICALLY
+   IDENTICAL to the approved pair. `.admin-label` is 0.7rem/.08em/uppercase —
+   byte-for-byte `.f__k`'s register — and `.admin-hint` is 0.75rem, `.f__h`'s.
+   Only the ink differed. So this is not a register migration (which is what
+   shipped ADR 0033's one visible defect, the uppercased parenthetical caught by
+   a screenshot); nothing changes size, case, weight or layout. **Two numbers.**
+
+   80% / 65% are plan 19's measured floors, not preferences: dusk crosses 4.5:1
+   at 55% and paper not until 65%, so 65 is the lowest step that clears AA in
+   BOTH themes, and 80 is what a micro-type key needs on top of that.
+
+   `oklch` rather than `oklab` to match the rules these now agree with. The two
+   are equivalent when mixing with `transparent` — premultiplied alpha, no
+   chroma to interpolate — so this changes nothing on screen and removes the
+   question of whether it was supposed to.
+
+   ⚠ THE NAME. `.admin-label` was retired INTO `.f__k` for its seven field uses;
+   the five that survived were never labels — two `<h2>`s, a `<summary>`, and two
+   menu headings. `.sec__k` says what they are and matches the building's `__k`
+   convention (`f__k`, `fs__k`, `tgroup__k`, `rail__k`), which is the suffix this
+   codebase already uses for a small uppercase key. */
+.sec__k {
   display: block;
   margin-bottom: 0.3rem;
   font-family: var(--font-sans);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
 }
 .admin-hint {
   font-family: var(--font-sans);
   font-size: 0.75rem;
-  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  color: color-mix(in oklch, var(--color-base-content) 65%, transparent);
 }
 
 /* Inline error banner (was hand-rolled on five separate pages). */
