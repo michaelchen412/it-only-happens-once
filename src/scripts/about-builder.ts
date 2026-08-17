@@ -179,6 +179,33 @@ saveBtn.addEventListener('click', async () => {
   statusText.classList.remove('text-warning', 'text-error');
 });
 
+/*
+  ⌘/Ctrl+S SAVES (plan 42 · §4.C.3).
+
+  ⚠ THE ADMIN HAD EXACTLY ONE KEYBOARD SAVE AND IT WAS ON THE WRONG SURFACE.
+  `constellation-composer.ts` bound ⌘S — the first, and it says so — while the
+  two rooms you actually TYPE in bound nothing: this page, and the writing
+  sheet's published Save changes. Both are explicit-save surfaces where the
+  reflex is strongest and the button is a scroll away up in a sticky bar.
+
+  ⚠ AND IT IS DELIBERATELY NOT EVERYWHERE. A draft essay and a note AUTOSAVE, so
+  ⌘S there would be a no-op that still has to say something — a keystroke that
+  reports success for work already done teaches you to press it for reassurance.
+  The rule is: ⌘S belongs where there is an explicit save and nowhere else.
+
+  Swallowed either way, for the composer's stated reason: on an editing surface
+  the browser's Save-page dialog is never what ⌘S meant, and offering it on a
+  clean form would teach you to expect it.
+*/
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's' || e.altKey) return;
+  e.preventDefault();
+  // The button owns "is there anything to save" — it is disabled while clean,
+  // and re-disabled by the save itself. Reading it rather than `dirty` keeps
+  // one answer to that question instead of two that can disagree.
+  if (!saveBtn.disabled) saveBtn.click();
+});
+
 // warn on navigating away with unsaved edits
 window.addEventListener('beforeunload', (e) => {
   if (dirty) {

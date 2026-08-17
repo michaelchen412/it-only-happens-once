@@ -593,8 +593,20 @@ document.addEventListener('fragment:edit', (e) => {
     // `reusable` because this sheet is CLOSED AND REOPENED, never replaced —
     // and the song form's Save has no validity rule to switch it back on the
     // way in, unlike the quote form's `refreshQuoteValid`.
+    // ⚠ `busy` ADDED 2026-08-17 (plan 42 · §4.A.6). This was the ONE save in the
+    // building that said nothing while it ran: eight surfaces pass a busy label
+    // through `submitAction`, two hand-roll one, two drive a spinner — and this
+    // one passed neither, on a full-width primary reading **Save quote**. The
+    // exception is argued once, at `goal-sheet.ts`, and it is about a TRASH
+    // GLYPH: *"this button is a trash glyph and one word… the disabled state is
+    // the whole signal."* That does not reach a labelled primary.
+    //
+    // ⚠ What this sheet was NOT missing is the confirmation afterwards. It
+    // closes on success, which is what task, goal, event, person and the song
+    // sheet all do — `docs/admin.md` §4a said otherwise and has been corrected.
     const res = await submitAction(() => action(fd), {
       button: submitBtn,
+      busy: 'Saving…',
       onError: showError,
       reusable: true,
     });

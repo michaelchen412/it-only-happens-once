@@ -474,14 +474,33 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     {it.endAt && <span class="drow__e">→ {clockTime(it.endAt)}</span>}
                   </span>
                   <span class="min-w-0 flex-1">
-                    {/* A mirrored row's title is a link to Google — the only
-                        place it can actually be changed. That door IS the
-                        explanation of read-only, and it cannot go stale. */}
+                    {/* ⚠ THREE KINDS OF TITLE, AND THE KIND DECIDES THE DOOR
+                        (plan 42 · §4.A.2). This used to be two — a link for a
+                        mirrored row, an inert span for everything else — with a
+                        labelled `✎ Edit` chip bolted onto the end of every
+                        event row. `tasks.astro` rejects exactly that, in
+                        writing: *"The title IS the edit affordance, so no pencil
+                        sits on every row announcing itself."* Same building,
+                        same shape of row, opposite answer.
+
+                        ⚠ AND THE FIX IS PER-KIND, NOT GLOBAL, which is why the
+                        first draft of this finding was wrong. This panel carries
+                        FOUR kinds and only one of them is ours to edit: a
+                        mirrored row's title stays a link to Google (the only
+                        place it CAN be changed — that door is the explanation of
+                        read-only, and it cannot go stale), and a birthday stays
+                        inert because there is nothing behind it. An inert title
+                        is correct here; an inert title beside an Edit chip was
+                        not. */}
                     {it.kind === 'mirror' && it.href ? (
                       <a class="drow__x row-open" href={it.href} target="_blank" rel="noreferrer">
                         {it.title}
                         <Icon name="ph:arrow-up-right" class="ev__i" />
                       </a>
+                    ) : it.kind === 'event' ? (
+                      <button type="button" class="drow__x" data-edit-event>
+                        {it.title}
+                      </button>
                     ) : (
                       <span class="drow__x">
                         {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
@@ -491,11 +510,6 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     {it.location && <span class="drow__l">{it.location}</span>}
                     {!!it.people?.length && <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>}
                   </span>
-                  {it.kind === 'event' && (
-                    <button type="button" class="chip chip--act shrink-0" data-edit-event>
-                      <Icon name="ph:pencil-simple" /> Edit
-                    </button>
-                  )}
                   {it.kind === 'task' && !it.answered && (
                     <button type="button" class="chip chip--act chip--did shrink-0" data-dispose="done">
                       <Icon name="ph:check" /> Did it

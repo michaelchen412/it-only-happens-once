@@ -3007,6 +3007,19 @@ a.row__t:hover {
   gap: 0.375rem;
   font-size: 0.9375rem;
 }
+/* ⚠ THE EVENT ROW'S TITLE IS A BUTTON NOW (plan 42 · §4.A.2), so it needs what
+   `.task__t` needed for the same reason one room over: a `<button>` centres its
+   text and shrinks to content, and this has to fill the cell and read as prose.
+   The hover borrows `--cn` exactly as `.task__t:hover` does, so the two rooms'
+   editable titles light the same way. */
+button.drow__x {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+button.drow__x:hover {
+  color: var(--cn);
+}
 .drow__l {
   display: block;
   margin-top: 0.0625rem;

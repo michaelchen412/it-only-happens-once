@@ -66,7 +66,28 @@ export const FRAGMENT_TYPES = Object.keys(TYPE_META) as FragmentType[];
 export const typeCountLabel = (type: FragmentType, n: number): string =>
   type === 'writing' ? 'writing' : n === 1 ? TYPE_META[type].label : `${TYPE_META[type].label}s`;
 
-/** Compact absolute date ("Apr 19, 2023") or an em-dash for null. UTC-stable. */
+/**
+ * The CALENDAR DATE a fragment is filed under ("Apr 19, 2023"), read from the
+ * stored value without converting it.
+ *
+ * ⚠ THE UTC HERE IS DELIBERATE AND IT IS NOT THE "never UTC on screen" RULE
+ * BEING BROKEN (plan 42 · §4.C.7). `occurred_at` at `date_precision: 'day'` is a
+ * calendar date, not an instant: a backdated essay is written by
+ * `occurredAtFrom`, which does `new Date('2023-04-19T00:00').toISOString()` on a
+ * UTC server and therefore stores UTC midnight. Reading its Y-M-D back is
+ * reading exactly what was typed. Converting it to a viewer's zone would render
+ * that essay as **18 April** for everyone west of Greenwich.
+ *
+ * ⚠⚠ AND THE OTHER HALF IS A REAL DEFECT THAT THIS FUNCTION CANNOT FIX. When a
+ * piece is published without a custom date, `occurred_at` is set to `now` — an
+ * instant — so a quote saved at 6pm Pacific stores `…T01:00Z` and is filed under
+ * TOMORROW. Rendering cannot repair that: the wrong day is already in the
+ * column. The fix is at the WRITE site (mint the auto date as *today in the
+ * configured home zone* rather than as an instant), it changes what goes into
+ * the database, and it is public-facing — so it is recorded rather than
+ * smuggled into a display helper. **Do not "fix" this by changing the timezone
+ * below; that trades one wrong day for another.**
+ */
 export function shortDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -75,6 +96,34 @@ export function shortDate(iso: string | null): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/**
+ * An INSTANT, in the configured home zone — for `updated_at`, which nobody
+ * backdates and which has no `date_precision` to argue about.
+ *
+ * ⚠ This column printed UTC until 2026-08-17, which `docs/admin.md` §11a and
+ * `architecture.md` §106 both call a project rule against: *"Times on screen are
+ * never UTC."* The fragment manager was outside the mechanism entirely — a bare
+ * string in a `<td>`, invisible to `local-time.ts`, which `AdminLayout` mounts
+ * precisely "so no page has to remember to opt in".
+ *
+ * ⚠ AND IT DELIBERATELY DOES NOT CARRY `data-local`. That script's two modes
+ * render `7:02 AM` and `Aug 1, 7:02 AM` — **neither carries a year**, and this
+ * column is sorted on and read against rows from 2023. Opting in would rewrite
+ * "Apr 19, 2023" to "Apr 19" on the client and lose the fact the column exists
+ * for. Full compliance wants a third mode; that is a change to a shared script
+ * for one column, and the home zone already removes UTC from the screen, which
+ * is what the rule asks.
+ */
+export function homeDate(iso: string | null, tz: string): string {
+  if (!iso) return '—';
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(iso));
 }
 
 /** The primary line for a list row: title for writing/song, the text for a quote. */

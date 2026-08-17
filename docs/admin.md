@@ -153,10 +153,11 @@ Ten surfaces commit ten slightly different ways, and until 2026-08-12 nothing on
 
 **Read it as a predictor, not a description.** The value of the rule is that a surface which does not yet exist has an answer before anyone argues about it; a surface that *contradicts* it should either change or write down why in the file.
 
-⚠ **Two of the ten do not fit, and both are open**, recorded here rather than reworded into compliance:
+⚠ **One of the ten does not fit, and it is open**, recorded here rather than reworded into compliance:
 
-- **The quote sheet** commits like a record and then says nothing at all — no timestamp, no chip, no sentence. Every other record surface confirms.
 - **The Library** commits **per row** where every other record surface commits per object. It is a hundred records on one page, and a per-row Save is why saving one row could discard edits in the others (guarded since 2026-08-12; see `library.astro`).
+
+⚠ **The quote sheet was listed here as a second exception until 2026-08-17, and the entry was wrong.** It read: *"commits like a record and then says nothing at all — no timestamp, no chip, no sentence. Every other record surface confirms."* Measured against its neighbours, **the confirmation is the sheet closing** — which is exactly what the task, goal, event, person and song sheets do, none of which carries a timestamp or a chip either. What the quote sheet actually lacked was the **busy label while the save ran**: it was the one `submitAction` call in the admin passing no `busy`, on a full-width primary reading *Save quote*. Fixed (plan 42 · §4.A.6). ⚠ **The lesson is the reason this correction is written out rather than quietly deleted:** the entry named the wrong half of a real problem, and a surface listed as non-compliant for the wrong reason is one nobody re-measures.
 
 ⚠ **This is a `docs/` paragraph and not an ADR on purpose.** It describes what the app does; it does not yet refuse anything. **The day it turns down a proposed surface, it has become a decision and belongs in `adr/`** — that is the test in [`plans/GROUND-RULES.md`](../docs/plans/GROUND-RULES.md), and this line is the marker for when it flips.
 

@@ -937,6 +937,32 @@ async function dropWorkingVersion(): Promise<void> {
   versionHeld = false;
 }
 
+/*
+  ⌘/Ctrl+S PUSHES A PUBLISHED PIECE'S EDITS (plan 42 · §4.C.3).
+
+  ⚠ PUBLISHED ONLY, AND THAT IS THE WHOLE RULE. A draft autosaves 1.2s after you
+  stop typing, so ⌘S on one is a keystroke that reports success for work already
+  done — which teaches you to press it for reassurance and then to trust it. The
+  live row of a published piece is the one document in this building that waits
+  for a deliberate press, and it is also the one where the button can be a
+  scroll away behind the command row.
+
+  ⚠ SCOPED TO THIS DIALOG being open. `constellation-composer.ts` binds ⌘S on
+  the page underneath and explicitly refuses to fire while any `dialog[open]` is
+  up — *"the right feedback for the wrong document"*. This is the other half of
+  that handshake: the composer stands down when this sheet is open, and this one
+  only acts when it is.
+
+  The button owns "is there anything to save": `updateDirtyUI` disables it while
+  clean, so reading it keeps one answer rather than two that can disagree.
+*/
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's' || e.altKey) return;
+  if (!sheet.open) return;
+  e.preventDefault();
+  if (isPublished() && !saveChangesBtn.disabled) saveChangesBtn.click();
+});
+
 saveChangesBtn.addEventListener('click', async () => {
   saveChangesBtn.disabled = true;
   const ok = await save('published');

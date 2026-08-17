@@ -44,7 +44,7 @@
 */
 import type { Database } from '../../lib/database.types';
 import type { PanelMode } from '../../lib/fragment-query';
-import { shortDate, rowTitle } from '../../lib/fragments-display';
+import { shortDate, homeDate, rowTitle } from '../../lib/fragments-display';
 import { excerpts, toPlain } from '../../lib/search-highlight';
 import Highlighted from './Highlighted.astro';
 import TypeMark from './TypeMark.astro';
@@ -86,6 +86,10 @@ const {
   searchTerm = '',
 } = Astro.props;
 // The combo prefill needs ids (to select the existing entity), not just names.
+// The configured home zone, for the `Edited` stamp. `Astro.locals` is available
+// to any .astro component during SSR, so this needs no prop threading — and it
+// is the same resolved value every other room's clock reads (middleware.ts).
+const { tz } = Astro.locals.today;
 const authorId = r.author_id ?? '';
 const workId = r.work_id ?? '';
 const trash = mode === 'manage' && view === 'trash';
@@ -369,8 +373,15 @@ const editorData =
   >
     {shortDate(r.occurred_at)}
   </td>
+  {
+    /* ⚠ AN INSTANT, IN THE HOME ZONE, IN A REAL `<time>` (plan 42 · §4.C.7).
+      This printed UTC as a bare string — the one list in the Observatory outside
+      the timestamp mechanism. `Posted` beside it stays UTC on purpose: it is a
+      calendar date, not an instant. See `fragments-display.ts` for both halves
+      and for the write-side defect neither of them fixes. */
+  }
   <td class="text-base-content/65 px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap">
-    {shortDate(r.updated_at)}
+    <time datetime={r.updated_at}>{homeDate(r.updated_at, tz)}</time>
   </td>
   {
     pick && (
