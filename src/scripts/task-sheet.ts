@@ -422,7 +422,14 @@ if (sheet && form) {
     const { confirmDialog } = await import('./confirm-dialog');
     const ok = await confirmDialog({
       title: 'Delete this task?',
-      message: 'Its record of what you did and skipped goes with it.',
+      // ⚠ WHAT SURVIVES FIRST, THEN THAT NOTHING DOES (plan 42 · §4.A.1). This
+      // is a hard `tasks.remove` — no trash tier, argued at the action — and the
+      // control sits in the footer beside Cancel and Save rather than in a
+      // delete zone, so this sentence is the ONLY place the reader is told the
+      // move is final. The corpus says the same words on a path that IS
+      // recoverable (`admin-list.ts`), which is how the building came to warn
+      // hardest where it mattered least.
+      message: 'Its record of what you did and skipped goes with it. This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     });

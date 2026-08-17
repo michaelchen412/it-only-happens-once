@@ -20,12 +20,59 @@
 //   · `writing-sheet.ts` (1,014 lines) AUTOSAVES, so it has no dirty tracker and
 //     no submit button — its exit parks unsaved words in a draft version before
 //     it asks anything. Nothing below fits it.
-//   · `fragment-sheet.ts` and `log-sheet.ts` carry neither a dirty tracker nor
-//     an error line; they are dialogs rather than forms with something to lose.
+//   · `fragment-sheet.ts` — ⚠ ITS `<form>` IS ONE PANEL, NOT THE SHEET. The
+//     quote form is a tabpanel beside a Constellations tab whose ticks write
+//     IMMEDIATELY (docs/admin.md §4a), so `wireSheet`'s dialog↔form 1:1
+//     assumption does not hold and its tracker would have to learn to ignore a
+//     region. That is the escape hatch this module refuses to grow.
+//   · `log-sheet.ts` — has an error line and an explicit save, and NOTHING TO
+//     LOSE: it opens prefilled from a dump that stays in the pile, so closing it
+//     costs the prefill and nothing else. It answers ADR 0032 with the first
+//     legal answer ("dismissing costs nothing") and so has no guard to share.
+//
+// ⚠ THIS LIST USED TO SAY `fragment-sheet.ts` AND `log-sheet.ts` "carry neither
+// a dirty tracker nor an error line", AND BOTH HALVES WERE FALSE (plan 42 ·
+// §4.C.11). The quote sheet has a hand-rolled dirty flag driving a full discard
+// guard (`fragment-sheet.ts:326,381`) and renders `<SheetError id="sheet-error">`;
+// `LogSheet.astro:96` carries an error line too. By the test written directly
+// below, the quote sheet passed all three and was exempted anyway. A wrong
+// exemption reason is worse than none — it invites the next reader to "fix" a
+// sheet into this shell on a premise that does not hold, and the correction is
+// the same defect this plan names elsewhere: the code and its comment disagreed.
 //
 // A `wireSheet` with six escape hatches to swallow those would be worse than the
 // duplication it removed. The test of whether a sheet belongs here is whether it
 // has all of: something to lose, an error line, and an explicit save.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠ TWO CONVENTIONS THIS MODULE DOES NOT ENFORCE AND THE BUILDING KEEPS ANYWAY.
+// Both were unwritten until plan 42 went looking, and both read as drift until
+// the boundary is stated — which is the whole reason they are here rather than
+// in a plan nobody checks out.
+//
+//   1. WHERE DELETE SITS. The rule is `WritingSheet.astro`'s: apart from the
+//      benign controls, at the END of the thing it destroys, below a rule, with
+//      a line saying what it takes and what it leaves. The quote sheet, the song
+//      sheet and the composer all follow it.
+//      ⚠ THE FOOTER VARIANT IS LEGAL WHEN THE FORM DOES NOT SCROLL — a short
+//      record has no "end of the object" distinct from its footer, so the zone
+//      buys ceremony and no separation, and under `GoalSheet`'s four fields it
+//      would be a visible fraction of the sheet. Task, goal and event take that
+//      variant deliberately. ⚠ The price is that a footer Delete must say
+//      IRREVERSIBILITY in its confirm, because nothing on screen says it first —
+//      all three of these are hard `.delete()` calls with no trash tier
+//      (`tasks.remove`, `events.remove` argue why), which makes them the least
+//      ceremonious deletes in the building and the only unrecoverable ones.
+//
+//   2. WHETHER THERE IS A CANCEL. Every sheet here carries one beside its Save;
+//      the three corpus sheets carry only the ✕. That split is deliberate, and
+//      it is NOT the one ADR 0032 settled — that record's table has exactly
+//      these columns minus this one. A corpus sheet is wide and its primary is
+//      full-width (`flex-1`), so a Cancel beside `Save quote` would read as a
+//      second primary; an HQ sheet is a short form where *abandon* is a real
+//      intention deserving a real button. ⚠ Do not add a Cancel to the corpus
+//      sheets to make the two halves match.
+// ─────────────────────────────────────────────────────────────────────────────
 import { closeWithExit, openDialog } from './dialog-close';
 import { confirmDiscard, dirtyTracker, wireSheetDismiss } from './sheet-dismiss';
 import { sheetError } from './sheet-error';

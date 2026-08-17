@@ -253,7 +253,10 @@ if (sheet && form) {
     const { confirmDialog } = await import('./confirm-dialog');
     const ok = await confirmDialog({
       title: 'Delete this event?',
-      message: 'Its person tags go with it.',
+      // What survives first, then that nothing does — the footer-Delete rule in
+      // `sheet.ts` (plan 42 · §4.A.1). `events.remove` is a hard delete with no
+      // trash tier, and it argues why at the action.
+      message: 'Its person tags go with it. This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     });

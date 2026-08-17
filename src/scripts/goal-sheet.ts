@@ -98,11 +98,16 @@ if (sheet && form) {
     const id = form.dataset.id;
     if (!id) return;
     const { confirmDialog } = await import('./confirm-dialog');
-    // A real confirm, unlike letting go: this one cannot be undone. The
-    // sentence names what survives, because that is the actual question.
+    // A real confirm, unlike letting go: this one cannot be undone.
+    //
+    // ⚠ AND IT NOW SAYS SO ON SCREEN (plan 42 · §4.A.1). That clause used to
+    // live in this comment ALONE while the message carried only the reassuring
+    // half — so the fact the reader most needed was the one fact the code knew
+    // and the interface withheld. The sentence still names what survives first,
+    // because that is the actual question; irreversibility follows it.
     const ok = await confirmDialog({
       title: 'Delete this goal?',
-      message: 'The tasks filed under it stay, and what you did toward it stays done.',
+      message: 'The tasks filed under it stay, and what you did toward it stays done. This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     });

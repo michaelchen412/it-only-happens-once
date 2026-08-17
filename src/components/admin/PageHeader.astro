@@ -4,6 +4,38 @@
   (or a `title` slot when the title is an editable field), a right-aligned
   actions cluster, and an optional one-line explanation. Keeps the workshop's
   surfaces from each inventing their own header geometry.
+
+  ⚠ THE ACTIONS SLOT IS WHERE A ROOM'S CREATE DOOR GOES, and what that door is
+  CALLED had no rule until 2026-08-17 (plan 42 · §4.C.10). The tree said: New
+  (tasks, goals) · New constellation · New event · Add (people) · Add ▾
+  (fragments) · Add (placement) · ＋ (shared-by) — and it did not split on any
+  line anyone could name, since People and Tasks are both HQ and disagree.
+
+  THE RULE, derived from what the tree already does rather than invented:
+  **the door names the noun only when the page around it does not.**
+
+    Tasks      h1 "Tasks"           → New                    ✓
+    Goals      h1 "Goals"           → New                    ✓
+    People     h1 "People"          → Add                    ✓
+    Calendar   no h1 naming events  → New event              ✓
+    Fragments  makes TWO kinds      → Add ▾ (nouns on items) ✓
+    Constellations  h1 "Constellations" → New constellation  ✗
+
+  ⚠ FIVE OF SIX ALREADY KEEP IT AND THE SIXTH IS REDUNDANT WITH ITS OWN HEADING.
+  `/admin/constellations` says the word twice, 40px apart. It is not worth a
+  commit of its own — fold it to "New" whenever that file is next open. Recorded
+  rather than fixed, so the exception reads as known instead of as the precedent.
+
+  ⚠ AND ON *Add* VERSUS *New*: Add where the thing joins something that already
+  exists — a roster, a suite, a shelf (a person, a placement, a shared-by link).
+  New where the room brings it into being (a task, a goal, an event). The
+  fragment manager's **Add ▾** is the one that breaks this and earns it: its
+  trigger only has to say *there is a menu here*, and the nouns are on the items.
+
+  ⚠ CONSEQUENCE FOR A ROOM THAT DOES NOT EXIST YET (plan 42 · §4.D.2): the sets
+  sheet's door is **"New"**, not "New set" — `/admin/sets` already carries an h1
+  reading Sets. The plan said "New set" before this rule was written down, which
+  is exactly the coin-flip a stated rule removes.
 */
 interface Props {
   title?: string;

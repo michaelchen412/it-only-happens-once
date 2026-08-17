@@ -252,7 +252,23 @@ const { people = [], sharedBy = {} } = Astro.props;
       <div class="border-base-300 bg-base-100 sticky bottom-0 mt-auto flex items-center gap-2 border-t px-6 py-4">
         {
           /* Named, like "Save quote" and "Add task" beside it — a bare "Save" is
-          the one label that tells you nothing about what you are committing. */
+          the one label that tells you nothing about what you are committing.
+
+          ⚠ THE QUALIFIER, ADDED 2026-08-17 (plan 42 · §4.A.4), because this
+          sentence was stated absolutely and the building practises it with a
+          condition — which made six correct buttons look like drift.
+
+          A BARE "Save" IS LEGAL WHEN THE SURFACE COMMITS EXACTLY ONE OBJECT AND
+          SOMETHING ABOVE IT NAMES THAT OBJECT. The composer's Save sits in a
+          `PageHeader` beside the constellation's own name; `/admin/about` is one
+          object on a titled page; the Library's per-row Save sits beside the
+          name input it commits, which is the naming in its strongest form.
+          Naming those buys nothing.
+
+          The label earns its noun when the surface holds MORE THAN ONE savable
+          object, or when the label is the only thing identifying what is about
+          to be written. That is why this sheet, the quote sheet and the task
+          and event sheets all carry one. */
         }
         <button id="sng-save" type="button" class="btn btn-primary btn-sm flex-1 normal-case">Save song</button>
         <span id="sng-status" class="admin-hint ml-auto" aria-live="polite"></span>
