@@ -84,9 +84,17 @@ const COLUMNS = [
           {
             /* The picker drops the `song` segment entirely rather than showing it
               at zero (ADR 0031). A segment reading "song 0" invites the press that
-              proves it. Songs used to be filtered out of the placeable list
-              here because a song could never sit in a suite; since ADR 0035
-              they are not fragments at all, so there is nothing to exclude. */
+              proves it. Songs used to be filtered out of the picker's row query
+              because a song could never sit in a suite; since ADR 0035 they are
+              not fragments at all, so there is nothing to exclude.
+
+              ⚠ THIS COMMENT WAS RIGHT AND THE CODE WAS NOT, for two days. The
+              filter it describes in the past tense (`params.placeable` →
+              `neq('type', 'song')`) was still live in `fragment-query.ts` until
+              2026-08-17, comparing the enum to a label the migration had
+              deleted — which Postgres errors on rather than ignoring, so this
+              picker returned NO rows at all. Reasoning written down is not the
+              same as reasoning applied. */
             FRAGMENT_TYPES.map((t) => (
               <button
                 type="button"
