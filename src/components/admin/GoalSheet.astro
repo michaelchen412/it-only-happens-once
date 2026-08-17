@@ -34,7 +34,7 @@
   bar, because a direction cannot be 60% travelled.
 */
 import { Icon } from 'astro-icon/components';
-import { HORIZONS, STATUSES } from '../../lib/hq/goals';
+import { HORIZONS } from '../../lib/hq/goals';
 import type { Tables } from '../../lib/database.types';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
@@ -102,27 +102,6 @@ const editing = !!goal;
           >{goal?.notes}</textarea
         >
       </label>
-
-      {
-        editing && (
-          <div class="f mt-4">
-            <span class="f__k">Status</span>
-            <div class="pseg" role="radiogroup" aria-label="Status">
-              {STATUSES.map((s) => (
-                <button
-                  type="button"
-                  class="pseg__b"
-                  role="radio"
-                  data-goal-status={s.key}
-                  aria-checked={goal!.status === s.key}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )
-      }
     </div>
 
     <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">

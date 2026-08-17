@@ -35,7 +35,28 @@ const input = z.object({
    */
   notes: z.preprocess(blankToUndef, z.string().max(10_000).optional()),
   horizon: z.enum(['this_season', 'this_year', 'next_few_years']).default('this_year'),
-  status: z.enum(['active', 'paused', 'achieved', 'let_go']).default('active'),
+  /*
+    ⚠ NO `status` HERE, AND ITS ABSENCE IS THE DECISION (plan 41 · §5a).
+    `setStatus` below is the ONLY writer of that column, and this schema must not
+    grow one back.
+
+    It used to be `z.enum([…]).default('active')`, fed by a segmented control in
+    the sheet — which never worked (`cdfbced`: the script asked for
+    `[data-goalStatus]`, the markup writes `data-goal-status`). So every save
+    sent nothing and the default won, and EDITING A GOAL'S NOTES SET IT BACK TO
+    ACTIVE. Fixing the selector made the control work and left a second, worse
+    problem standing: two controls for one fact on one screen, the header's
+    optimistic and the sheet's server-rendered, so changing the status and then
+    opening the sheet showed the OLD value until a hard refresh. Michael,
+    2026-08-15: *"I don't like how we have the same controls in two areas… it's
+    not intuitive."*
+
+    ⚠ AND DELETING THE CONTROL ALONE WOULD HAVE RESTORED THE BUG BY DESIGN. With
+    the field gone from the form but still in this schema, Zod's default fires
+    on every save and writes `active` again — `_shared.ts`'s standing warning
+    that an action cannot tell "cleared" from "not sent". The field has to leave
+    the schema, not just the markup.
+  */
 });
 
 /**
@@ -68,24 +89,29 @@ export const goals = {
         why: v.why ?? null,
         notes: v.notes ?? null,
         horizon: v.horizon,
-        status: v.status,
       };
 
+      // ⚠ AN EDIT NEVER TOUCHES `status`. Not "writes the same value back" —
+      // does not name the column at all, so there is no path from editing prose
+      // to changing a standing.
       if (v.id) {
-        if (v.status === 'active') await assertRoomToActivate(sb, v.id);
         const { data, error } = await sb.from('goals').update(values).eq('id', v.id).select('id, slug').single();
         if (error) throw fail(error.message);
         return data;
       }
 
-      if (v.status === 'active') await assertRoomToActivate(sb);
+      // ⚠ A NEW GOAL IS ACTIVE, and that is what makes it a goal rather than a
+      // note about one — so the cap applies to creation, and only to creation.
+      // Set here rather than defaulted through the schema, so the one place a
+      // save writes a status is a line you can see.
+      await assertRoomToActivate(sb);
       // The slug is minted once, from the name, and never re-minted: renaming a
       // goal is ordinary and must not move its page. Inactive goals still count
       // — they keep their address, so a link to something you let go resolves.
       const slug = await uniqueSlug(sb, 'goals', goalSlug(v.name));
       const { data, error } = await sb
         .from('goals')
-        .insert({ ...values, slug })
+        .insert({ ...values, slug, status: 'active' })
         .select('id, slug')
         .single();
       if (error) throw fail(error.message);

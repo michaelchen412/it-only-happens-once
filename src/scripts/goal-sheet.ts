@@ -38,32 +38,19 @@ if (sheet && form) {
   const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
 
   /*
-    ⚠ `goal-status`, NOT `goalStatus`, AND THE DIFFERENCE WAS A LIVE BUG.
+    ⚠ THE SHEET NO LONGER EDITS STATUS AT ALL (plan 41 · §5a). The header's
+    four-way control is the only one, and `goals.setStatus` is the only writer —
+    so there is nothing here to go stale when a status changes behind the sheet,
+    which is what sent Michael to a hard refresh on 2026-08-15.
 
-    These three used to be local copies that queried `[data-${attr}]` and read
-    `el.dataset[attr]` — two spellings of one name. `GoalSheet.astro` writes
-    `data-goal-status`, whose dataset key is `goalStatus`, so no single string
-    could satisfy both and this file passed the camel one. `[data-goalStatus]`
-    matches case-insensitively as `data-goalstatus`, which nothing renders, so
-    the group was EMPTY: no click handler was ever bound, `pick` set nothing,
-    and `picked('goalStatus', 'active')` fell through to its fallback on every
-    save.
-
-    So editing any goal wrote `status: 'active'` — silently reactivating one you
-    had paused, achieved or let go, while the sheet went on showing the real
-    status, because that comes from the server's `aria-checked`. The screen and
-    the write disagreed, which is the failure `requireAdmin`'s note calls worse
-    than a refusal.
-
-    The shared versions in `radio-group.ts` take the attribute exactly as the
-    markup spells it and never touch `dataset`, so the two spellings that made
-    this possible no longer exist.
+    The control that used to sit here had never worked: it asked for
+    `[data-goalStatus]` while the markup writes `data-goal-status`, so `picked`
+    fell through to its fallback and editing a goal's NOTES set it back to
+    active (`cdfbced`). Fixing the selector made it work and left the real
+    problem — two controls for one fact — standing.
   */
   options(form, 'horizon').forEach((b) =>
     b.addEventListener('click', () => pick(form, 'horizon', b.getAttribute('data-horizon')!)),
-  );
-  options(form, 'goal-status').forEach((b) =>
-    b.addEventListener('click', () => pick(form, 'goal-status', b.getAttribute('data-goal-status')!)),
   );
 
   document.querySelectorAll<HTMLElement>('[data-open-goal-sheet], [data-edit-goal]').forEach((btn) =>
@@ -92,7 +79,6 @@ if (sheet && form) {
           why: whyInput.value.trim(),
           notes: notesInput.value.trim(),
           horizon: picked(form, 'horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
-          status: picked(form, 'goal-status', 'active') as 'active' | 'paused' | 'achieved' | 'let_go',
         }),
       { button: submitBtn, busy: 'Saving…', onError: ui.showError },
     );
