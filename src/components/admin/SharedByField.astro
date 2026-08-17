@@ -25,6 +25,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { hueFor, monogram } from '../../lib/hq/people';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
 
 interface Props {
   /** Namespaces the ids so the quote form and the song form can each hold one. */
@@ -32,7 +33,6 @@ interface Props {
   people: { id: string; display_name: string }[];
 }
 const { scope, people } = Astro.props;
-const FILTER_THRESHOLD = 8; // below this, a filter field is just another control
 ---
 
 {

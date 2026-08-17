@@ -37,6 +37,8 @@
   reading Sets. The plan said "New set" before this rule was written down, which
   is exactly the coin-flip a stated rule removes.
 */
+import BackLink from './BackLink.astro';
+
 interface Props {
   title?: string;
   /** A single level up — the workshop is never deeper than that. */
@@ -48,13 +50,8 @@ const { title, back, subtitle, class: className = '' } = Astro.props;
 ---
 
 <header class:list={['mb-6', className]}>
-  {
-    back && (
-      <a href={back.href} class="admin-back mb-2">
-        <span aria-hidden="true">←</span> {back.label}
-      </a>
-    )
-  }
+  {/* The same component the two custom-header pages use — see BackLink. */}
+  {back && <BackLink href={back.href} label={back.label} class="mb-2" />}
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <div class="min-w-0 grow">
       {title ? <h1 class="font-display text-2xl font-light">{title}</h1> : <slot name="title" />}

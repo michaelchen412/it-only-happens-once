@@ -26,6 +26,7 @@
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PersonSheet from '../../../components/admin/PersonSheet.astro';
+import BackLink from '../../../components/admin/BackLink.astro';
 import { renderMarkdown } from '../../../lib/markdown';
 import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
 import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
@@ -130,16 +131,12 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
   {
     !person ? (
       <div class="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
-        <a href="/admin/people" class="admin-back mb-4 inline-flex">
-          <span aria-hidden="true">←</span> People
-        </a>
+        <BackLink href="/admin/people" label="People" class="mb-4" />
         <p class="font-serif text-lg">Nobody here by that name.</p>
       </div>
     ) : (
       <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 sm:px-6" data-person-id={person.id}>
-        <a href="/admin/people" class="admin-back mb-4 inline-flex">
-          <span aria-hidden="true">←</span> People
-        </a>
+        <BackLink href="/admin/people" label="People" class="mb-4" />
 
         {person.archived_at && (
           <p class="admin-hint rounded-box border-base-300 bg-base-200 mb-4 border px-3 py-2 text-xs">

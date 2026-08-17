@@ -33,6 +33,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AltTextDialog from '../../components/admin/AltTextDialog.astro';
 import EditorToolbar from '../../components/admin/EditorToolbar.astro';
+import EmptyState from '../../components/admin/EmptyState.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
 import LinkDialog from '../../components/admin/LinkDialog.astro';
 import LogSheet from '../../components/admin/LogSheet.astro';
@@ -142,10 +143,20 @@ const roster = rosterData ?? [];
       notes.length === 0 ? (
         /* A room with nothing in it says one plain sentence and offers the way
            in — never an empty skeleton of the cards that would be here
-           (10-hq §10b). */
-        <p class="text-base-content/55 font-sans text-sm">
-          Nothing here yet. The <span class="text-base-content/80">✚</span> in the corner is the way in — from any room.
-        </p>
+           (10-hq §10b).
+
+           ⚠ `EmptyState`, NOT A BARE `<p>` (plan 42 · §4.C.4). Plan 38 · §4.2
+           consolidated six copies of this box and did not reach the seventh,
+           so this room said it in a different voice and a different weight from
+           the eight that use the component.
+
+           ⚠ AND IT PASSES NOTHING TO THE SLOT, WHICH IS THE POINT. Three rooms
+           offer a create button in their empty state and three do not; the door
+           here is the ✚ in the corner, which belongs to the building rather
+           than to this room, and the hint already says so. A second door would
+           duplicate a live control rather than supply a missing one — which is
+           exactly why that component takes a slot instead of a prop. */
+        <EmptyState title="Nothing here yet." hint="The ✚ in the corner is the way in — from any room." />
       ) : (
         <ul id="notes-pile" class="space-y-3">
           {notes.map((n) => (

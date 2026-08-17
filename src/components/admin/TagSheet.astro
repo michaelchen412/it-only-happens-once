@@ -24,6 +24,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { hueFor, monogram } from '../../lib/hq/people';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
 
@@ -31,7 +32,6 @@ interface Props {
   people: { id: string; display_name: string }[];
 }
 const { people } = Astro.props;
-const FILTER_THRESHOLD = 8;
 ---
 
 {

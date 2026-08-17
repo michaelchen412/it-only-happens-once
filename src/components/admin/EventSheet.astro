@@ -21,6 +21,7 @@ import { Icon } from 'astro-icon/components';
 import KindBar from './KindBar.astro';
 import { hueFor, monogram } from '../../lib/hq/people';
 import type { Ymd } from '../../lib/hq/time';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
 
@@ -29,7 +30,6 @@ interface Props {
   people: { id: string; display_name: string }[];
 }
 const { today, people } = Astro.props;
-const FILTER_THRESHOLD = 8;
 ---
 
 <dialog id="event-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="event-sheet-title">

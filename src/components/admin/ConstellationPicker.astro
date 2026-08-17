@@ -43,6 +43,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { toPlainText } from '../../lib/markdown';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
 
 interface Props {
   scope: string;
@@ -50,7 +51,6 @@ interface Props {
   class?: string;
 }
 const { scope, constellations, class: className = '' } = Astro.props;
-const FILTER_THRESHOLD = 8; // below this, a filter field is just another control
 
 // ⚠ THE DESCRIPTION ARRIVES AS MARKDOWN (2026-08-11) and is flattened here, for
 // the row AND for what the filter searches. Two callers feed this component

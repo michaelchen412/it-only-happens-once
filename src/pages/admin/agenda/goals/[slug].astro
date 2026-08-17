@@ -24,6 +24,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../../../components/admin/AgendaTabs.astro';
 import GoalSheet from '../../../../components/admin/GoalSheet.astro';
+import BackLink from '../../../../components/admin/BackLink.astro';
 import TaskSheet from '../../../../components/admin/TaskSheet.astro';
 import { shiftYmd } from '../../../../lib/hq/time';
 import { clockTime, dmd, fullDate } from '../../../../lib/hq/dates';
@@ -120,7 +121,7 @@ const payload = (t: Task) =>
   <div class="hq-cq mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
     <AgendaTabs active="goals" />
 
-    <a href="/admin/agenda/goals" class="admin-back mb-3 inline-flex"><span aria-hidden="true">←</span> Goals</a>
+    <BackLink href="/admin/agenda/goals" label="Goals" class="mb-3" />
 
     <header class="ghead">
       <div class="min-w-0 flex-1">

@@ -66,13 +66,6 @@ export const FRAGMENT_TYPES = Object.keys(TYPE_META) as FragmentType[];
 export const typeCountLabel = (type: FragmentType, n: number): string =>
   type === 'writing' ? 'writing' : n === 1 ? TYPE_META[type].label : `${TYPE_META[type].label}s`;
 
-/** The bare public date for a fragment (UTC, so it never drifts by a day). */
-export function displayDate(iso: string, precision: 'day' | 'year'): string {
-  const d = new Date(iso);
-  if (precision === 'year') return String(d.getUTCFullYear());
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-}
-
 /** Compact absolute date ("Apr 19, 2023") or an em-dash for null. UTC-stable. */
 export function shortDate(iso: string | null): string {
   if (!iso) return '—';

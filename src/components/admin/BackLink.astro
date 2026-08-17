@@ -1,0 +1,32 @@
+---
+/*
+  BackLink — one level up, and the workshop is never deeper than that.
+
+  ⚠ THIS EXISTED TWICE (plan 42 · §4.B.4). `PageHeader` took a `back` prop and
+  rendered it; `people/[slug].astro` and `agenda/goals/[slug].astro` hand-rolled
+  the same anchor because they carry their OWN headers — `.phead` holds a face
+  and a fact strip, `.ghead` a status radiogroup, and neither fits `PageHeader`
+  (that part is earned, and stays). But the back link above them is not part of
+  either header, and it had drifted to two different margins: `mb-4` on one page
+  and `mb-3` on the other, because nothing owned the spacing.
+
+  Two implementations, one of them inside a component that could not be reused
+  without also adopting its header, is how `EmptyState` came to have six copies.
+
+  ⚠ THE ARROW IS `aria-hidden` AND THE LABEL CARRIES THE MEANING. A screen
+  reader announcing "left arrow People" reads as two things; "People" inside a
+  link that goes to People is one.
+*/
+interface Props {
+  href: string;
+  label: string;
+  /** Spacing against whatever follows — the one thing each caller genuinely differs on. */
+  class?: string;
+}
+const { href, label, class: className } = Astro.props;
+---
+
+<a href={href} class:list={['admin-back inline-flex', className]}>
+  <span aria-hidden="true">←</span>
+  {label}
+</a>
