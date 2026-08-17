@@ -1,0 +1,186 @@
+---
+/*
+  SetSheet — make a curated listen, or change one (plan 40 §3, plan 42 · §4.D.2).
+
+  ⚠ THIS REPLACES PLAIN SERVER-RENDERED FORMS, AND THE ARGUMENT THEY LOST IS
+  WORTH KEEPING. `sets.astro` used to render every set as an open `<form>` on the
+  list, with no client script at all, and defended it in a comment:
+
+    "Every other room in the workshop is JS-driven — sheets, drawers, panels —
+     because they edit objects with a dozen fields, bulk selection and live
+     preview. A set has FIVE fields and there will be about seven of them.
+     Astro's actions accept a form POST natively, so this page is server-
+     rendered, works with script disabled, cannot get its optimistic state out
+     of step with the database, and is about a tenth of the code a sheet would
+     be."
+
+  THREE THINGS WERE WRONG WITH IT, and the first is the one that matters:
+
+   1. ⚠ THE PAGE WAS THE COMMIT UNIT, SO IT COULD LOSE WORK. Every card being a
+      live form meant a reorder, a delete, or a Save on ANY card posted and
+      reloaded — silently discarding unsaved text in every other card. The
+      Library has the same hazard and GUARDED it on 2026-08-12 (`library.ts`,
+      a confirm naming the other dirty rows); sets shipped unguarded three days
+      later. A sheet has no other cards to lose.
+   2. The count was wrong on the day it was written — the card rendered SIX
+      controls, and the comment's own escape clause was "if a set ever grows a
+      sixth field… this becomes a sheet like its neighbours."
+   3. "A tenth of the code" does not survive measurement: `GoalSheet.astro` is
+      126 lines for five fields.
+
+  ⚠ AND THE NO-JS HALF IS A REAL ARGUMENT THAT LOSES ON A NARROWER POINT. The
+  Observatory is one authenticated person on their own devices; every other room
+  already needs script to create anything; and the benefit was bought at the
+  price of a page that cannot hold two edits at once. Michael's call, 2026-08-17.
+  See the ADR.
+
+  SHAPED AFTER `GoalSheet`, deliberately and to the letter: `drawer-dialog
+  max-w-md`, `SheetHeader`, `SheetError`, a footer of Delete · Cancel · Save.
+  Six fields is a short record, so the footer IS the end of the object — the
+  boundary `scripts/sheet.ts` states.
+
+  ⚠ ONE SHEET, MANY SETS — so it fills on open rather than server-rendering its
+  values, which is `TaskSheet`'s shape and not `GoalSheet`'s. A goal page holds
+  exactly one goal and can therefore render the form filled; this room lists
+  seven, and mounting seven sheets to avoid a prefill step is how you get seven
+  copies of a form to keep in step. The row carries its own JSON and
+  `set-sheet.ts` reads it.
+
+  ⚠ THE ROW SERIALISES THE COLUMNS, not what it happens to be displaying — the
+  rule `TaskSheet` states for the same reason. A list shows a title and a status
+  chip; the sheet needs the playlist, the quote and the description too, and
+  deriving those from what is on screen is how a form and a row come to disagree.
+*/
+import { Icon } from 'astro-icon/components';
+import MiniEditor from './MiniEditor.astro';
+import SheetHeader from './SheetHeader.astro';
+import SheetError from './SheetError.astro';
+
+interface Props {
+  /** Published quotes, for the epigraph picker. */
+  quotes: { id: string; label: string }[];
+}
+const { quotes } = Astro.props;
+---
+
+<dialog id="set-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="set-sheet-title">
+  <form id="set-form" class="flex h-full flex-col overflow-hidden font-sans">
+    <SheetHeader titleId="set-sheet-title" title="New set" />
+
+    <SheetError id="set-sheet-error" />
+
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <label class="f">
+        <span class="f__k">Title <em>required</em></span>
+        <input type="text" name="title" required maxlength="300" placeholder="If nothing else, I love you" />
+        <span class="f__h">An utterance, not a label — it is the whole of the index on the music page.</span>
+      </label>
+
+      <label class="f mt-4">
+        <span class="f__k">Playlist <em>required</em></span>
+        <input type="url" name="playlist_url" required placeholder="https://open.spotify.com/playlist/…" />
+        <span class="f__h">Any Spotify playlist link — the <code>?si=</code> token is stripped on save.</span>
+      </label>
+
+      {
+        /* ⚠ STILL A `<select>`, AND IT IS THE ONE THING THIS SHEET DOES NOT FIX
+          (plan 42 · §4.D.4). The right answer is `FragmentBrowser` in a third
+          mode — published quotes, single-select, with the create bar retargeted
+          — and it is a bigger piece than the rest of this file. Carried across
+          unchanged rather than quietly improved, so the finding stays open and
+          visible instead of looking done.
+
+          What DID change: it is rendered ONCE here instead of once per card
+          plus once in the New form. Seven sets × 77 quotes was 616 `<option>`
+          elements for a control only ever open once — the same O(n²) shape
+          plan 38 · §1.2 deleted from the Library. */
+      }
+      <label class="f mt-4">
+        <span class="f__k">Quote <span>— optional</span></span>
+        <select name="quote_fragment_id" data-quote>
+          <option value="">None</option>
+          {quotes.map((q) => <option value={q.id}>{q.label}</option>)}
+        </select>
+        <span class="f__h">It leads the open set, above your description.</span>
+      </label>
+
+      {
+        /* ⚠ A MINI EDITOR, NOT A TEXTAREA (plan 42 · §4.D.5). `MusicSets.astro`
+          already renders this field through `renderMarkdown`, so the PUBLIC
+          page has always supported bold and italic and only the editor refused
+          — the one prose field in the building where what you type and what
+          ships were different languages.
+
+          The same control the quote body, the song notes and the constellation
+          description use, for the reason that last one gives: ADR 0006 chose
+          WYSIWYG-storing-Markdown for essays and ADR 0018 retired "plain
+          textarea, ever" for notes, and this was the last room those two
+          rulings had not reached.
+
+          ⚠ THE VALUE TRAVELS IN A HIDDEN INPUT — a contenteditable is not a
+          form control, so `new FormData(form)` cannot see it. */
+      }
+      <div class="f mt-4">
+        <span class="f__k">Description</span>
+        <MiniEditor id="set-desc" wrapId="set-desc-wrap" size="max-h-[30vh] min-h-[4.5rem]" />
+        <input type="hidden" name="description" data-desc-value />
+      </div>
+
+      {
+        /* ⚠ A SWITCH, FORM-BOUND, AND THE LIST HAS THE OTHER ONE. This is the
+          composer's shape exactly (plan 42 · §0): two states that are opposites
+          read as a switch, where a `<select>` made you open a menu to learn
+          that and put the current state behind it. The old page used a select,
+          which the composer's own comment had already argued against in writing
+          — six days earlier.
+
+          IT SAVES WITH THE CARD rather than on flip, and the line beneath says
+          so until you press Save. The list row's ⋯ menu is the click-is-commit
+          half; two screens, one fact, which is the constellations shape Michael
+          already lives with. Plan 41's finding was two controls for one fact on
+          ONE screen.
+
+          ⚠ THE CHECKBOX IS THE FIELD — no hidden mirror. Unchecked, a checkbox
+          submits nothing, and `sets.setStatus` is the only writer anyway, so
+          `set-sheet.ts` reads this and calls that. */
+      }
+      <div class="f mt-4">
+        <span class="f__k">Visibility</span>
+        <div class="flex items-center gap-2.5">
+          <input type="checkbox" id="set-status" class="toggle toggle-sm toggle-primary" data-status />
+          <label id="set-status-word" for="set-status" class="cursor-pointer font-sans text-sm">Draft</label>
+        </div>
+        <p class="f__h" data-status-hint>Only you can see it. It joins the music page when you press Save.</p>
+      </div>
+
+      <label class="f mt-4">
+        <span class="f__k">Address <span>— the URL</span></span>
+        <input type="text" name="slug" placeholder="auto" spellcheck="false" autocapitalize="off" />
+        <span class="f__h">Leave blank to follow the title.</span>
+      </label>
+    </div>
+
+    <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">
+      {
+        /* The footer variant, and it is legal here for the reason `sheet.ts`
+          states: a short record whose form does not scroll has no "end of the
+          object" distinct from its footer. ⚠ The confirm carries the
+          irreversibility, because `sets.remove` is a hard delete — argued at
+          the action, and correct: a set is a title, a sentence and a link. */
+      }
+      <button type="button" class="btn btn-ghost btn-sm text-error gap-1 font-sans" data-delete hidden>
+        <Icon name="ph:trash" /> Delete
+      </button>
+      <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
+      {
+        /* Named, per the rule in `SongSheet.astro`: this room holds several
+          savable sets, so the label carries the noun. */
+      }
+      <button type="submit" class="btn btn-primary btn-sm font-sans normal-case" data-submit>Save set</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import '../../scripts/set-sheet';
+</script>

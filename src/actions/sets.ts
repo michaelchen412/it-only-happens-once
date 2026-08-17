@@ -85,7 +85,26 @@ export const sets = {
       description: z.string().optional(),
       playlist_url: z.string().trim().min(1, 'A set needs a playlist'),
       quote_fragment_id: optUuid,
-      status: setStatus,
+      /*
+        ⚠ NO `status` HERE, AND ITS ABSENCE IS THE DECISION (plan 42 · §4.D.3,
+        applying plan 41 · §5a to the one table that shipped without it).
+        `setStatus` below is the ONLY writer of that column.
+
+        This table was created on the same day plan 41 established that rule for
+        `goals`, and the rule did not reach it: `save` carried
+        `status: setStatus` — a `.default('draft')` — so publishing rode a
+        whole-card save, and every save named the column.
+
+        ⚠ THE DEFAULT IS WHY THE FIELD HAD TO LEAVE THE SCHEMA RATHER THAN THE
+        FORM. `_shared.ts` says an action cannot tell "cleared" from "not sent",
+        so with the field gone from the markup but still `.default('draft')`
+        here, Zod's default would fire on every edit and quietly UNPUBLISH a live
+        set. That is bug 1 from `actions-goals.test.ts`, rebuilt on a table where
+        it would be public. `src/tests/actions-sets.test.ts` pins it.
+
+        A new set still starts as a draft — the column's own DB default does it,
+        which is a rule Postgres keeps rather than one a schema re-states.
+      */
     }),
     handler: async (input, ctx) => {
       requireAdmin(ctx);
@@ -102,7 +121,9 @@ export const sets = {
         description: input.description?.trim() ?? '',
         playlist_url: playlistUrl,
         quote_fragment_id: input.quote_fragment_id ?? null,
-        status: input.status,
+        // ⚠ `status` IS NOT NAMED — see the schema above. On an update that
+        // leaves a published set published; on an insert the column's own
+        // default makes it a draft.
       };
 
       if (input.id) {

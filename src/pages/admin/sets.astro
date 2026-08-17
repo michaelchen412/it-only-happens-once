@@ -2,48 +2,38 @@
 /*
   /admin/sets — the sets, where a curated listen is made (plan 40 §3).
 
-  ⚠ PLAIN FORMS, NO CLIENT SCRIPT, AND THAT IS A DEPARTURE WORTH DEFENDING.
-  Every other room in the workshop is JS-driven — sheets, drawers, panels —
-  because they edit objects with a dozen fields, bulk selection and live
-  preview. A set has FIVE fields and there will be about seven of them. Astro's
-  actions accept a form POST natively, so this page is server-rendered, works
-  with script disabled, cannot get its optimistic state out of step with the
-  database, and is about a tenth of the code a sheet would be.
+  ⚠ THIS WAS SEVEN OPEN `<form>`s AND IS NOW A LIST OF ROWS (plan 42 · §4.D.2).
+  The old page defended plain server-rendered forms — no client script, works
+  with script disabled — and the argument is preserved in `SetSheet.astro`
+  rather than deleted, because it was a real one. What it lost on:
 
-  If a set ever grows a sixth field or the list passes ~30 rows, that argument
-  expires and this becomes a sheet like its neighbours. Written down so the next
-  person knows it was a decision rather than an omission.
+   · ⚠ THE PAGE WAS THE COMMIT UNIT, SO IT COULD LOSE WORK. A reorder, a delete
+     or a Save on ANY card posted and reloaded, silently discarding unsaved text
+     in every other card. The Library has the identical hazard and guarded it on
+     2026-08-12; this shipped unguarded three days later.
+   · Its own escape clause had fired: "if a set ever grows a sixth field… this
+     becomes a sheet like its neighbours." The card rendered six controls.
+   · Publishing rode a `<select>` inside a whole-card save, six days after the
+     composer's own comment argued in writing against exactly that control, and
+     two days after plan 41 · §5a made `setStatus` the only writer of that
+     column on the table next door.
 
-  ⚠ THE QUOTE PICKER IS A `<select>`, AND IT HAS A CEILING. It lists every
-  published quote — 77 today — which is browsable but not searchable. The right
-  answer at three hundred is `FragmentBrowser` in a pair mode, exactly as the
-  song pairing does it. Not built yet because a select over 77 is honest and a
-  drawer over 77 is furniture.
+  WHAT THE ROOM IS NOW, and every part of it is a shape this building already
+  keeps: `PageHeader` + one primary, an `EmptyState` carrying the same door, rows
+  with a status chip, drag-or-Alt reorder, and a ⋯ menu holding publish and
+  delete — the `/admin/constellations` shape, which is the nearest sibling by
+  construction (this table's own migration says it was "shaped after
+  `constellations`").
 */
 import { Icon } from 'astro-icon/components';
-import { actions } from 'astro:actions';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import StatusChip from '../../components/admin/StatusChip.astro';
 import EmptyState from '../../components/admin/EmptyState.astro';
+import SetSheet from '../../components/admin/SetSheet.astro';
 import { listSetsAdmin } from '../../lib/sets';
 import { embedForUrl } from '../../lib/media';
-
-/*
-  ⚠ REDIRECT AFTER A SUCCESSFUL POST, always. Without it a refresh resubmits the
-  form — which for `save` means a duplicate set and for `remove` means a
-  confusing error about a row that is already gone. The result is only read to
-  decide whether to redirect or to render the message.
-*/
-for (const action of [actions.sets.save, actions.sets.setStatus, actions.sets.reorder, actions.sets.remove]) {
-  const result = Astro.getActionResult(action);
-  if (result && !result.error) return Astro.redirect('/admin/sets');
-}
-const saveError = Astro.getActionResult(actions.sets.save)?.error;
-const otherError =
-  Astro.getActionResult(actions.sets.remove)?.error ??
-  Astro.getActionResult(actions.sets.setStatus)?.error ??
-  Astro.getActionResult(actions.sets.reorder)?.error;
+import { jsonForScript } from '../../lib/serialize';
 
 const sb = Astro.locals.supabase;
 const [rows, { data: quoteRows }] = await Promise.all([
@@ -57,23 +47,33 @@ const [rows, { data: quoteRows }] = await Promise.all([
     .order('attribution'),
 ]);
 
+/*
+  ⚠ RENDERED ONCE, NOT ONCE PER CARD. The old page put this list inside every
+  set's form AND in the New form — seven sets × 77 quotes was 616 `<option>`
+  elements for a control that is only ever open once, which is the same O(n²)
+  shape plan 38 · §1.2 deleted from the Library. One sheet, one list.
+
+  The label is still a truncation of the body plus the attribution, and it is
+  still not good enough — picking a quote by its opening clause is what §4.D.4's
+  `FragmentBrowser` mode exists to replace. Carried across unchanged so the
+  finding stays visible.
+*/
 const quotes = (quoteRows ?? []).map((q) => ({
   id: q.id,
-  // One line in a dropdown: enough of the quote to recognise it, and the
-  // attribution, which is how you actually remember which one it is.
   label: `${(q.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 70)}${(q.body ?? '').length > 70 ? '…' : ''} — ${q.attribution ?? 'unattributed'}`,
 }));
 
-const ids = rows.map((r) => r.id);
-/** The full order with `i` moved by `delta` — the whole list, because `reorder` rewrites 1..n. */
-const moved = (i: number, delta: number) => {
-  const next = [...ids];
-  const [x] = next.splice(i, 1);
-  next.splice(Math.max(0, Math.min(next.length, i + delta)), 0, x);
-  return next.join(',');
-};
-
-const FIELD = 'input input-sm input-bordered w-full font-sans';
+/** Everything the sheet needs, which is the COLUMNS rather than what the row shows. */
+const payload = (s: (typeof rows)[number]) =>
+  jsonForScript({
+    id: s.id,
+    title: s.title,
+    slug: s.slug,
+    playlist_url: s.playlist_url,
+    quote_fragment_id: s.quote_fragment_id,
+    description: s.description ?? '',
+    status: s.status,
+  });
 ---
 
 <AdminLayout title="Sets" active="sets">
@@ -81,231 +81,132 @@ const FIELD = 'input input-sm input-bordered w-full font-sans';
     <PageHeader
       title="Sets"
       subtitle="A curated listen: one Spotify playlist, one quote, one description. The order here is the order the music page reads top to bottom."
-    />
+    >
+      {
+        /* "New", not "New set" — the page already carries an h1 reading Sets,
+          and `PageHeader.astro` holds the rule. */
+      }
+      <button
+        slot="actions"
+        type="button"
+        data-open-set-sheet
+        class="btn btn-primary btn-sm gap-1 font-sans normal-case"
+      >
+        <Icon name="ph:plus" /> New
+      </button>
+    </PageHeader>
+
+    <p id="sets-error" hidden role="alert" class="admin-alert mb-4"></p>
 
     {
-      (saveError || otherError) && (
-        <div role="alert" class="alert alert-error mb-6 font-sans text-sm">
-          {saveError?.message ?? otherError?.message}
-        </div>
-      )
-    }
-
-    {
-      rows.length === 0 && (
+      rows.length === 0 ? (
         <EmptyState
           title="No sets yet."
           hint="A set is a playlist you'd want somebody to save — give it a sentence for a title and one quote that belongs beside it."
-          class="mb-8"
-        />
+        >
+          {/* The same control as the header's, not a second one — the button is
+              bound by `[data-open-set-sheet]` across every element carrying it,
+              so there is no second code path to keep in step. */}
+          <button type="button" data-open-set-sheet class="btn btn-primary btn-sm mt-4 gap-1 font-sans normal-case">
+            <Icon name="ph:plus" /> Name the first
+          </button>
+        </EmptyState>
+      ) : (
+        <ul id="sets-list" class="divide-base-300 rounded-box border-base-300 bg-base-200/50 divide-y border">
+          {rows.map((s) => {
+            const ref = embedForUrl(s.playlist_url);
+            return (
+              <li class="group flex items-center gap-3 px-4 py-3" data-id={s.id} data-set={payload(s)} draggable="true">
+                <span
+                  class="text-base-content/25 group-hover:text-base-content/50 shrink-0 cursor-grab transition-colors select-none"
+                  title="Drag to reorder (or Alt+↑/↓)"
+                  aria-hidden="true"
+                >
+                  ⋮⋮
+                </span>
+                <div class="min-w-0 grow">
+                  <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    {/* The title IS the edit affordance — no pencil on every
+                        row announcing itself (the rule `tasks.astro` states). */}
+                    <button type="button" class="font-display truncate text-left text-lg hover:underline" data-edit-set>
+                      {s.title}
+                    </button>
+                    <StatusChip status={s.status} />
+                  </div>
+                  {/* One fact, and it is the one you cannot check by reading the
+                      row: whether the link still resolves to a playlist. */}
+                  <p class="text-base-content/45 mt-0.5 font-sans text-xs">
+                    {ref ? 'playlist attached' : 'no playable link'}
+                    {s.quote_fragment_id && ' · quote'}
+                  </p>
+                </div>
+
+                <span class="row-edit flex shrink-0 items-center gap-0.5">
+                  {/* Touch-only, like the constellations index and the composer
+                      suite: with a pointer you drag the ⋮⋮ and with a keyboard
+                      you Alt+↑/↓, so on a hovering device these would reserve
+                      row width for a duplicate of drag (`.row-nudge`, app.css). */}
+                  <button
+                    type="button"
+                    class="row-nudge btn btn-ghost btn-xs"
+                    data-move="up"
+                    aria-label={`Move ${s.title} up`}
+                  >
+                    <Icon name="ph:arrow-up" />
+                  </button>
+                  <button
+                    type="button"
+                    class="row-nudge btn btn-ghost btn-xs"
+                    data-move="down"
+                    aria-label={`Move ${s.title} down`}
+                  >
+                    <Icon name="ph:arrow-down" />
+                  </button>
+                  {/* `data-status` rides the trigger so the menu can word its
+                      first item before it opens — the constellations rule. */}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    data-row-menu
+                    data-status={s.status}
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-label={`More actions for ${s.title}`}
+                  >
+                    <Icon name="ph:dots-three" />
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )
     }
-
-    <ul class="flex flex-col gap-6">
-      {
-        rows.map((s, i) => {
-          /*
-            ⚠ `embedForUrl`, NOT A HAND-WRITTEN FRAME (plan 42 · §5). This
-            preview carried `height="152"` — the TRACK height — for a PLAYLIST
-            whose frame is 352, and **no `allow` attribute at all**, so the one
-            control it exists to offer (press play, is this the right playlist?)
-            was the one most likely not to work. `lib/media.ts` records why:
-            Chrome blocks `autoplay`/`encrypted-media` in a cross-origin frame
-            unless the EMBEDDER delegates them, and it fails per-profile, so it
-            reads as "the embed is broken" rather than "the attribute is
-            missing".
-
-            The gate is now the embed itself rather than a separate parse: a URL
-            that cannot be embedded shows no player and no Open link, which is
-            one answer instead of two that could disagree.
-
-            ⚠ THE HEIGHT IS THE CANONICAL 352 AND THE PUBLIC PAGE RENDERS 480
-            (`MusicSets.astro`, chosen at the bench). Matching that is plan 42 ·
-            §4.D.6 and belongs with the sheet rebuild, not here — this commit
-            fixes what was WRONG, and the remaining gap is a deliberate
-            difference between a preview and the page.
-          */
-          const ref = embedForUrl(s.playlist_url);
-          return (
-            <li class="border-base-300 rounded-box border p-5">
-              <div class="mb-4 flex items-start justify-between gap-4">
-                <h2 class="font-display text-xl leading-snug font-light">{s.title}</h2>
-                <div class="flex shrink-0 items-center gap-2">
-                  <StatusChip status={s.status} />
-                  {/* Reorder posts the WHOLE order, because `sort` is rewritten
-                      1..n rather than nudged — the same rule constellations
-                      follow. Disabled at the ends rather than hidden, so the
-                      row's controls do not shift as you move it. */}
-                  <form method="POST" action={actions.sets.reorder} class="contents">
-                    <input type="hidden" name="ids" value={moved(i, -1)} />
-                    <button class="btn btn-ghost btn-xs" disabled={i === 0} aria-label={`Move ${s.title} up`}>
-                      <Icon name="ph:arrow-up" />
-                    </button>
-                  </form>
-                  <form method="POST" action={actions.sets.reorder} class="contents">
-                    <input type="hidden" name="ids" value={moved(i, 1)} />
-                    <button
-                      class="btn btn-ghost btn-xs"
-                      disabled={i === rows.length - 1}
-                      aria-label={`Move ${s.title} down`}
-                    >
-                      <Icon name="ph:arrow-down" />
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              <form method="POST" action={actions.sets.save} class="flex flex-col gap-3">
-                <input type="hidden" name="id" value={s.id} />
-                <label class="block">
-                  <span class="f__k">Title</span>
-                  <input name="title" value={s.title} required class={FIELD} />
-                </label>
-                <label class="block">
-                  <span class="f__k">Slug</span>
-                  <input name="slug" value={s.slug} class={FIELD} />
-                </label>
-                <label class="block">
-                  <span class="f__k">Playlist</span>
-                  <input name="playlist_url" value={s.playlist_url} required class={FIELD} />
-                  <p class="admin-hint mt-1.5">
-                    Any Spotify playlist link — the <code>?si=</code> token is stripped on save.
-                  </p>
-                </label>
-                <label class="block">
-                  <span class="f__k">Quote — optional</span>
-                  <select name="quote_fragment_id" class="select select-sm select-bordered w-full font-sans">
-                    <option value="">None</option>
-                    {quotes.map((q) => (
-                      <option value={q.id} selected={q.id === s.quote_fragment_id}>
-                        {q.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="f__k">Description</span>
-                  {/* ⚠ `set:text`, NOT A CHILD EXPRESSION. A textarea preserves everything
-                      between its tags, so `<textarea>\n  {value}\n</textarea>` saves the
-                      indentation with the prose and grows it by two spaces every time the
-                      form is opened and saved. */}
-                  <textarea
-                    name="description"
-                    rows="3"
-                    class="textarea textarea-bordered w-full font-sans text-sm"
-                    set:text={s.description}
-                  />
-                </label>
-                <label class="block">
-                  <span class="f__k">Status</span>
-                  <select name="status" class="select select-sm select-bordered w-full font-sans">
-                    <option value="draft" selected={s.status === 'draft'}>
-                      Draft
-                    </option>
-                    <option value="published" selected={s.status === 'published'}>
-                      Published
-                    </option>
-                  </select>
-                </label>
-                <div class="flex items-center gap-2">
-                  <button class="btn btn-primary btn-sm font-sans normal-case">Save</button>
-                  {/* ⚠ THE ONE FIELD YOU CANNOT CHECK BY READING IT — the same
-                      argument the constellation composer makes about its score.
-                      A playlist id is 22 opaque characters, and the only other
-                      way to find out it is the wrong one is to publish the page
-                      and press play. */}
-                  {ref && (
-                    <a
-                      href={s.playlist_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      class="admin-hint hover:text-primary inline-flex items-center gap-1 underline"
-                    >
-                      Open <Icon name="ph:arrow-up-right" />
-                    </a>
-                  )}
-                </div>
-              </form>
-
-              {ref &&
-                (ref.height === null ? (
-                  <div class="mt-4 aspect-video overflow-hidden" style="border-radius: var(--radius-box)">
-                    <iframe
-                      class="h-full w-full"
-                      src={ref.src}
-                      loading="lazy"
-                      allow={ref.allow}
-                      title={s.title}
-                      style="border: 0"
-                    />
-                  </div>
-                ) : (
-                  <iframe
-                    class="mt-4"
-                    src={ref.src}
-                    width="100%"
-                    height={ref.height}
-                    loading="lazy"
-                    allow={ref.allow}
-                    title={s.title}
-                    style="border-radius: var(--radius-box); border: 0"
-                  />
-                ))}
-
-              <form
-                method="POST"
-                action={actions.sets.remove}
-                class="border-base-300 mt-4 border-t pt-3"
-                onsubmit="return confirm('Delete this set? The playlist on Spotify is untouched.')"
-              >
-                <input type="hidden" name="id" value={s.id} />
-                <button class="btn btn-ghost btn-xs text-error font-sans normal-case">Delete</button>
-              </form>
-            </li>
-          );
-        })
-      }
-    </ul>
-
-    <section class="border-base-300 rounded-box mt-10 border border-dashed p-5">
-      <h2 class="font-display mb-4 text-xl font-light">New set</h2>
-      <form method="POST" action={actions.sets.save} class="flex flex-col gap-3">
-        <label class="block">
-          <span class="f__k">Title</span>
-          <input name="title" required placeholder="If nothing else, I love you" class={FIELD} />
-        </label>
-        <label class="block">
-          <span class="f__k">Playlist</span>
-          <input
-            name="playlist_url"
-            required
-            type="url"
-            placeholder="https://open.spotify.com/playlist/…"
-            class={FIELD}
-          />
-        </label>
-        <label class="block">
-          <span class="f__k">Quote — optional</span>
-          <select name="quote_fragment_id" class="select select-sm select-bordered w-full font-sans">
-            <option value="">None</option>
-            {quotes.map((q) => <option value={q.id}>{q.label}</option>)}
-          </select>
-        </label>
-        <label class="block">
-          <span class="f__k">Description</span>
-          <textarea name="description" rows="3" class="textarea textarea-bordered w-full font-sans text-sm"></textarea>
-        </label>
-        {
-          /* A new set starts as a draft and says so by omission — `status`
-            defaults to draft in the action, so there is no control here to get
-            wrong. Publish it from its own card once it reads right. */
-        }
-        <div>
-          <button class="btn btn-primary btn-sm gap-1 font-sans normal-case">
-            <Icon name="ph:plus" /> Create as draft
-          </button>
-        </div>
-      </form>
-    </section>
   </div>
+
+  {
+    /* ONE MENU FOR THE WHOLE LIST, positioned against the ⋯ that opened it, and
+      a top-layer `popover` so no ancestor's overflow clips it and no z-index
+      covers it. The status row is worded at open time: one menu over a list of
+      mixed drafts and published sets cannot render "Unpublish" on the server. */
+  }
+  <div id="sets-row-menu" popover class="pop" aria-label="Set actions">
+    <button type="button" class="pop__row" data-act="status">
+      <span data-icon-publish><Icon name="ph:eye" /></span>
+      <span data-icon-unpublish hidden><Icon name="ph:eye-slash" /></span>
+      <span data-status-label>Publish</span>
+    </button>
+    <button type="button" class="pop__row" data-act="open">
+      <Icon name="ph:arrow-up-right" /> Open on Spotify
+    </button>
+    <button type="button" class="pop__row pop__row--danger" data-act="delete">
+      <Icon name="ph:trash" /> Delete
+    </button>
+  </div>
+
+  <SetSheet quotes={quotes} />
+
+  <script>
+    import '../../scripts/sets-index';
+  </script>
 </AdminLayout>
