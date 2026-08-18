@@ -108,6 +108,37 @@ async function startBlank(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-panel="fill"]')).toBeVisible();
 }
 
+/**
+ * The three night times, all of them, so a derived number is a function of what
+ * the test said and nothing else.
+ *
+ * ⚠⚠ UNANSWERED IS NOT THE SAME AS EMPTY, and the gap between those two words
+ * cost two specs (found 2026-08-18). `startBlank` guards "today has no answers"
+ * — but **prefill is ON for today** and pulls the night times forward from a
+ * recent day, which is a real feature with a passing spec of its own two blocks
+ * down ("prefill is OFF on a past day, and on today it is on"). So the form
+ * these two opened was unanswered AND prefilled: `gotUp` sat at `09:21`.
+ *
+ * ⚠ AND `gotUp` IS INSIDE THE DERIVED NUMBER, which is what turned a stale field
+ * into a wrong assertion rather than a harmless one:
+ * `inBed = night + (gotUp − woke) − outOfBed`. A test that set `bed`/`woke` for a
+ * 6h 50m night and left `gotUp` alone read **9h 46m** — the prefilled 2h 56m
+ * lie-in, added on. It looked like a derivation bug and was a fixture bug:
+ * exactly the "environmental failure wearing a bug's clothes" this file warns
+ * about twice, walking straight through the guard written for it, because the
+ * guard asks whether the day was ANSWERED and the tests need it EMPTY.
+ *
+ * ⚠ It sets all three rather than clearing them. A night with no `gotUp` is a
+ * different case from one where you got up when you woke, and these tests mean
+ * the second — so the default is `woke`, which is what makes `inBed` equal the
+ * night itself.
+ */
+async function night(page: import('@playwright/test').Page, bed: string, woke: string, gotUp = woke) {
+  await page.locator('[data-field="bed"]').fill(bed);
+  await page.locator('[data-field="woke"]').fill(woke);
+  await page.locator('[data-field="gotUp"]').fill(gotUp);
+}
+
 test.describe('the check-in, before it has been answered', () => {
   test('asks once, offers a skip, and blocks nothing', async ({ page }) => {
     await page.goto('/admin');
@@ -272,9 +303,8 @@ test.describe('answering it', () => {
     await startBlank(page);
 
     const derived = page.locator('[data-derived]');
-    await page.locator('[data-field="bed"]').fill('23:35');
-    await page.locator('[data-field="woke"]').fill('06:25');
     // Crossing midnight is the normal case, not the edge one.
+    await night(page, '23:35', '06:25');
     await expect(derived).toHaveText('6h 50m in bed');
 
     // An efficiency that assumed "asleep instantly, never woke" would be a
@@ -325,8 +355,7 @@ test.describe('answering it', () => {
     await startBlank(page);
 
     const derived = page.locator('[data-derived]');
-    await page.locator('[data-field="bed"]').fill('23:00');
-    await page.locator('[data-field="woke"]').fill('07:00');
+    await night(page, '23:00', '07:00');
     await page.locator('[data-lat="under_15"]').click();
     await page.locator('[data-wake="none"]').click();
     await expect(derived).toHaveText('8h 00m in bed · ≈7h 52m asleep · 98%');
