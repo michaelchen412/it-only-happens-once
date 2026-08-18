@@ -18,7 +18,7 @@
 import { describe, expect, it } from 'vitest';
 import { recurrenceOf } from '../actions/tasks';
 import { assertBirthday } from '../actions/people';
-import { firstWords, yearToISO } from '../actions/fragments';
+import { autoOccurredAtFor, firstWords, yearToISO } from '../actions/fragments';
 import { oneLine } from '../actions/site';
 
 /** The editor's payload, as `recurrenceOf` receives it after validation. */
@@ -241,5 +241,56 @@ describe('oneLine — a stranger’s name cannot forge a line', () => {
 
   it('collapses runs of whitespace and trims, so a padded name still reads', () => {
     expect(oneLine('  Ada   Lovelace  ')).toBe('Ada Lovelace');
+  });
+});
+
+// ============================================================================
+describe('autoOccurredAtFor — the day a piece is filed under', () => {
+  // ⚠ THIS IS THE TEST FOR A BUG THAT WAS LIVE ON THE PUBLIC BLOG (plan 42 ·
+  // §4.C.7, ADR 0039). `occurred_at` used to be `new Date().toISOString()` — an
+  // INSTANT standing in for a CALENDAR DATE — so on a UTC server every evening
+  // in the Americas rolled the date forward. 17 of 56 published essays were
+  // dated a day late because of it, and no rendering could repair them: the
+  // wrong day was already in the column.
+
+  it('files an evening in Los Angeles under that evening, not tomorrow', () => {
+    // 6pm Pacific on the 18th is 01:00 UTC on the 19th — the exact shape of the
+    // defect, and the reason the old code was wrong for a third of the corpus.
+    const at = new Date('2026-08-19T01:00:00Z');
+    expect(autoOccurredAtFor('America/Los_Angeles', at)).toBe('2026-08-18T00:00:00.000Z');
+    // What the old rule did, stated so the regression is legible:
+    expect(at.toISOString().slice(0, 10)).toBe('2026-08-19');
+  });
+
+  it('files a morning in Tokyo under that morning, not yesterday', () => {
+    // ⚠ THE OTHER HEMISPHERE, and it is why this is `ymdToUtc(localToday(tz))`
+    // rather than `zonedTimeToUtc(today, '00:00', tz)`. The near-miss stores a
+    // real local midnight — harmless at 07:00Z for Los Angeles, but 15:00Z the
+    // PREVIOUS DAY for Tokyo, so the UTC read comes back a day early and the bug
+    // returns wearing the opposite sign.
+    const at = new Date('2026-08-18T22:00:00Z'); // 07:00 on the 19th in Tokyo
+    expect(autoOccurredAtFor('Asia/Tokyo', at)).toBe('2026-08-19T00:00:00.000Z');
+  });
+
+  it('always lands on a UTC midnight, which is what makes it a calendar date', () => {
+    // The invariant the reader depends on: `shortDate` and `Timestamp` both read
+    // the Y-M-D back with `timeZone: 'UTC'`, and a backdated piece written by
+    // `occurredAtFrom` stores the same shape. One convention, two writers.
+    for (const tz of ['America/Los_Angeles', 'Asia/Tokyo', 'Europe/London', 'Pacific/Kiritimati']) {
+      const iso = autoOccurredAtFor(tz, new Date('2026-08-18T22:00:00Z'));
+      expect(iso).toMatch(/T00:00:00\.000Z$/);
+    }
+  });
+
+  it('agrees with what a backdated piece stores for the same day', () => {
+    // ⚠ THIS ASSERTION FOUND A LATENT BUG rather than confirming a belief, which
+    // is the reason it is worth its lines. `occurredAtFrom` did `new Date(local)`
+    // on a `datetime-local` string — parsed in the SERVER'S zone. Vercel runs
+    // UTC so production was right by accident; this suite does not, and the two
+    // write paths disagreed by four hours here. `occurredAtFrom` reads the wall
+    // clock as UTC now, which is a no-op in production and removes the
+    // dependency on an environment variable.
+    const at = new Date('2023-04-19T12:00:00Z');
+    expect(autoOccurredAtFor('America/Los_Angeles', at)).toBe('2023-04-19T00:00:00.000Z');
   });
 });

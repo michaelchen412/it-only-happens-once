@@ -27,6 +27,10 @@ import {
 // ⚠ THE ONE DEFINITION OF "how you select a paired song", and this action is
 // here because it used to carry a second one. See `get` below.
 import { PAIRED_SELECT, type PairedRow } from '../lib/blog';
+// ⚠ THE CORPUS BORROWS HQ'S CLOCK, AND ONLY FOR THE CALENDAR HALF. `homeTimezone`
+// reads the configured zone from `settings`; `localToday` + `ymdToUtc` turn it
+// into the calendar position `occurred_at` is supposed to hold. See `autoOccurredAt`.
+import { homeTimezone, localToday, ymdToUtc } from '../lib/hq/time';
 
 type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 
@@ -37,6 +41,39 @@ type FragmentInsert = Database['public']['Tables']['fragments']['Insert'];
 /** The first `n` words of a body, whitespace collapsed — a slug's last resort. */
 export function firstWords(text: string, n = 7): string {
   return text.trim().split(/\s+/).slice(0, n).join(' ');
+}
+
+/**
+ * The date a piece is filed under when nobody chose one — TODAY in the
+ * configured home zone, stored as that day's UTC midnight.
+ *
+ * ⚠⚠ THIS WAS `new Date().toISOString()` AND IT FILED THINGS UNDER THE WRONG DAY
+ * (plan 42 · §4.C.7, ADR 0039). `occurred_at` at `date_precision: 'day'` is a
+ * CALENDAR DATE — the day the piece belongs to — and `now` is an INSTANT. On a
+ * UTC server those disagree for every evening in the Americas: a quote saved at
+ * 6pm Pacific stored `…T01:00Z` and was filed under TOMORROW, on the public
+ * blog, permanently. **No rendering repairs a wrong day that is already in the
+ * column**, which is why this is the write site and not `shortDate`.
+ *
+ * ⚠ IT MATCHES WHAT A BACKDATED PIECE ALREADY STORES, which is the test that
+ * makes the two paths agree: `occurredAtFrom('2023-04-19T00:00')` gives
+ * `2023-04-19T00:00:00Z`, and so does this for the 19th. One convention, one
+ * reader (`shortDate` and `Timestamp`, both in UTC), two writers that agree.
+ *
+ * ⚠ NOT `zonedTimeToUtc(today, '00:00', tz)`, which is the tempting near-miss:
+ * that stores local midnight as a real instant — `07:00Z` for Los Angeles,
+ * fine — but `15:00Z` the *previous day* for Tokyo, so the UTC read comes back
+ * a day early and the bug returns wearing the other hemisphere. A calendar
+ * position has no zone by construction, and `ymdToUtc` is the function that
+ * says so.
+ */
+export function autoOccurredAtFor(tz: string, now = new Date()): string {
+  return ymdToUtc(localToday(tz, now)).toISOString();
+}
+
+/** The same rule, reading the zone the site is configured to live in. */
+async function autoOccurredAt(sb: DB): Promise<string> {
+  return autoOccurredAtFor(await homeTimezone(sb));
 }
 
 /** A bare year → Jan 1 noon UTC. Paired with date_precision 'year'. */
@@ -62,7 +99,19 @@ export function yearToISO(year: number): string {
  * the same limit and says so in the same words.
  */
 function occurredAtFrom(local: string): string {
-  const at = new Date(local);
+  // ⚠ `+ 'Z'` — READ AS A WALL CLOCK, NOT IN THE SERVER'S ZONE (plan 42 ·
+  // §4.C.7). `new Date('2023-04-19T00:00')` is parsed in whatever zone the
+  // process happens to be in: UTC on Vercel, so production was right by
+  // accident, and four hours off on the machine this repo's tests run on —
+  // which is how the unit test that pins the two write paths together found it.
+  // A `datetime-local` field has no zone by construction, `occurred_at` at day
+  // precision is a calendar date with no zone either (ADR 0039), and the only
+  // thing standing between them was an environment variable.
+  //
+  // ⚠ A NO-OP IN PRODUCTION, deliberately: on a UTC server both readings are the
+  // same instant, so this changes no stored value and nothing needs backfilling
+  // on its account. It removes a dependency, not a behaviour.
+  const at = new Date(`${local}Z`);
   if (Number.isNaN(at.getTime())) throw fail('That posted date isn’t a real moment', 'BAD_REQUEST');
   return at.toISOString();
 }
@@ -220,9 +269,23 @@ async function persist(
 
   const payload: FragmentInsert = { ...row, published_at };
   if (row.occurred_at === undefined) {
-    // No explicit date: snap to now only on a writing's first publish; else leave alone.
-    if (publishing && !existing?.published_at) payload.occurred_at = now;
-    else delete payload.occurred_at; // keep existing on update; DB default on insert
+    // No explicit date: today on a first publish, and on any insert; otherwise
+    // leave it alone, so a draft edit or a re-publish never moves the date.
+    //
+    // ⚠ `autoOccurredAt`, NOT `now` — different KINDS of value, and the
+    // difference is a whole day for every evening west of Greenwich. ADR 0039.
+    //
+    // ⚠ AND AN INSERT NOW SETS IT RATHER THAN FALLING THROUGH TO THE COLUMN
+    // DEFAULT. `occurred_at timestamptz not null default now()` is the same
+    // instant-for-a-calendar-date mistake one layer down, in SQL, where this
+    // fix cannot reach it — so a DRAFT created at 6pm Pacific was filed under
+    // tomorrow too. It only ever showed in the manager's Posted column, because
+    // a first publish overwrites it, but "wrong until you publish" is still
+    // wrong. Setting it here fixes that without a migration, and leaves the
+    // column default as nothing but a backstop.
+    const firstPublish = publishing && !existing?.published_at;
+    if (!existing || firstPublish) payload.occurred_at = await autoOccurredAt(sb);
+    else delete payload.occurred_at;
   }
 
   let saved: { id: string; slug: string; updated_at: string };

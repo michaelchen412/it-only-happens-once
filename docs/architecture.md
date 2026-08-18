@@ -103,7 +103,7 @@ Editing architecture (Astro Actions, and a WYSIWYG that stores Markdown) is [ADR
 Three conventions fall out of it and are worth stating separately:
 
 - **A local date is a `YYYY-MM-DD` string, never a `Date`.** `new Date('2026-08-01')` is midnight UTC, so `.getDate()` gives 31 July west of Greenwich. `src/lib/hq/time.ts` is the only place that decides what day it is, and the zone is a row in `settings` rather than the server's clock.
-- **Nothing renders UTC on screen.** Server-rendered stamps use the configured home zone; `src/scripts/local-time.ts` then rewrites them into the reader's device zone. The browser may say what o'clock it was, never what day.
+- **Nothing renders UTC on screen — but only instants have a zone to render in.** Server-rendered stamps use the configured home zone; `src/scripts/local-time.ts` then rewrites them into the reader's device zone. The browser may say what o'clock it was, never what day. ⚠ **A CALENDAR DATE IS THE EXCEPTION AND IT IS NOT A LOOPHOLE** — `occurred_at` at day precision is the day a piece belongs to, not a moment; it is written as that day's UTC midnight and read back in UTC, with no time of day, so it says the same thing in every zone. Applying the rule above to it literally is what dated 30% of the published essays a day early. See [ADR 0039](adr/0039-an-instant-and-a-calendar-date-are-different-values.md).
 - **A module that reaches the browser imports Supabase as a type only**, and takes its client as an argument.
 
 ### The write path

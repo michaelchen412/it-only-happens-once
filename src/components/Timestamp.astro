@@ -29,25 +29,52 @@ const d = new Date(date);
 const u = updated ? new Date(updated) : null;
 const now = new Date();
 
-const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+// ⚠⚠ `timeZone: 'UTC'`, AND IT IS THE "never UTC on screen" RULE BEING KEPT
+// RATHER THAN BROKEN (ADR 0039). `date` here is `occurred_at` — a CALENDAR DATE,
+// the day a piece belongs to, not an instant. It is written as that day's UTC
+// midnight (`autoOccurredAt`, `occurredAtFrom`) and read back the same way by
+// the admin's `shortDate`. Rendering it in any zone at all is what makes an
+// essay filed on 19 April read as the 18th for every reader west of Greenwich.
+//
+// ⚠ THIS COMPONENT WAS THE THIRD CONVENTION IN THE BUILDING and nobody had
+// counted it: `shortDate` read UTC, `homeDate` read the configured zone, and
+// this one passed NO `timeZone` at all — so the public blog rendered whatever
+// zone the server happened to be in (UTC on Vercel, the author's laptop in dev).
+// Three readers, one column.
+const CAL = { timeZone: 'UTC' } as const;
+
+const startOfDay = (x: Date) => Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
 const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
 
-const weekdayLong = d.toLocaleDateString('en-US', { weekday: 'long' });
-const monthDay = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-const monthDayYear = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const weekdayLong = d.toLocaleDateString('en-US', { ...CAL, weekday: 'long' });
+const monthDay = d.toLocaleDateString('en-US', { ...CAL, month: 'long', day: 'numeric' });
+const monthDayYear = d.toLocaleDateString('en-US', { ...CAL, month: 'long', day: 'numeric', year: 'numeric' });
 
 let label: string;
-if (precision === 'year') label = String(d.getFullYear());
+if (precision === 'year') label = String(d.getUTCFullYear());
 else if (diffDays === 0) label = 'Today';
 else if (diffDays === 1) label = 'Yesterday';
 else if (diffDays > 1 && diffDays < 7) label = weekdayLong;
-else if (d.getFullYear() === now.getFullYear()) label = monthDay;
+else if (d.getUTCFullYear() === now.getUTCFullYear()) label = monthDay;
 else label = monthDayYear;
 
 const verb = kind === 'added' ? 'Added' : 'Posted';
-const detail =
-  precision === 'year' ? `${verb} in ${d.getFullYear()}` : `${verb} on ${weekdayLong}, ${monthDayYear} at ${time}`;
+// ⚠ NO TIME OF DAY, AND ITS ABSENCE IS THE POINT (ADR 0039). This read
+// "Posted on Thursday, July 6, 2023 at 12:42 AM" — a clock reading INVENTED for
+// a value that never carried one. Where the stored instant was real it was the
+// moment a row was written, which is not something a reader is being told; where
+// it was a backdated piece it was a literal midnight, printed as though it meant
+// something. A calendar date has a day and nothing smaller.
+const detail = precision === 'year' ? `${verb} in ${d.getUTCFullYear()}` : `${verb} on ${weekdayLong}, ${monthDayYear}`;
+// ⚠ `updated` IS THE OTHER KIND AND IS DELIBERATELY LEFT ALONE — the one place
+// this component is still not fully compliant, recorded rather than smuggled.
+// `updated_at` is an INSTANT, so ADR 0039 says it belongs in the viewer's zone;
+// rendered on the server it can only be the server's. Fixing it properly means a
+// client pass, and `local-time.ts`'s two modes both drop the YEAR — which this
+// line carries and needs, against posts from 2022. `fragments-display.ts` met
+// exactly this and declined it in the same words ("full compliance wants a third
+// mode"). Same call, same reason; the discrepancy is hours, not a day, and the
+// year is the fact a reader is actually using.
 const updatedDetail = u
   ? `Last updated on ${u.toLocaleDateString('en-US', {
       weekday: 'long',
