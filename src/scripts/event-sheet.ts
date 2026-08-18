@@ -12,6 +12,7 @@ import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
+import { wireFilterFields } from './filter-field';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
 const form = document.querySelector<HTMLFormElement>('#event-form');
@@ -197,12 +198,10 @@ if (sheet && form) {
   });
 
   // The filter, when the roster is long enough to need one.
-  form.querySelector<HTMLInputElement>('.sby-filter')?.addEventListener('input', (e) => {
-    const q = (e.target as HTMLInputElement).value.trim().toLowerCase();
-    form.querySelectorAll<HTMLElement>('.sby__row').forEach((row) => {
-      row.hidden = !!q && !(row.dataset.search ?? '').includes(q);
-    });
-  });
+  // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — these six lines
+  // existed here, in `event-sheet.ts` and in `tag-sheet.ts`, byte for byte, and
+  // all three were missing the no-match line the fourth copy had.
+  wireFilterFields(form);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

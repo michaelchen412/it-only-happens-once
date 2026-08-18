@@ -1,0 +1,91 @@
+---
+/*
+  FilterField — the box that shortens a list, and the line that says nothing
+  matched.
+
+  ⚠ IT WRAPS THE LIST RATHER THAN SITTING BESIDE IT, and that is the whole
+  design. The no-match line has to render AFTER the rows, so a component that
+  emitted only the field would leave every caller hand-writing its own `<p>` —
+  which is exactly the duplication this replaces. The rows go in the slot; the
+  field, the rows and the line are then one owner (plan 42 · §4.B.2).
+
+  ⚠ FOUR CALL SITES HAD FOUR ANSWERS AND ONLY ONE OF THEM WAS COMPLETE.
+  `ConstellationPicker` had a no-match line and a threshold that re-checks
+  itself; `SharedByField`, `EventSheet` and `TagSheet` shared a SIX-LINE PASS
+  COPIED VERBATIM THREE TIMES with no no-match line at all — so on those three,
+  filtering to nothing showed an empty box and no explanation. The complete one
+  won and the other three gained the line.
+
+  ⚠ THE CHROME IS `.search`, NOT `input-xs input-bordered`. Both existed: four
+  fields were the bare daisyUI input, four were `.search` + `ph:magnifying-glass`
+  (the roster, `MergeDialog`, `LinkSheet`, `FragmentListPanel`). `.search` wins
+  because it carries the magnifier — R16 standardises one glyph per affordance,
+  and a search box whose only cue is a placeholder loses that cue the moment you
+  type in it. `.search--w` is what stops hq.css's fixed `9rem` from stranding
+  the field at a third of a drawer.
+
+  ⚠ NOT `autocomplete="off"`, DELIBERATELY — and it is the opposite of what the
+  neighbouring fields do. `MergeDialog` and `WritingSheet` both switch restore
+  off. Here the browser SHOULD restore the query, because `wireFilterField`
+  re-applies from the field's own value on wire: the surfaces this mounts on
+  reload after a save (ADR 0036), and on a page whose job is *filter to the row,
+  then groom it* a filter destroyed by the save is worse than no filter. Restore
+  without the re-apply is the live defect on `/admin/people` — the text comes
+  back, `input` never fires, and a filled box sits over an unfiltered list.
+
+  ⚠ NOT USED BY: the roster, Notes' file picker, `MergeDialog`, the fragment
+  panel, `LinkSheet` — and each refusal is specific, not an oversight. The
+  roster also hides section headings and rewrites counts; Notes' picker and
+  `MergeDialog` fetch; the fragment panel is a server GET (`name="q"`), not a
+  DOM pass at all; and `LinkSheet` runs ONE field over TWO swappable lists with
+  a no-match line in each, re-filtering on mode switch. Folding that last one in
+  needs a two-list mode this would carry for a single caller — and `LinkSheet`
+  already renders this exact chrome by hand, so the axis this component exists
+  to settle is already settled there.
+*/
+import { Icon } from 'astro-icon/components';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
+
+interface Props {
+  /** How many rows the slot holds — read against `threshold`, not counted from the DOM. */
+  count: number;
+  /** Selector, within this wrapper, for the rows that hide and show. They carry `data-search`. */
+  rows: string;
+  placeholder: string;
+  /** The field's accessible name. It has no visible label; this is the only one it gets. */
+  label: string;
+  /** Shown only when a query matches nothing — never over an empty list. */
+  noMatch?: string;
+  /** Rows below which the field stays hidden. `null` always shows it. */
+  threshold?: number | null;
+  class?: string;
+  /** Spacing for the field itself; the wrapper owns none, so callers keep their own rhythm. */
+  fieldClass?: string;
+}
+const {
+  count,
+  rows,
+  placeholder,
+  label,
+  noMatch = 'Nothing matches.',
+  threshold = FILTER_THRESHOLD,
+  class: className = '',
+  fieldClass = 'mb-1.5',
+} = Astro.props;
+---
+
+{
+  /* The field is RENDERED ALWAYS and hidden below the threshold, rather than
+    branched away — `ConstellationPicker`'s reasoning, kept because it is right
+    for all four: creating a constellation from the picker's own footer can push
+    the sky past 8 mid-session, and a filter that only arrives on the next page
+    load is a filter you learn not to expect. `sync()` re-checks it. */
+}
+<div class:list={['ff', className]} data-ff data-rows={rows} data-threshold={threshold ?? ''}>
+  <label class:list={['search search--w', fieldClass]} hidden={threshold !== null && count <= threshold}>
+    <Icon name="ph:magnifying-glass" class="shrink-0 opacity-45" />
+    <input type="search" placeholder={placeholder} aria-label={label} />
+  </label>
+  <slot />
+  <p class="ff__none admin-hint mt-1" hidden>{noMatch}</p>
+</div>

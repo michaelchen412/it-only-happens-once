@@ -25,7 +25,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { hueFor, monogram } from '../../lib/hq/people';
-import { FILTER_THRESHOLD } from '../../lib/filtering';
+import FilterField from './FilterField.astro';
 
 interface Props {
   /** Namespaces the ids so the quote form and the song form can each hold one. */
@@ -49,30 +49,30 @@ const { scope, people } = Astro.props;
         </span>
       </summary>
 
-      {people.length > FILTER_THRESHOLD && (
-        <input
-          type="search"
-          class="sby-filter input input-xs input-bordered mt-2 w-full font-sans"
-          placeholder="Find someone…"
-          aria-label="Filter people"
-        />
-      )}
-
-      <div class="sby__list">
-        {people.map((p) => (
-          <label class="sby__row" data-search={p.display_name.toLowerCase()}>
-            {/* ⚠ The name is carried on the INPUT, not read off the row. The
+      <FilterField
+        count={people.length}
+        rows=".sby__row"
+        placeholder="Find someone…"
+        label="Filter people"
+        noMatch="Nobody by that name."
+        fieldClass="mt-2"
+      >
+        <div class="sby__list">
+          {people.map((p) => (
+            <label class="sby__row" data-search={p.display_name.toLowerCase()}>
+              {/* ⚠ The name is carried on the INPUT, not read off the row. The
                 row's `textContent` also contains the monogram, so the summary
                 line rendered "MMarisol Quint" — visible only once a real name
                 was on screen, and caught by the spec rather than by review. */}
-            <input type="checkbox" class="sby-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
-            <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
-              {monogram(p.display_name)}
-            </span>
-            <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
-          </label>
-        ))}
-      </div>
+              <input type="checkbox" class="sby-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
+              <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+                {monogram(p.display_name)}
+              </span>
+              <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
+            </label>
+          ))}
+        </div>
+      </FilterField>
 
       <p class="sby-status admin-hint mt-1 text-xs" role="status" />
     </details>

@@ -8,6 +8,7 @@
 import { actions } from 'astro:actions';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { announceSkyChange, onSkyChange, type SkyConstellation } from './sky-changed';
+import { wireFilterField } from './filter-field';
 
 export interface PickerHandle {
   /** Point the picker at a fragment (null = a new one, toggles get queued). */
@@ -26,7 +27,6 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
   const boxes = () => Array.from(root.querySelectorAll<HTMLInputElement>('.cn-check'));
   const status = root.querySelector('.cn-picker-status') as HTMLElement | null;
   const list = root.querySelector('.cn-list') as HTMLElement;
-  const filter = root.querySelector<HTMLInputElement>('.cn-filter');
   const noneHint = root.querySelector<HTMLElement>('.cn-none');
 
   let fragmentId: string | null = null;
@@ -95,28 +95,12 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
     else say('Will be added when you save');
   });
 
-  // Filter — rendered always, hidden below the threshold, so a sky that GROWS
-  // past it mid-session (which is now possible from the footer below) gets its
-  // filter without a reload. Hidden rows keep their checkbox state: they're
-  // still in the DOM, so selected() stays complete.
-  filter?.addEventListener('input', () => {
-    const q = filter.value.trim().toLowerCase();
-    let shown = 0;
-    root.querySelectorAll<HTMLElement>('.cn-row').forEach((row) => {
-      const hit = !q || (row.dataset.search ?? '').includes(q);
-      row.hidden = !hit;
-      if (hit) shown++;
-    });
-    const empty = root.querySelector<HTMLElement>('.cn-empty');
-    if (empty) empty.hidden = shown > 0;
-  });
-
-  /** Reveal the filter once the sky outgrows what you can scan at a glance. */
-  function syncFilterVisibility() {
-    if (!filter) return;
-    const threshold = Number(filter.dataset.threshold ?? 8);
-    filter.hidden = list.querySelectorAll('.cn-row').length <= threshold;
-  }
+  // ⚠ THE PASS ITSELF IS `filter-field.ts` NOW (plan 42 · §4.B.2), and what it
+  // kept is this one's behaviour: hidden rows keep their checkbox state — they
+  // are still in the DOM, so `selected()` stays complete. What is left here is
+  // the one thing the component cannot know: that this picker MINTS rows, so
+  // the threshold has to be re-checked after the footer makes one.
+  const filter = wireFilterField(root);
 
   // --- the footer: making a constellation from in here ------------------------
 
@@ -164,7 +148,7 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
     link.querySelector('.sr-only')!.textContent = `Open ${c.name} in a new tab`;
     list.appendChild(li);
     if (noneHint) noneHint.hidden = true;
-    syncFilterVisibility();
+    filter?.sync();
     return li;
   }
 

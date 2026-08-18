@@ -43,7 +43,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { toPlainText } from '../../lib/markdown';
-import { FILTER_THRESHOLD } from '../../lib/filtering';
+import FilterField from './FilterField.astro';
 
 interface Props {
   scope: string;
@@ -67,59 +67,59 @@ const words = new Map(constellations.map((c) => [c.id, toPlainText(c.description
 
 <div class:list={['cn-picker', className]} data-scope={scope}>
   {
-    /* The filter is rendered ALWAYS and hidden below the threshold, rather
-      than branched away. Creating constellations from the footer can push the
-      sky past 8 mid-session, and a filter that only arrives on the next page
-      load is a filter you learn not to expect. */
+    /* ⚠ THE ARGUMENT FOR RENDERING-THEN-HIDING MOVED INTO `FilterField` and is
+      now the rule for all four pickers, not this one's private habit: creating
+      a constellation from the footer below can push the sky past 8 mid-session,
+      and a filter that only arrives on the next page load is a filter you learn
+      not to expect. `wireConstellationPicker` calls `sync()` after the footer
+      mints one. */
   }
-  <input
-    type="search"
-    class="cn-filter input input-xs input-bordered mb-1.5 w-full font-sans"
+  <FilterField
+    count={constellations.length}
+    rows=".cn-row"
     placeholder="Filter constellations…"
-    aria-label="Filter constellations"
-    hidden={constellations.length <= FILTER_THRESHOLD}
-    data-threshold={FILTER_THRESHOLD}
-  />
-  <ul class="cn-list space-y-0.5">
-    {
-      /* The ↗ is a SIBLING of the label, never inside it. Interactive content
+    label="Filter constellations"
+  >
+    <ul class="cn-list space-y-0.5">
+      {
+        /* The ↗ is a SIBLING of the label, never inside it. Interactive content
         inside a <label> is specified not to forward activation to the control,
         but "specified not to" is a thin thread to hang a mis-tick on when the
         whole surface is one you click fast without looking. Outside, it cannot
         toggle anything by construction. */
-      constellations.map((c) => (
-        <li
-          class="cn-row group rounded-field hover:bg-base-200 flex items-start"
-          data-id={c.id}
-          data-name={c.name}
-          data-search={`${c.name} ${words.get(c.id) ?? ''}`.toLowerCase()}
-        >
-          <label class="flex min-w-0 grow cursor-pointer items-start gap-2.5 py-2 pl-2">
-            <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
-            <span class="min-w-0 grow">
-              <span class="block truncate text-sm leading-snug">{c.name}</span>
-              {words.get(c.id) && (
-                <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
-                  {words.get(c.id)}
-                </span>
-              )}
-            </span>
-          </label>
-          <a
-            href={`/admin/constellations/${c.id}`}
-            target="_blank"
-            rel="noopener"
-            class="cn-open text-base-content/40 hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            title={`Open ${c.name} in a new tab`}
+        constellations.map((c) => (
+          <li
+            class="cn-row group rounded-field hover:bg-base-200 flex items-start"
+            data-id={c.id}
+            data-name={c.name}
+            data-search={`${c.name} ${words.get(c.id) ?? ''}`.toLowerCase()}
           >
-            <span aria-hidden="true">↗</span>
-            <span class="sr-only">Open {c.name} in a new tab</span>
-          </a>
-        </li>
-      ))
-    }
-  </ul>
-  <p class="cn-empty admin-hint mt-1" hidden>Nothing matches.</p>
+            <label class="flex min-w-0 grow cursor-pointer items-start gap-2.5 py-2 pl-2">
+              <input type="checkbox" class="cn-check checkbox checkbox-xs mt-0.5 shrink-0" value={c.id} />
+              <span class="min-w-0 grow">
+                <span class="block truncate text-sm leading-snug">{c.name}</span>
+                {words.get(c.id) && (
+                  <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
+                    {words.get(c.id)}
+                  </span>
+                )}
+              </span>
+            </label>
+            <a
+              href={`/admin/constellations/${c.id}`}
+              target="_blank"
+              rel="noopener"
+              class="cn-open text-base-content/40 hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              title={`Open ${c.name} in a new tab`}
+            >
+              <span aria-hidden="true">↗</span>
+              <span class="sr-only">Open {c.name} in a new tab</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </FilterField>
   {
     /* The empty state gets the create form too, and stops sending you away —
       "make one in Constellations" was a dead end that cost you the edit. */

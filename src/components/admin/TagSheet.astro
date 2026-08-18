@@ -24,7 +24,7 @@
 */
 import { Icon } from 'astro-icon/components';
 import { hueFor, monogram } from '../../lib/hq/people';
-import { FILTER_THRESHOLD } from '../../lib/filtering';
+import FilterField from './FilterField.astro';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
 
@@ -48,28 +48,34 @@ const { people } = Astro.props;
         <SheetError id="tag-sheet-error" />
 
         <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
-          {people.length > FILTER_THRESHOLD && (
-            <input
-              type="search"
-              class="sby-filter input input-xs input-bordered mb-2 w-full font-sans"
-              placeholder="Find someone…"
-              aria-label="Filter people"
-            />
-          )}
-          <div class="sby__list">
-            {people.map((p) => (
-              <label class="sby__row" data-search={p.display_name.toLowerCase()}>
-                {/* The name rides on the INPUT, not the row — a row's
+          <FilterField
+            count={people.length}
+            rows=".sby__row"
+            placeholder="Find someone…"
+            label="Filter people"
+            noMatch="Nobody by that name."
+            fieldClass="mb-2"
+          >
+            <div class="sby__list">
+              {people.map((p) => (
+                <label class="sby__row" data-search={p.display_name.toLowerCase()}>
+                  {/* The name rides on the INPUT, not the row — a row's
                     textContent also carries the monogram, which is how the
                     fragment editor's summary once read "MMarisol Quint". */}
-                <input type="checkbox" class="tag-check checkbox checkbox-xs" value={p.id} data-name={p.display_name} />
-                <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
-                  {monogram(p.display_name)}
-                </span>
-                <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
-              </label>
-            ))}
-          </div>
+                  <input
+                    type="checkbox"
+                    class="tag-check checkbox checkbox-xs"
+                    value={p.id}
+                    data-name={p.display_name}
+                  />
+                  <span class:list={['face face--sm', hueFor(p.id)]} aria-hidden="true">
+                    {monogram(p.display_name)}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate">{p.display_name}</span>
+                </label>
+              ))}
+            </div>
+          </FilterField>
         </div>
 
         <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">

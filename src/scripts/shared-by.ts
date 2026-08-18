@@ -10,6 +10,7 @@
 //   preselect(id)                      — tick somebody without user input
 import { actions } from 'astro:actions';
 import { callAction, formatActionError } from './action-error';
+import { wireFilterFields } from './filter-field';
 
 export interface SharedByHandle {
   setFragment: (id: string | null, personIds: string[]) => void;
@@ -22,7 +23,6 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
   const boxes = () => Array.from(root.querySelectorAll<HTMLInputElement>('.sby-check'));
   const status = root.querySelector('.sby-status') as HTMLElement | null;
   const who = root.querySelector('[data-sby-who]') as HTMLElement | null;
-  const filter = root.querySelector('.sby-filter') as HTMLInputElement | null;
 
   let fragmentId: string | null = null;
   let inFlight: Promise<unknown> = Promise.resolve();
@@ -95,20 +95,20 @@ export function wireSharedBy(root: HTMLElement): SharedByHandle {
     else say('Will be linked when you save');
   });
 
-  filter?.addEventListener('input', () => {
-    const q = filter.value.trim().toLowerCase();
-    root.querySelectorAll<HTMLElement>('.sby__row').forEach((row) => {
-      row.hidden = !!q && !(row.dataset.search ?? '').includes(q);
-    });
-  });
+  // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — the same six lines
+  // stood here, in `event-sheet.ts` and in `tag-sheet.ts`, and none of the
+  // three ever said "nobody by that name".
+  const [filter] = wireFilterFields(root);
 
   return {
     setFragment(id, personIds) {
       fragmentId = id;
       const want = new Set(personIds);
       boxes().forEach((b) => (b.checked = want.has(b.value)));
-      if (filter) filter.value = '';
-      root.querySelectorAll<HTMLElement>('.sby__row').forEach((row) => (row.hidden = false));
+      // ⚠ ONE CALL WHERE THERE WERE TWO, and the second was the bug waiting to
+      // happen: clearing the box without unhiding the rows leaves an empty
+      // query over a filtered list. `clear()` cannot do one without the other.
+      filter?.clear();
       // Open when there is something to see, closed when there is not — the
       // one place this field earns the space it takes.
       (root as HTMLDetailsElement).open = want.size > 0;
