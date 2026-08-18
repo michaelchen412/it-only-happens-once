@@ -61,23 +61,27 @@ test.describe('the filter field', () => {
     await expect(page.locator('[data-vocab]:not([hidden])')).toHaveCount(3);
   });
 
-  // ⚠⚠ WHAT THIS TEST MEASURED, AND IT CONTRADICTS THE PREMISE THE FIX WAS
-  // WRITTEN FROM. Plan 42 · §4.B.2 says — from an outside review — that browsers
-  // restore form state across a reload, so a filter box would come back FILLED
-  // over an UNFILTERED list. Chromium under Playwright does **not** restore it:
-  // measured 2026-08-18, the field comes back empty.
+  // ⚠⚠ WHAT THIS MEASURED, AND IT DOES NOT MATCH THE PREMISE THE FIX WAS WRITTEN
+  // FROM. Plan 42 · §4.B.2 says — from an outside review — that browsers restore
+  // form state across a reload, so a filter box comes back FILLED over an
+  // UNFILTERED list, and that the defect was *already live on `/admin/people`*.
+  // Measured 2026-08-18 on BOTH pages: Chromium returns the field **empty**.
   //
-  // So the fix (`if (input.value) apply()` in `filter-field.ts`) is a no-op in
-  // this browser, and the defect the review described is narrower than claimed.
-  // It is kept because the failure it prevents is silent and the guard is one
-  // line — but the honest assertion is the INVARIANT, not the restoration:
-  // whatever the browser chooses to do with the value, the value and the rows
-  // must agree. Filled-box-over-unfiltered-list is the one outcome forbidden.
+  // ⚠ AND THE BOUND ON THAT MEASUREMENT MATTERS AS MUCH AS THE RESULT. Every
+  // project in `playwright.config.ts` uses `Desktop Chrome`, so this is "not in
+  // the engine we test", **not** "cannot happen" — Firefox restores form state
+  // across a reload more eagerly than Chromium. So the guard stays on both
+  // surfaces: it costs nothing where the hazard is absent, and it means nobody
+  // re-opens the question per engine.
   //
-  // ⚠ Stated plainly so nobody over-reads this: it therefore does NOT catch
+  // The honest assertion is therefore the INVARIANT rather than the restoration:
+  // whatever the browser does with the value, the value and the rows must agree.
+  // **Filled-box-over-unfiltered-list is the one outcome forbidden.**
+  //
+  // ⚠ Stated plainly so nobody over-reads these two tests: they do NOT catch
   // deletion of the re-apply line in a browser that does not restore. Proving
-  // that half needs a browser that does, and the invariant is what holds in all
-  // of them.
+  // that half needs a browser that does; the invariant is what holds in all of
+  // them.
   test('never leaves a query in the box that the rows disagree with', async ({ page }) => {
     await page.goto('/admin/library');
 
@@ -101,6 +105,45 @@ test.describe('the filter field', () => {
         ? 'the query came back, so the rows must be filtered to match it'
         : 'the query did not come back, so every row must be showing',
     ).toBe(restored ? narrowed : total);
+  });
+
+  // ⚠ THE ROSTER IS NOT A `<FilterField>` — it hides section headings AND rewrites
+  // their counts, which is roster-specific. It is here because §4.B.2 named it as
+  // the page the defect was *already live on*, and that was the plan's last
+  // unverified factual claim. Measured: it does not reproduce in Chromium either.
+  // The invariant is pinned on both pages so the claim never needs re-litigating.
+  test('the roster never leaves a query in the box that the cards disagree with', async ({ page }) => {
+    await page.goto('/admin/people');
+
+    const field = page.locator('#people-search');
+    if (!(await field.count())) {
+      test.skip(true, 'the roster is below SEARCH_APPEARS_ABOVE, so there is correctly no box');
+    }
+
+    const cards = page.locator('[data-person]');
+    const total = await cards.count();
+    const term = (await cards.first().getAttribute('data-search'))!.split(' ')[0];
+
+    await field.fill(term);
+    const narrowed = await page.locator('[data-person]:not([hidden])').count();
+    expect(narrowed).toBeLessThan(total);
+
+    // The navigation `person-sheet.ts` ends every Save with, as a bare GET.
+    await page.reload();
+
+    const restored = await field.inputValue();
+    const showing = await page.locator('[data-person]:not([hidden])').count();
+    expect(
+      restored ? showing : total,
+      restored
+        ? 'the query came back, so the cards must be filtered to match it'
+        : 'the query did not come back, so every card must be showing',
+    ).toBe(restored ? narrowed : total);
+
+    // And the sections agree with the cards either way — a heading over an empty
+    // grid is the roster's own stated bug.
+    const sections = page.locator('[data-section]:not([hidden])');
+    expect(await sections.count()).toBeGreaterThan(0);
   });
 
   test('a picker inside a sheet gets the same box and the same sentence', async ({ page }) => {

@@ -283,8 +283,8 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
     const input = document.querySelector<HTMLInputElement>('#people-search');
     const noMatch = document.querySelector<HTMLElement>('#people-no-match');
 
-    input?.addEventListener('input', () => {
-      const q = input.value.trim().toLowerCase();
+    const applyFilter = () => {
+      const q = input!.value.trim().toLowerCase();
       let shown = 0;
 
       document.querySelectorAll<HTMLElement>('[data-person]').forEach((card) => {
@@ -312,6 +312,29 @@ const drifting = driftList(roster, lastContact, todayYmd, seenToday);
       });
 
       if (noMatch) noMatch.hidden = shown > 0 || !q;
-    });
+    };
+
+    input?.addEventListener('input', applyFilter);
+
+    // ⚠ RE-APPLY ON LOAD, and what it is worth is bounded rather than assumed
+    // (plan 42 · §4.B.2). `person-sheet.ts` ends every Save with
+    // `location.reload()` for a good stated reason, and an outside review held
+    // that a browser restoring this field across that reload would leave the
+    // query text sitting over an UNFILTERED roster — the box and the grid
+    // disagreeing, which is worse than losing the query.
+    //
+    // ⚠ MEASURED 2026-08-18 AND IT DID NOT REPRODUCE: Chromium returns the
+    // field EMPTY, both here and on `/admin/library`. But the suite runs
+    // `Desktop Chrome` and nothing else, so this is "not in the engine we test",
+    // not "cannot happen" — Firefox restores form state across a reload more
+    // eagerly than Chromium does. Three lines that cost nothing in the browser
+    // where the hazard is absent are the cheaper side of that bet, and they mean
+    // nobody has to re-open the question per engine.
+    //
+    // `<FilterField>` carries the same guard for the four pickers. This page is
+    // deliberately NOT one of them: it also hides section headings and rewrites
+    // their counts, which is roster-specific and would be a prop nothing else
+    // uses.
+    if (input?.value) applyFilter();
   </script>
 </AdminLayout>
