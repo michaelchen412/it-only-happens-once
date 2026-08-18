@@ -176,9 +176,22 @@ export const contact = {
       // Secrets via getSecret (astro:env/server): reads the server env in prod
       // AND .env files in dev — unlike import.meta.env, which since Astro v6
       // no longer exposes non-PUBLIC vars. See docs/environment-variables.
-      // Turnstile: enforced when configured; skipped in local dev without a key.
+      //
+      // ⚠ IN PROD, A MISSING TURNSTILE SECRET REFUSES THE SEND (plan 43 §3.2,
+      // ruled 2026-08-18). It used to skip the check instead — right for local
+      // dev, where no key exists and the widget isn't rendered, but in prod a
+      // skip is indistinguishable from a misconfigured deploy, and the form
+      // silently accepting unverified submissions is the one failure shape
+      // nothing would ever surface. Refusing uses the same friendly-sentence
+      // shape as the missing Resend key below, and `fail()` logs 5xx-class
+      // errors — so the misconfiguration also lands in Vercel's function log
+      // instead of arriving as spam. Dev keeps the skip; that is the branch.
       const turnstileSecret = getSecret('TURNSTILE_SECRET_KEY');
-      if (turnstileSecret) {
+      if (!turnstileSecret) {
+        if (import.meta.env.PROD) {
+          throw fail('The contact form isn’t configured yet. Please try again later.', 'INTERNAL_SERVER_ERROR');
+        }
+      } else {
         if (!input.token) throw fail('Please complete the “I’m human” check.', 'BAD_REQUEST');
         const ok = await verifyTurnstile(turnstileSecret, input.token, ip);
         if (!ok) throw fail('That verification didn’t go through — please try again.', 'BAD_REQUEST');

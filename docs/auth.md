@@ -66,7 +66,7 @@ The RLS **policies are unchanged** — they already call `public.is_admin()`. On
 
 ## 6. Secrets & environment
 
-**The whole table, and it is ten rows rather than three.** It listed only the Supabase keys until 2026-08-09 while [`architecture.md`](architecture.md) §10 pointed here for "the full table" — so five integrations' worth of configuration existed only in the code that read it, and a fresh deploy's missing key was discoverable by watching a feature quietly not work.
+**The whole table, and it is twelve rows rather than three.** It listed only the Supabase keys until 2026-08-09 while [`architecture.md`](architecture.md) §10 pointed here for "the full table" — so five integrations' worth of configuration existed only in the code that read it, and a fresh deploy's missing key was discoverable by watching a feature quietly not work. (The two `CONTACT_*` rows joined 2026-08-18, found missing by the same audit that changed how a missing key behaves — see below.)
 
 | Variable | Exposure | Read by | Purpose |
 |---|---|---|---|
@@ -78,10 +78,12 @@ The RLS **policies are unchanged** — they already call `public.is_admin()`. On
 | `ANTHROPIC_API_KEY` | **server only** | [`actions/fragments.ts`](../src/actions/fragments.ts), [`actions/tasks.ts`](../src/actions/tasks.ts) | **three tenants**: ✦ Suggest with AI ([ADR 0007](adr/0007-ai-subject-tagging.md)), the capture parser ([admin.md](admin.md) §5d) and Proofread ([admin.md](admin.md) §5e) |
 | `SPOTIFY_CLIENT_ID` | **server only** | [`lib/media.ts`](../src/lib/media.ts) | Spotify Web API, client-credentials — song title/artist/album/year |
 | `SPOTIFY_CLIENT_SECRET` | **server only** | [`lib/media.ts`](../src/lib/media.ts) | the other half. Both unset ⇒ lookups fall back to keyless oEmbed, which is a tier and not a failure ([admin.md](admin.md) §6) |
-| `RESEND_API_KEY` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | sends the /about contact form |
-| `TURNSTILE_SECRET_KEY` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | verifies the Turnstile token server-side — the half that actually gates the send |
+| `RESEND_API_KEY` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | sends the /about contact form. This or `CONTACT_TO_EMAIL` unset ⇒ the form refuses with the not-configured sentence |
+| `TURNSTILE_SECRET_KEY` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | verifies the Turnstile token server-side — the half that actually gates the send. Unset **in prod** ⇒ the send is refused (fail closed); unset in dev ⇒ the check is skipped, since the widget was never rendered |
+| `CONTACT_TO_EMAIL` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | where the contact form delivers |
+| `CONTACT_FROM_EMAIL` | **server only** | [`actions/site.ts`](../src/actions/site.ts) | optional sender identity; unset ⇒ Resend's onboarding sender, which works but reads as scaffolding |
 
-**How they are read is itself a security property.** The `PUBLIC_*` four are `import.meta.env` and are **inlined into the client bundle at build time** — that is what "public" means here, and it is why nothing else may ever take that prefix. The six server-only ones go through `getSecret()` from `astro:env/server`, which reads the runtime environment, so an unset key is a sentence in the UI rather than a build failure or a 500.
+**How they are read is itself a security property.** The `PUBLIC_*` four are `import.meta.env` and are **inlined into the client bundle at build time** — that is what "public" means here, and it is why nothing else may ever take that prefix. The two Supabase keys are additionally declared in `astro.config.mjs`'s `env.schema`, so a deploy missing either **fails the build** rather than shipping a site whose middleware 500s every route — they are the only two variables with that power, which is why they are the only two declared. The eight server-only ones go through `getSecret()` from `astro:env/server`, which reads the runtime environment, so an unset key is a sentence in the UI rather than a build failure or a 500 — with one deliberate exception: `TURNSTILE_SECRET_KEY` unset **in production** refuses the contact-form send (fail closed), because a prod deploy that lost its key is indistinguishable from one that never had it, and a form silently accepting unverified submissions is the one failure shape nothing would ever surface.
 
 **Three more secrets exist and are deliberately *not* in this app's env** — they belong to Supabase, because that is where the code holding them runs ([admin.md](admin.md) §9a):
 

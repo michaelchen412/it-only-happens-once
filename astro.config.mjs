@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig, fontProviders } from 'astro/config';
+import { defineConfig, envField, fontProviders } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import icon from 'astro-icon';
 import vercel from '@astrojs/vercel';
@@ -13,6 +13,28 @@ export default defineConfig({
     '/admin/tasks': '/admin/agenda/tasks',
     '/admin/goals': '/admin/agenda/goals',
     '/admin/goals/[slug]': '/admin/agenda/goals/[slug]',
+  },
+  // ⚠ ONLY THE TWO KEYS THAT CAN TAKE THE WHOLE SITE DOWN ARE DECLARED (plan 43
+  // §3.1). Middleware mints a Supabase client on EVERY request out of these two
+  // (lib/supabase.ts), so their absence is not a broken feature — it is every
+  // route 500ing, public and admin alike, with nothing but a runtime stack to
+  // say why. Declared, a missing key is a FAILED BUILD instead; and since
+  // `verify` runs inside the Vercel build, a failed build is a deploy that
+  // never replaces the last good version.
+  //
+  // ⚠ THE SERVER SECRETS ARE DELIBERATELY NOT HERE. Their absence is a designed
+  // state rather than a misconfiguration: an unset key degrades to a sentence
+  // in the UI (docs/auth.md §6) — except TURNSTILE_SECRET_KEY in prod, which
+  // refuses the send instead (actions/site.ts, plan 43 §3.2). Declaring them
+  // required would turn "the contact form is resting" into "the site cannot
+  // build", the wrong trade for a site whose rooms are allowed to be optional.
+  env: {
+    schema: {
+      PUBLIC_SUPABASE_URL: envField.string({ context: 'client', access: 'public', url: true }),
+      // `min` exists for the empty-string a botched paste or a `KEY=` line
+      // produces; every real key (legacy JWT or sb_publishable_*) is far longer.
+      PUBLIC_SUPABASE_ANON_KEY: envField.string({ context: 'client', access: 'public', min: 20 }),
+    },
   },
   // SSR + edge caching for DB-backed content; the admin renders on demand.
   // See docs/adr/0001. Static pages opt back in with `export const prerender = true`.
