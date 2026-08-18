@@ -1,0 +1,68 @@
+---
+/*
+  500 — the request that reached a route and died there (plan 43 · §2).
+
+  The 404 next door has owned "no route matched" since plan 34; nothing owned
+  "a route matched and threw." Until now that fell to the host's unbranded
+  default — which, going public, is the page a reader would meet at the exact
+  moment the site is least able to explain itself.
+
+  ⚠ NO DATABASE READ, NO SESSION, DELIBERATELY — stricter than taste. This page
+  renders precisely when those things are broken: Astro serves it for errors
+  thrown from pages AND from middleware, and in the middleware case
+  `Astro.locals` was never populated. SiteLayout is safe here because it reads
+  only its props (verified 2026-08-18); anything on this page that asked for
+  locals or the database would turn "an error page" into "an error page that
+  errors", and Astro's fallback for THAT is the bare host default this file
+  exists to replace.
+
+  ⚠ THE ERROR IS LOGGED, NEVER SHOWN. `error.message` can carry anything the
+  failing layer interpolated into it — a key name, a table name, a URL with a
+  token on it. The visitor gets a sentence; Vercel's function log gets the
+  stack. This is the render-path half of plan 43 §4 (the read path logs its own
+  query failures and degrades to empty states without ever reaching here).
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  /** Astro hands the thrown value to this page; its type is whatever threw. */
+  error?: unknown;
+}
+const { error } = Astro.props;
+
+if (error !== undefined) {
+  console.error('[500]', error instanceof Error ? (error.stack ?? error.message) : error);
+}
+
+// Explicit, same argument as 404.astro: Astro renders this with a 500 for a
+// failed route, but a direct visit to `/500` would otherwise answer 200 — a
+// page that says "broken" under a status that says "fine".
+Astro.response.status = 500;
+
+// Never cache a failure as if it were the page that was asked for — and this
+// one especially: the whole pitch of the line below is "try again".
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<SiteLayout title="Something broke" description="Something went wrong on this side.">
+  <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
+    <p class="text-base-content/70 font-serif text-2xl">Something broke on the way to this page.</p>
+    <p class="text-base-content/45 mt-2 font-sans text-sm">
+      The fault is on this side, not yours. It’s usually a passing thing — trying again in a moment tends to clear it.
+    </p>
+
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+      {/* href="" re-requests the current URL — a retry with no script in it. */}
+      <a href="" class="text-primary inline-flex items-center gap-1 font-sans text-sm hover:underline">
+        <Icon name="ph:arrow-counter-clockwise" class="size-3.5" /> Try again
+      </a>
+      <a href="/" class="text-primary inline-flex items-center gap-1 font-sans text-sm hover:underline">
+        <Icon name="ph:caret-left" class="size-3.5" /> The sky
+      </a>
+      <a href="/blog" class="text-primary inline-flex items-center gap-1 font-sans text-sm hover:underline">
+        <Icon name="ph:caret-left" class="size-3.5" /> The blog
+      </a>
+    </div>
+  </div>
+</SiteLayout>
