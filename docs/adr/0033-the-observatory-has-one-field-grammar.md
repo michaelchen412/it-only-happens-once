@@ -1,8 +1,11 @@
 # 0033 — The Observatory has one field grammar
 
 Status: **Accepted** *(2026-08-12 — decided at a bench, not on paper. The
-register was chosen by looking; the ink was chosen by measuring. The CSS half is
-in the tree; the markup half is named in Consequences and is not yet done.)*
+register was chosen by looking; the ink was chosen by measuring. ⚠ **Fully
+closed 2026-08-18**, when the two items Consequences left open were finished —
+see the amendment at the end of that section. The parenthetical that used to
+stand here said the markup half was outstanding; it shipped the same day, and
+what actually remained was the ink.)*
 Date: 2026-08-12
 
 ## Context
@@ -131,7 +134,8 @@ none of it was visible from the decision:
   and `.admin-label` survives as a heading-only class. **This is most of why it
   looked like a competing field primitive: half its uses were never fields.**
   ⚠ **It still needs a name and an ink** — at 50% it fails AA like everything
-  else did, and "admin-label" now describes none of what it does. Open.
+  else did, and "admin-label" now describes none of what it does. ~~Open.~~
+  **Closed 2026-08-18** — see the amendment below.
 - ⚠ **There was a FIFTH register, not four.** `PublishDialog` labels at
   `text-base-content/80` where the other corpus sheets use `/70`. Nobody counted
   it because nobody was looking at that dialog.
@@ -158,7 +162,57 @@ none of it was visible from the decision:
 - **`.admin-hint` stays.** 71 uses across 29 files, most of them general small
   print rather than field hints, and at 45% it fails AA everywhere. That is
   [plan 19 · Piece 5](../../docs/plans/archive/19-one-chair.md)'s ink ramp, not this
-  decision.
+  decision. ⚠ **Overtaken 2026-08-18** — it was done here after all, and the
+  amendment below says why deferring it turned out to be the wrong call.
+
+### Amendment, 2026-08-18 — the two open items are closed
+
+⚠ **AMENDING CONSEQUENCES, NOT THE DECISION.** The register chosen at the bench
+is untouched; what follows is the rest of the work it named. (Plan 31 had to be
+corrected about this distinction once, so it is stated.)
+
+Both loose ends closed in one commit (`3db25dd`, plan 42 · §4.C.1), and **it was
+two numbers**:
+
+| | was | is |
+|---|---|---|
+| `.admin-label` → **`.sec__k`** | 50% | **80%** |
+| `.admin-hint` (73 uses, 31 files) | 45% | **65%** |
+
+⚠ **THE MEASUREMENT IS WHY IT WAS CHEAP, and it is the opposite of the risk this
+was deferred over.** Both classes were already **geometrically identical** to the
+approved pair — `.admin-label` is 0.7rem/.08em/uppercase, byte-for-byte `.f__k`'s
+register, and `.admin-hint` is 0.75rem, `.f__h`'s. **Only the ink differed.** So
+nothing changed size, case, weight or layout: there was no markup migration, and
+therefore none of the exposure that produced this record's one visible defect
+(`PHOTO CAPTION (OPTIONAL — A PLACE, A DATE, A MOMENT)`, green checks throughout,
+caught by a screenshot). 80/65% are plan 19's **measured** floors, not
+preferences.
+
+⚠ **AND THE DEFERRAL WAS THE ERROR, WORTH RECORDING AS ONE.** *"That is plan 19's
+ink ramp, not this decision"* is a clean piece of scope discipline that left a
+**stated, measured AA failure across 31 files sitting in the tree for six days**,
+in a record whose own bench had computed the contrast that condemned it. The
+boundary was drawn correctly and in the wrong place: an accessibility floor this
+record measured is this record's to finish, whichever stylesheet the class lives
+in.
+
+**The name.** `.admin-label` retired into `.f__k` for its seven field uses; the
+five survivors were never labels — two `<h2>`s, a `<summary>`, two menu
+headings. **`.sec__k`** says what they are and matches the building's existing
+`__k` convention (`f__k`, `fs__k`, `tgroup__k`, `rail__k`).
+
+⚠ **One thing that did NOT get renamed, and the refusal is at the rule in
+`hq.css`:** `.zone__cta` keeps its name. It was proposed alongside `.admin-label`
+as a second outgrown name, and it is not the same defect — it carries no colour
+of its own, so it belongs to whichever zone palette it is mounted in, and
+`zone__` names the system rather than the element. Renaming 21 call sites to say
+that differently is churn.
+
+⚠ **What is still owed on this record is a LOOK, not a change.** 73 hint lines
+and 16 headings changed weight across 31 files, and `verify` cannot see any of
+it — the screenshot pass in both themes is the verification this batch was
+scheduled around, and it has not been run.
 
 **What would falsify this.** If a form appears whose labels genuinely need to be
 read rather than glanced — a long questionnaire, something a second person fills
