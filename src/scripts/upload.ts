@@ -46,17 +46,31 @@ export class UploadError extends Error {}
  *   file input anyway, so this is the paste/drop path.
  * - **Already small enough** — re-encoding would only lose quality.
  */
-async function downscale(file: File, maxEdge: number): Promise<{ blob: Blob; contentType: string }> {
-  const asIs = { blob: file as Blob, contentType: file.type };
-  if (file.type === 'image/gif') return asIs;
+interface Downscaled {
+  blob: Blob;
+  contentType: string;
+  /** Intrinsic pixels of what will actually be SERVED — the canvas's when we
+   *  re-encoded, the bitmap's when the original goes up untouched, absent only
+   *  when the browser couldn't decode the format at all. The renderer embeds
+   *  these in the URL (`?w=&h=`, essay-image-attrs.ts) so every essay image
+   *  can reserve its box and offer a srcset without anything ever probing the
+   *  file again (plan 43 §5). */
+  width?: number;
+  height?: number;
+}
 
+async function downscale(file: File, maxEdge: number): Promise<Downscaled> {
+  const asIs = { blob: file as Blob, contentType: file.type };
+  // A GIF may be animated and a canvas keeps one frame — never re-encode, but
+  // still decode for dimensions: the first frame's box is the animation's box.
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return asIs;
+  const dims = { width: bitmap.width, height: bitmap.height };
 
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  if (scale === 1) {
+  if (scale === 1 || file.type === 'image/gif') {
     bitmap.close();
-    return asIs;
+    return { ...asIs, ...dims };
   }
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
@@ -64,7 +78,7 @@ async function downscale(file: File, maxEdge: number): Promise<{ blob: Blob; con
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     bitmap.close();
-    return asIs;
+    return { ...asIs, ...dims };
   }
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
@@ -72,7 +86,7 @@ async function downscale(file: File, maxEdge: number): Promise<{ blob: Blob; con
   // WebP where transparency might matter, JPEG for photographs.
   const contentType = file.type === 'image/png' || file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, contentType, 0.85));
-  return blob ? { blob, contentType } : asIs;
+  return blob ? { blob, contentType, width: canvas.width, height: canvas.height } : { ...asIs, ...dims };
 }
 
 /** First 6 bytes of SHA-256, hex. Enough to be unique within one fragment. */
@@ -102,8 +116,24 @@ export interface UploadImageOptions {
 export interface UploadedImage {
   /** Storage path — what the About page persists so it can replace the file. */
   path: string;
-  /** Public URL — what an essay's markdown embeds. */
+  /**
+   * Bare public URL, no query string. ⚠ KEEP IT BARE: about-builder appends
+   * `?v=${Date.now()}` to this — a second `?` would quietly break the one
+   * consumer that was here first.
+   */
   url: string;
+  /**
+   * What an essay's markdown embeds: the same URL carrying the image's own
+   * intrinsic size (`?w=&h=`), which is how the public renderer reserves the
+   * box and builds a srcset without ever probing the file (plan 43 §5,
+   * essay-image-attrs.ts owns the convention). Falls back to the bare URL for
+   * the rare format the browser couldn't decode — those images simply keep
+   * the old behaviour.
+   */
+  embedUrl: string;
+  /** Intrinsic pixels of the uploaded file, when the browser could decode it. */
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -115,7 +145,11 @@ export interface UploadedImage {
  * it — and a `bucket` parameter would have made that a thing you look up rather
  * than a thing you read.
  */
-async function put(file: File, bucket: 'site' | 'hq', opts: UploadImageOptions): Promise<string> {
+async function put(
+  file: File,
+  bucket: 'site' | 'hq',
+  opts: UploadImageOptions,
+): Promise<{ path: string; width?: number; height?: number }> {
   const accepted = opts.accept ?? Object.keys(EXT_FOR);
   if (!EXT_FOR[file.type] || !accepted.includes(file.type)) {
     const names = accepted.map((t) => (EXT_FOR[t] ?? t).toUpperCase()).join(', ');
@@ -131,7 +165,7 @@ async function put(file: File, bucket: 'site' | 'hq', opts: UploadImageOptions):
     );
   }
 
-  const { blob, contentType } = await downscale(file, opts.maxEdge ?? MAX_EDGE);
+  const { blob, contentType, width, height } = await downscale(file, opts.maxEdge ?? MAX_EDGE);
   if (blob.size > MAX_UPLOAD_BYTES) {
     throw new UploadError(`Still ${(blob.size / 1e6).toFixed(1)} MB after resizing — too large to publish.`);
   }
@@ -146,13 +180,15 @@ async function put(file: File, bucket: 'site' | 'hq', opts: UploadImageOptions):
   // one is not an error, it's a cache hit. Only surface anything else.
   if (error && !/exists/i.test(error.message)) throw new UploadError(`Upload failed: ${error.message}`);
 
-  return path;
+  return { path, width, height };
 }
 
 /** Upload to the PUBLIC `site` bucket, for reader-facing images. */
 export async function uploadImage(file: File, opts: UploadImageOptions): Promise<UploadedImage> {
-  const path = await put(file, 'site', opts);
-  return { path, url: supabase().storage.from('site').getPublicUrl(path).data.publicUrl };
+  const { path, width, height } = await put(file, 'site', opts);
+  const url = supabase().storage.from('site').getPublicUrl(path).data.publicUrl;
+  const embedUrl = width && height ? `${url}?w=${width}&h=${height}` : url;
+  return { path, url, embedUrl, width, height };
 }
 
 /**
@@ -166,5 +202,5 @@ export async function uploadImage(file: File, opts: UploadImageOptions): Promise
  * thing worth persisting (12-people.md §7).
  */
 export async function uploadPrivateImage(file: File, opts: UploadImageOptions): Promise<string> {
-  return put(file, 'hq', opts);
+  return (await put(file, 'hq', opts)).path;
 }

@@ -3,6 +3,7 @@ import { defineConfig, envField, fontProviders } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import icon from 'astro-icon';
 import vercel from '@astrojs/vercel';
+import { IMAGE_WIDTHS } from './image-widths.mjs';
 
 // https://astro.build/config
 export default defineConfig({
@@ -84,8 +85,12 @@ export default defineConfig({
     //
     // Adding a width costs nothing by itself — entries are permissions, not work.
     // Only the widths a real browser actually requests are ever generated or billed.
+    //
+    // The list itself lives in image-widths.mjs (one owner) because the essay
+    // renderer asks `getImage` for widths out of the SAME ladder — see that
+    // file for why the two must never drift.
     imagesConfig: {
-      sizes: [224, 448, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+      sizes: IMAGE_WIDTHS,
       // ⚠ THIS IS LOAD-BEARING, AND THE REASON IS THE UPSTREAM, NOT THIS SITE.
       // Vercel derives an optimized image's own Cache-Control from the origin it
       // fetched, floored by this. Supabase Storage serves our objects

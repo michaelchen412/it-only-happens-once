@@ -161,7 +161,9 @@ if (undoBar) {
       upload: async (file) => {
         const id = editing?.dataset.note;
         if (!id) throw new Error('No note is open');
-        return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).url;
+        // `embedUrl` — the dims ride along so the picture keeps its box when
+        // this note graduates to a public piece (plan 43 §5).
+        return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).embedUrl;
       },
       askAlt: wireAltDialog(document.getElementById('dump-alt-dialog') as HTMLDialogElement),
       // The card's own stamp is the status line — this room has no other, and

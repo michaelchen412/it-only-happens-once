@@ -134,11 +134,13 @@ async function boot(dialog: HTMLDialogElement) {
       // because "make it a piece" is a status flip on this very row: the
       // picture must not need moving when the thought graduates.
       upload: async (file) =>
+        // `embedUrl` — same reason as the writing sheet: the markdown carries
+        // the image's own size for the public renderer (plan 43 §5).
         (
           await uploadImage(file, {
             pathFor: (hash, ext) => `essays/${(currentId ??= crypto.randomUUID())}/${hash}.${ext}`,
           })
-        ).url,
+        ).embedUrl,
       askAlt: wireAltDialog(document.getElementById('cap-alt-dialog') as HTMLDialogElement),
       onStatus: (m) => (m ? flash(m, true) : flash('')),
       onError: (m) => flash(m, true),

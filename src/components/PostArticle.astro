@@ -20,6 +20,7 @@
 */
 import Timestamp from './Timestamp.astro';
 import FragmentStrip from './FragmentStrip.astro';
+import { enhanceEssayImages } from '../lib/essay-images';
 import { renderMarkdown } from '../lib/markdown';
 import { embedForUrl } from '../lib/media';
 import type { WritingItem } from '../lib/blog';
@@ -38,7 +39,12 @@ interface Props {
   share?: boolean;
 }
 const { item, linkTitle = false, share = true } = Astro.props;
-const bodyHtml = renderMarkdown(item.bodyMarkdown);
+// The sanitizer already gave every image its lazy/decoding/dimensions; this
+// pass adds srcset through the image service (plan 43 §5), and it lives HERE
+// because PostArticle is the one renderer every essay passes through — the
+// feed's template, the Reader, the permalink and the suite all arrive at this
+// line, so one seam covers all four.
+const bodyHtml = await enhanceEssayImages(renderMarkdown(item.bodyMarkdown));
 
 // The paired song (ADR-0009): *this song goes with this piece*. It sits at the
 // HEAD, below the title block and above the prose — "press play, then read",

@@ -145,7 +145,9 @@ const {
   // that has never been saved, and a later rename never moves the files.
   images: {
     upload: async (file) =>
-      (await uploadImage(file, { pathFor: (hash, ext) => `essays/${idField.value}/${hash}.${ext}` })).url,
+      // `embedUrl`, not `url`: the markdown carries the image's own size so
+      // the public page can reserve its box and offer a srcset (plan 43 §5).
+      (await uploadImage(file, { pathFor: (hash, ext) => `essays/${idField.value}/${hash}.${ext}` })).embedUrl,
     askAlt,
     onStatus: (m) => (m ? setStatusNote(m) : restStatus()),
     onError: (m) => {

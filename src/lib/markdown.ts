@@ -9,6 +9,7 @@
 // output in `.reading` so it picks up the article typography from app.css.
 import { Marked, marked, type RendererObject, type Tokens } from 'marked';
 import sanitizeHtml from 'sanitize-html';
+import { imageDims } from './essay-image-attrs';
 import { countWords, minutesForWords } from './reading';
 import { MIN_SEARCH, highlight } from './search-highlight';
 
@@ -21,7 +22,7 @@ const SANITIZE: sanitizeHtml.IOptions = {
   allowedTags: [...sanitizeHtml.defaults.allowedTags, 'img'],
   allowedAttributes: {
     a: ['href', 'title', 'name', 'target', 'rel'],
-    img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
+    img: ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding'],
     code: ['class'],
     // The search highlight below, and only that — `allowedClasses` pins the
     // value, so an authored `<mark class="anything-else">` still loses it.
@@ -59,6 +60,37 @@ const SANITIZE: sanitizeHtml.IOptions = {
       const rel = new Set((attribs.rel ?? '').split(/\s+/).filter(Boolean));
       rel.add('noopener');
       return { tagName, attribs: { ...attribs, rel: [...rel].join(' ') } };
+    },
+    /**
+     * Every rendered image loads lazily and decodes off the main thread
+     * (plan 43 §5). Essays here run 5,700–14,000 characters, and until
+     * 2026-08-18 every photo in one loaded EAGERLY — a phone on a slow
+     * connection paid for the last image in a long essay before the first
+     * paragraph settled. Markdown cannot say `loading=`, so the `??` matters
+     * only for raw-HTML bodies — where an authored `loading="eager"` is kept,
+     * which is also the escape hatch if a piece ever leads with its image and
+     * that image becomes the LCP.
+     *
+     * `width`/`height` come out of the URL itself (`?w=&h=` — the uploader
+     * writes them, `imageDims` reads them, essay-image-attrs.ts owns the
+     * convention): the box is reserved before the bytes arrive, so a long
+     * essay stops reflowing as its photos land. Older bodies don't carry the
+     * params yet — scripts/backfill-image-dims.mjs adds them, and running it
+     * is a production content write that stays Michael's call. Until then
+     * those images simply keep today's behaviour, minus the eager loading.
+     */
+    img: (tagName, attribs) => {
+      const out: Record<string, string> = {
+        ...attribs,
+        loading: attribs.loading ?? 'lazy',
+        decoding: attribs.decoding ?? 'async',
+      };
+      const dims = imageDims(attribs.src);
+      if (dims && !attribs.width && !attribs.height) {
+        out.width = String(dims.width);
+        out.height = String(dims.height);
+      }
+      return { tagName, attribs: out };
     },
   },
 };

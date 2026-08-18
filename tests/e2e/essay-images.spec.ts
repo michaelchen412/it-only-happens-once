@@ -134,6 +134,10 @@ test.describe('images in essays', () => {
     const body = saves.at(-1)!;
     expect(body).toContain('![A snowy road at dusk](');
     expect(body).toContain('/storage/v1/object/public/site/essays/');
+    // The URL carries the image's own size (plan 43 §5) — the 1×1 test PNG
+    // makes the convention legible. This is what lets the public page reserve
+    // the box and build a srcset without ever probing the file.
+    expect(body).toContain('?w=1&h=1');
   });
 
   test('pasting a screenshot uploads it — the affordance that actually matters', async ({ page }) => {
