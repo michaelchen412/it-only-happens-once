@@ -26,6 +26,7 @@
 import type { APIRoute } from 'astro';
 import { buildSitemap, type SitemapEntry } from '../lib/sitemap';
 import { listConstellations } from '../lib/constellations';
+import { noted } from '../lib/read-log';
 
 export const GET: APIRoute = async ({ url, locals }) => {
   const supabase = locals.supabase;
@@ -56,7 +57,10 @@ export const GET: APIRoute = async ({ url, locals }) => {
       */
       .eq('status', 'published')
       .is('deleted_at', null)
-      .order('updated_at', { ascending: false }),
+      .order('updated_at', { ascending: false })
+      // A failed read here is a sitemap quietly missing its fragments — valid
+      // XML, fewer URLs, and nothing anywhere to say it happened (plan 43 §4).
+      .then(noted('sitemap: fragments')),
   ]);
 
   const entries: SitemapEntry[] = [

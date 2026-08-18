@@ -12,6 +12,7 @@
 // Every query here re-states `status`/`deleted_at` anyway, because the
 // neighbourhood is assembled from join tables that carry no status of their own.
 import type { createSupabaseServerClient } from './supabase';
+import { noted } from './read-log';
 import type { QuoteItem } from './blog';
 import { revealOf } from './provenance';
 import { toPlainText } from './markdown';
@@ -117,7 +118,7 @@ export async function getQuotePage(
     .eq('slug', slug);
   if (!opts.includeUnpublished) query = query.eq('status', 'published');
 
-  const { data: r } = await query.maybeSingle();
+  const { data: r } = await query.maybeSingle().then(noted(`quote: ${slug}`));
   if (!r) return null;
 
   const subjectRows = (r.fragment_subjects ?? []) as SubjectRow[];
@@ -260,7 +261,8 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
       .from('fragment_constellations')
       .select('fragment_id, position, constellations(name, slug, description, color, status)')
       .in('fragment_id', ids)
-      .order('position'),
+      .order('position')
+      .then(noted('quote: placements')),
     // Every published quote by any of these authors. Counting client-side beats
     // a `count` per author, and the corpus is small enough that the rows are
     // cheaper than the round trips.
@@ -272,9 +274,14 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
           .eq('status', 'published')
           .is('deleted_at', null)
           .in('author_id', authorIds)
+          .then(noted('quote: author siblings'))
       : Promise.resolve({ data: [] as { id: string; author_id: string | null }[] }),
     allSubjectIds.length
-      ? supabase.from('fragment_subjects').select('fragment_id, subject_id').in('subject_id', allSubjectIds)
+      ? supabase
+          .from('fragment_subjects')
+          .select('fragment_id, subject_id')
+          .in('subject_id', allSubjectIds)
+          .then(noted('quote: kin links'))
       : Promise.resolve({ data: [] as { fragment_id: string; subject_id: string }[] }),
   ]);
 
@@ -337,7 +344,8 @@ export async function getQuoteNeighbourhoods(supabase: DB, seeds: QuoteSeed[]): 
       .select('id, slug, type, title, body, attribution')
       .in('id', [...wanted])
       .eq('status', 'published')
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .then(noted('quote: kin rows'));
     for (const f of data ?? []) {
       neighbours.set(f.id, {
         slug: f.slug,

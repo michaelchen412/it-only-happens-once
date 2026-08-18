@@ -146,7 +146,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // mid-session is not noticed until that token expires. For one account behind
   // a Google-only allowlist that is an acceptable trade; it is written down so
   // it stays a decision rather than becoming a surprise.
-  const { data: claims } = await supabase.auth.getClaims();
+  // ⚠ THE TRY/CATCH IS FOR THE COOKIE-CARRYING REQUEST DURING AN AUTH OUTAGE
+  // (plan 43 §4). The no-cookie path never throws — it short-circuits before
+  // any network (verified above) — but a request that CARRIES a session cookie
+  // can need the JWKS fetch or a token refresh, and if Supabase Auth is down
+  // at that moment the rejection would surface here, in front of EVERY route,
+  // as a 500 on the one request most likely to be Michael's own. An
+  // unverifiable session degrades to an anonymous one instead: public pages
+  // render, `/admin` redirects to sign-in, and the log says why. Fail closed
+  // for authorization, open for availability — never the other way around.
+  let claims: Awaited<ReturnType<typeof supabase.auth.getClaims>>['data'] = null;
+  try {
+    ({ data: claims } = await supabase.auth.getClaims());
+  } catch (e) {
+    console.error(`[read] auth: getClaims — ${e instanceof Error ? e.message : String(e)}`);
+  }
   const user = claims?.claims ?? null;
 
   context.locals.supabase = supabase;

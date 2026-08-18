@@ -38,6 +38,7 @@
 import type { APIRoute } from 'astro';
 import rss from '@astrojs/rss';
 import { excerpt } from '../lib/markdown';
+import { noted } from '../lib/read-log';
 
 /**
  * ⚠ Twenty, not everything. A feed is a recent-items protocol, not an archive —
@@ -88,7 +89,11 @@ export const GET: APIRoute = async (context) => {
       typo was fixed.
     */
     .order('occurred_at', { ascending: false })
-    .limit(FEED_SIZE);
+    .limit(FEED_SIZE)
+    // A failed read here is an EMPTY feed served with a 200 and a 600s edge
+    // cache — a reader's app would say "no posts" with nothing logged anywhere
+    // to disagree (plan 43 §4).
+    .then(noted('rss: writing'));
 
   const res = await rss({
     title: 'It Only Happens Once',

@@ -8,6 +8,7 @@ import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, QuoteItem, SubjectRef } from './blog';
 import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
+import { noted } from './read-log';
 import { revealOf } from './provenance';
 import type { FragmentType } from './fragments-display';
 
@@ -75,12 +76,14 @@ export async function listConstellations(supabase: DB): Promise<ConstellationRef
       .from('constellations')
       .select('name, slug, description, sort, color')
       .eq('status', 'published')
-      .order('sort'),
+      .order('sort')
+      .then(noted('sky: constellations')),
     supabase
       .from('fragment_constellations')
       .select('constellations!inner(slug), fragments!inner(status, deleted_at)')
       .eq('fragments.status', 'published')
-      .is('fragments.deleted_at', null),
+      .is('fragments.deleted_at', null)
+      .then(noted('sky: placements')),
   ]);
 
   const counts = new Map<string, number>();
@@ -132,7 +135,8 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     .eq('fragment_constellations.fragments.status', 'published')
     .is('fragment_constellations.fragments.deleted_at', null)
     .order('position', { referencedTable: 'fragment_constellations' })
-    .maybeSingle();
+    .maybeSingle()
+    .then(noted(`suite: ${slug}`));
   if (!c) return null;
 
   const rows = c.fragment_constellations;

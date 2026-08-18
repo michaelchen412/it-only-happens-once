@@ -11,6 +11,7 @@ import type { createSupabaseServerClient } from './supabase';
 import type { FragmentType } from './fragments-display';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { excerpt, readingMinutes } from './markdown';
+import { noted } from './read-log';
 import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
@@ -256,14 +257,19 @@ async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<st
   const wanted = Array.from(new Set(slugs.filter(Boolean)));
   if (wanted.length === 0) return null;
 
-  const { data: subs } = await supabase.from('subjects').select('id, slug').in('slug', wanted);
+  const { data: subs } = await supabase
+    .from('subjects')
+    .select('id, slug')
+    .in('slug', wanted)
+    .then(noted('blog: subject slugs'));
   if (!subs || subs.length !== wanted.length) return []; // a slug didn't resolve → AND impossible
   const ids = subs.map((s) => s.id);
 
   const { data: links } = await supabase
     .from('fragment_subjects')
     .select('fragment_id, subject_id')
-    .in('subject_id', ids);
+    .in('subject_id', ids)
+    .then(noted('blog: subject filter'));
   // A fragment satisfies the AND iff it links to all selected subjects. Track a
   // Set per fragment so a duplicate link can never fake a match.
   const perFragment = new Map<string, Set<string>>();
@@ -310,7 +316,7 @@ export async function listWriting(
   if (ids) query = query.in('id', ids);
   if (q) query = query.or(`title.ilike.%${q}%,body.ilike.%${q}%`);
 
-  const { data, count } = await query;
+  const { data, count } = await query.then(noted('blog: writing'));
   const items: WritingItem[] = (data ?? []).map((r) => {
     const authored = (r.excerpt ?? '').trim();
     const lede = authored || excerpt(r.body, 400);
@@ -364,7 +370,12 @@ export async function listQuotes(
 
   let authorId: string | null = null;
   if (opts.author) {
-    const { data: a } = await supabase.from('authors').select('id').eq('slug', opts.author).maybeSingle();
+    const { data: a } = await supabase
+      .from('authors')
+      .select('id')
+      .eq('slug', opts.author)
+      .maybeSingle()
+      .then(noted('blog: quote author'));
     // ⚠ An unknown slug matches NOTHING rather than being silently ignored —
     // the same rule `fragment-query.ts` uses for an unknown constellation. A
     // dropped filter would show the whole corpus under a heading naming one
@@ -404,7 +415,7 @@ export async function listQuotes(
   if (authorId) query = query.eq('author_id', authorId);
   if (searchTerm) query = query.or(`body.ilike.%${searchTerm}%,attribution.ilike.%${searchTerm}%`);
 
-  const { data, count } = await query;
+  const { data, count } = await query.then(noted('blog: quotes'));
 
   /*
     ⚠ ONE COUNT FOR THE PAGE. Each card's attribution offers "N more lines from
@@ -422,7 +433,8 @@ export async function listQuotes(
       .eq('type', 'quote')
       .eq('status', 'published')
       .is('deleted_at', null)
-      .in('author_id', pageAuthorIds);
+      .in('author_id', pageAuthorIds)
+      .then(noted('blog: quote siblings'));
     for (const row of sib ?? []) {
       if (row.author_id) siblingsByAuthor.set(row.author_id, (siblingsByAuthor.get(row.author_id) ?? 0) + 1);
     }
@@ -496,7 +508,7 @@ export async function getWritingBySlug(
   // `fragments.slug` is UNIQUE across every type, so this stays a single row.
   if (!opts.includeUnpublished) query = query.eq('status', 'published');
 
-  const { data: r } = await query.maybeSingle();
+  const { data: r } = await query.maybeSingle().then(noted(`writing: ${slug}`));
   if (!r) return null;
 
   const lede = (r.excerpt ?? '').trim() || excerpt(r.body, 400);
@@ -572,7 +584,8 @@ export async function listSubjects(
     .select('fragment_id, subjects(name, slug), fragments!inner(type, status, deleted_at, authors(slug))')
     .eq('fragments.type', type)
     .eq('fragments.status', 'published')
-    .is('fragments.deleted_at', null);
+    .is('fragments.deleted_at', null)
+    .then(noted('blog: subject rail'));
 
   const fragSubs = new Map<string, Set<string>>(); // fragment id → its subject slugs
   const authorOf = new Map<string, string | null>(); // fragment id → its author's slug
@@ -607,7 +620,8 @@ export async function listSubjects(
       .eq('type', type)
       .eq('status', 'published')
       .is('deleted_at', null)
-      .or(or);
+      .or(or)
+      .then(noted('blog: rail search'));
     matchIds = new Set((data ?? []).map((r) => r.id));
   }
 
@@ -694,7 +708,8 @@ export async function neighbourhoodsFor(
     .in(
       'fragment_id',
       seeds.map((s) => s.id),
-    );
+    )
+    .then(noted('blog: neighbourhoods'));
   const byFragment = new Map<string, string[]>();
   for (const row of data ?? []) {
     const list = byFragment.get(row.fragment_id) ?? [];
