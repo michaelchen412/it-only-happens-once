@@ -90,6 +90,17 @@ const pair = mode === 'pair';
   data-constellation-color={constellationColor}
   aria-labelledby={`${id}-title`}
 >
+  {
+    /* ⚠ A DECLARED CLONE SOURCE for `pair-browser.ts` (plan 42 · §4.B.5). When
+      you un-pair a song, `drop()` rebuilds that row's button — the one
+      `FragmentRow` renders with `<Icon ph:plus>` — and `icon.ts` clones from a
+      `ph:plus` already on the page. In a drawer where every row is paired there
+      is none to clone, and the rebuilt button would come back bare. Declaring
+      one here makes the source a fact of the component rather than a property
+      of what happens to be listed. */
+  }
+  <span hidden data-icon-source><Icon name="ph:plus" /></span>
+
   <div class="flex h-full flex-col">
     <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">

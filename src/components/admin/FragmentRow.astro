@@ -12,7 +12,7 @@
 
   mode="pick" (the browser sheet): rows already placed in the target
   constellation render dimmed with a disabled checkbox — visible, never
-  re-addable; everything else gets a per-row ＋ place button (data-act).
+  re-addable; everything else gets a per-row `ph:plus` place button (data-act).
 
   mode="pair" (the song sheet's picker, plan 39): the same dimming for rows
   already paired to THIS song, and no checkbox column at all — `paired_song_id`
@@ -42,6 +42,7 @@
   song. Reading the status chip's rendered text was the alternative, and it is
   one relabelling away from breaking.
 */
+import { Icon } from 'astro-icon/components';
 import type { Database } from '../../lib/database.types';
 import type { PanelMode } from '../../lib/fragment-query';
 import { shortDate, homeDate, rowTitle } from '../../lib/fragments-display';
@@ -370,6 +371,17 @@ const editorData =
               )}
             </span>
             {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
+            {/* ⚠ THE ONE `＋` THAT STAYS A CHARACTER (plan 42 · §4.B.5), and the
+                reason is this slot rather than this table. `.cn-cell__mark` is
+                0.85rem wide at `font-size: .7rem` with `line-height: 1.15rem`
+                and `text-align: center` — geometry tuned to a GLYPH, in the
+                densest column in the app, where the mark is `aria-hidden` and
+                exists only to be reserved and then lit on hover. An `<Icon>`
+                here is a re-measure of the cell, not a swap.
+                ⚠ The first draft of this refusal said "FragmentRow's ＋ are
+                held" and that was too wide: the other two in this file were
+                ordinary `btn btn-ghost btn-xs` rows with nothing tuned about
+                them, and they are `ph:plus` now. */}
             <span class="cn-cell__mark" aria-hidden="true">
               ＋
             </span>
@@ -409,8 +421,9 @@ const editorData =
             data-act="place"
             data-id={r.id}
             title="Place in this constellation"
+            aria-label="Place in this constellation"
           >
-            ＋
+            <Icon name="ph:plus" />
           </button>
         )}
       </td>
@@ -447,8 +460,9 @@ const editorData =
             data-act="pair"
             data-id={r.id}
             title={pairedToOther ? `Replace ${pairedToOther} with this song` : 'Pair this song to it'}
+            aria-label={pairedToOther ? `Replace ${pairedToOther} with this song` : 'Pair this song to it'}
           >
-            {pairedToOther ? 'Replace' : '＋'}
+            {pairedToOther ? 'Replace' : <Icon name="ph:plus" />}
           </button>
         )}
       </td>

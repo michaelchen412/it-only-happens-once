@@ -17,6 +17,8 @@
   Public API: setValue(id, name), clear(), getId(), getName(), getOption(),
   setOptions(list). Modelled on TagInput's custom-element pattern.
 */
+import { Icon } from 'astro-icon/components';
+
 interface Option {
   id: string;
   name: string;
@@ -34,6 +36,18 @@ interface Props {
 }
 const { name, idName, noun, label, options = [], placeholder = '', id, class: className = '' } = Astro.props;
 ---
+
+{
+  /* ⚠ A DECLARED CLONE SOURCE, not a hopeful `document.querySelector` (plan 42
+    · §4.B.5). This element builds its whole menu in the browser, so its
+    "＋ Add «text»" row cannot use `<Icon>` — and `icon.ts` clones from whatever
+    `ph:plus` the page already rendered. On a page where this combo is the ONLY
+    thing wanting a plus, there is nothing to clone and the create row would
+    lose its mark. Rendering one here, hidden, makes the source a fact of the
+    component rather than a property of the page it lands on — and it costs one
+    `<use>` against a sprite symbol that is emitted once either way. */
+}
+<span hidden data-icon-source><Icon name="ph:plus" /></span>
 
 <entity-combo
   id={id}

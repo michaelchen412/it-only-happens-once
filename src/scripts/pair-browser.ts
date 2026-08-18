@@ -21,6 +21,7 @@ import { callAction, formatActionError } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { starMarkHtml } from '../lib/star-mark';
 import { wireBrowserShell } from './browser-shell';
+import { cloneIcon } from './icon';
 import { MIN_SEARCH } from '../lib/search-highlight';
 
 /** A piece this song is now paired to — what the sheet's list renders. */
@@ -312,8 +313,24 @@ export function wirePairBrowser(root: HTMLDialogElement, opts: PairBrowserOpts):
         row.classList.remove('opacity-45');
         row.classList.add('hover:bg-base-200/40');
         const cell = row.querySelector('td:last-child');
-        if (cell)
-          cell.innerHTML = `<button type="button" class="btn btn-ghost btn-xs font-sans normal-case" data-act="pair" data-id="${id}" title="Pair this song to it">＋</button>`;
+        if (cell) {
+          // ⚠ BUILT, NOT `innerHTML`d WITH A `＋` (plan 42 · §4.B.5). This
+          // rebuilds the button `FragmentRow` renders with `<Icon ph:plus>`, so
+          // an innerHTML string carrying the character meant un-pairing a song
+          // swapped one row's SVG for a font glyph — the split the finding is
+          // about, arriving through the back door and only in the transient
+          // state nobody screenshots.
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-ghost btn-xs font-sans normal-case';
+          btn.dataset.act = 'pair';
+          btn.dataset.id = id;
+          btn.title = 'Pair this song to it';
+          btn.setAttribute('aria-label', 'Pair this song to it');
+          const glyph = cloneIcon('ph:plus');
+          if (glyph) btn.appendChild(glyph);
+          cell.replaceChildren(btn);
+        }
       }
     },
     reset() {

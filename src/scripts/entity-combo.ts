@@ -1,3 +1,5 @@
+import { cloneIcon } from './icon';
+
 if (!customElements.get('entity-combo')) {
   let uid = 0;
   interface Opt {
@@ -166,9 +168,15 @@ if (!customElements.get('entity-combo')) {
         if (i === this.activeIndex) li.classList.add('is-active');
         if (row.create) {
           li.classList.add('entity-combo__opt--create');
+          // ⚠ `ph:plus`, NOT THE `＋` CHARACTER (plan 42 · §4.B.5) — and this
+          // slot gave no reason to keep it: `.entity-combo__plus` is one margin
+          // rule, not geometry tuned to a glyph the way `.cn-cell__mark` is. It
+          // is CLONED rather than `<Icon>`d because this menu is built in the
+          // browser; the source is the hidden span in `EntityCombo.astro`.
           const plus = document.createElement('span');
           plus.className = 'entity-combo__plus';
-          plus.textContent = '＋';
+          const glyph = cloneIcon('ph:plus');
+          if (glyph) plus.appendChild(glyph);
           const b = document.createElement('b');
           b.textContent = row.name;
           li.append(plus, document.createTextNode(` Add ${this.noun} “`), b, document.createTextNode('”'));
