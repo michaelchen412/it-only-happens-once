@@ -51,6 +51,13 @@ interface Props {
   count: number;
   /** Selector, within this wrapper, for the rows that hide and show. They carry `data-search`. */
   rows: string;
+  /**
+   * Optional selector for a CONTAINER that hides when it holds no visible row —
+   * a section with its own heading, so a filter cannot leave a heading standing
+   * over an empty table. The roster wrote this rule first, in its own words: *"a
+   * heading over an empty grid reads as a rendering bug."*
+   */
+  groups?: string;
   placeholder: string;
   /** The field's accessible name. It has no visible label; this is the only one it gets. */
   label: string;
@@ -65,6 +72,7 @@ interface Props {
 const {
   count,
   rows,
+  groups,
   placeholder,
   label,
   noMatch = 'Nothing matches.',
@@ -81,7 +89,7 @@ const {
     the sky past 8 mid-session, and a filter that only arrives on the next page
     load is a filter you learn not to expect. `sync()` re-checks it. */
 }
-<div class:list={['ff', className]} data-ff data-rows={rows} data-threshold={threshold ?? ''}>
+<div class:list={['ff', className]} data-ff data-rows={rows} data-groups={groups} data-threshold={threshold ?? ''}>
   <label class:list={['search search--w', fieldClass]} hidden={threshold !== null && count <= threshold}>
     <Icon name="ph:magnifying-glass" class="shrink-0 opacity-45" />
     <input type="search" placeholder={placeholder} aria-label={label} />

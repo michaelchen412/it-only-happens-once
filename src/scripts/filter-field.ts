@@ -25,13 +25,29 @@ export interface FilterFieldHandle {
  * field wired twice would run its pass twice per keystroke. Same guard idiom as
  * `wireRadioGroups`.
  */
-export function wireFilterField(root: HTMLElement): FilterFieldHandle | null {
+export function wireFilterField(el: HTMLElement): FilterFieldHandle | null {
+  // ⚠ RESOLVE THE WRAPPER RATHER THAN TRUSTING THE ARGUMENT, because the first
+  // caller got it wrong and NOTHING SAID SO. `constellation-picker.ts` passed
+  // its `.cn-picker` root — the element the `[data-ff]` div now sits inside —
+  // so `dataset.rows` came back undefined, the row selector was `''`, and
+  // `querySelectorAll('')` throws a SyntaxError from inside an `input`
+  // listener: swallowed, no console line on the happy path, and the filter
+  // simply did nothing. Caught by the e2e spec, not by `verify`.
+  const root = el.matches('[data-ff]') ? el : (el.querySelector<HTMLElement>('[data-ff]') ?? el);
+
   const field = root.querySelector<HTMLElement>('.search');
   const input = root.querySelector<HTMLInputElement>('input[type="search"]');
   if (!field || !input) return null;
 
   const none = root.querySelector<HTMLElement>('.ff__none');
   const rowSel = root.dataset.rows ?? '';
+  // Belt and braces on the same trap: an empty selector is a programming error,
+  // and it should say so once rather than throw on every keystroke.
+  if (!rowSel) {
+    console.error('FilterField: no data-rows on', root);
+    return null;
+  }
+  const groupSel = root.dataset.groups ?? '';
   const rawThreshold = root.dataset.threshold ?? '';
   /** '' means the caller passed `threshold={null}`: always show the field. */
   const threshold = rawThreshold === '' ? null : Number(rawThreshold);
@@ -44,6 +60,16 @@ export function wireFilterField(root: HTMLElement): FilterFieldHandle | null {
       const hit = !q || (row.dataset.search ?? '').includes(q);
       row.hidden = !hit;
       if (hit) shown++;
+    }
+
+    // A section whose every row is filtered out hides its heading with them.
+    // The roster's words for why: "a heading over an empty grid reads as a
+    // rendering bug." Its own count stays truthful because it counts what
+    // EXISTS, not what is showing — so nothing here has to rewrite it.
+    if (groupSel) {
+      for (const group of root.querySelectorAll<HTMLElement>(groupSel)) {
+        group.hidden = !group.querySelector(`${rowSel}:not([hidden])`);
+      }
     }
 
     // ⚠ `|| !q` IS NOT DEFENSIVE, IT FIXES A LINE THAT SHOWED THE WRONG THING.

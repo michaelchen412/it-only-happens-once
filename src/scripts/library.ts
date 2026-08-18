@@ -4,6 +4,7 @@ import { submitAction } from './action-error';
 import { deleteWarning } from '../lib/library-delete';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
+import { wireFilterFields } from './filter-field';
 
 const A: Record<string, any> = {
   subject: actions.subjects,
@@ -257,3 +258,11 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
     if (res.ok && row) await reloadUnless(row);
   });
 }
+
+// ⚠ WIRED LAST, AND IT MUST SURVIVE THE RELOAD ABOVE. Every per-row Save on this
+// page ends in `reloadUnless(row)` — a navigation, and ADR 0036 says that is
+// correct. So on the one page whose purpose is *filter to the duplicate, then
+// groom it*, the browser restores the query text across that reload while
+// `input` never fires again. `wireFilterField` re-applies from the field's own
+// value precisely so the filter you were working in is still there afterwards.
+wireFilterFields();

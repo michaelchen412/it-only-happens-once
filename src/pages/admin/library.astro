@@ -8,6 +8,7 @@
 */
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
+import FilterField from '../../components/admin/FilterField.astro';
 import VocabTable from '../../components/admin/VocabTable.astro';
 import VocabActions from '../../components/admin/VocabActions.astro';
 import MergeDialog from '../../components/admin/MergeDialog.astro';
@@ -94,156 +95,183 @@ const mergeOptions = {
     </PageHeader>
     <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
 
-    {/* SUBJECTS */}
-    <VocabTable
-      title="Subjects"
-      count={(subjects ?? []).length}
-      columns={[
-        { label: 'Name' },
-        { label: 'Definition' },
-        { label: 'Used', w: 'w-14', right: true },
-        { label: 'Actions', w: 'w-64' },
-      ]}
-    >
-      {
-        (subjects ?? []).map((s) => (
-          <tr
-            class="lib-row border-base-300 border-b align-top last:border-0"
-            data-entity="subject"
-            data-id={s.id}
-            data-name={s.name}
-            data-uses={subjCount[s.id] ?? 0}
-          >
-            <td class="px-3 py-2">
-              <input
-                data-field="name"
-                value={s.name}
-                aria-label="Subject name"
-                class="input input-xs input-bordered w-36"
-              />
-            </td>
-            <td class="px-3 py-2">
-              <input
-                data-field="definition"
-                value={s.definition ?? ''}
-                placeholder="one-line meaning…"
-                class="input input-xs input-bordered w-full"
-              />
-            </td>
-            <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
-            <td class="px-3 py-2">
-              <VocabActions entity="subject" id={s.id} name={s.name} />
-            </td>
-          </tr>
-        ))
-      }
-    </VocabTable>
+    {
+      /* ⚠ ONE FIELD OVER ALL THREE TABLES, not one per table (plan 42 · §4.B.2).
+        This is the longest list in the building — roughly 106 rows — and it was
+        the only one with no way to find a row at all, on the page whose whole
+        job is *find the duplicate, then groom it*. Three boxes would make you
+        guess the table first, and the guess is exactly what you came here
+        without: a name you half-remember could be an author or a work. A
+        vocabulary with no hit hides itself, heading and all.
 
-    {/* AUTHORS */}
-    <VocabTable
-      title="Authors"
-      count={(authors ?? []).length}
-      columns={[
-        { label: 'Name' },
-        { label: 'Note' },
-        { label: 'Used', w: 'w-14', right: true },
-        { label: 'Actions', w: 'w-64' },
-      ]}
+        ⚠ NO THRESHOLD — `threshold={null}`. The rule the constant encodes is
+        about a picker inside a sheet, scanned mid-decision; this is a page you
+        opened to search. It never has too few rows to be worth a box. */
+    }
+    <FilterField
+      count={(subjects ?? []).length + (authors ?? []).length + (works ?? []).length}
+      rows=".lib-row"
+      groups="[data-vocab]"
+      threshold={null}
+      placeholder="Find a subject, author or work…"
+      label="Find a subject, author or work"
+      noMatch="Nothing in the vocabularies by that name."
+      fieldClass="mb-6 max-w-md"
     >
-      {
-        (authors ?? []).map((a) => (
-          <tr
-            class="lib-row border-base-300 border-b align-top last:border-0"
-            data-entity="author"
-            data-id={a.id}
-            data-name={a.name}
-            data-uses={authorCount[a.id] ?? 0}
-            data-own-note={a.note?.trim() ? '1' : ''}
-          >
-            <td class="px-3 py-2">
-              <input
-                data-field="name"
-                value={a.name}
-                aria-label="Author name"
-                class="input input-xs input-bordered w-44"
-              />
-            </td>
-            <td class="px-3 py-2">
-              <input
-                data-field="note"
-                value={a.note ?? ''}
-                placeholder="dates, a line…"
-                class="input input-xs input-bordered w-full"
-              />
-            </td>
-            <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
-            <td class="px-3 py-2">
-              <VocabActions entity="author" id={a.id} name={a.name} />
-            </td>
-          </tr>
-        ))
-      }
-    </VocabTable>
+      {/* SUBJECTS */}
+      <VocabTable
+        title="Subjects"
+        count={(subjects ?? []).length}
+        columns={[
+          { label: 'Name' },
+          { label: 'Definition' },
+          { label: 'Used', w: 'w-14', right: true },
+          { label: 'Actions', w: 'w-64' },
+        ]}
+      >
+        {
+          (subjects ?? []).map((s) => (
+            <tr
+              class="lib-row border-base-300 border-b align-top last:border-0"
+              data-entity="subject"
+              data-id={s.id}
+              data-name={s.name}
+              data-search={`${s.name} ${s.definition ?? ''}`.toLowerCase()}
+              data-uses={subjCount[s.id] ?? 0}
+            >
+              <td class="px-3 py-2">
+                <input
+                  data-field="name"
+                  value={s.name}
+                  aria-label="Subject name"
+                  class="input input-xs input-bordered w-36"
+                />
+              </td>
+              <td class="px-3 py-2">
+                <input
+                  data-field="definition"
+                  value={s.definition ?? ''}
+                  placeholder="one-line meaning…"
+                  class="input input-xs input-bordered w-full"
+                />
+              </td>
+              <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
+              <td class="px-3 py-2">
+                <VocabActions entity="subject" id={s.id} name={s.name} />
+              </td>
+            </tr>
+          ))
+        }
+      </VocabTable>
 
-    {/* WORKS */}
-    <VocabTable
-      title="Works"
-      count={(works ?? []).length}
-      columns={[
-        { label: 'Title' },
-        { label: 'Author' },
-        { label: 'Year', w: 'w-16' },
-        { label: 'Used', w: 'w-14', right: true },
-        { label: 'Actions', w: 'w-64' },
-      ]}
-    >
-      {
-        (works ?? []).map((w) => (
-          <tr
-            class="lib-row border-base-300 border-b align-top last:border-0"
-            data-entity="work"
-            data-id={w.id}
-            data-name={w.title}
-            data-uses={workCount[w.id] ?? 0}
-            data-shelves={shelfCount[w.id] ?? 0}
-            data-shelf-notes={shelfNotes[w.id] ?? 0}
-          >
-            <td class="px-3 py-2">
-              <input
-                data-field="title"
-                value={w.title}
-                aria-label="Work title"
-                class="input input-xs input-bordered w-44"
-              />
-            </td>
-            <td class="px-3 py-2">
-              <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
-                <option value="">— none —</option>
-                {(authors ?? []).map((a) => (
-                  <option value={a.id} selected={a.id === w.author_id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </td>
-            <td class="px-3 py-2">
-              <input
-                data-field="year"
-                type="number"
-                value={w.year ?? ''}
-                aria-label="Year"
-                class="input input-xs input-bordered w-16"
-              />
-            </td>
-            <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
-            <td class="px-3 py-2">
-              <input data-field="kind" type="hidden" value={w.kind ?? ''} />
-              <VocabActions entity="work" id={w.id} name={w.title} />
-            </td>
-          </tr>
-        ))
-      }
-    </VocabTable>
+      {/* AUTHORS */}
+      <VocabTable
+        title="Authors"
+        count={(authors ?? []).length}
+        columns={[
+          { label: 'Name' },
+          { label: 'Note' },
+          { label: 'Used', w: 'w-14', right: true },
+          { label: 'Actions', w: 'w-64' },
+        ]}
+      >
+        {
+          (authors ?? []).map((a) => (
+            <tr
+              class="lib-row border-base-300 border-b align-top last:border-0"
+              data-entity="author"
+              data-id={a.id}
+              data-name={a.name}
+              data-search={`${a.name} ${a.note ?? ''}`.toLowerCase()}
+              data-uses={authorCount[a.id] ?? 0}
+              data-own-note={a.note?.trim() ? '1' : ''}
+            >
+              <td class="px-3 py-2">
+                <input
+                  data-field="name"
+                  value={a.name}
+                  aria-label="Author name"
+                  class="input input-xs input-bordered w-44"
+                />
+              </td>
+              <td class="px-3 py-2">
+                <input
+                  data-field="note"
+                  value={a.note ?? ''}
+                  placeholder="dates, a line…"
+                  class="input input-xs input-bordered w-full"
+                />
+              </td>
+              <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
+              <td class="px-3 py-2">
+                <VocabActions entity="author" id={a.id} name={a.name} />
+              </td>
+            </tr>
+          ))
+        }
+      </VocabTable>
+
+      {/* WORKS */}
+      <VocabTable
+        title="Works"
+        count={(works ?? []).length}
+        columns={[
+          { label: 'Title' },
+          { label: 'Author' },
+          { label: 'Year', w: 'w-16' },
+          { label: 'Used', w: 'w-14', right: true },
+          { label: 'Actions', w: 'w-64' },
+        ]}
+      >
+        {
+          (works ?? []).map((w) => (
+            <tr
+              class="lib-row border-base-300 border-b align-top last:border-0"
+              data-entity="work"
+              data-id={w.id}
+              data-name={w.title}
+              data-search={`${w.title} ${(authors ?? []).find((a) => a.id === w.author_id)?.name ?? ''}`.toLowerCase()}
+              data-uses={workCount[w.id] ?? 0}
+              data-shelves={shelfCount[w.id] ?? 0}
+              data-shelf-notes={shelfNotes[w.id] ?? 0}
+            >
+              <td class="px-3 py-2">
+                <input
+                  data-field="title"
+                  value={w.title}
+                  aria-label="Work title"
+                  class="input input-xs input-bordered w-44"
+                />
+              </td>
+              <td class="px-3 py-2">
+                <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
+                  <option value="">— none —</option>
+                  {(authors ?? []).map((a) => (
+                    <option value={a.id} selected={a.id === w.author_id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td class="px-3 py-2">
+                <input
+                  data-field="year"
+                  type="number"
+                  value={w.year ?? ''}
+                  aria-label="Year"
+                  class="input input-xs input-bordered w-16"
+                />
+              </td>
+              <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
+              <td class="px-3 py-2">
+                <input data-field="kind" type="hidden" value={w.kind ?? ''} />
+                <VocabActions entity="work" id={w.id} name={w.title} />
+              </td>
+            </tr>
+          ))
+        }
+      </VocabTable>
+    </FilterField>
   </div>
 
   <MergeDialog options={mergeOptions} />

@@ -37,7 +37,11 @@ interface Props {
 const { title, count, columns } = Astro.props;
 ---
 
-<section class="mb-12">
+{
+  /* `data-vocab` is the hook `<FilterField>` hides this whole section by when a
+  query matches nothing in it — heading, count and all (plan 42 · §4.B.2). */
+}
+<section class="mb-12" data-vocab>
   <h2 class="font-display mb-3 text-lg">
     {title}
     <span class="text-base-content/40 text-sm">({count})</span>
