@@ -142,6 +142,15 @@ async function closeReader(page: Page, how: 'button' | 'escape' | 'backdrop'): P
 
 for (const how of ['button', 'escape', 'backdrop'] as const) {
   test(`the reader slides out when closed by ${how}, without swapping the page`, async ({ page }) => {
+    // ⚠ Below 640px the reader is a FULL-SCREEN sheet (admin.css `.reader`),
+    // so there is no backdrop on screen to dismiss with — the affordance
+    // itself is desktop-only, not merely hard to reach (plan 43 §7). Button
+    // and Escape still run at every width; the phone's third way out is Back,
+    // which has its own spec below.
+    test.skip(
+      how === 'backdrop' && (page.viewportSize()?.width ?? 1280) < 640,
+      'no backdrop exists on a full-screen sheet',
+    );
     await page.goto('/blog');
     await openReader(page);
 

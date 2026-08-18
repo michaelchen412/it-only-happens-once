@@ -275,3 +275,22 @@ export async function stubActions(
   });
   return () => seen;
 }
+
+/**
+ * Reach a control that lives in the public site's chrome (plan 43 §7).
+ *
+ * Below SiteLayout's one collapse point (`md:`, 768px) the nav links and the
+ * theme toggle live inside `#site-menu`, which is `display: none` until the
+ * burger opens it. The chrome is ONE set of controls that reflows — no
+ * duplicated ids — which is why one helper covers every spec: on desktop the
+ * burger is hidden and this is a no-op. Call it before each interaction
+ * rather than once per test; the menu closes itself after every nav tap and
+ * every page swap, on purpose.
+ */
+export async function openSiteMenuIfCollapsed(page: Page): Promise<void> {
+  const burger = page.locator('#menu-toggle');
+  if (!(await burger.isVisible())) return;
+  if (await page.locator('#site-menu.is-open').count()) return;
+  await burger.click();
+  await expect(page.locator('#site-menu.is-open')).toBeVisible();
+}

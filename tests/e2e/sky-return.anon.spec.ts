@@ -26,7 +26,7 @@
 // assertion below reads the settled DOM through `toPass`, never the
 // pseudo-elements.
 import type { Page } from '@playwright/test';
-import { test, expect, hideDevToolbar } from './fixtures';
+import { test, expect, hideDevToolbar, openSiteMenuIfCollapsed } from './fixtures';
 
 // ⚠ RETRIES, AND EXACTLY WHY — because a retry with no reason attached is how a
 // real failure gets slept through.
@@ -197,7 +197,11 @@ const WAYS: { name: string; take: (page: Page) => Promise<void> }[] = [
   },
   {
     name: 'the Constellations nav item',
-    take: async (page) => void (await page.locator('#site-menu a[href="/"]').click()),
+    take: async (page) => {
+      // On a phone this item is inside the menu (plan 43 §7).
+      await openSiteMenuIfCollapsed(page);
+      await page.locator('#site-menu a[href="/"]').click();
+    },
   },
 ];
 
@@ -303,8 +307,10 @@ test.describe('the edges', () => {
     // Three navigations later, a page that silently scrolls itself reads as a
     // bug rather than as being remembered.
     const picked = await openFromMidSky(page);
+    await openSiteMenuIfCollapsed(page);
     await page.locator('#site-menu a[href="/blog"]').click();
     await page.waitForURL('/blog');
+    await openSiteMenuIfCollapsed(page);
     await page.locator('#site-menu a[href="/"]').click();
     await page.waitForURL('/');
 

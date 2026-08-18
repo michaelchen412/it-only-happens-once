@@ -72,6 +72,26 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /\.mobile\.spec\.ts$/,
     },
+    {
+      // The combination going public actually creates: a STRANGER on a phone
+      // (plan 43 §7). Until 2026-08-18 the two properties were only ever tested
+      // apart — `anon` proved the public surfaces at desktop width, `mobile`
+      // proved the ADMIN narrow, and `mobile`'s testMatch can never see an
+      // `*.anon.spec.ts` — so the audience the cutover invites had zero
+      // automated coverage. Same viewport and same honesty caveats as `mobile`
+      // above: chromium at 390px catches layout, overflow and touch wiring,
+      // not iOS; the phone walkthrough in 43a is still owed. No storageState,
+      // for `anon`'s own reason — this project is the public.
+      name: 'anon-mobile',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        isMobile: false,
+        hasTouch: true,
+      },
+      dependencies: ['setup'], // only for the fixture slugs, not for the session
+      testMatch: /\.anon\.spec\.ts$/,
+    },
   ],
   webServer: {
     command: 'npx astro dev',

@@ -9,7 +9,7 @@
 // Signed out on purpose: the public site is the half that was broken, and it is
 // also the half with the router, which is what made it stay broken. Read-only —
 // the theme lives in localStorage and nothing here touches the database.
-import { test, expect } from './fixtures';
+import { test, expect, openSiteMenuIfCollapsed } from './fixtures';
 
 const TOGGLE = '#theme-toggle';
 
@@ -28,11 +28,15 @@ test.describe('the toggle says which way it is pointing', () => {
     const btn = page.locator(TOGGLE);
 
     const before = await html.getAttribute('data-theme');
+    // On a phone the toggle lives inside the menu — reach it the way a thumb
+    // does (plan 43 §7). A no-op at desktop width.
+    await openSiteMenuIfCollapsed(page);
     await btn.click();
     const after = await html.getAttribute('data-theme');
     expect(after, 'the theme actually changed').not.toBe(before);
     await expect(btn).toHaveAttribute('aria-pressed', String(after === 'paper'));
 
+    await openSiteMenuIfCollapsed(page);
     await btn.click();
     await expect(html).toHaveAttribute('data-theme', before!);
     await expect(btn).toHaveAttribute('aria-pressed', String(before === 'paper'));
@@ -45,9 +49,11 @@ test.describe('the toggle says which way it is pointing', () => {
     // rendered — which is no aria-pressed at all. Only a re-sync on
     // `astro:page-load` puts it back.
     await page.goto('/');
+    await openSiteMenuIfCollapsed(page);
     await page.locator(TOGGLE).click();
     const chosen = await page.locator('html').getAttribute('data-theme');
 
+    await openSiteMenuIfCollapsed(page);
     await page.locator('#site-menu a[href="/blog"]').click();
     await page.waitForURL('/blog');
 
@@ -60,6 +66,7 @@ test.describe('the toggle says which way it is pointing', () => {
 
   test('the choice persists across a full reload', async ({ page }) => {
     await page.goto('/');
+    await openSiteMenuIfCollapsed(page);
     await page.locator(TOGGLE).click();
     const chosen = await page.locator('html').getAttribute('data-theme');
     await page.reload();
@@ -84,6 +91,7 @@ test.describe('dark is the default, whatever the machine says', () => {
     // The other direction of the same rule: the OS cannot force paper, but the
     // reader can, and a reload must not hand it back.
     await page.goto('/');
+    await openSiteMenuIfCollapsed(page);
     await page.locator(TOGGLE).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
     await page.reload();
