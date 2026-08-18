@@ -12,6 +12,7 @@ import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
 import { ProofreadMarks, proofreadHandle, type ProofreadHandle } from './proofread-marks';
 import { closeWithExit, openDialog } from './dialog-close';
+import { keepCaretClear } from './caret-reveal';
 
 export interface RichEditorHandle {
   editor: Editor;
@@ -190,6 +191,14 @@ export function mountRichEditor(opts: RichEditorOptions): RichEditorHandle {
   const getMarkdown = () =>
     (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
 
+  // ⚠ EVERY EDITOR IN THE BUILDING GETS THIS, not just the writing sheet, and
+  // that is why it is here rather than in the composer. A docked toolbar is a
+  // phone problem the capture box has in exactly the same shape (`.cap-tools`
+  // sits below `.cap-box` for the same reason `#ws-toolbar` does), and the rule
+  // it enforces — the caret keeps a line and a half of air — is not a phone
+  // rule at all. It is inert wherever there is no scrollport to be trapped in.
+  keepCaretClear(editor, opts.editorEl);
+
   // ---- toolbar ----
   // Reassigned below when a link dialog is supplied; a no-op otherwise.
   let openLinkDialog = () => {};
@@ -362,6 +371,11 @@ export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
   });
   const getMarkdown = () =>
     (editor.storage as unknown as { markdown: { getMarkdown: () => string } }).markdown.getMarkdown();
+
+  // Same reveal as the full editor — a quote's words are short, but a song
+  // sheet on a phone is a drawer with a sticky footer, which is the same trap
+  // with a different lid.
+  keepCaretClear(editor, opts.editorEl);
 
   const cmds: Record<string, () => void> = {
     bold: () => editor.chain().focus().toggleBold().run(),

@@ -23,6 +23,9 @@ const root = document.documentElement;
 const vv = window.visualViewport;
 
 let queued = 0;
+/** The last value written to `--kb`; -1 so the first measure always writes. */
+let last = -1;
+let settle = 0;
 
 function measure(): void {
   if (!vv) return;
@@ -35,7 +38,26 @@ function measure(): void {
   // Small differences are browser chrome sliding in and out — the URL bar on
   // scroll — not a keyboard. Reacting to those would resize every open sheet
   // on an ordinary flick. A keyboard is never this short.
-  root.style.setProperty('--kb', `${inset > 120 ? Math.round(inset) : 0}px`);
+  const px = inset > 120 ? Math.round(inset) : 0;
+  if (px === last) return;
+  last = px;
+  root.style.setProperty('--kb', `${px}px`);
+
+  // ⚠ `kb:settled` FIRES ONCE THE NUMBER STOPS MOVING, NOT EVERY TIME IT MOVES,
+  // and the debounce is the whole point of the event. Setting `--kb` resizes
+  // every open sheet, which moves the scrollport out from under whatever the
+  // caret was revealed against — so something has to look again afterwards
+  // (scripts/caret-reveal.ts). Doing that per frame would have a scroll
+  // correction chasing a keyboard mid-animation, each one computed against a
+  // geometry already stale; 150ms of quiet is past the end of that animation on
+  // every engine, and past Safari's habit of reporting the resize and the
+  // visual-viewport `scroll` as two separate events.
+  //
+  // It fires on the way DOWN as well, which is right: dismissing the keyboard
+  // grows the sheet, and a caret parked at the old floor is now needlessly high
+  // up the screen. Listeners are expected to no-op when nothing is focused.
+  clearTimeout(settle);
+  settle = window.setTimeout(() => document.dispatchEvent(new CustomEvent('kb:settled')), 150);
 }
 
 function schedule(): void {
