@@ -1455,8 +1455,23 @@ a.row__t:hover {
    takes the metrics he approved rather than the ones `.f` happened to carry.
    The daisyUI classes come OFF the migrated fields instead of being layered
    over this rule: two systems both styling one <input> is how you get a border
-   that answers to whichever stylesheet loaded last. */
-.f input,
+   that answers to whichever stylesheet loaded last.
+
+   ⚠ A TICK IS NOT A FIELD, AND THIS RULE USED TO DRESS IT AS ONE. `.f input`
+   is (0,1,1) and daisyUI's `.toggle` is (0,1,0) — which is every declaration
+   that gives a switch its shape — so the set sheet's Visibility switch took
+   `width: 100%`, the field border and the field padding and rendered as a
+   drawer-wide box. The orange edge in the report was this rule's own
+   `:focus` border, below, arriving on a control that had just lost daisyUI's
+   ring to the `outline: none` beside it: nothing put back, WCAG 2.4.7, and the
+   sixth of the five outline-droppers this file's comments count.
+   The exclusion sits in `:where()` so it adds NO specificity — every tie and
+   override under this rule (`[size]`, `.f--narrow`, `.f--n`, the coarse-pointer
+   floor) still resolves exactly as it did. Written as a type exclusion rather
+   than fixed at the one call site because the next checkbox dropped in a `.f`
+   would have found the same trap; the composer's switch only escaped it by
+   sitting in a bare <div>. */
+.f input:where(:not([type='checkbox'], [type='radio'])),
 .f select,
 .f textarea {
   width: 100%;
@@ -1473,7 +1488,7 @@ a.row__t:hover {
   line-height: 1.55;
   resize: vertical;
 }
-.f input:focus,
+.f input:where(:not([type='checkbox'], [type='radio'])):focus,
 .f select:focus,
 .f textarea:focus {
   outline: none;
