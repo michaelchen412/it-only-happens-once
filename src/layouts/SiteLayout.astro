@@ -92,18 +92,6 @@ const nav = [
         screenshot thumbnail where every other site puts a face. */
     }
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    {
-      /* Vercel Web Analytics (plan 43 §6, ruled 2026-08-18): cookieless, so no
-        consent chrome; pageviews only. The component, NOT the adapter's
-        `webAnalytics` flag — that flag is the documented legacy path for
-        @vercel/analytics ≤1.3, and this is 2.x. ⚠ HERE, NOT IN Base, on
-        purpose: Base is also the Observatory's document, and the workshop's
-        one inhabitant would count himself into the public numbers on every
-        edit. The public chrome is the audience being measured. Inert until
-        Web Analytics is enabled on the Vercel project (43a's checklist) — the
-        script 404s quietly until then. */
-    }
-    <Analytics />
   </Fragment>
   <div class="flex min-h-screen flex-col">
     {
@@ -369,6 +357,39 @@ const nav = [
   <Colophon />
 
   {backToTop && <BackToTop />}
+
+  {
+    /* Vercel Web Analytics (plan 43 §6, ruled 2026-08-18): cookieless, so no
+      consent chrome; pageviews only. The component, NOT the adapter's
+      `webAnalytics` flag — that flag is the documented legacy path for
+      @vercel/analytics ≤1.3, and this is 2.x. ⚠ NOT IN Base, on purpose: Base
+      is also the Observatory's document, and the workshop's one inhabitant
+      would count himself into the public numbers on every edit. The public
+      chrome is the audience being measured. Inert until Web Analytics is
+      enabled on the Vercel project (43a's checklist) — the script 404s quietly
+      until then.
+
+      ⚠ IN THE BODY, AND VERCEL'S OWN DOCS SAY <head>. THEY ARE WRONG, and it
+      cost this site every page transition for a day. The component renders a
+      `<vercel-analytics>` CUSTOM ELEMENT, which is not one of the handful of
+      tags the HTML parser accepts in a head — so the parser closed the head at
+      it and reparented everything after it into the body. Everything after it
+      is all of the CSS: Astro appends the page's stylesheet <link> and its 22
+      scoped <style> blocks LAST in head, which is after this slot. The site
+      then rendered from a stylesheet living in the body, and `<ClientRouter />`
+      replaces the body wholesale on every navigation — so each swap destroyed
+      the stylesheet and re-created it, and the page painted at least one frame
+      with NO CSS AT ALL: white ground, blue underlined links, and the StarMark
+      blown up to the width of the viewport, which is what made it look like the
+      favicon was flashing across the page. ClientRouter's own protection only
+      covers `document.head` (it re-uses a matching <link> there instead of
+      re-creating it), and the stylesheet was never in the head to be protected.
+      The element belongs in the body regardless of this bug — it is a custom
+      element, it reads its own `data-*` in its constructor, and it works from
+      anywhere in the document. Keep it INSIDE the swapped body: a fresh element
+      per navigation is what makes each one count as a pageview. */
+  }
+  <Analytics />
 
   <script>
     // The theme toggle used to be implemented here too, and this copy was the

@@ -15,10 +15,12 @@ export const STAR_PATH = 'M12 1.4 Q12.9 9.8 22.6 12.3 Q13.1 13.9 12 22.6 Q10.9 1
 
 export const STAR_VIEWBOX = '0 0 24 24';
 
-/** The mark as a string, for markup assembled at runtime. */
+/** The mark as a string, for markup assembled at runtime. Carries the same
+ *  `width`/`height` attributes as the component, for the same reason — see
+ *  `StarMark.astro`. */
 export function starMarkHtml(className = ''): string {
   return (
-    `<svg viewBox="${STAR_VIEWBOX}" class="star-mark${className ? ` ${className}` : ''}" ` +
+    `<svg viewBox="${STAR_VIEWBOX}" width="1em" height="1em" class="star-mark${className ? ` ${className}` : ''}" ` +
     `aria-hidden="true" fill="none"><path d="${STAR_PATH}" fill="currentColor"/></svg>`
   );
 }

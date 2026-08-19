@@ -10,6 +10,18 @@
 
   Decorative by default — pass `label` only when it is the sole content of a
   control that has no other accessible name.
+
+  ⚠ IT CARRIES `width`/`height` ATTRIBUTES AS WELL AS THE CSS, which looks like
+  a duplicate of `.star-mark` and is not. An <svg> with a viewBox and no
+  dimensions has no intrinsic size, so in any frame where the stylesheet is not
+  applied it fills its container — and this mark is the site's face, so that
+  reads as the favicon flashing across the whole page. It happened for real
+  (see the Analytics note in SiteLayout, which put every stylesheet in the body
+  and cost a styleless frame per navigation). These are presentation
+  attributes, the weakest thing in the cascade, so `.star-mark` and every
+  override of it — `.sky-star`'s .48em, the bloom's satellites — still decide
+  the size exactly as before. This only decides what happens when nothing else
+  can.
 */
 import { STAR_PATH, STAR_VIEWBOX } from '../lib/star-mark';
 
@@ -22,6 +34,8 @@ const { class: className = '', label } = Astro.props;
 
 <svg
   viewBox={STAR_VIEWBOX}
+  width="1em"
+  height="1em"
   class:list={['star-mark', className]}
   role={label ? 'img' : undefined}
   aria-label={label}
