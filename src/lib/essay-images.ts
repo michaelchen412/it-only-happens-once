@@ -59,7 +59,10 @@ export async function enhanceEssayImages(html: string): Promise<string> {
       tag,
       widths.length === 0
         ? Promise.resolve(null)
-        : getImage({ src, width: dims!.width, height: dims!.height, widths })
+        : // quality 75, matching the About portrait's setting — without it the
+          // default came out q=100, and a 640w candidate weighed 208KB, which
+          // defeats the reason the srcset exists (measured 2026-08-18).
+          getImage({ src, width: dims!.width, height: dims!.height, widths, quality: 75 })
             .then((image) =>
               image.srcSet.values.length < 2
                 ? null
