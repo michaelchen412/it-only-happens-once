@@ -261,15 +261,54 @@ test.describe('the pile', () => {
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
 
     const text = card.locator('[data-text]');
-    // ⚠ THE RECT OF THE RENDERED LINE, not of `[data-text]` itself. That element
-    // carries `0.875rem 1rem` of padding, so a drag along the top of its box
-    // runs through empty space and selects nothing — which is exactly what the
-    // canary below caught on the first run of this test.
-    const line = (await text.locator('p, li').first().boundingBox()) ?? (await text.boundingBox())!;
-    const y = line.y + line.height / 2;
-    await page.mouse.move(line.x + 2, y);
+    await text.scrollIntoViewIfNeeded();
+
+    // ⚠ A RENDERED LINE BOX, FROM `Range.getClientRects()` — NOT ANY ELEMENT'S
+    // `boundingBox()`, AND THIS IS THE SECOND TIME THAT DISTINCTION HAS BITTEN.
+    //
+    // The first time, the drag ran along the top of `[data-text]`, through its
+    // `0.875rem 1rem` of padding, and selected nothing. The fix was to take the
+    // inner `p`'s box instead — which is better, and is still an ELEMENT box,
+    // and so still fails the moment the jot wraps:
+    //
+    //   line rects: [{y:107, h:16, w:646}, {y:132.6, h:16, w:90}]
+    //   the p's own box: {y:103, h:51.2}  →  y + height/2 = 128.6
+    //
+    // 128.6 is between 123 and 132.6 — the LEADING between the two lines, where
+    // there are no glyphs at all, so mousedown and mouseup resolved to the same
+    // caret position and the selection came back empty. Measured on the real
+    // pile, 2026-08-19; a Y sweep across the same paragraph selects 59
+    // characters at every offset from +4 to +24, zero at +25.6, and 12 from +28
+    // on (the short second line).
+    //
+    // ⚠ AND IT WAS THEREFORE DECIDED BY WHATEVER MICHAEL LAST JOTTED. This test
+    // reads `.dump` FIRST, which is live production data. A one-line note put
+    // `height/2` inside the text and it passed; a note that wrapped to exactly
+    // two lines put it in the gap and it failed. That is the actual defect —
+    // not the coordinates, but that the geometry was ever inferred from a box
+    // whose height depends on the content.
+    //
+    // A Range's client rects ARE the browser's own line boxes, one per rendered
+    // line, so the first entry is the first line however the note wraps. The
+    // width filter drops the zero-width rects an empty inline can contribute.
+    const line = await text.evaluate((el) => {
+      const node = el.querySelector('p, li') ?? el;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const first = [...range.getClientRects()].find((r) => r.width > 20 && r.height > 0);
+      return first ? { x: first.x, y: first.y, width: first.width, height: first.height } : null;
+    });
+    expect(line, 'the first card rendered no line box to drag along').not.toBeNull();
+
+    // ⚠ 60% OF THE LINE, NOT OF THE ELEMENT. The two are the same number only
+    // for a jot that does not wrap; on the note above, line two is 90px inside
+    // a 686px element, so an element-derived end point would land 500px past
+    // the last glyph — which selects to the end of the line and happens to
+    // work, right up until it doesn't.
+    const y = line!.y + line!.height / 2;
+    await page.mouse.move(line!.x + 2, y);
     await page.mouse.down();
-    await page.mouse.move(line.x + Math.max(40, line.width * 0.6), y, { steps: 12 });
+    await page.mouse.move(line!.x + Math.max(40, line!.width * 0.6), y, { steps: 12 });
     await page.mouse.up();
 
     // ⚠ A CANARY, NOT A FORMALITY. Without it a drag that selected nothing —
