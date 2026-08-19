@@ -95,6 +95,20 @@ const nav = [
   </Fragment>
   <div class="flex min-h-screen flex-col">
     {
+      /* ⚠ THE ONLY THING THAT ANSWERS A NAV CLICK ON THIS SITE — see
+        `scripts/route-progress.ts` for the whole argument, and `admin.css` for
+        the bar's own shape, which the Observatory drew first and this reuses
+        unchanged. Short version: `<ClientRouter />` turns a navigation into a
+        `fetch()` and a swap, so the browser shows NO loading state of any kind
+        — not even the weak tab spinner the workshop still gets. Between the
+        press and the new page painting, nothing on screen moved.
+
+        Rendered here always and merely flat, never created on demand: an
+        element that has to be inserted cannot paint on the frame the click
+        happened, which is the one frame it exists for. */
+    }
+    <div id="nav-progress" aria-hidden="true"></div>
+    {
       /* Top bar — the site's primary navigation.
 
         ⚠ NO HAIRLINE, NO BLUR, AND THE GROUND IS SOLID. Dropping the border is
@@ -172,15 +186,36 @@ const nav = [
             One register with the wordmark, at all widths including the mobile
             dropdown: a panel that switched back to sans would be exactly the
             unexplained fork §7 warns about. Only `leading-none` is held back to
-            `md:`, so the dropdown's rows keep their tappable height. */
+            `md:`, so the dropdown's rows keep their tappable height.
+
+            ⚠ `py-2.5` AND NOT `py-1.5` (2026-08-19). 16px type at normal
+            leading is ~24px, so the old padding built a **36px** row — under
+            every touch-target floor there is (WCAG 2.5.8 wants 24, Apple and
+            Material both want 44), in the one place on this site that is only
+            ever pressed with a thumb. 2.5 lands it at 44. It costs nothing
+            above `md:`, where `md:p-0` takes it all back and the links are an
+            inline row rather than a menu.
+
+            ⚠ `data-nav-row` IS READ BY CSS, NOT BY THE SCRIPT — it marks the
+            three links whose ink may run ahead of the page. `data-astro-prefetch`
+            is `tap` rather than `viewport`, and the distinction is the same one
+            the Sky's rows argue in the other direction: eleven links that ARE
+            the page can afford to be fetched on sight, but these three sit on
+            every page including the feed, so `viewport` would pull ~90 KB of
+            documents a reader did not ask for on every single arrival. `tap`
+            fires on pointerdown — the fetch starts a beat before the click
+            resolves, costs nothing to anyone who does not press, and is the
+            only strategy `hover` does not already cover on a phone. */
         }
         {
           nav.map((item) => (
             <a
               href={item.href}
               aria-current={active === item.key ? 'page' : undefined}
+              data-nav-row
+              data-astro-prefetch="tap"
               class:list={[
-                'rounded-field w-full px-2 py-1.5 font-serif text-base tracking-[0.09em] transition-colors [font-variant:all-small-caps] md:w-auto md:rounded-none md:p-0 md:leading-none',
+                'rounded-field w-full px-2 py-2.5 font-serif text-base tracking-[0.09em] transition-colors [font-variant:all-small-caps] md:w-auto md:rounded-none md:p-0 md:leading-none',
                 active === item.key
                   ? 'text-base-content'
                   : 'text-base-content/60 hover:bg-base-200 hover:text-base-content md:hover:bg-transparent',
@@ -201,10 +236,28 @@ const nav = [
             the line now goes destinations → who made this → how you'd like to
             read it, which is descending order of what it says about the site.
             The footer's group was reordered to match on the same principle:
-            "Say hello" (a sentence) then ⌗ then ⌁, credential before utility. */
+            "Say hello" (a sentence) then ⌗ then ⌁, credential before utility.
+
+            ⚠ ON A PHONE THEY STACK AND THEY SPEAK (2026-08-19). Michael: *"I
+            want some kind of label for the github icon and theme toggle in the
+            mobile hamburger menu."* Two unlabelled marks in a row at the foot
+            of a menu whose every other item is a WORD is the one place on this
+            site where a reader is asked to decode rather than read — and the
+            row was 28px tall, which is the other half of the same complaint.
+            Below `md:` each becomes a full-width labelled row like the three
+            above it; at `md:` and up `md:flex-row` and `md:p-1.5` restore
+            exactly the inline pair of marks that shipped before, because up
+            there they sit beside a wordmark in a 13-tall bar and a word each
+            would crowd it.
+
+            ⚠ THE ORDER IS NOW LOAD-BEARING TWICE. Reading inward it was
+            already destinations → who made this → how you'd like to read it;
+            stacked, ⌗ ABOVE the toggle is that same sequence turned ninety
+            degrees, which is what Michael asked for by name. Do not let a
+            future `flex-col-reverse` "fix" the visual weight. */
         }
         <div
-          class="border-base-300 mt-1 flex w-full items-center gap-1 border-t px-1 pt-2 md:mt-0 md:w-auto md:border-0 md:p-0"
+          class="border-base-300 mt-1 flex w-full flex-col items-stretch gap-0.5 border-t px-1 pt-2 md:mt-0 md:w-auto md:flex-row md:items-center md:gap-1 md:border-0 md:p-0"
         >
           {
             /* A trigger only; the drawer it opens is mounted once at layout
@@ -212,24 +265,62 @@ const nav = [
               even though the footer now carries the same mark, because the two
               are not the same claim: this one is a CREDENTIAL, seen rather than
               read, saying at a glance and before anything is opened that a
-              person built this. */
+              person built this.
+
+              ⚠ "SOURCE", AND THE LOUDER CANDIDATES LOST ON REGISTER. The label
+              has to imply the site was built rather than assembled, and the
+              direct spellings of that — "Built from scratch", "Built by hand" —
+              are the site boasting in its own chrome, which is the one voice
+              this bar does not have. "Source" says only where to look; the
+              drawer it opens is where the claim actually lives, in a sentence
+              written for it ("This site is an independent project built with…").
+              "Colophon" was the near-miss and is the truer word for the drawer —
+              it lost because a menu row is not the place to teach one.
+
+              ⚠ THE `aria-label` NOW OPENS WITH THE VISIBLE WORD, and the note
+              in the footer forty lines down is why: WCAG 2.5.3 (Label in Name)
+              is broken the moment a control SHOWS one thing and is NAMED
+              another, and someone driving the page by voice says "click
+              Source". That note used to end *"the bar's copy keeps the bare
+              sentence and is correct as it stands — two instances, two right
+              answers, do not unify them"*, on the reasoning that the bar
+              rendered a mark with no visible text to disagree with. It renders
+              a word now, below `md:`, so the exemption expired with it. Above
+              `md:` the label is `display: none` and contributes nothing to the
+              accessible name, which is exactly why the sentence stays attached
+              rather than being replaced by the word. */
           }
           <button
             type="button"
             popovertarget="site-colophon"
-            aria-label="How this site was built"
-            class="rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content inline-flex p-1.5 transition-colors"
+            aria-label="Source — how this site was built"
+            class="site-util rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content inline-flex items-center gap-2.5 px-2 py-2.5 transition-colors md:justify-center md:gap-0 md:p-1.5"
           >
-            <Icon name="simple-icons:github" class="size-4" />
+            <Icon name="simple-icons:github" class="size-4 shrink-0" />
+            <span class="font-serif text-base tracking-[0.09em] [font-variant:all-small-caps] md:hidden">Source</span>
           </button>
+          {
+            /* ⚠ THE LABEL IS THE NOUN AND NOT THE VERB, and that is the one
+              decision in this control. "Light theme" / "Dark theme" — the state
+              you would switch TO, matching what the icon already shows — reads
+              better and cannot be rendered honestly: the theme is chosen by an
+              inline script in <head> from `localStorage`, so the SERVER does
+              not know which word is true and would ship the wrong one to every
+              reader who has ever pressed this. A CSS swap keyed on
+              `[data-theme]` would fix the flash and break WCAG 2.5.3 instead —
+              "Light theme" is not a substring of any accessible name that is
+              also correct in the other state. So the word is stable, the icon
+              carries the direction, and `aria-pressed` carries the state. */
+          }
           <button
             id="theme-toggle"
-            class="theme-toggle rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content p-1.5"
+            class="site-util theme-toggle rounded-field text-base-content/55 hover:bg-base-200 hover:text-base-content inline-flex items-center gap-2.5 px-2 py-2.5 transition-colors md:justify-center md:gap-0 md:p-1.5"
             aria-label="Toggle light and dark theme"
             title="Toggle theme"
           >
-            <Icon name="ph:sun" class="theme-icon-sun text-base" />
-            <Icon name="ph:moon" class="theme-icon-moon text-base" />
+            <Icon name="ph:sun" class="theme-icon-sun shrink-0 text-base" />
+            <Icon name="ph:moon" class="theme-icon-moon shrink-0 text-base" />
+            <span class="font-serif text-base tracking-[0.09em] [font-variant:all-small-caps] md:hidden">Theme</span>
           </button>
         </div>
       </nav>
@@ -298,8 +389,18 @@ const nav = [
       <div class="site-foot__inner">
         <nav class="site-foot__group" aria-label="Site">
           {
+            /* Same two attributes as the bar's copies, and for the same two
+              reasons — these are chrome links to the same three rooms, so a
+              press here may move the mark here, and `tap` gives the fetch its
+              head start. A reader who has scrolled to the footer of a
+              constellation is one press from the site's heaviest document. */
             nav.map((item) => (
-              <a href={item.href} aria-current={active === item.key ? 'page' : undefined}>
+              <a
+                href={item.href}
+                aria-current={active === item.key ? 'page' : undefined}
+                data-nav-row
+                data-astro-prefetch="tap"
+              >
                 {item.label}
               </a>
             ))
@@ -323,11 +424,16 @@ const nav = [
               page by voice says "click GitHub", because that is what the page
               says, and nothing happens. Flagged by Lighthouse 2026-08-11.
 
-              ⚠ THE BAR'S COPY OF THIS BUTTON KEEPS THE BARE SENTENCE (see the
-              CREDENTIAL note above) AND IS CORRECT AS IT STANDS. It renders the
-              mark alone, so there is no visible text for a name to disagree
-              with, and the sentence is the only thing telling anyone what the ⌗
-              does. Two instances, two right answers — do not unify them. */
+              ⚠ THE BAR'S COPY NOW CARRIES A VISIBLE WORD TOO (2026-08-19) — but
+              a DIFFERENT one, and that is deliberate rather than drift. It says
+              "Source"; this says "GitHub". Up there the ⌗ is a credential and
+              the row it sits in is a menu of destinations, so the word names
+              where you are being sent. Down here it stands between "Say hello"
+              and "RSS", and those are proper nouns for services: "Source" in
+              that line is the one word of the three that is not the name of a
+              thing, and it reads as a heading rather than an address. Same
+              drawer, two rooms, two registers — which is the same argument the
+              paragraph above already makes about the accessible names. */
           }
           <button type="button" popovertarget="site-colophon" aria-label="GitHub — how this site was built">
             <Icon name="simple-icons:github" class="site-foot__icon" />
@@ -392,6 +498,10 @@ const nav = [
   <Analytics />
 
   <script>
+    // The one thing that answers a nav click here — see the file, and the
+    // `#nav-progress` note at the top of this layout.
+    import '../scripts/route-progress';
+
     // The theme toggle used to be implemented here too, and this copy was the
     // wrong one: it set `aria-pressed` only inside its own click handler, so the
     // attribute was absent until you pressed the button and absent again after
@@ -400,9 +510,21 @@ const nav = [
     // picker. Nothing about the markup changed.
 
     // ---- Mobile menu (delegated) ----
-    const closeMenu = () => {
-      document.getElementById('site-menu')?.classList.remove('is-open');
-      document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'false');
+    //
+    // ⚠ `closeMenu` TAKES AN ARGUMENT NOW, AND IT IS AN ACCESSIBILITY FIX RATHER
+    // THAN A TIDY-UP. Escape used to close the panel and leave focus on whatever
+    // was inside it — an element that is now in a `display: none` subtree, so
+    // the browser drops focus to <body> and a keyboard reader is returned to the
+    // top of the document instead of to the control they opened. Only the
+    // dismissals that were not a navigation restore it: sending focus back to
+    // the burger after tapping "Blog" would fight the page that is arriving.
+    const closeMenu = (restoreFocus = false) => {
+      const menu = document.getElementById('site-menu');
+      const toggle = document.getElementById('menu-toggle');
+      const wasOpen = menu?.classList.contains('is-open') ?? false;
+      menu?.classList.remove('is-open');
+      toggle?.setAttribute('aria-expanded', 'false');
+      if (restoreFocus && wasOpen && menu?.contains(document.activeElement)) toggle?.focus();
     };
     document.addEventListener('click', (e) => {
       const target = e.target as Element;
@@ -413,12 +535,19 @@ const nav = [
         document.getElementById('menu-toggle')?.setAttribute('aria-expanded', String(open));
         return;
       }
-      if (target?.closest?.('#site-menu a')) return closeMenu(); // nav link tapped
+      // ⚠ `a, button` AND NOT `a` — the panel holds two <button>s now that the
+      // colophon trigger and the theme toggle wear labels in it. The ⌗ was
+      // always one and always misbehaved here: pressing it opened the drawer
+      // BEHIND a menu that stayed open on top of it. The toggle is the one
+      // control that must NOT close the panel — flipping the theme is something
+      // you may want to do twice, and the panel is where you can see it happen.
+      if (target?.closest?.('#theme-toggle')) return;
+      if (target?.closest?.('#site-menu a, #site-menu button')) return closeMenu();
       if (menu.classList.contains('is-open') && !menu.contains(target)) closeMenu(); // outside click
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeMenu();
+      if (e.key === 'Escape') closeMenu(true);
     });
-    document.addEventListener('astro:page-load', closeMenu); // each page starts closed
+    document.addEventListener('astro:page-load', () => closeMenu()); // each page starts closed
   </script>
 </Base>

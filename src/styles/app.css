@@ -475,9 +475,155 @@
 }
 
 /* Mobile nav dropdown — revealed when the hamburger toggles it open (§8 chrome).
-   Base is `hidden sm:flex`; this compound selector out-specifies `hidden`. */
-.site-menu.is-open {
-  display: flex;
+   Base is `hidden md:flex`; this compound selector out-specifies `hidden`.
+
+   ⚠ IT USED TO APPEAR AND VANISH IN ONE FRAME, which is the complaint (Michael,
+   2026-08-19: *"not sure if this popover can open and close more gracefully —
+   currently just instantaneously opens or closes"*). A panel that materialises
+   with no transit reads as a repaint rather than as something arriving, and it
+   is the site's only piece of chrome that moved that way: every sheet in the
+   building already animates, and the argument for how is written next door in
+   `admin.css`.
+
+   ⚠ THE WHOLE MECHANISM IS THE `display` TRANSITION, and without
+   `allow-discrete` the other two properties do nothing at all — an element
+   going from `display: none` has no before-change style to interpolate from,
+   so opacity would jump 0→1 in the same frame the box appears. `@starting-style`
+   is the other half: it supplies the from-state for the ENTER only. The exit
+   needs neither, because the element is already displayed when `.is-open` goes.
+   Same shape as the dialogs, one step simpler — no top layer, so no `overlay`.
+
+   ⚠ SCOPED BELOW `md:`, AND THAT IS NOT TIDINESS. Above it the base rule's
+   `md:flex` shows this permanently as an inline row in the bar. Left global,
+   `opacity: 0` on the base `.site-menu` would hide the DESKTOP nav outright
+   until something added `.is-open` — which nothing does above `md:`, because
+   there is no burger to press.
+
+   Under `prefers-reduced-motion` the global rule collapses every duration to
+   0.01ms, so this correctly degrades to the instant open it replaced. */
+@media (width < 48rem) {
+  .site-menu {
+    opacity: 0;
+    translate: 0 -0.35rem;
+    transition:
+      opacity 0.16s ease,
+      translate 0.16s ease,
+      display 0.16s allow-discrete;
+  }
+  .site-menu.is-open {
+    display: flex;
+    opacity: 1;
+    translate: 0 0;
+  }
+  @starting-style {
+    .site-menu.is-open {
+      opacity: 0;
+      translate: 0 -0.35rem;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   A TRIGGER HOLDS ITS STATE WHILE THE THING IT OPENED IS OPEN.
+
+   Michael, 2026-08-19: *"I want that icon to be highlighted somehow while the
+   popover is shown … not sure if in general whenever popovers are shown the
+   popover trigger, whether text or icon, can be highlighted?"* Yes, and it
+   wants no JavaScript in either case — both states are already in the DOM, they
+   were simply never drawn.
+
+   · The burger already carries `aria-expanded`, maintained by the layout's own
+     handler. Styling the attribute rather than a second class means the visual
+     state cannot disagree with the one assistive tech is told.
+   · The ⌗ has no attribute of its own — `popovertarget` does not get one, and
+     the browser's implicit expanded state is exposed to the a11y tree without
+     ever reaching CSS. `:has()` reads it off the POPOVER instead, which is the
+     element that actually knows: `#site-colophon:popover-open`.
+
+   ⚠ THE SELECTOR NAMES THE ID TWICE AND CANNOT BE GENERALISED, which is worth
+   stating so nobody spends an afternoon trying. CSS has no way to correlate an
+   arbitrary `[popovertarget=X]` with `#X:popover-open` — there is no
+   parameterised match — so a general rule would need one `:has()` per popover.
+   The public site has exactly one, and it is written here. A second one is two
+   more lines directly below this, not a refactor.
+
+   ⚠ AND THE TWO TRIGGERS ARE STYLED DIFFERENTLY ON PURPOSE. The bar's ⌗ is a
+   control in a menu and takes the same ground its hover does — the row looks
+   held down. The footer's is a word in a running line between "Say hello" and
+   "RSS"; a filled rectangle around one of three would read as a button that the
+   other two are not, so it brightens to full ink and nothing else. Same state,
+   said in each place's own language.
+   ------------------------------------------------------------------------ */
+#menu-toggle[aria-expanded='true'],
+:root:has(#site-colophon:popover-open) .site-util[popovertarget='site-colophon'] {
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+:root:has(#site-colophon:popover-open) .site-foot__group button[popovertarget='site-colophon'] {
+  color: var(--color-base-content);
+}
+
+/* ---------------------------------------------------------------------------
+   THE COLOPHON ARRIVES INSTEAD OF APPEARING — the same three-property shape as
+   the menu above, applied to a native [popover]. `overlay` joins the list here
+   and does not there: this element IS promoted to the top layer, and without
+   the promotion being deferred too the browser yanks it out on the first frame
+   of the exit and the fade plays somewhere the reader cannot see.
+
+   ⚠ `overlay` IS CHROMIUM-ONLY, and `admin.css` documents at length what that
+   costs the dialogs — a sheet that vanishes in one frame on WebKit. It costs
+   this almost nothing by comparison: Safari and Firefox simply drop the popover
+   at once on close and still animate the OPEN, because the enter is driven by
+   `@starting-style`, which is baseline everywhere. A slightly abrupt dismissal
+   on two engines is not worth the `[data-closing]` machinery the dialogs need,
+   since nothing here is mid-gesture when it goes.
+   ------------------------------------------------------------------------ */
+[popover].colophon-popover {
+  opacity: 0;
+  translate: 0 -0.35rem;
+  transition:
+    opacity 0.16s ease,
+    translate 0.16s ease,
+    overlay 0.16s ease allow-discrete,
+    display 0.16s ease allow-discrete;
+}
+[popover].colophon-popover:popover-open {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  [popover].colophon-popover:popover-open {
+    opacity: 0;
+    translate: 0 -0.35rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   THE CHROME LINK ANSWERS BEFORE THE PAGE DOES (scripts/route-progress.ts).
+
+   The Observatory's twin of this rule lives in `admin.css` and carries the full
+   argument; the two differences here are worth the lines:
+
+   ⚠ IT IS NOT SCOPED TO ONE CONTAINER. The sidebar's version says `#sidebar nav
+   a[…]` because there is one nav. These three links exist TWICE on every public
+   page — the bar and the footer — and either copy may be the one pressed, so
+   the rule keys on the attribute and lets `data-nav-row` decide who may wear it.
+
+   ⚠ AND IT SETS ONLY INK, because that is all "you are here" is on this site:
+   ADR 0030 took the active marker down to 80%-vs-60% ink precisely so the page's
+   own switch could be the only masthead. A pending row that grew a background
+   would be a louder statement of "where you are" than arriving there produces.
+
+   The handover is a crossfade rather than a snap — `transition-colors` is
+   already on the bar's links and `transition: color 150ms` on the footer's, so
+   this inherits it. `getComputedStyle` in the same tick therefore reads the
+   crossfade's start value; the Observatory's spec learned that the hard way and
+   says so at its assertion. */
+[data-nav-row][data-nav-pending] {
+  color: var(--color-base-content);
+}
+:is(.site-menu, .site-foot__group):has([data-nav-pending]) [aria-current='page']:not([data-nav-pending]) {
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
 
 /* ---------------------------------------------------------------------------
