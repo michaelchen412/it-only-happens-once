@@ -15,7 +15,10 @@
 #   2. A scheduled `npm audit`. Plan 31 §1 found seven advisories, none of them
 #      reachable, and five were `astro-icon`'s transitive tail — which is not
 #      maintained on this repo's schedule and will regrow. A schedule is how you
-#      find that out without remembering to look.
+#      find that out without remembering to look. It regrew on 2026-08-19, which
+#      is also when this stopped running on every commit — see the `audit` job,
+#      whose triggers are the calendar, a pull request, and the pushes that move
+#      `package-lock.json`.
 #
 # ⚠ THE E2E SUITE IS DELIBERATELY NOT HERE. It needs SUPABASE_SERVICE_ROLE_KEY
 # to mint an admin session, and putting that key in GitHub Actions secrets would
@@ -118,14 +121,79 @@ jobs:
       - run: npm run build
 
   audit:
+    # ── NOT ON EVERY PUSH, SINCE 2026-08-19 ──────────────────────────────────
+    #
+    # `npm audit` measures a property of the dependency TREE, not of the commit.
+    # It reads `package-lock.json`; between lockfile changes the answer cannot
+    # move. So a plain `push` trigger does not report many things — it reports
+    # ONE standing fact, once per commit. In the nine days after this file
+    # landed there were 157 pushes to `main` and 9 of them touched the lockfile;
+    # the other 148 audited a tree that had not moved. That is how a single
+    # advisory in `astro-icon`'s transitive tail — the exact regrowth the header
+    # above predicted — became a stream of identical failure mails.
+    #
+    # ⚠ `pull_request` + `schedule` IS NOT A SUFFICIENT REPLACEMENT, and the
+    # history says so rather than a guess. All 9 of those dependency changes
+    # arrived as DIRECT PUSHES to `main`, because CLAUDE.md mandates exactly
+    # that, and Dependabot has opened nothing here yet. Dropping `push` would
+    # have deferred every dependency change actually made on this repo to the
+    # following Monday. It stays — narrowed to the pushes that can move it.
+    #
+    # The narrowing is a job-level check rather than a workflow-level `paths:`
+    # filter because that filter would take `verify` down with it, and `verify`
+    # genuinely is per-commit.
+    #
+    # ⚠ THE SCHEDULE IS NOT MADE REDUNDANT BY ANY OF THIS. It catches the case
+    # where the advisory is new and the tree is old — precisely what happened on
+    # 2026-08-19, when the lockfile had not moved in a week.
+    #
+    # Two cheaper knobs were rejected, both because a check that lies is worse
+    # than a check that is loud: `continue-on-error: true` puts a ✓ on a run
+    # that found something, and §9a says half of this Action's purpose is the
+    # mark it leaves on the commit; `--audit-level=critical` would have
+    # swallowed the `high` that started all this.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # ⚠ FULL HISTORY, because the check below diffs the push's whole
+          # commit RANGE, not just its tip. A push of several commits where only
+          # an earlier one touched the lockfile is exactly the case a
+          # `HEAD^..HEAD` shortcut misses, and it misses it silently.
+          fetch-depth: 0
+      - name: Did the dependency tree move?
+        id: tree
+        # ⚠ Through `env:`, not interpolated into the script. These particular
+        # values are GitHub-controlled SHAs and could not carry a payload, but
+        # the habit is what keeps the one that could out of a `run:` block.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != 'push' ]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # `github.event.before` is the all-zero SHA on a branch's first push
+          # and can name a discarded commit after a force-push. In both cases
+          # the range is unusable and the tip comparison is the honest fallback.
+          base="$BEFORE"
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then base='HEAD^'; fi
+          if git diff --name-only "$base" "$SHA" | grep -qx 'package-lock.json'; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+            echo 'Lockfile unchanged — audit skipped. Monday sweeps the tree regardless.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.tree.outputs.run == 'true'
         with:
           node-version: '22.12.0'
           cache: npm
       - run: npm ci
+        if: steps.tree.outputs.run == 'true'
       # ⚠ `--omit=dev`, because that is the command a reviewer runs, and the
       # number it prints is the one that shapes their first impression. It is
       # not the number that measures risk: plan 31 §1 established that
@@ -134,3 +202,4 @@ jobs:
       # can ship while being absent from that folder's node_modules. A red run
       # here is a prompt to redo that reachability work, not proof of exposure.
       - run: npm audit --omit=dev
+        if: steps.tree.outputs.run == 'true'

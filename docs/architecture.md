@@ -227,14 +227,27 @@ Action is additive, and it exists for the two things the gate leaves open:
 - **A ✓ or ✗ on the commit.** The gate stops a bad deploy but leaves no mark in
   the history. Anyone reading this repository — including its author, six months
   from now — otherwise has no signal either way.
-- **A scheduled `npm audit --omit=dev`**, Mondays. This is the half that earns
-  its keep independently: on 2026-08-10 the tree carried seven advisories, five
-  of them `astro-icon`'s transitive tail, which is not maintained on this repo's
-  schedule and will regrow. A schedule is how that surfaces without remembering
-  to look. ⚠ A red audit is a prompt to redo the **reachability** work, not
-  proof of exposure — five of those seven never entered the deployed function,
-  and two shipped *bundled*, absent from the function's `node_modules` entirely.
-  Grep the server chunk, not the folder.
+- **`npm audit --omit=dev` on the calendar and on lockfile changes** — Mondays,
+  any pull request, and any push that moves `package-lock.json`. This is the
+  half that earns its keep independently: on 2026-08-10 the tree carried seven
+  advisories, five of them `astro-icon`'s transitive tail, which is not
+  maintained on this repo's schedule and will regrow. It regrew on 2026-08-19.
+  A schedule is how that surfaces without remembering to look. ⚠ A red audit is
+  a prompt to redo the **reachability** work, not proof of exposure — five of
+  those seven never entered the deployed function, and two shipped *bundled*,
+  absent from the function's `node_modules` entirely. Grep the server chunk,
+  not the folder.
+- **⚠ Deliberately not on every commit, since 2026-08-19** — and until then it
+  was, because this section said "scheduled" while the YAML gated nothing. That
+  mismatch is what hid the cost. `npm audit` reads `package-lock.json`: it
+  measures the dependency **tree**, not the commit, so between lockfile changes
+  its answer cannot move. In the nine days after the Action landed there were
+  157 pushes to `main` and 9 touched the lockfile — so one standing advisory was
+  re-reported 148 times, as 148 identical failure mails. ⚠ Narrowing it to
+  `pull_request` + `schedule` would have been the *wrong* fix: all 9 of those
+  dependency changes arrived as direct pushes, because CLAUDE.md's rule is to commit
+  straight to `main`, and Dependabot has yet to open anything. The push trigger
+  is the one that matters here; it is the lockfile that filters it.
 
 **The `verify` job runs `npm run verify`, not `npm run build`** — deliberately.
 The build additionally runs `check-server-bundle.mjs`, which is only meaningful
