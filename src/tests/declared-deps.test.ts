@@ -238,6 +238,16 @@ describe('every imported package is declared in package.json', () => {
       '@iconify-json/ph', // icon data, resolved by astro-icon
       '@iconify-json/simple-icons',
       '@tailwindcss/vite', // astro.config.mjs
+      // tsc only — and DECLARED EXPLICITLY SINCE 2026-08-19, having been an
+      // accident before it. Nothing here ever asked for it: it arrived as a hard
+      // dependency of @types/yauzl, under extract-zip, under @iconify/tools,
+      // under astro-icon. vite and vitest want it too but only as an OPTIONAL
+      // peer, so npm never installed it on their account. Bumping astro-icon to
+      // 1.2.0 to clear GHSA-jmr9-qjv8-65gv dropped that chain and took the Node
+      // globals with it — 75 `astro check` errors for `Buffer` and `node:fs`.
+      // Pinned to ^22 to match `engines.node`, not the floating 26.x that the
+      // old chain happened to resolve; the types should describe the runtime.
+      '@types/node',
       '@types/sanitize-html', // tsc only
       'daisyui', // imported from app.css
       'eslint',
