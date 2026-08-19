@@ -3330,13 +3330,82 @@ a.sig:hover .sig__k {
   box-shadow: 0 12px 32px -10px color-mix(in oklch, var(--shadow-color) 70%, transparent);
   transition:
     filter 0.15s ease,
-    translate 0.15s ease;
+    translate 0.15s ease,
+    opacity 0.15s ease,
+    visibility 0.15s;
 }
 .cap-fab:hover {
   filter: brightness(1.08);
 }
 .cap-fab:active {
   translate: 0 1px;
+}
+
+/* ⚠ IT LEAVES WHILE YOU ARE ALREADY MAKING SOMETHING (2026-08-19). Michael:
+   *"the + button in the bottom right is perpetually visible. I don't mind that
+   concept but it needs to go away whenever we're doing something focused —
+   when we're typing or creating tasks or fragments or quotes, where we're
+   already creating or editing something."*
+
+   The ✚ is a DOOR — one door, every room, for the thought you have while
+   standing somewhere else. Inside a sheet you are not standing somewhere else;
+   you are already through a door, and a second one floating over the room you
+   just entered is an invitation to abandon what you are typing. On a phone it
+   is also, physically, a filled 56px circle in the corner your thumb rests in
+   while writing.
+
+   ⚠ THREE SELECTORS AND NO JAVASCRIPT, WHICH IS THE WHOLE REASON THIS IS
+   CORRECT RATHER THAN MERELY DONE. The alternative was a script toggling a
+   class from open/close handlers — and there are ~20 sheets, each with several
+   ways in and out (`closeWithExit`, `cancel`, the browser's own close watcher),
+   so that is ~20 places to remember a rule, which is precisely the failure
+   `dialog-exit.test.ts` was written after. `:has()` reads the state the DOM
+   already holds, so a sheet added next year is covered on the day it is added.
+
+   · `dialog[open]` — every sheet in the building. They are all <dialog>, which
+     is what makes one selector enough. Includes the capture dialog itself,
+     where hiding the ✚ behind its own modal costs nothing.
+   · a focused rich editor — the two FULL-PAGE composition surfaces that are not
+     sheets at all (`/admin/writing/[id]`, `/admin/notes`). Without this line the
+     ✚ would float over the two rooms most typed in.
+   · a focused <textarea> — same argument, for the fields TipTap does not own.
+
+   ⚠ AND `input:focus` IS DELIBERATELY ABSENT. A single-line input on these
+   pages is a filter, a search box, a title — things you touch in passing while
+   still reading the room. Hiding a global control because someone clicked into
+   a search field is the twitchy version of this, and it would fire on nearly
+   every page in the Observatory.
+
+   ⚠ `visibility`, NOT JUST `opacity`, and it is in the transition list above
+   for the same reason. Opacity alone leaves a 56px invisible button in the tab
+   order and in the accessibility tree, so a keyboard reader inside a sheet
+   still meets "Write something down" on their way out of it. As a discrete
+   property it flips at the END of the fade going out and at the START coming
+   back, which is exactly the timing wanted.
+
+   ⚠ ONE ROUTE LOSES THE ✚ ENTIRELY, AND IT IS THE RIGHT ONE — write it down so
+   it is never reported as a bug. Every room was walked signed-in on 2026-08-19
+   and eight of the nine hold the button at rest; `/admin/writing/[id]` does
+   not, because that room IS a sheet — it renders `<dialog id="wsheet" open>`
+   as its whole content, so the first selector matches from the moment the page
+   loads. That is the essay editor. If there is one surface in this building
+   where a floating "write something else down" is the wrong offer, it is the
+   one you opened in order to write. The other eight were verified to come back
+   correctly: sheet closed, blur out of a jot, and a `search` input focused on
+   `/admin/fragments` all leave it visible.
+
+   The `body:has(.cap-fab) .back-to-top` offset above is deliberately NOT keyed
+   to this. The ↑ keeps its raised position while the ✚ is away — it is the only
+   floating control on screen for at most a few seconds, and a button that
+   slides down and back up again every time a sheet opens is a second motion
+   nobody asked for. */
+body:has(dialog[open]) .cap-fab,
+body:has([contenteditable]:not([contenteditable='false']):focus) .cap-fab,
+body:has(textarea:focus) .cap-fab {
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 0.5rem;
+  pointer-events: none;
 }
 /* Back-to-top shares this corner. It only appears once you have scrolled, but
    when it does it would land underneath the ✚ — so in the Observatory it sits a
