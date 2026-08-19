@@ -46,12 +46,79 @@ const API_DEADLINE_MS = 2500;
  */
 const READY_DEADLINE_MS = 4000;
 
+/**
+ * ⚠ THE MOUNT THE DELEGATED LISTENERS ARE CURRENTLY SPEAKING FOR, and it exists
+ * because those listeners live on `document` and `window` while everything they
+ * act on lives in a DOM the router replaces. See `wireMusicSets` for the bug
+ * that made this necessary; the shape is: the listeners bind ONCE per document
+ * and read the live mount from here, so a navigation swaps the mount rather
+ * than stacking a second copy of every handler on top of the first.
+ *
+ * `null` on a page with no music pane — which is most of them, and is why the
+ * click handler asks. A stale `active` would let a `[data-set]` click on some
+ * later page drive a render against a DOM that no longer exists.
+ */
+let active: {
+  data: Record<string, SetRow>;
+  base: string;
+  render: (slug: string) => void;
+  currentSlug: () => string;
+} | null = null;
+
+let delegatesBound = false;
+
+/** Has the third-party script tag been appended to THIS document yet. */
+let apiRequested = false;
+
+/**
+ * Take ownership of the sets pane the server rendered.
+ *
+ * ⚠ THIS IS CALLED AGAIN ON EVERY NAVIGATION, AND UNTIL 2026-08-19 IT WAS NOT —
+ * which is the whole of a bug Michael found on the live site: *"if I navigate
+ * to the music section of the blog from the writing section, there is an
+ * infinite loading skeleton of the playlist embed. Hard refreshing the page
+ * will cause it to properly load."*
+ *
+ * The mechanism is the one this repo has now paid for several times, and it is
+ * the same sentence every time: **a module script executes ONCE per document,
+ * and a view-transition swap replaces the DOM without re-running it.** So
+ * `blog/index.astro`'s `wireMusicSets()` ran against the writing view — where
+ * there is no `#set-detail`, so it returned immediately, correctly — and when
+ * the Music switch swapped a fresh pane into the page, nothing ran against it.
+ * Nothing called `conceal()`, so nothing ever called `reveal()`; `is-ready` was
+ * never added and the skeleton breathed forever. Not even the 4s deadline could
+ * save it, because the deadline is armed by `conceal()`.
+ *
+ * ⚠ AND IT WAS THE ONLY PUBLIC SCRIPT MISSING THIS. `blog-feed`,
+ * `constellation-suite`, `back-to-top` and `sky-slot` all re-init on
+ * `astro:page-load` (or `after-swap`, for the one that must beat the paint).
+ * This file was written as an exported function the page calls once, which
+ * reads as a cost decision — *"it returns immediately on any page without one,
+ * so the two text views pay nothing but the import"* — and quietly opted out of
+ * the convention that made the rest of them survive a navigation. The early
+ * return is still exactly right; it just needed to happen on every arrival
+ * rather than on one.
+ *
+ * ⚠ SO IT MUST BE IDEMPOTENT, and the guard is on the ELEMENT rather than in a
+ * module variable. A module flag cannot tell "already wired" from "wired
+ * against a DOM that has since been replaced" — which is the only distinction
+ * that matters here. A fresh pane is a fresh element and arrives without the
+ * attribute, so it wires; the same pane asked twice in one document (the page's
+ * own call plus the first `astro:page-load`) does not.
+ */
 export function wireMusicSets(): void {
   const detail = document.getElementById('set-detail');
   const slot = document.getElementById('set-embed-slot');
   const frame = document.getElementById('set-embed-frame');
   const dataEl = document.getElementById('set-data');
-  if (!detail || !slot || !frame || !dataEl) return;
+  if (!detail || !slot || !frame || !dataEl) {
+    // No pane on this page. Drop the old one so the delegated listeners below
+    // stop answering for a DOM that is gone.
+    active = null;
+    return;
+  }
+  if (detail.dataset.setsWired) return;
+  detail.dataset.setsWired = '1';
 
   let data: Record<string, SetRow>;
   try {
@@ -143,14 +210,24 @@ export function wireMusicSets(): void {
       });
     };
     if (w.SpotifyIframeApi) return build(w.SpotifyIframeApi);
+    // Overwritten deliberately when a second pane arrives before the script
+    // resolves: the newest mount is the one that should be built.
     w.onSpotifyIframeApiReady = (api: IFrameAPI) => {
       w.SpotifyIframeApi = api;
       build(api);
     };
-    const s = document.createElement('script');
-    s.src = API_SRC;
-    s.async = true;
-    document.head.appendChild(s);
+    // ⚠ ONCE PER DOCUMENT, not once per pane. `startApi` runs on every arrival
+    // at the music view now, and the document never reloads — so without this
+    // a reader crossing Writing ⇄ Music four times would append four copies of
+    // the same third-party script to <head>, each a fresh request for a file
+    // whose only export is a global the first one already set.
+    if (!apiRequested) {
+      apiRequested = true;
+      const s = document.createElement('script');
+      s.src = API_SRC;
+      s.async = true;
+      document.head.appendChild(s);
+    }
     // See API_DEADLINE_MS — a blocked script never resolves, so the fallback is
     // a clock rather than an error handler.
     window.setTimeout(() => {
@@ -269,33 +346,83 @@ export function wireMusicSets(): void {
    * `Reader.astro` hit this first and `music-room.ts` documents the same fix in
    * the same words. Third time; it is a property of the site, not a surprise.
    */
+  // Hand this mount to the document-level listeners, which were bound once and
+  // outlive every pane they drive.
+  active = { data, base, render, currentSlug: () => current };
+  bindDelegates();
+
+  conceal();
+  startApi();
+}
+
+/**
+ * The two listeners that cannot live on the pane, bound once per document.
+ *
+ * ⚠ THEY USED TO BE INSIDE `wireMusicSets`, WHICH WAS CORRECT WHILE IT RAN ONCE
+ * AND IS A LEAK NOW THAT IT RUNS PER NAVIGATION. Left there, every trip through
+ * the Music switch would add another capturing click listener and another
+ * `popstate` listener to a document that never reloads — each closed over a
+ * dead pane, each still calling `preventDefault()` and `stopPropagation()`, and
+ * the oldest one winning. Reading the live mount out of `active` is what lets
+ * there be exactly one of each.
+ */
+function bindDelegates(): void {
+  if (delegatesBound) return;
+  delegatesBound = true;
+
+  /**
+   * ⚠ CAPTURE PHASE AND `stopPropagation`, AND WITHOUT THEM THIS FILE IS
+   * DECORATION. The site mounts `<ClientRouter />`, whose document-level click
+   * listener claims any `<a href>` and navigates — and every sentence here is a
+   * real anchor, because that is the no-JS floor. A bubble-phase
+   * `preventDefault()` arrives after the router has already started the
+   * transition, so the page swaps out from under the embed and the in-place
+   * swap this whole file exists for never happens.
+   *
+   * `Reader.astro` hit this first and `music-room.ts` documents the same fix in
+   * the same words. Third time; it is a property of the site, not a surprise.
+   */
   document.addEventListener(
     'click',
     (e) => {
+      if (!active) return; // no pane on this page — let the router have it
       const el = (e.target as HTMLElement | null)?.closest?.('[data-set]') as HTMLElement | null;
       if (!el) return;
       // ⌘/Ctrl/Shift-click still opens the real URL — the interception is an
       // enhancement, not a replacement.
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      const slug = el.dataset.set ?? '';
+      // ⚠ THE GUARD MOVED ABOVE `preventDefault`, and it had to. Swallowing a
+      // click we then decline to act on is how a link becomes inert: a
+      // `[data-set]` anchor for a set this pane does not know would have been
+      // cancelled here and navigated nowhere. Now it falls through to the
+      // router, which is the honest outcome and the no-JS floor besides.
+      if (!active.data[slug]) return;
       e.preventDefault();
       e.stopPropagation();
-      const slug = el.dataset.set ?? '';
-      if (!data[slug] || slug === current) return;
+      if (slug === active.currentSlug()) return;
+      const base = active.base;
       history.pushState({ set: slug }, '', `${base}${base.includes('?') ? '&' : '?'}set=${encodeURIComponent(slug)}`);
-      render(slug);
+      active.render(slug);
     },
     true,
   );
 
   // A set is a place you can send someone — and a place you can leave.
   window.addEventListener('popstate', () => {
+    if (!active) return;
     const slug = new URLSearchParams(location.search).get('set') ?? '';
-    if (data[slug] && slug !== current) render(slug);
+    if (active.data[slug] && slug !== active.currentSlug()) active.render(slug);
   });
-
-  conceal();
-  startApi();
 }
+
+// ⚠ THE RE-INIT, AND IT LIVES HERE RATHER THAN IN `blog/index.astro`. The page
+// still calls `wireMusicSets()` itself, which is what covers a first arrival
+// straight onto `?view=music`; this covers every arrival after it. Putting the
+// listener in the module means the rule travels with the thing it protects —
+// the page cannot forget it, and neither can the next surface that mounts a
+// sets pane. Registered once, because this module body runs once.
+document.addEventListener('astro:page-load', () => wireMusicSets());
 
 /**
  * ⚠ THE ONLY PROVIDER KNOWLEDGE IN THE BROWSER, and deliberately the smallest
