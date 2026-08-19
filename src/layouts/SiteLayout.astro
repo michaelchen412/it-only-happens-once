@@ -343,7 +343,7 @@ const nav = [
         Five things, one line, one register — the bar's own language, so both
         ends of the page speak the same way.
 
-            Constellations · Blog · About        Say hello   ⌁ RSS   ⌗ GitHub
+            Constellations · Blog · About        Say hello   ⌗ Source   ⌁ RSS
 
         ⚠ NOTHING HERE CLOSES THE PAGE, AND THAT IS THE DECISION (ADR 0029).
         Four variants were built on the assumption that a footer's job is to
@@ -417,27 +417,35 @@ const nav = [
           <a href="/about#mv-hello">Say hello</a>
           {
             /* ⚠ THE LABEL OPENS WITH THE WORD ON SCREEN, AND THAT IS NOT
-              REDUNDANCE. This button SHOWS "GitHub" and used to be NAMED "How
-              this site was built" — an accessible name that does not contain
-              the visible text (WCAG 2.5.3, Label in Name). The cost is not
-              theoretical and it is not a screen reader's: someone driving the
-              page by voice says "click GitHub", because that is what the page
-              says, and nothing happens. Flagged by Lighthouse 2026-08-11.
+              REDUNDANCE. This button used to be NAMED "How this site was
+              built" — an accessible name that does not contain the visible
+              text (WCAG 2.5.3, Label in Name). The cost is not theoretical and
+              it is not a screen reader's: someone driving the page by voice
+              says the word they can see, and nothing happens. Flagged by
+              Lighthouse 2026-08-11. So the name still leads with whatever this
+              button shows, and if the word below ever changes again, this
+              string changes with it — they are a pair.
 
-              ⚠ THE BAR'S COPY NOW CARRIES A VISIBLE WORD TOO (2026-08-19) — but
-              a DIFFERENT one, and that is deliberate rather than drift. It says
-              "Source"; this says "GitHub". Up there the ⌗ is a credential and
-              the row it sits in is a menu of destinations, so the word names
-              where you are being sent. Down here it stands between "Say hello"
-              and "RSS", and those are proper nouns for services: "Source" in
-              that line is the one word of the three that is not the name of a
-              thing, and it reads as a heading rather than an address. Same
-              drawer, two rooms, two registers — which is the same argument the
-              paragraph above already makes about the accessible names. */
+              ⚠ IT SAID "GitHub" UNTIL 2026-08-19, AND THE TWO TRIGGERS NOW
+              MATCH. The bar's copy grew a visible label the same day and took
+              "Source"; this kept "GitHub" for one commit on the argument that a
+              footer row reading `Say hello · GitHub · RSS` is three service
+              names and "Source" would be the odd one out. Michael's call was to
+              unify, and the argument for it is better than the argument
+              against: this is ONE DRAWER WITH TWO TRIGGERS (see the note above
+              the panel), and a reader who meets it as "Source" in the menu and
+              as "GitHub" at the foot of the page has no way to know they are
+              the same thing. Two names for one door is a worse cost than one
+              slightly unusual word in a row of three. It also makes the claim
+              the drawer exists to make — that a person wrote this, rather than
+              assembled it — in both places instead of naming a vendor in one.
+
+              The mark stays GitHub's, which is the half that should: the icon
+              says which service, the word says what it is of. */
           }
-          <button type="button" popovertarget="site-colophon" aria-label="GitHub — how this site was built">
+          <button type="button" popovertarget="site-colophon" aria-label="Source — how this site was built">
             <Icon name="simple-icons:github" class="site-foot__icon" />
-            GitHub
+            Source
           </button>
           <a href="/rss.xml">
             <Icon name="ph:rss-simple" class="site-foot__icon" />
@@ -535,18 +543,37 @@ const nav = [
         document.getElementById('menu-toggle')?.setAttribute('aria-expanded', String(open));
         return;
       }
-      // ⚠ `a, button` AND NOT `a` — the panel holds two <button>s now that the
-      // colophon trigger and the theme toggle wear labels in it. The ⌗ was
-      // always one and always misbehaved here: pressing it opened the drawer
-      // BEHIND a menu that stayed open on top of it. The toggle is the one
-      // control that must NOT close the panel — flipping the theme is something
-      // you may want to do twice, and the panel is where you can see it happen.
-      if (target?.closest?.('#theme-toggle')) return;
-      if (target?.closest?.('#site-menu a, #site-menu button')) return closeMenu();
+      // ⚠ `a` ONLY, AND A <button> IN HERE DELIBERATELY LEAVES THE PANEL OPEN.
+      // This was briefly `a, button` on the reasoning that a control which
+      // opens a drawer should get out of its way, and Michael reversed it
+      // (2026-08-19): *"I'd much prefer the menu stay open behind it like it
+      // was before."* He is right, and the reason is the one thing the ✕
+      // version could not do — the ⌗ has to stay ON SCREEN to be the trigger
+      // that lights up while its drawer is open, which is the whole point of
+      // the `:popover-open` rule in app.css. A trigger that dismisses itself
+      // has no state to show.
+      //
+      // It is the right rule for the other button too: flipping the theme is
+      // something you may want to do twice, and this panel is where you can
+      // watch it happen. An <a> is different in kind — it is leaving.
+      if (target?.closest?.('#site-menu a')) return closeMenu();
       if (menu.classList.contains('is-open') && !menu.contains(target)) closeMenu(); // outside click
     });
+    // ⚠ ESCAPE DISMISSES THE TOP LAYER ONLY, AND THE GUARD IS WHAT MAKES THE
+    // DECISION ABOVE HOLD. Now that the ⌗ leaves this panel open behind its
+    // drawer, there are genuinely two things stacked — and this listener fires
+    // on the same keypress the popover's own light-dismiss does, so without the
+    // check one Escape closed both and the reader was returned to the page
+    // having pressed one key and lost two things. Measured, not assumed: the
+    // theme toggle was unreachable after a single Escape.
+    //
+    // No `stopPropagation` anywhere — the popover's dismissal is the browser's,
+    // not ours, and we cannot order ourselves after it. Asking whether it is
+    // still open is the same question asked at a moment we can actually answer.
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeMenu(true);
+      if (e.key !== 'Escape') return;
+      if (document.getElementById('site-colophon')?.matches(':popover-open')) return;
+      closeMenu(true);
     });
     document.addEventListener('astro:page-load', () => closeMenu()); // each page starts closed
   </script>
