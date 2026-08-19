@@ -233,35 +233,117 @@ html.scroll-locked {
   overscroll-behavior: contain;
 }
 .reader-inner {
-  padding: 3.5rem 1.75rem 4rem;
+  /* The old value was `3.5rem 1.75rem 4rem`, and both ends have moved out to
+     the two controls that now bracket this: the 3.5rem top was clearance for an
+     absolutely positioned ✕ that no longer exists, and the 4rem bottom is
+     `.reader-foot`'s job. */
+  padding: 1.25rem 1.75rem 0;
 }
-.reader-close {
+
+/* ── The way back, top and bottom (components/Reader.astro) ─────────────────
+   ⚠ THE ✕ USED TO BE HERE and its rule is deleted rather than disabled. It was
+   `position: absolute` with a translucent ground and `backdrop-filter:
+   blur(4px)` — which is worth one line on the way out, because that blur is the
+   first item on design.md §3's list of tells the site refuses on sight, and it
+   was only ever there to keep a floating glyph legible over moving text. A bar
+   with its own ground needs no such trick. Nothing else in the tree references
+   `.reader-close`; the JS and the e2e suite both key on `[data-reader-close]`,
+   which both new controls carry. */
+.reader-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-base-100);
+  padding: 0.6rem 1.75rem 0.35rem;
+}
+
+/* Its lower edge, and it is the site bar's answer rather than a second one —
+   `.site-bar::after` in app.css carries the whole argument (a solid strip over
+   same-coloured ground has no edge, so text is guillotined mid-letterform with
+   nothing to attribute the disappearance to; three treatments were driven and
+   the fade won). Same gesture, one third the height, because what passes under
+   this is a reading measure rather than a whole page.
+
+   `z-index: -1` for the same reason it has one there: the scrim must sit above
+   the bar's own background and below everything positioned inside it. */
+.reader-top::after {
+  content: '';
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 1;
+  top: 100%;
+  left: 0;
+  right: 0;
+  /* ⚠ 1.25rem, AND IT WAS 0.5rem FOR ONE ROUND. Photographed mid-scroll on a
+     390px phone, 8px was not a dissolve — the reading face is 1.15rem at 1.8
+     leading, so a line is ~33px tall and a fade shorter than a quarter of it
+     just moves the guillotine down by eight pixels. It has to be a
+     line-height's worth of ground for the text to actually go soft before the
+     edge. (`.site-bar::after` is 1.5rem over slightly smaller type, which is
+     the same ratio.) */
+  height: 1.25rem;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--color-base-100), transparent);
+}
+
+/* ⚠ NO RULE ABOVE THIS CONTROL, AND THAT WAS A CORRECTION. It shipped with a
+   `border-top` at the measure — the suite outro's gesture — and the screenshot
+   killed it: `PostArticle` ENDS in `FragmentStrip`, whose apparatus already
+   draws a hairline, then the date, then a second hairline (ADR 0023 — the
+   apparatus is what closes the reading). A third rule 40px under those two
+   fenced a lone date between two lines and read as a table. The piece is
+   already closed by the time this control is reached; what it needs from this
+   file is air, not another edge. */
+.reader-foot {
+  padding: 1.5rem 1.75rem 4rem;
+}
+
+.reader-back {
   display: inline-flex;
-  padding: 0.4rem;
+  align-items: center;
+  gap: 0.3rem;
+  /* 44px. The control it replaces was 28px square, in the corner, on the one
+     surface that is full-screen on a phone. */
+  min-height: 2.75rem;
+  /* Pulled back by its own padding so the CARET, not the button box, lines up
+     with the left edge of the prose. An inline control that starts half a
+     character in from the text below it looks like a mistake at every width. */
+  padding-inline: 0.5rem;
+  margin-inline-start: -0.5rem;
   border-radius: var(--radius-field);
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  background: color-mix(in oklab, var(--color-base-100) 70%, transparent);
-  backdrop-filter: blur(4px);
-  transition:
-    color 0.15s ease,
-    background 0.15s ease;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  cursor: pointer; /* Tailwind 4 preflight sets buttons to `default` (trap 4) */
+  transition: color 0.15s ease;
 }
-.reader-close:hover {
+.reader-back:hover {
   color: var(--color-base-content);
-  background: var(--color-base-200);
 }
+/* The caret leans the way you are about to go — `.return-arrow`'s gesture at a
+   smaller size, so the suite's outro and the sheet's exit move alike. */
+.reader-back svg {
+  flex-shrink: 0;
+  transition: translate 0.25s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.reader-back:hover svg,
+.reader-back:focus-visible svg {
+  translate: -0.2em 0;
+}
+
 @media (max-width: 640px) {
   /* Full-screen sheet on phones (the platform-correct pattern). */
   .reader {
     width: 100vw;
     border-left: 0;
   }
+  .reader-top {
+    padding-inline: 1.25rem;
+  }
   .reader-inner {
-    padding: 3.25rem 1.25rem 3rem;
+    padding: 1rem 1.25rem 0;
+  }
+  .reader-foot {
+    padding: 0 1.25rem 3rem;
   }
 }
 

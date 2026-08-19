@@ -324,7 +324,7 @@ const score = constellation.scoreUrl ? embedForUrl(constellation.scoreUrl) : nul
 </section>
 
 {/* The blog's Reader, verbatim — a fragment reads identically everywhere. */}
-<Reader />
+<Reader returnLabel="Back to the constellation" />
 {
   writings.map((w) => (
     <template data-reader-content={w.slug}>

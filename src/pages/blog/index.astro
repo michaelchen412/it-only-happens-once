@@ -539,7 +539,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       whole apparatus is a few hundred bytes, where the essay measurement above
       was 51% of the document. */
   }
-  {(view === 'writing' || view === 'music' || view === 'quotes') && <Reader />}
+  {(view === 'writing' || view === 'music' || view === 'quotes') && <Reader returnLabel="Back to the blog" />}
   {
     view === 'quotes' &&
       quotes!.items.map((q) => {

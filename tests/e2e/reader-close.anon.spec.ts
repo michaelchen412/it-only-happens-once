@@ -117,7 +117,11 @@ async function closeReader(page: Page, how: 'button' | 'escape' | 'backdrop'): P
   if (how === 'escape') await page.keyboard.press('Escape');
   else if (how === 'backdrop')
     await page.mouse.click(20, 400); // the dimmed feed, left of the sheet
-  else await page.locator('[data-reader-close]').click();
+  // ⚠ `.first()` — the sheet carries TWO of these since 2026-08-19 (the sticky
+  // "Back to the blog" at the top and its twin under the essay), and a bare
+  // locator matching two elements is a strict-mode failure rather than a click.
+  // The top one is the one always on screen, which is what this exercises.
+  else await page.locator('[data-reader-close]').first().click();
 
   await expect(page.locator(READER)).toHaveJSProperty('open', false);
   // Long enough for the 0.28s slide plus the deferred scroll-unlock at 320ms.

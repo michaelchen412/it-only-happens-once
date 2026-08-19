@@ -16,17 +16,98 @@
   Desktop: a right-side sheet at full height (a comfortable reading width).
   Mobile: a full-screen sheet (styles in app.css). Motion self-disables under
   prefers-reduced-motion (global rule).
+
+  ⚠ THE WAY OUT IS A SENTENCE NOW, TWICE, AND THE ✕ IS GONE (2026-08-19).
+  Michael: *"the x button isn't always completely apparent, and making the way
+  back to the list should be intuitive and obvious."* He is describing a real
+  asymmetry: the way IN is a whole essay card you press with your thumb, and
+  the way OUT was a 28px glyph in the corner with a `backdrop-filter` behind it,
+  carrying no word at all. On a phone that sheet is the entire screen, so the ✕
+  is not "close this panel" — there is no visible page left for it to be a
+  panel over — it is the only thing standing between a reader and the feeling
+  of being stuck.
+
+  ⚠ THE ✕ WAS REMOVED RATHER THAN JOINED, which was the live option and lost.
+  Two controls doing one job, 40px apart in the same corner, is not redundancy
+  insurance — it is what makes neither of them read as THE way back, and it
+  spends the top-right corner twice. Nothing is lost by dropping it: Escape,
+  the backdrop, and the browser's Back button all still dismiss, and every one
+  of those is tested (`tests/e2e/reader-close.anon.spec.ts`).
+
+  ⚠ AND IT BORROWS ITS WORDS AND ITS MARK FROM `pages/blog/[slug].astro`,
+  DELIBERATELY. That page renders the SAME `PostArticle` at the permalink, and
+  it has said *‹ The blog* in sans since it was written. A reader who meets one
+  essay in the sheet and the next at its own URL should not be taught two
+  different ways home — so this is the permalink's control, repeated, rather
+  than a new idiom invented for the sheet.
+
+  TOP **AND** BOTTOM, and the bottom one is the half that earns the change.
+  The top control is sticky, so it is the always-available answer that replaces
+  what the ✕ was doing. But a reader who has just finished a 3,000px essay is
+  at the far end of it, and asking them to scroll all the way back up to leave
+  is exactly the friction being complained about. `BackToTop` is not that
+  answer — it returns you to the top OF THE ESSAY, which is one more step, not
+  the way out.
 */
 import { Icon } from 'astro-icon/components';
 import BackToTop from './BackToTop.astro';
+
+interface Props {
+  /**
+   * Where dismissing this sheet puts you — the room the reader is standing in.
+   *
+   * ⚠ REQUIRED, WITH NO DEFAULT, ON PURPOSE. Every plausible default is wrong
+   * somewhere: "Back to the blog" lies inside a constellation, and a bare
+   * "Back" is the vague control this whole change exists to replace. Four
+   * mounts, one line each, and `astro check` fails the fifth if it forgets.
+   *
+   * ⚠ THE ROOM'S KIND, NOT ITS NAME. A constellation could name itself here
+   * ("Back to Conditions, Not Character") and it was tried on paper first:
+   * `to-be-like-the-rock-that-the-waves-keep-crashing-over` is a real slug on
+   * this site, and its name does not fit a sticky bar at any width a phone has.
+   * Truncating it is worse than not saying it — a return control that ends in
+   * an ellipsis is a return control you have to think about.
+   */
+  returnLabel: string;
+}
+const { returnLabel } = Astro.props;
 ---
 
 <dialog id="site-reader" class="reader drawer-dialog" aria-label="Reading view">
-  <button type="button" class="reader-close" data-reader-close aria-label="Close reading view">
-    <Icon name="ph:x" class="text-lg" />
-  </button>
+  {
+    /* Inside the scroller rather than absolutely positioned over it, which is
+      what the ✕ was. `position: sticky` then costs the sheet ~44px of height
+      and gives back the thing the ✕ never had: its own ground, so the first
+      line of an essay passes UNDER a bar with an edge instead of being
+      guillotined by a floating glyph. The edge itself is `.reader-top::after`
+      — the same fade-to-ground the site bar uses, for the same reason and with
+      the same argument (see `.site-bar::after` in app.css). */
+  }
   <div class="reader-scroll">
+    <div class="reader-top">
+      <div class="prose-measure mx-auto">
+        <button type="button" class="reader-back" data-reader-close>
+          <Icon name="ph:caret-left" class="size-3.5" />
+          {returnLabel}
+        </button>
+      </div>
+    </div>
     <div class="reader-inner prose-measure mx-auto"></div>
+    {
+      /* ⚠ OUTSIDE `.reader-inner`, WHICH IS THE ONE STRUCTURAL CONSTRAINT HERE.
+        That div's children are REPLACED wholesale on every open
+        (`inner.replaceChildren(...)`), from a template or a fetched
+        `article.post-article`. A control living in there would be destroyed by
+        the first fragment anyone opened. */
+    }
+    <div class="reader-foot">
+      <div class="prose-measure mx-auto">
+        <button type="button" class="reader-back" data-reader-close>
+          <Icon name="ph:caret-left" class="size-3.5" />
+          {returnLabel}
+        </button>
+      </div>
+    </div>
   </div>
   <BackToTop scroller="#site-reader .reader-scroll" inDialog />
 </dialog>
