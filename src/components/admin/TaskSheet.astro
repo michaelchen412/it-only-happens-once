@@ -99,8 +99,27 @@ const { today, goals = [] } = Astro.props;
       </fieldset>
 
       <fieldset class="fs">
-        <div class="flex flex-wrap gap-x-6 gap-y-3">
-          <div class="min-w-0 flex-1">
+        {
+          /* ⚠ STACKED, NOT TWO COLUMNS, AND `flex-wrap` NEVER SAVED THIS. These
+            sat side by side in a `flex flex-wrap` whose children were
+            `min-w-0 flex-1` — and `flex-1` is `flex: 1 1 0%`, a ZERO basis, so
+            the row always "fits" and wrapping can never fire. The columns shrank
+            for ever instead.
+
+            That is not a phone problem. The sheet is `max-w-md` — 28rem, its
+            width on the largest desktop there is — so each column was ~10rem,
+            Effort split it FOUR ways, and `.pseg__b`'s `text-overflow: ellipsis`
+            rendered `Qui…` `Sitt…` `Blo…` `Pro…` on every screen size ever
+            shipped. The same failure `.pseg--fit`'s note records for the
+            calendar's `Mon…`, and invisible to `tasks.mobile.spec.ts` for the
+            same reason: an ellipsis is not an overflow.
+
+            Full width gives Effort ~5.5rem a segment and Priority ~8rem. No
+            breakpoint restores the two-column version, because a 28rem cap means
+            there is no width at which it would have fitted. */
+        }
+        <div class="space-y-3">
+          <div>
             <p class="f__k">Effort</p>
             <div class="pseg" role="radiogroup" aria-label="Effort">
               {
@@ -119,7 +138,7 @@ const { today, goals = [] } = Astro.props;
               }
             </div>
           </div>
-          <div class="min-w-0 flex-1">
+          <div>
             <p class="f__k">Priority</p>
             <div class="pseg" role="radiogroup" aria-label="Priority">
               {
@@ -149,15 +168,14 @@ const { today, goals = [] } = Astro.props;
           <label class="lead__o">
             <input type="checkbox" data-override-on />
             <span>Warn me</span>
-            <input
-              type="text"
-              inputmode="numeric"
-              class="f--n"
-              value="3"
-              data-override-n
-              disabled
-              aria-label="Days ahead"
-            />
+            {
+              /* NOT `disabled` — see task-sheet.ts. A dead grey box beside a
+                sentence explaining why it is dead is the exact shape §10i
+                rejects, and this file's own header cites §10i for the two
+                sections that appear only once there is a date. Typing here
+                arms the tick. */
+            }
+            <input type="text" inputmode="numeric" class="f--n" value="3" data-override-n aria-label="Days ahead" />
             <span>days ahead instead</span>
           </label>
         </div>

@@ -190,7 +190,6 @@ if (sheet && form) {
     pick(form, 'rep', 'none');
     pick(form, 'unit', 'weeks');
     overrideOn.checked = false;
-    overrideN.disabled = true;
     overrideN.value = '3';
     everyInput.value = '2';
     presetSel.selectedIndex = 0;
@@ -211,7 +210,6 @@ if (sheet && form) {
     pick(form, 'prio', row.priority);
     if (row.lead_days != null) {
       overrideOn.checked = true;
-      overrideN.disabled = false;
       overrideN.value = String(row.lead_days);
     }
     if (row.recur_mode === 'after_completion') {
@@ -294,7 +292,6 @@ if (sheet && form) {
       // screen disagreeing.
       if (p.lead_days) {
         overrideOn.checked = true;
-        overrideN.disabled = false;
         overrideN.value = String(p.lead_days.value);
       }
 
@@ -351,11 +348,20 @@ if (sheet && form) {
     timeInput.value = '';
     anytime.hidden = !dueInput.value;
   });
-  overrideOn.addEventListener('change', () => {
-    overrideN.disabled = !overrideOn.checked;
+  overrideOn.addEventListener('change', paintLead);
+  // ⚠ TYPING ARMS THE TICK, which is why the field is no longer `disabled`.
+  // The pair invariant the parser's note states above — *"filling only the number
+  // does nothing"* — was a trap for the KEYBOARD as well as for the model: a
+  // count you typed yourself, sitting in an unticked row, sends `leadDays: ''`
+  // and lets effort's default lead win with nothing on screen disagreeing. The
+  // two can no longer drift apart in that direction.
+  //
+  // Unticking clears the override but LEAVES the number, so re-ticking restores
+  // what you typed instead of snapping back to 3.
+  overrideN.addEventListener('input', () => {
+    overrideOn.checked = true;
     paintLead();
   });
-  overrideN.addEventListener('input', paintLead);
   presetSel.addEventListener('change', paintRepeat);
 
   // ── saving ────────────────────────────────────────────────────────────────
