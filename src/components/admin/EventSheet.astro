@@ -24,6 +24,7 @@ import type { Ymd } from '../../lib/hq/time';
 import FilterField from './FilterField.astro';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
+import MiniEditor from './MiniEditor.astro';
 
 interface Props {
   today: Ymd;
@@ -119,10 +120,36 @@ const { today, people } = Astro.props;
         )
       }
 
-      <label class="f mt-4">
+      {
+        /* ⚠ A MINI EDITOR, NOT A TEXTAREA, AND THIS FIELD WAS THE WORST CASE OF
+          IT IN THE BUILDING. The placeholder read *"Optional. Markdown."* and
+          NOTHING EVER RENDERED IT — `agenda.astro` carried the column
+          into the row payload and back into this form, and no surface on the
+          site ever ran it through `renderMarkdown`. So the promise was doubly
+          broken: you were asked to type asterisks, and then shown your own
+          asterisks back for ever.
+
+          Both halves are answered together, and they have to be — a rich editor
+          over a value nobody renders would only have moved the lie. The notes
+          now appear on the day panel's row, beside the location and the
+          people who are coming (`.drow__n`).
+
+          Same ruling SetSheet cites for its description: ADR 0006 chose
+          WYSIWYG-storing-Markdown, ADR 0018 retired "plain textarea, ever".
+
+          ⚠ NO HIDDEN INPUT HERE, unlike SetSheet — that sheet's action reads
+          `new FormData(form)`, which cannot see a contenteditable. This one
+          builds its payload field by field, so the script calls `getMarkdown()`
+          at submit and there is no third copy of the value to fall out of step.
+
+          ⚠ AND IT IS A <div>, NOT A <label>. A label's `for` cannot address a
+          contenteditable, and wrapping one puts the whole surface inside a
+          click target that steals the caret's column on every press. */
+      }
+      <div class="f mt-4">
         <span class="f__k">Notes</span>
-        <textarea name="notes" rows="2" placeholder="Optional. Markdown."></textarea>
-      </label>
+        <MiniEditor id="event-notes" wrapId="event-notes-wrap" size="max-h-[28vh] min-h-[3.25rem]" />
+      </div>
     </div>
 
     <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">

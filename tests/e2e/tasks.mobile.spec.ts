@@ -65,6 +65,38 @@ test('⚠ TRAP 5: nothing in the editor is sheared off, on any control', async (
   expect(await overflowingChildren(page.locator('#task-form'))).toEqual([]);
 });
 
+/**
+ * ⚠ TRUNCATION IS NOT OVERFLOW, AND THAT IS WHY NOTHING CAUGHT THIS FOR A YEAR.
+ *
+ * `.pseg__b` carries `overflow: hidden; text-overflow: ellipsis`, so a segment
+ * too narrow for its own label does not push its parent anywhere — it quietly
+ * renders `Qui…`. Every assertion in this file measures the RIGHT EDGE of a box
+ * against its container, and an ellipsised label is perfectly inside its box.
+ * `aria-checked` is equally true of a label nobody can read.
+ *
+ * The file's own comments record the same miss twice before this one: the
+ * calendar rendered `Mon…` for a day and it was found in a screenshot, and
+ * `.pseg--fit` exists because of it. Effort and Priority sat in a `flex-wrap`
+ * row whose children had a ZERO flex basis — so the wrap could never fire and
+ * the columns shrank for ever — and shipped `Qui… Sitt… Blo… Pro…` at EVERY
+ * viewport, desktop included, because the sheet is capped at 28rem.
+ *
+ * So the measurement is `scrollWidth` against `clientWidth`: the only one that
+ * can see a label the browser folded away.
+ */
+test('⚠ no segmented label is ellipsised away — at any width the sheet can take', async ({ page }) => {
+  await openEditor(page);
+  await page.locator('[data-due]').fill('2026-12-07');
+  await page.locator('[data-due]').dispatchEvent('input');
+  // Every panel open, so the repeat control's three labels are measured too.
+  await page.locator('[data-rep="after"]').click();
+
+  const cut = await page
+    .locator('#task-form .pseg__b')
+    .evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent?.trim()));
+  expect(cut).toEqual([]);
+});
+
 test('⚠ every control you press without looking clears 44px', async ({ page }) => {
   await openEditor(page);
   // The repeat control does not exist until there is a date to repeat from, so

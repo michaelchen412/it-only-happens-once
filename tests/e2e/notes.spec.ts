@@ -810,7 +810,10 @@ test.describe('the parser (14 · Piece 3)', () => {
     const s = page.locator('#task-sheet');
 
     await expect(s.locator('input[name="title"]')).toHaveValue('Appointment with the dentist');
-    await expect(s.locator('textarea[name="notes"]')).toHaveValue('bring a gift every single time');
+    // ⚠ NOT `toHaveValue` — the notes field is a mini editor since plan 43, so it
+    // holds a rendered document rather than a form value. The parser still writes
+    // Markdown into it; `setContent` renders that, and the text is what comes back.
+    await expect(s.locator('#task-notes [contenteditable]')).toHaveText('bring a gift every single time');
     await expect(s.locator('[data-due]')).toHaveValue('2026-08-06');
     await expect(s.locator('[data-time]')).toHaveValue('16:00');
     await expect(s.locator('[data-prio][aria-checked="true"]')).toHaveAttribute('data-prio', 'high');

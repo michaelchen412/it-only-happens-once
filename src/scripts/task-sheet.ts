@@ -24,6 +24,16 @@ import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '..
 import { ordinal } from '../lib/hq/dates';
 import { ymdToUtc, type Ymd } from '../lib/hq/time';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
+// ⚠ A STATIC IMPORT, AND capture.ts's LAZY ONE IS NOT THE PRECEDENT IT LOOKS
+// LIKE. That file loads `rich-editor` on idle because `CaptureDialog` is mounted
+// from `AdminLayout` — every admin page paid 509 KB of parse for a box most of
+// them never open. This is a ROOM's sheet, in rooms that have an editor in them,
+// which is exactly what `fragment-sheet.ts`, `set-sheet.ts`, `notes.ts` and
+// `constellation-composer.ts` all do. The lazy shape was weighed and dropped:
+// it buys a parse this page's own capture dialog performs on idle regardless,
+// and costs a pending-content dance for every `setContent` that can now run
+// before the editor exists.
+import { mountMiniEditor } from './rich-editor';
 
 const sheet = document.querySelector<HTMLDialogElement>('#task-sheet');
 const form = document.querySelector<HTMLFormElement>('#task-form');
@@ -49,7 +59,6 @@ if (sheet && form) {
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const deleteBtn = form.querySelector<HTMLButtonElement>('[data-delete]')!;
   const titleInput = form.querySelector<HTMLInputElement>('input[name="title"]')!;
-  const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
   const dueInput = form.querySelector<HTMLInputElement>('[data-due]')!;
   const timeInput = form.querySelector<HTMLInputElement>('[data-time]')!;
   const anytime = form.querySelector<HTMLElement>('[data-anytime]')!;
@@ -61,6 +70,31 @@ if (sheet && form) {
   const prevEl = form.querySelector<HTMLElement>('[data-prev]')!;
   /** Absent until goals exist — 13 · Piece 1 shipped with no goal field at all. */
   const goalSel = form.querySelector<HTMLSelectElement>('[data-goal-id]');
+
+  /**
+   * The notes field — rich since plan 43, and the storage is unchanged Markdown.
+   *
+   * `breaks: true` MATCHES THE ROW, which renders with `{ breaks: true }`
+   * (tasks.astro). Notes here are jottings — an errand list, an address, three
+   * lines of what "deep clean" actually means — and that is the same shape the
+   * pile takes, so a lone newline is a line break at both ends.
+   *
+   * A contenteditable fires no event the dirty tracker can hear, so `onChange`
+   * does that job by hand — see `dirtyTracker.touch`.
+   */
+  const notes = mountMiniEditor({
+    editorEl: document.getElementById('task-notes')!,
+    toolbarRoot: document.getElementById('task-notes-wrap')!,
+    placeholder: 'Optional.',
+    ariaLabel: 'Notes',
+    // A field's register, not an essay's — see `docClass`.
+    docClass: 'f-prose',
+    onChange: () => ui.dirty.touch(),
+  });
+  /** `emitUpdate: false` everywhere below — TipTap v3 fires `update` from
+   *  `setContent`, which would arm the exit guard on a sheet nobody has typed
+   *  in. The same note stands in five other files. */
+  const setNotes = (md: string) => notes.editor.commands.setContent(md, { emitUpdate: false });
 
   /** The row's JSON — every column, so the form and the row cannot disagree. */
   interface TaskRow {
@@ -182,7 +216,7 @@ if (sheet && form) {
     editing = null;
     form.reset();
     titleInput.value = '';
-    notesInput.value = '';
+    setNotes('');
     dueInput.value = '';
     timeInput.value = '';
     pick(form, 'effort', 'sitting');
@@ -203,7 +237,7 @@ if (sheet && form) {
     reset();
     editing = row.id;
     titleInput.value = row.title;
-    notesInput.value = row.notes ?? '';
+    setNotes(row.notes ?? '');
     dueInput.value = row.due_on ?? '';
     timeInput.value = row.due_time ? row.due_time.slice(0, 5) : '';
     pick(form, 'effort', row.effort);
@@ -277,7 +311,7 @@ if (sheet && form) {
     // has failed at the one thing §6.4 asks of it.
     const [first, ...rest] = detail.text.split('\n');
     titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
-    notesInput.value = (p?.notes ?? rest.join('\n')).trim();
+    setNotes((p?.notes ?? rest.join('\n')).trim());
 
     if (p) {
       dueInput.value = p.due_on?.value ?? '';
@@ -379,7 +413,7 @@ if (sheet && form) {
         actions.tasks.save({
           id: editing ?? undefined,
           title: titleInput.value.trim(),
-          notes: notesInput.value.trim(),
+          notes: notes.getMarkdown().trim(),
           dueOn: dueInput.value,
           dueTime: timeInput.value,
           priority: picked(form, 'prio', 'normal') as Priority,

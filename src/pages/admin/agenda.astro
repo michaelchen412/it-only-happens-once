@@ -41,6 +41,7 @@ import {
 } from '../../lib/hq/calendar';
 import { staleness } from '../../lib/hq/mirror';
 import { liveAndAnswered } from '../../lib/hq/today-data';
+import { renderMarkdown } from '../../lib/markdown';
 
 const supabase = Astro.locals.supabase;
 const { ymd: todayYmd } = Astro.locals.today;
@@ -509,6 +510,23 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     )}
                     {it.location && <span class="drow__l">{it.location}</span>}
                     {!!it.people?.length && <span class="drow__l">{it.people.map((p) => p.name).join(' · ')}</span>}
+                    {/* ⚠ THE ONE PLACE AN EVENT'S NOTES ARE READABLE, and before
+                        plan 43 there was none: the column round-tripped through
+                        the sheet and appeared on no surface at all, while the
+                        field asked you to type Markdown into it. The door code
+                        and the parking instructions belong on the day you need
+                        them, beside the location and the people.
+
+                        NOT IN THE GRID. `.ev` is a single clipped line inside a
+                        month cell — it cannot hold a second sentence, and a
+                        month view that grew one would stop being scannable. The
+                        day panel is where a row is allowed to be more than its
+                        title, which is already why location and people live here
+                        and not up there.
+
+                        Mirrored rows are excluded by construction: `it.notes` is
+                        HQ's own column, so Google's copy has none to show. */}
+                    {it.notes && <span class="drow__n reading" set:html={renderMarkdown(it.notes, { breaks: true })} />}
                   </span>
                   {it.kind === 'task' && !it.answered && (
                     <button type="button" class="chip chip--act chip--did shrink-0" data-dispose="done">

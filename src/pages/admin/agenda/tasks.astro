@@ -34,6 +34,7 @@ import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '..
 import { liveAndAnswered } from '../../../lib/hq/today-data';
 import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
 import type { Tables } from '../../../lib/database.types';
+import { renderMarkdown } from '../../../lib/markdown';
 
 type Task = Tables<'tasks'>;
 
@@ -208,6 +209,26 @@ const payload = (t: Task) =>
                               {eff.label}
                             </span>
                           </span>
+                          {/* ⚠ THE NOTES HAVE A READER NOW, AND UNTIL PLAN 43 THEY
+                              HAD NONE. The column was written by the sheet, carried
+                              back into `payload(t)`, and rendered nowhere on the
+                              site — so a field whose placeholder said "Markdown"
+                              handed your own asterisks back to you for ever. A rich
+                              editor alone would only have moved that lie; the value
+                              had to become visible in the same change.
+
+                              BELOW THE STAMPS, NOT ABOVE THEM. The title and its
+                              date/effort chips are what you scan down a list on a
+                              Tuesday morning, and prose wedged between them pushes
+                              the scannable half apart. Two lines, clamped, because
+                              a task with six lines of notes must not be able to
+                              bury the five tasks under it.
+
+                              `breaks: true` matches the editor it was typed in
+                              (task-sheet.ts) — see `mountMiniEditor`'s note. */}
+                          {t.notes && (
+                            <span class="task__n reading" set:html={renderMarkdown(t.notes, { breaks: true })} />
+                          )}
                         </span>
 
                         {past && <DispositionChips answered={t.answeredAs} />}

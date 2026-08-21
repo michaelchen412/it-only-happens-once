@@ -32,6 +32,7 @@ import type { Ymd } from '../../lib/hq/time';
 import type { Tables } from '../../lib/database.types';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
+import MiniEditor from './MiniEditor.astro';
 
 interface Props {
   /** Today in the configured home zone — the lead sentence measures against it. */
@@ -65,10 +66,36 @@ const { today, goals = [] } = Astro.props;
         <input type="text" name="title" required maxlength="300" placeholder="Deep clean the bathroom" />
       </label>
 
-      <label class="f mt-4">
+      {
+        /* ⚠ A MINI EDITOR, NOT A TEXTAREA, AND THIS FIELD WAS THE WORST CASE OF
+          IT IN THE BUILDING. The placeholder read *"Optional. Markdown."* and
+          NOTHING EVER RENDERED IT — `tasks.astro` carried the column
+          into the row payload and back into this form, and no surface on the
+          site ever ran it through `renderMarkdown`. So the promise was doubly
+          broken: you were asked to type asterisks, and then shown your own
+          asterisks back for ever.
+
+          Both halves are answered together, and they have to be — a rich editor
+          over a value nobody renders would only have moved the lie. The notes
+          now appear on the row that owns them, clamped to two lines
+          (`.task__n`), which is the only reason the field is worth filling in.
+
+          Same ruling SetSheet cites for its description: ADR 0006 chose
+          WYSIWYG-storing-Markdown, ADR 0018 retired "plain textarea, ever".
+
+          ⚠ NO HIDDEN INPUT HERE, unlike SetSheet — that sheet's action reads
+          `new FormData(form)`, which cannot see a contenteditable. This one
+          builds its payload field by field, so the script calls `getMarkdown()`
+          at submit and there is no third copy of the value to fall out of step.
+
+          ⚠ AND IT IS A <div>, NOT A <label>. A label's `for` cannot address a
+          contenteditable, and wrapping one puts the whole surface inside a
+          click target that steals the caret's column on every press. */
+      }
+      <div class="f mt-4">
         <span class="f__k">Notes</span>
-        <textarea name="notes" rows="2" placeholder="Optional. Markdown."></textarea>
-      </label>
+        <MiniEditor id="task-notes" wrapId="task-notes-wrap" size="max-h-[28vh] min-h-[3.25rem]" />
+      </div>
 
       <fieldset class="fs mt-4">
         <legend class="fs__k">When</legend>
@@ -195,7 +222,18 @@ const { today, goals = [] } = Astro.props;
           <div class="flex flex-wrap items-center gap-2">
             <span class="admin-hint text-xs">Every</span>
             <input type="text" inputmode="numeric" class="f--n" value="2" data-every aria-label="How many" />
-            <div class="pseg" role="radiogroup" aria-label="Unit">
+            {
+              /* ⚠ `pseg--fit`: THREE WORDS OF DIFFERENT LENGTHS IN A SENTENCE.
+                `.pseg__b`'s default `flex: 1 1 0` gives every segment the SAME
+                width, which is right for a full-width control and wrong here —
+                `days` and `weeks` are 51px, `months` is 59px, so equal thirds
+                meant `month…` at 390px. That is verbatim the case `.pseg--fit`
+                was added for ("Month does not fit its own"), and the class was
+                simply never reached for a second time. Found by the new
+                ellipsis spec on its first run, in a control nobody had
+                suspected. */
+            }
+            <div class="pseg pseg--fit" role="radiogroup" aria-label="Unit">
               <button type="button" class="pseg__b" role="radio" data-unit="days" aria-checked="false">days</button>
               <button type="button" class="pseg__b" role="radio" data-unit="weeks" aria-checked="true">weeks</button>
               <button type="button" class="pseg__b" role="radio" data-unit="months" aria-checked="false">months</button>

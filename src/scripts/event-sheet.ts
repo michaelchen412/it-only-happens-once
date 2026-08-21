@@ -13,6 +13,8 @@ import { submitAction } from './action-error';
 import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 import { wireFilterFields } from './filter-field';
+// Static, for the reason task-sheet.ts states at its own copy of this import.
+import { mountMiniEditor } from './rich-editor';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
 const form = document.querySelector<HTMLFormElement>('#event-form');
@@ -41,10 +43,28 @@ if (sheet && form) {
   const startInput = form.querySelector<HTMLInputElement>('[data-starts-at]')!;
   const endInput = form.querySelector<HTMLInputElement>('[data-ends-at]')!;
   const locationInput = form.querySelector<HTMLInputElement>('input[name="location"]')!;
-  const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
   const allDay = form.querySelector<HTMLElement>('[data-all-day]')!;
   const whoEl = form.querySelector<HTMLElement>('[data-who]');
   const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.ep-check'));
+
+  /**
+   * Rich since plan 43; the stored value is the same Markdown it always was.
+   * `breaks: true` matches the day panel, which renders it `{ breaks: true }`
+   * (agenda.astro) — an event's notes are the door code and the parking, not an
+   * essay, so a lone newline is a line break at both ends.
+   */
+  const notes = mountMiniEditor({
+    editorEl: document.getElementById('event-notes')!,
+    toolbarRoot: document.getElementById('event-notes-wrap')!,
+    placeholder: 'Optional.',
+    ariaLabel: 'Notes',
+    // A field's register, not an essay's — see `docClass`.
+    docClass: 'f-prose',
+    onChange: () => ui.dirty.touch(),
+  });
+  /** `emitUpdate: false`: v3 emits `update` from `setContent` and would arm the
+   *  exit guard on a sheet nobody typed in. */
+  const setNotes = (md: string) => notes.editor.commands.setContent(md, { emitUpdate: false });
 
   interface EventRow {
     id: string;
@@ -84,7 +104,7 @@ if (sheet && form) {
     startInput.value = '';
     endInput.value = '';
     locationInput.value = '';
-    notesInput.value = '';
+    setNotes('');
     checks().forEach((c) => (c.checked = false));
     heading.textContent = 'New event';
     submitBtn.textContent = 'Add event';
@@ -101,7 +121,7 @@ if (sheet && form) {
     startInput.value = row.starts_at ? row.starts_at.slice(0, 5) : '';
     endInput.value = row.ends_at ? row.ends_at.slice(0, 5) : '';
     locationInput.value = row.location ?? '';
-    notesInput.value = row.notes ?? '';
+    setNotes(row.notes ?? '');
     const on = new Set(row.person_ids);
     checks().forEach((c) => (c.checked = on.has(c.value)));
     heading.textContent = 'Edit event';
@@ -171,7 +191,7 @@ if (sheet && form) {
     const p = detail.parsed;
     const [first, ...rest] = detail.text.split('\n');
     titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
-    notesInput.value = (p?.notes ?? rest.join('\n')).trim();
+    setNotes((p?.notes ?? rest.join('\n')).trim());
     if (p) {
       dateInput.value = p.due_on?.value ?? form.dataset.today ?? '';
       startInput.value = timeValue(p.due_time);
@@ -219,7 +239,7 @@ if (sheet && form) {
           startsAt: startInput.value,
           endsAt: endInput.value,
           location: locationInput.value.trim(),
-          notes: notesInput.value.trim(),
+          notes: notes.getMarkdown().trim(),
           personIds: checks()
             .filter((c) => c.checked)
             .map((c) => c.value),

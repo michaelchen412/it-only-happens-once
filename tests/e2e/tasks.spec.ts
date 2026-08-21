@@ -59,6 +59,30 @@ test.describe('the editor — where the two invisible rules become checkable', (
     await expect(line).toContainText('2 days ahead');
   });
 
+  /**
+   * ⚠ THE FIELD ASKED FOR MARKDOWN AND NOTHING EVER RENDERED IT. Until plan 43
+   * the notes placeholder read *"Optional. Markdown."*, the column round-tripped
+   * through the sheet, and no surface on the site ran it through `renderMarkdown`
+   * — so you typed asterisks and were shown your own asterisks back for ever.
+   *
+   * What this pins is the half a screenshot cannot: that pressing B produces a
+   * MARK and not a character. A spec asserting the visible text would pass just
+   * as happily on `*bold*`, which is the exact failure being fixed.
+   */
+  test('⚠ the notes field makes marks, not asterisks', async ({ page }) => {
+    await openEditor(page);
+    const box = page.locator('#task-notes [contenteditable]');
+    await box.click();
+    await box.pressSequentially('Grout brush is under the sink. ');
+    await page.locator('#task-notes-wrap .tt-btn[data-cmd="bold"]').click();
+    await expect(page.locator('#task-notes-wrap .tt-btn[data-cmd="bold"]')).toHaveAttribute('aria-pressed', 'true');
+    await box.pressSequentially('shower first');
+
+    await expect(box.locator('strong')).toHaveText('shower first');
+    // The whole point: no asterisk was typed and none is on screen.
+    await expect(box).not.toContainText('*');
+  });
+
   test('⚠ the lead names a real DATE, and says so when it reaches back past today', async ({ page }) => {
     await openEditor(page);
     // A date 7 days out with a project's 21-day lead: the lead started two

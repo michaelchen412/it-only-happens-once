@@ -337,14 +337,45 @@ export interface MiniEditorOptions {
   placeholder?: string;
   ariaLabel?: string;
   onChange?: () => void;
+  /**
+   * Extra classes for the editable surface, beside `reading tiptap-doc` —
+   * `mountRichEditor`'s option of the same name, and it is needed here for the
+   * same reason it was needed there.
+   *
+   * ⚠ `reading` IS AN ESSAY'S TYPOGRAPHY: 1.15rem at 1.8, with 1.4em between
+   * paragraphs. That is right for a quote, which is the whole point of the sheet
+   * it sits in, and wrong for a field you fill in — mounted bare on the task
+   * sheet's notes it came out half again the size of the title input above it.
+   * `.f-prose` is the field register (hq.css), exactly the metrics of the
+   * `.f textarea` it replaced; `.jot-prose` is the card one.
+   */
+  docClass?: string;
+  /**
+   * Treat a lone newline as a hard break, both ways through Markdown —
+   * `mountRichEditor`'s option of the same name, and read its note for the why.
+   *
+   * ⚠ IT MUST MATCH THE RENDERER THIS FIELD IS READ BACK THROUGH, and that is
+   * the whole reason it became a parameter (2026-08-20). It was hardcoded `true`
+   * while every original caller happened to render with `{ breaks: true }`, so
+   * nothing disagreed. The fields converted from plain textareas in plan 43 do
+   * NOT all render that way — a goal's *why* is rendered `breaks: false` on the
+   * stated reasoning that *"a why is prose, where a wrapped line is not a line
+   * break"* — and mounting those at `true` would have made the editor show a
+   * line break the page then silently closed up. A WYSIWYG that lies about one
+   * character is worse than the textarea it replaced.
+   *
+   * Defaults to `true`, which is what the five callers that predate the option
+   * were already getting.
+   */
+  breaks?: boolean;
 }
 
 /**
  * The short-form editor: bold and italic, line breaks preserved, no headings /
  * lists / rules. That's the register a quote's words and a song's annotation
  * share — a sentence or a few, never an essay — so the composer's full toolbar
- * would be noise. `breaks: true` keeps a poem's line breaks through the
- * Markdown round-trip.
+ * would be noise. `breaks` defaults to true, which keeps a poem's line breaks
+ * through the Markdown round-trip; pass false where the render side says false.
  *
  * Same handle as `mountRichEditor`, so callers serialize the same way.
  */
@@ -361,12 +392,15 @@ export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
         codeBlock: false,
         horizontalRule: false,
       }),
-      Markdown.configure({ breaks: true, transformPastedText: true }),
+      Markdown.configure({ breaks: opts.breaks ?? true, transformPastedText: true }),
       Placeholder.configure({ placeholder: opts.placeholder ?? 'Write…' }),
     ],
     content: '',
     editorProps: {
-      attributes: { class: 'reading tiptap-doc focus:outline-none', 'aria-label': opts.ariaLabel ?? 'Text' },
+      attributes: {
+        class: `reading tiptap-doc focus:outline-none${opts.docClass ? ` ${opts.docClass}` : ''}`,
+        'aria-label': opts.ariaLabel ?? 'Text',
+      },
     },
   });
   const getMarkdown = () =>

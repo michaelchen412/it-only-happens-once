@@ -571,6 +571,18 @@ a.row__t:hover {
   padding-top: 1.125rem;
   border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
 }
+/* ⚠ A FIELDSET AFTER A FIELD HAD NO GAP OF ITS OWN. `.fs` zeroes its margin and
+   only `.fs + .fs` puts one back, so every sheet where a `.f` is followed by a
+   `.fs` was spaced by ACCIDENT: the field above ended in a `<textarea>`, and a
+   textarea is inline-block, so its baseline descender donated a few pixels that
+   read as deliberate. Swapping the task sheet's notes for a mini editor — a
+   block-level box, no descender — took the donation away and dropped WHEN onto
+   the editor's bottom border, which is how a fifteen-month-old gap turned out
+   never to have existed. No border here: `.fs + .fs`'s rule is a divider between
+   two SECTIONS, and a field is not a section. */
+.f + .fs {
+  margin-top: 1.125rem;
+}
 .fs__k {
   font-family: var(--font-sans);
   font-size: 0.6875rem;
@@ -1522,6 +1534,19 @@ a.row__t:hover {
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-field, 0.5rem);
   overflow: hidden;
+  /* ⚠ NEVER CRUSH THE LABELS — WRAP THE WHOLE CONTROL INSTEAD. Only bites when
+     a `.pseg` is itself a flex ITEM, which is the repeat panel's sentence row:
+     `Every [2] [days|weeks|months] after I finish`. There the control was being
+     squeezed until `months` ellipsised, and the spec that found it was written
+     the same hour to catch the identical failure in Effort — so this is the
+     THIRD instance in this file (`.pseg--fit`'s `Mon…` was the first).
+
+     It is the general rule and not a modifier because a segmented control whose
+     labels cannot be read is never the outcome anybody wanted; a control that
+     wraps to its own line always is. If one is ever genuinely too wide for its
+     container it now OVERFLOWS rather than lying quietly, and overflow is the
+     one thing `tasks.mobile.spec.ts` has always been able to see. */
+  flex-shrink: 0;
 }
 .pseg__b {
   flex: 1 1 0;
@@ -3090,6 +3115,54 @@ button.drow__x:hover {
   font-size: 0.6875rem;
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
 }
+/* ── notes, where a row is allowed to be more than its title ───────────────
+   Both of these render Markdown a mini editor wrote, so both are `.reading`'s
+   register knocked down to a row's scale, and both are CLAMPED TO TWO LINES.
+   The clamp is the load-bearing part: notes are the only field on either
+   surface with no length limit, and one task carrying six lines of them would
+   push the five tasks under it off the screen. Two lines say whether there is
+   something to open; the sheet says what it is.
+
+   ⚠ `-webkit-line-clamp` NEEDS ALL THREE DECLARATIONS — the box display, the
+   orientation and the count — and drops to "no clamp" rather than to an error
+   if one is missing. `line-clamp` is beside it for the standard property. */
+.task__n,
+.drow__n {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-family: var(--font-serif, serif);
+  line-height: 1.5;
+}
+.task__n {
+  margin-top: 0.1875rem;
+  font-size: 0.8125rem;
+  color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+}
+.drow__n {
+  margin-top: 0.1875rem;
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+/* `.reading` gives a paragraph its article rhythm, which inside a clamped
+   two-line box would spend the first line on margin. */
+.task__n > :first-child,
+.drow__n > :first-child {
+  margin-top: 0;
+}
+.task__n > :last-child,
+.drow__n > :last-child {
+  margin-bottom: 0;
+}
+/* A done or skipped row keeps its notes but stops competing for the eye — the
+   title already carries the strike, and a second full-strength line under it
+   would undo what the strike is for. */
+.task--done .task__n,
+.task--skipped .task__n {
+  color: color-mix(in oklch, var(--color-base-content) 38%, transparent);
+}
 /* A left rule, carrying the same authority language as the grid — and the
    background is cleared, because in the panel the fill would fight the text. */
 .drow.ev--event,
@@ -3576,6 +3649,35 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .dump:hover {
   border-color: color-mix(in oklch, var(--color-base-content) 20%, var(--color-base-300));
 }
+/* ── a form field's prose register ───────────────────────────────────────────
+   The same split `.jot-prose` makes below, made for a FIELD instead of a card.
+   A mini editor's surface wears `.reading`, which is an essay's typography —
+   1.15rem at 1.8 — and mounted bare on the task sheet's notes it rendered half
+   again the size of the title input above it and shoved the date off the phone.
+
+   `.reading` keeps saying what the marks MEAN (bold, italic, a link); this says
+   what scale they mean it at. The numbers are `.f textarea`'s exactly, because
+   the box this replaces is the box beside it — a field that changed instrument
+   must not change register too, or the sheet reads as two typographies.
+
+   Unlayered, so it beats `@layer base`'s `.reading` without a specificity
+   contest — the same note `.jot-prose` carries. */
+.f-prose {
+  font-family: var(--font-serif, serif);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere; /* a pasted URL must not widen the sheet */
+}
+.f-prose > :first-child {
+  margin-top: 0;
+}
+.f-prose > :last-child {
+  margin-bottom: 0;
+}
+.f-prose :is(p, ul, ol, blockquote) {
+  margin-block: 0.5em;
+}
+
 /* ── a jotting's prose register ─────────────────────────────────────────────
    `.reading` is tuned for an essay in a wide column: 1.15rem at 1.8, with
    1.4em between paragraphs. Every one of those is wrong inside a card that may
