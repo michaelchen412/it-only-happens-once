@@ -118,7 +118,7 @@ const COLUMNS = [
     }
 
     {/* search — icon lives inside the field (daisyUI pattern; no overlay) */}
-    <label class="input input-sm input-bordered flex min-w-[12rem] flex-1 items-center gap-2 font-sans md:max-w-xs">
+    <label class="input input-sm flex min-w-[12rem] flex-1 items-center gap-2 font-sans md:max-w-xs">
       <Icon name="ph:magnifying-glass" class="text-base-content/50 shrink-0" />
       <input
         type="search"
@@ -150,11 +150,7 @@ const COLUMNS = [
         writing". */
       !pair && (
         <>
-          <select
-            name="author"
-            aria-label="Filter by author"
-            class="select select-sm select-bordered max-w-[10rem] font-sans"
-          >
+          <select name="author" aria-label="Filter by author" class="select select-sm max-w-[10rem] font-sans">
             <option value="">All authors</option>
             {data.allAuthors.map((a) => (
               <option value={a.slug} selected={a.slug === p.authorSlug}>
@@ -162,11 +158,7 @@ const COLUMNS = [
               </option>
             ))}
           </select>
-          <select
-            name="work"
-            aria-label="Filter by work"
-            class="select select-sm select-bordered max-w-[10rem] font-sans"
-          >
+          <select name="work" aria-label="Filter by work" class="select select-sm max-w-[10rem] font-sans">
             <option value="">All works</option>
             {data.allWorks.map((w) => (
               <option value={w.slug} selected={w.slug === p.workSlug}>
@@ -178,11 +170,7 @@ const COLUMNS = [
       )
     }
     {/* The fragment→constellation view: what's placed where, and what's placed nowhere. */}
-    <select
-      name="in"
-      aria-label="Filter by constellation"
-      class="select select-sm select-bordered max-w-[12rem] font-sans"
-    >
+    <select name="in" aria-label="Filter by constellation" class="select select-sm max-w-[12rem] font-sans">
       <option value="">Any constellation</option>
       <option value="none" selected={p.membership === 'none'}>— in none —</option>
       {

@@ -140,19 +140,14 @@ const mergeOptions = {
               data-uses={subjCount[s.id] ?? 0}
             >
               <td class="px-3 py-2">
-                <input
-                  data-field="name"
-                  value={s.name}
-                  aria-label="Subject name"
-                  class="input input-xs input-bordered w-36"
-                />
+                <input data-field="name" value={s.name} aria-label="Subject name" class="input input-xs w-36" />
               </td>
               <td class="px-3 py-2">
                 <input
                   data-field="definition"
                   value={s.definition ?? ''}
                   placeholder="one-line meaning…"
-                  class="input input-xs input-bordered w-full"
+                  class="input input-xs w-full"
                 />
               </td>
               <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
@@ -187,19 +182,14 @@ const mergeOptions = {
               data-own-note={a.note?.trim() ? '1' : ''}
             >
               <td class="px-3 py-2">
-                <input
-                  data-field="name"
-                  value={a.name}
-                  aria-label="Author name"
-                  class="input input-xs input-bordered w-44"
-                />
+                <input data-field="name" value={a.name} aria-label="Author name" class="input input-xs w-44" />
               </td>
               <td class="px-3 py-2">
                 <input
                   data-field="note"
                   value={a.note ?? ''}
                   placeholder="dates, a line…"
-                  class="input input-xs input-bordered w-full"
+                  class="input input-xs w-full"
                 />
               </td>
               <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
@@ -236,15 +226,10 @@ const mergeOptions = {
               data-shelf-notes={shelfNotes[w.id] ?? 0}
             >
               <td class="px-3 py-2">
-                <input
-                  data-field="title"
-                  value={w.title}
-                  aria-label="Work title"
-                  class="input input-xs input-bordered w-44"
-                />
+                <input data-field="title" value={w.title} aria-label="Work title" class="input input-xs w-44" />
               </td>
               <td class="px-3 py-2">
-                <select data-field="author_id" class="select select-xs select-bordered max-w-[10rem]">
+                <select data-field="author_id" class="select select-xs max-w-[10rem]">
                   <option value="">— none —</option>
                   {(authors ?? []).map((a) => (
                     <option value={a.id} selected={a.id === w.author_id}>
@@ -259,7 +244,7 @@ const mergeOptions = {
                   type="number"
                   value={w.year ?? ''}
                   aria-label="Year"
-                  class="input input-xs input-bordered w-16"
+                  class="input input-xs w-16"
                 />
               </td>
               <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>

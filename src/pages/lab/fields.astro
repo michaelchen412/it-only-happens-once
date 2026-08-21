@@ -388,7 +388,7 @@ const MONTHS = ['—', 'January', 'February', 'March'];
     color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
   }
   /* `.admin-label` never appears beside a `.f input` in the tree — it co-occurs
-     with daisyUI's `input input-sm input-bordered`, because it belongs to the
+     with daisyUI's `input input-sm `, because it belongs to the
      half that was built on daisyUI. Reproduced here so this column is the real
      thing and not a straw man; it is meant to be dismissed on the LABEL, which
      is a fair fight only if everything else matches. */
@@ -405,7 +405,7 @@ const MONTHS = ['—', 'January', 'February', 'March'];
 
   /* ── corpus: what the quote and song sheets actually do ────────────────────
      `flex flex-col gap-1 text-sm` + `span.text-base-content/70`, and daisyUI's
-     `input input-sm input-bordered` rather than `.f`'s descendant selector.
+     `input input-sm ` rather than `.f`'s descendant selector.
      The required `<em>` is hidden because the corpus half HAS no word for
      required — FragmentSheet marks it with a red `*` carrying `aria-hidden`,
      which is why plan 38 · §2's finding F says the quote sheet's only required

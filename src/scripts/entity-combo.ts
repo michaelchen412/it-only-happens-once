@@ -69,7 +69,7 @@ if (!customElements.get('entity-combo')) {
 
       this.field = document.createElement('input');
       this.field.type = 'text';
-      this.field.className = 'entity-combo__field input input-sm input-bordered w-full';
+      this.field.className = 'entity-combo__field input input-sm  w-full';
       this.field.placeholder = this.dataset.placeholder || '';
       this.field.autocomplete = 'off';
       this.field.setAttribute('role', 'combobox');

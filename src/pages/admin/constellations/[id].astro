@@ -158,12 +158,7 @@ const VIS_HINT = {
             <label class="f__k" for="cc-slug">URL</label>
             <div class="flex items-center gap-1.5">
               <span class="text-base-content/40 font-mono text-xs">/</span>
-              <input
-                id="cc-slug"
-                name="slug"
-                value={c.slug}
-                class="input input-sm input-bordered w-full font-mono text-xs"
-              />
+              <input id="cc-slug" name="slug" value={c.slug} class="input input-sm w-full font-mono text-xs" />
             </div>
             <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
           </div>
@@ -358,7 +353,7 @@ const VIS_HINT = {
             inputmode="url"
             value={c.score_url}
             placeholder="https://open.spotify.com/playlist/…"
-            class="input input-sm input-bordered w-full font-sans"
+            class="input input-sm w-full font-sans"
           />
           <p class="admin-hint mt-1.5">
             A Spotify playlist to play through the read; it appears above the first fragment.
