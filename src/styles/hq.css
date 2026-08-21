@@ -276,6 +276,24 @@ a.row__t:hover {
   vertical-align: -0.125em;
   opacity: 0.6;
 }
+/* A row's LEADING mark — an icon standing alone as the row's first child, which
+   is a different job from `.row__i` above and is why it is a second class rather
+   than a reuse: `.row__i` sits INLINE BESIDE TEXT and carries its own right
+   margin to separate itself from it, while a leading mark is a flex child of
+   `.row` and is spaced by that row's own `gap`. Giving it `.row__i` would add
+   the margin on top of the gap.
+
+   ⚠ IT WAS WRITTEN IN THE MARKUP AND NEVER DEFINED. Two goal pages have
+   rendered `class="row__mark"` against no rule at all, so the ph:target beside
+   an inactive goal came out at full strength while every other icon in HQ is
+   muted to 0.6 — the one row on the page whose mark shouted. Found by scanning
+   for classes with no matching rule, which is also how `.navb` turned up. */
+.row__mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
 .row__sub {
   display: block;
   margin-top: 0.125rem;
@@ -2511,6 +2529,21 @@ a.row__t:hover {
 /* Disposition carries ICONS, not bare words: two same-shaped text chips side by
    side make you read to choose, on the one control that has to be answerable at
    a glance. */
+/* `draft`, on the notes list — and it is the WHOLE signal separating a draft
+   from a published piece there, which is what its own comment in notes.astro
+   says: *"the chip is the whole explanation."*
+
+   ⚠ IT EXPLAINED NOTHING UNTIL 2026-08-21. The markup read `chip chip--off`,
+   and the only `--off` ever written is `.admin-chip--off` in admin.css — the
+   WORKSHOP's chip family, not HQ's. A modifier from the wrong family is not a
+   fallback, it is nothing, so the badge rendered as a bare `.chip` and a draft
+   looked exactly like everything else. Defined here rather than by switching
+   the markup to `admin-chip`, because that page is an HQ room and one page
+   wearing two chip families is the confusion this fixes, twice. */
+.chip--off {
+  background: var(--color-base-300);
+  color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+}
 .chip--act {
   background: var(--color-base-100);
   border-color: var(--color-base-300);
