@@ -3244,6 +3244,39 @@ a.row__t:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* ⚠ THE WEEK FILLS THE PAGE; IT USED TO END A THIRD OF THE WAY DOWN IT.
+   Measured 2026-08-21 at 1280×900, on a week that HAD events in it: the grid
+   stopped at y=288 and left 612px — 68% of the screen — empty underneath. The
+   month view beside it fills, so the two sat side by side in the same room with
+   one of them looking unfinished.
+
+   The cause was `min-height: 6rem` on the body of a column that had no way to
+   grow: seven boxes sized to their contents in a page with room for five times
+   that. A day column is the one surface here whose whole job is to show
+   everything on a day at once, and it was the shortest thing on the page.
+
+   ⚠ ONLY ABOVE 60rem, WHICH IS WHERE IT IS ACTUALLY A WEEK. Below that the grid
+   reflows to two columns and four rows (the rule above), so a viewport-height
+   floor would make each of those four rows a screenful and turn one week into a
+   long scroll. There the content height is the right height.
+
+   The subtraction is what sits above the grid — the room's tabs, the period
+   control and the legend — measured rather than guessed, and `svh` so a mobile
+   browser's collapsing toolbar cannot make it taller than the screen. It is a
+   FLOOR, not a height: a genuinely busy day still grows past it and takes the
+   others with it, because the columns are one grid row. */
+@media (min-width: 60rem) {
+  .wk {
+    min-height: calc(100svh - 13rem);
+  }
+  .wkcol {
+    display: flex;
+    flex-direction: column;
+  }
+  .wkcol__b {
+    flex: 1;
+  }
+}
 .wkcol {
   border: 1px solid var(--color-base-300);
   border-radius: var(--radius-box);
