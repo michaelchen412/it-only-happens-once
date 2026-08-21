@@ -149,6 +149,95 @@ test.describe('holidays on the grid', () => {
   });
 });
 
+/* The period control — ‹ September 2026 › ↩ Today (2026-08-21).
+
+   ⚠ EVERY ASSERTION HERE IS A GEOMETRY ONE, because the two defects it was
+   built to fix were both invisible to the kind of test this file was already
+   full of. The arrows moved on every step and every existing spec still passed,
+   since they all matched on `aria-label` and never on position. And the arrows
+   carried `class="navb"` — referenced in one file, DEFINED IN NONE — so they
+   had no size, no hit area and no hover, which no assertion about a link can
+   see. A phantom class renders perfectly and fails nothing. */
+test.describe('the period control', () => {
+  const arrows = async (page: Page) => ({
+    prev: (await page.locator('[aria-label="Previous month"]').boundingBox())!,
+    next: (await page.locator('[aria-label="Next month"]').boundingBox())!,
+  });
+
+  test('⚠ the arrows do not move when the month name changes length', async ({ page }) => {
+    // May is the shortest title this calendar can show and September the
+    // longest — if any pair moves, these two do.
+    await calendar(page, '?date=2026-05-01');
+    const may = await arrows(page);
+    await calendar(page, '?date=2026-09-01');
+    const sep = await arrows(page);
+    await calendar(page, '?date=2027-02-01');
+    const feb = await arrows(page);
+
+    expect(sep.prev.x).toBe(may.prev.x);
+    expect(sep.next.x).toBe(may.next.x);
+    expect(feb.prev.x).toBe(may.prev.x);
+    expect(feb.next.x).toBe(may.next.x);
+  });
+
+  test('⚠ and they do not move when the way back appears or disappears', async ({ page }) => {
+    // On the current month there is nothing to go back to, so the chip is held
+    // rather than removed. This is the assertion that catches it being removed.
+    await calendar(page);
+    const onToday = await arrows(page);
+    await calendar(page, '?date=2027-02-01');
+    const elsewhere = await arrows(page);
+    expect(elsewhere.prev.x).toBe(onToday.prev.x);
+    expect(elsewhere.next.x).toBe(onToday.next.x);
+  });
+
+  test('the arrows are real targets, not bare glyphs in the text flow', async ({ page }) => {
+    await calendar(page);
+    const box = (await page.locator('[aria-label="Previous month"]').boundingBox())!;
+    // `.navb` gave them zero of both. 1.75rem is what `.datebar__step` sets.
+    expect(box.width).toBeGreaterThanOrEqual(24);
+    expect(box.height).toBeGreaterThanOrEqual(24);
+  });
+
+  test('the held way back is invisible to both eye and screen reader', async ({ page }) => {
+    await calendar(page);
+    const held = page.locator('.per__back--held');
+    await expect(held).toHaveCount(1);
+    await expect(held).toBeHidden();
+    // A <span>, so there is nothing to tab to and nothing to announce.
+    await expect(page.locator('a.per__back')).toHaveCount(0);
+  });
+
+  test('⚠ the view toggle centres its label inside its 44px tap target', async ({ page }) => {
+    await calendar(page);
+    const gaps = await page
+      .locator('.pseg--fit .pseg__b')
+      .first()
+      .evaluate((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const t = r.getBoundingClientRect();
+        const e = el.getBoundingClientRect();
+        return { height: e.height, above: t.top - e.top, below: e.bottom - t.bottom };
+      });
+    // The 44px floor is the point of the min-height and must survive the fix.
+    expect(gaps.height).toBeGreaterThanOrEqual(44);
+    // It read 10 above / 18 below before — the dead space Michael reported.
+    expect(Math.abs(gaps.above - gaps.below)).toBeLessThanOrEqual(1);
+  });
+
+  test('⚠ neither view makes the page scroll sideways on a phone', async ({ page }) => {
+    // The ghosts that hold the width are dropped under 40rem precisely because
+    // reserving the widest week range pushed a 390px document to 450px.
+    await page.setViewportSize({ width: 390, height: 700 });
+    for (const q of ['?date=2026-09-01', '?date=2026-09-01&view=week']) {
+      await calendar(page, q);
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(over).toBeLessThanOrEqual(0);
+    }
+  });
+});
+
 test.describe('the day panel', () => {
   const openADay = async (page: Page) => {
     await calendar(page);

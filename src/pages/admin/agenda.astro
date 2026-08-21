@@ -214,6 +214,43 @@ const roster = (peopleRows ?? [])
 const taggable = roster.length > 0;
 
 const stepWeek = (n: number) => shiftYmd(weekStart, n * 7);
+
+/* ── what the period control is WIDE ENOUGH FOR ──────────────────────────────
+   Michael, 2026-08-21: *"the month arrows shift around depending on the length
+   of the month name… keep the space enough and consistent to handle the longest
+   of month names."* The arrows moving as you step months is the whole complaint,
+   and it is a layout bug rather than a taste one: the control you are aiming at
+   is somewhere else by the time the page repaints, so stepping three months
+   means three separate aims.
+
+   ⚠ THE WIDTH IS MEASURED FROM REAL LABELS, NOT HARD-CODED. `.per__now` stacks
+   these in the same grid cell as the live title, hidden, so the cell is exactly
+   as wide as the widest thing that can ever land in it — in the actual display
+   serif, at the actual size, for ever. A `min-width: 9.5rem` would be a number
+   somebody measured once in one font and would go quietly wrong the day
+   `--font-display` changes.
+
+   AND THEY GO THROUGH THE SAME FORMATTERS the live label does, so the ghost can
+   never disagree with it about how a date is written. Hard-coding the string
+   'September 2026' would be a second, silent copy of `monthTitle`'s output
+   format. */
+const monthGhosts = Array.from({ length: 12 }, (_, m) =>
+  monthTitle(`${anchor.slice(0, 4)}-${String(m + 1).padStart(2, '0')}-01`),
+);
+
+/* The widest a week range can be: two-digit month and day at both ends, plus
+   the `/YY` that `dmd` adds whenever the date is not in the current year. Sized
+   separately from the months because they are different labels in different
+   views — each view is stable within itself, which is what "the arrows do not
+   move as I step" actually means. */
+const weekGhost = `${dmd('2026-12-22', '2025-01-01')} – ${dmd('2026-12-28', '2025-01-01')}`;
+
+/* Being on another period must never be ambiguous — the same rule the date bar
+   follows on Today. Hoisted out of the template because the control below needs
+   the answer twice: once to choose the link, once to reserve its width. */
+const offPeriod = week
+  ? todayYmd < weekCells[0] || todayYmd > weekCells[6]
+  : anchor.slice(0, 7) !== todayYmd.slice(0, 7);
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** The weekday name for a local date — via `ymdToUtc`, like everything else. */
 const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
@@ -228,36 +265,58 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
          a period, not a name, and it travels with the two step arrows and the
          way back. Those belong beside it — moving them to `actions` would put
          "previous month" at the far end of the bar, away from the month it
-         steps. The slot exists for exactly this. */
+         steps. The slot exists for exactly this.
+
+         ⚠ ONE CONTROL, ‹ TITLE ›, REBUILT 2026-08-21. It was a title, then a
+         pair of arrows, then a chip, laid out with `flex gap-3` — so all three
+         moved whenever the title's width changed, which in month view is every
+         single step. See `monthGhosts` above for how the width is held, and
+         `.per` in hq.css for the two rules that do it. */
     }
     <PageHeader class="mb-4">
-      <div slot="title" class="flex flex-wrap items-center gap-3">
-        <h1 class="font-display text-2xl font-light">
-          {week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}
+      <div slot="title" class="per">
+        <a
+          class="datebar__step"
+          href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
+          aria-label={week ? 'Previous week' : 'Previous month'}
+        >
+          <Icon name="ph:caret-left" />
+        </a>
+        <h1 class="per__now font-display text-2xl font-light">
+          {
+            /* The hidden labels that set the width. `aria-hidden`, so a screen
+               reader hears the month once rather than thirteen times. */
+            (week ? [weekGhost] : monthGhosts).map((g) => (
+              <span class="per__ghost" aria-hidden="true">
+                {g}
+              </span>
+            ))
+          }
+          <span>{week ? `${dmd(weekCells[0], todayYmd)} – ${dmd(weekCells[6], todayYmd)}` : monthTitle(anchor)}</span>
         </h1>
-        <span class="flex items-center">
-          <a
-            class="navb"
-            href={href({ date: week ? stepWeek(-1) : shiftMonth(anchor, -1) })}
-            aria-label={week ? 'Previous week' : 'Previous month'}
-          >
-            <Icon name="ph:caret-left" />
-          </a>
-          <a
-            class="navb"
-            href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
-            aria-label={week ? 'Next week' : 'Next month'}
-          >
-            <Icon name="ph:caret-right" />
-          </a>
-        </span>
+        <a
+          class="datebar__step"
+          href={href({ date: week ? stepWeek(1) : shiftMonth(anchor, 1) })}
+          aria-label={week ? 'Next week' : 'Next month'}
+        >
+          <Icon name="ph:caret-right" />
+        </a>
         {
-          /* Being on another month must never be ambiguous — the same rule the
-             date bar follows on Today. */
-          (week ? todayYmd < weekCells[0] || todayYmd > weekCells[6] : anchor.slice(0, 7) !== todayYmd.slice(0, 7)) && (
-            <a class="chip u-none" href={href({ date: null })}>
+          /* ⚠ THE WAY BACK KEEPS ITS SPACE WHETHER OR NOT IT IS THERE. Showing
+             and hiding a chip on the same row as the arrows reintroduces exactly
+             the jump the ghosts above remove — step from August into September
+             and everything to the left of it would shuffle. So the off-period
+             case renders the identical chip, invisible: same text, same padding,
+             therefore the same width, and a `<span>` rather than an `<a>` so it
+             is neither focusable nor announced. */
+          offPeriod ? (
+            <a class="chip u-none per__back" href={href({ date: null })}>
               ↩ Today
             </a>
+          ) : (
+            <span class="chip per__back per__back--held" aria-hidden="true">
+              ↩ Today
+            </span>
           )
         }
       </div>

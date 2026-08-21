@@ -384,6 +384,18 @@ a.row__t:hover {
 .cal-wrap[open] .datebar__caret {
   opacity: 0.45;
 }
+/* ⚠ TWO ROOMS USE THIS, since 2026-08-21: Today's date bar and the calendar's
+   period control (`.per`). The name still says `datebar` because that is where
+   it was born and renaming it would touch two pages to no effect — but it is
+   the app's ONE step-arrow, and a third stepper should reuse it rather than
+   grow a fourth.
+
+   ⚠ IT REPLACED A CLASS THAT DID NOT EXIST. The calendar's two arrows carried
+   `class="navb"`, which was referenced in exactly one file and DEFINED IN NONE —
+   so they had no size, no hit area, no hover and no colour, and were simply two
+   bare glyphs sitting in the text flow. That is most of why the header looked
+   unfinished, and no test could see it: a phantom class fails silently, renders
+   fine, and passes every assertion about the link it is on. */
 .datebar__step {
   display: grid;
   place-items: center;
@@ -409,6 +421,56 @@ a.row__t:hover {
 }
 .datebar__back:hover {
   background: var(--color-base-200);
+}
+
+/* ── the calendar's period control: ‹ September 2026 › ↩ Today ──────────────
+   Michael, 2026-08-21: *"the month arrows shift around depending on the length
+   of the month name."* They did, because the row was `title, arrows, chip` in a
+   plain flex — so every one of them sat wherever the month name happened to
+   end, and the target you were aiming at moved on every step.
+
+   The fix is that the TITLE holds a fixed width and the arrows flank it, which
+   is what makes this one control rather than three things in a row. */
+.per {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  /* It may wrap away from the actions cluster on a narrow screen, but it must
+     never wrap INSIDE itself — an arrow on its own line is not a stepper. */
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+/* ⚠ THE WIDTH COMES FROM HIDDEN COPIES OF THE REAL LABELS, not from a number.
+   Every ghost and the live title share one grid cell, so the cell is as wide as
+   the widest of them — measured in the real font at the real size, which no
+   hard-coded `min-width` can promise across a font change. See `monthGhosts` in
+   agenda.astro for which labels are stacked here and why they go through the
+   same formatters the live one does. */
+.per__now {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  white-space: nowrap;
+}
+.per__now > * {
+  grid-area: 1 / 1;
+}
+/* `visibility: hidden` and NOT `display: none` — the whole point is that these
+   still take part in layout. `display: none` would remove them from the grid and
+   the cell would collapse back onto the live title, which is the bug. */
+.per__ghost {
+  visibility: hidden;
+}
+
+.per__back {
+  margin-left: 0.5rem;
+}
+/* The way back, holding its place on a period that does not need one. Same
+   reason as the ghosts above, one row out: a chip that appears and disappears
+   would move everything left of it. */
+.per__back--held {
+  visibility: hidden;
 }
 
 .cal {
@@ -1556,8 +1618,29 @@ a.row__t:hover {
      — a mis-tap files somebody in the wrong circle and nothing says so. Caught
      by people.mobile.spec.ts on its first run, not by review. */
   min-height: 2.75rem;
+  /* ⚠ THE LINE FILLS THE FLOOR, WHICH IS WHAT CENTRES THE LABEL. Michael,
+     2026-08-21, on the calendar's Month/Week pair: *"weird dead space at the
+     bottom and not sure what that's for."* Measured: a 44px box holding 16px of
+     text with 10px above it and 18px below — the label sat 8px high and the
+     fill looked like it had a hole in the bottom of it.
+
+     The 44px is the tap floor above and is not negotiable. The bug was that
+     `min-height` on a BLOCK element puts every pixel of slack underneath the
+     text, because block layout has no vertical centring to do it with. Matching
+     `line-height` to the floor makes the single line box fill the button, and a
+     line box centres its own text.
+
+     ⚠ NOT `display: flex` + `align-items: center`, which is the reflex fix and
+     breaks something real: the text would become an anonymous flex item and
+     `text-overflow: ellipsis` below would stop applying to it — reopening the
+     `Mon…` truncation this control has already been bitten by twice (see
+     `.pseg--fit`). A line box keeps block layout, so the ellipsis keeps working.
+
+     Safe because `white-space: nowrap` two lines down guarantees there is only
+     ever ONE line to centre. */
+  line-height: 2.75rem;
   min-width: 0;
-  padding: 0.4375rem 0.5rem;
+  padding: 0 0.5rem;
   font-family: var(--font-sans);
   font-size: 0.8125rem;
   white-space: nowrap;
@@ -2985,6 +3068,21 @@ a.row__t:hover {
    the cell is showing — so there is no breakpoint the server has to guess at,
    and rotating a phone cannot catch the grid in the wrong state. */
 @media (max-width: 40rem) {
+  /* ⚠ THE GHOSTS COME OFF ON A PHONE, and this is a trade rather than an
+     oversight. Measured at 390px: month view fits (the widest title is
+     `September 2026`), but WEEK view did not — the widest week range carries a
+     `/YY` on both ends, and reserving it pushed the document to 450px and made
+     the whole page slide sideways.
+
+     A header that scrolls horizontally is a worse defect than an arrow that
+     moves, and at this width the arrows barely move anyway: the control is
+     already pinned between the screen edges rather than floating in a bar with
+     room to drift. So the width is held where it was actually complained about
+     — the desktop header — and released where holding it would cost more than
+     it buys. */
+  .per__ghost {
+    display: none;
+  }
   .month__grid {
     grid-auto-rows: minmax(3.5rem, auto);
   }
