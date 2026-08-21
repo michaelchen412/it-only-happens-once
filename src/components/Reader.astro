@@ -115,6 +115,34 @@ const { returnLabel } = Astro.props;
 <script>
   import { navigate } from 'astro:transitions/client';
   import { closeWithExit, openDialog } from '../scripts/dialog-close';
+  import { initReveal } from '../scripts/reveal';
+  import { initShareMark } from '../scripts/share-mark';
+
+  /**
+   * ⚠ THE SHEET CARRIES THE BEHAVIOUR FOR THE CONTENT IT MATERIALISES, and it
+   * has to, because that content's own scripts are not guaranteed to run.
+   *
+   * Astro emits a component's `<script>` beside the component. Everything this
+   * sheet shows is authored somewhere that seals that tag away: inside a
+   * `<template>` on the feed, or inside an article this file FETCHES, where
+   * `DOMParser` marks every script "already started" so it can never execute.
+   * The template path survived on an accident of the platform — cloning
+   * template content DOES run its scripts — and the fetch path did not survive
+   * at all. Measured in production 2026-08-21, on
+   * `/blog#read=<a slug not on the current feed page>`: the essay rendered
+   * perfectly and its whole closing strip was dead. "1 constellation" and "7
+   * related" were plain text with no underline and no popover, and the share
+   * mark was a button that did nothing.
+   *
+   * So the two interactive primitives an opened fragment can contain are
+   * imported HERE, where the sheet is, rather than left to arrive with their
+   * own markup. Both are idempotent and flagged on `<html>`, so the copies that
+   * do manage to run cost nothing. ⚠ A third primitive inside a fragment needs
+   * a third line — there is no mechanism that would notice its absence, only a
+   * control that quietly stops working.
+   */
+  initReveal();
+  initShareMark();
 
   const PREFIX = 'read=';
 
@@ -176,7 +204,15 @@ const { returnLabel } = Astro.props;
       // adopted into this page.
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
       const article = doc.querySelector('article.post-article');
-      return article ? document.importNode(article, true) : null;
+      if (!article) return null;
+      // ⚠ THE ARTICLE'S OWN SCRIPTS COME OUT, because they are already dead and
+      // leaving them in is what made this bug so hard to see. A script parsed
+      // by DOMParser has its "already started" flag set, so adopting it into
+      // this document does nothing — the tags sit in the sheet looking like the
+      // reason the controls work. They are not; the imports at the top of this
+      // file are. Dropping them says so.
+      article.querySelectorAll('script').forEach((s) => s.remove());
+      return document.importNode(article, true);
     } catch {
       return null; // offline, or the route moved — the caller falls back
     }

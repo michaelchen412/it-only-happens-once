@@ -300,3 +300,83 @@ test.describe('an essay closes with its apparatus', () => {
     expect((await mark.boundingBox())!.y).toBeGreaterThan(body.y + body.height);
   });
 });
+
+/*
+  ⚠ THE APPARATUS WORKS WHEN THE READER **FETCHED** THE PIECE, and until
+  2026-08-21 it did not. The Reader has two sources (Reader.astro): a
+  `<template>` shipped with the feed, or the permalink fetched over the network
+  when the page carries no template for that slug. Every spec above walks the
+  template path, and the template path was the one that worked — by an accident
+  of the platform, since cloning template content DOES execute the scripts
+  inside it. A `DOMParser` document marks its scripts "already started", so the
+  copy inside a FETCHED essay can never run, and on a feed page whose only other
+  copy is sealed inside a template the pairing code never ran at all. The strip
+  rendered perfectly and every control in it was dead: "1 constellation" and "7
+  related" were plain text, and the share mark was a button that did nothing.
+  Confirmed on the live site before the fix.
+
+  THE SEARCH IS THE LEVER, and it is deterministic where pagination is not: a
+  query that matches nothing ships NO reader templates, so `#read=<slug>` on
+  that page has no choice but to fetch. Same slug, same essay, other source.
+*/
+test.describe('an essay the Reader had to FETCH', () => {
+  test.skip(!publishedSlug, 'no published essay in the database');
+
+  /** A slug whose closing strip actually HAS a reveal — half the corpus does
+   *  not, and a spec that asserts against whatever turned up first is the
+   *  mistake `subjectedEssaySlug` was invented to stop making. */
+  async function slugWithAReveal(page: import('@playwright/test').Page): Promise<string | null> {
+    await page.goto('/blog');
+    return page.evaluate(
+      () =>
+        [...document.querySelectorAll<HTMLTemplateElement>('template[data-reader-content]')].find(
+          (t) => t.content.querySelector('[data-rv]') !== null,
+        )?.dataset.readerContent ?? null,
+    );
+  }
+
+  test('its share mark is bound — a fetched article brings no working scripts of its own', async ({ page }) => {
+    await page.goto(`/blog?q=zzq-matches-nothing#read=${publishedSlug}`);
+    await expect(page.locator('#site-reader .reading')).toBeVisible();
+    await expect(page.locator('template[data-reader-content]'), 'the search still shipped templates').toHaveCount(0);
+    // The behaviour is delegated from `document` and flags itself on <html>, so
+    // this asks the one question that matters: did the delegation get installed?
+    await expect(page.locator('html')).toHaveAttribute('data-share-bound', '1');
+    await expect(page.locator('#site-reader [data-share]')).toHaveCount(1);
+  });
+
+  test('its reveals pair, open, and follow the sheet when it scrolls', async ({ page }) => {
+    const slug = await slugWithAReveal(page);
+    test.skip(!slug, 'no essay on the feed closes with a constellation or a related list');
+
+    await page.goto(`/blog?q=zzq-matches-nothing#read=${slug}`);
+    const host = page.locator('#site-reader .reader-inner [data-rv]').first();
+    await expect(host).toBeAttached();
+    // `[data-rv-live]` IS the gate: no attribute, no underline, no popover.
+    await expect(host).toHaveAttribute('data-rv-live', '');
+
+    const trigger = host.locator('.rv__trigger');
+    await trigger.scrollIntoViewIfNeeded();
+    await trigger.click();
+    const pop = host.locator('.rv__pop');
+    await expect(pop).toBeVisible();
+
+    /*
+      ⚠ AND IT TRACKS THE SHEET'S SCROLLER, NOT THE WINDOW. A `scroll` event does
+      not bubble, so a listener on `window` hears the page and nothing else — and
+      inside the Reader the page does not scroll at all: <html> is locked and
+      `.reader-scroll` is the scroller. The box kept its 8px gap while the essay
+      moved out from under it. Adjacency, not a fixed edge: near the viewport
+      floor the box legitimately flips above its trigger.
+    */
+    const adjacency = async () =>
+      page.evaluate(() => {
+        const t = document.querySelector('#site-reader .reader-inner .rv__trigger')!.getBoundingClientRect();
+        const p = document.querySelector('#site-reader .rv__pop')!.getBoundingClientRect();
+        return Math.min(Math.abs(p.top - t.bottom), Math.abs(t.top - p.bottom));
+      });
+    expect(await adjacency()).toBeLessThan(24);
+    await page.evaluate(() => document.querySelector('#site-reader .reader-scroll')!.scrollBy(0, -120));
+    await expect.poll(adjacency, { message: 'the popover stayed put while the sheet moved' }).toBeLessThan(24);
+  });
+});
