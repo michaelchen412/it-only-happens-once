@@ -348,7 +348,24 @@ export default defineConfig({
       name: 'Atkinson Hyperlegible',
       cssVariable: '--font-atkinson',
       weights: [400, 700],
-      styles: ['normal', 'italic'],
+      // ⚠ NORMAL ONLY, AND THE COST OF THE MISSING ITALIC IS THE POINT OF THE
+      // CHECK BELOW. `<Font preload>` is per-FAMILY, not per-face: asking for
+      // italic here does not merely declare it, it puts another two woff2 in
+      // the <head> as `rel=preload` — highest priority, racing the one
+      // render-blocking stylesheet, on every page in the site.
+      //
+      // Measured 2026-08-21 across /, /blog, /about, /reading and
+      // /constellations: ZERO elements resolve to an italic Atkinson face. Not
+      // "rare" — none. This is the chrome font, and the chrome does not lean.
+      // The two files were 24 KB of the 169 KB of fonts on the critical path,
+      // fetched everywhere and used nowhere.
+      //
+      // Newsreader keeps its italic (it is the reading voice, and essays and
+      // the About page genuinely use it). Re-check with the same measurement
+      // before adding italic back — an `italic` class on a `font-sans` element
+      // is what would make it real, and it would silently fall back to a
+      // synthesised oblique until then.
+      styles: ['normal'],
       subsets: ['latin'],
       fallbacks: ['system-ui', 'sans-serif'],
     },
