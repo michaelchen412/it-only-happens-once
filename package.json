@@ -7,8 +7,8 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run verify && astro build && node scripts/check-server-bundle.mjs",
-    "build:unchecked": "astro build && node scripts/check-server-bundle.mjs",
+    "build": "npm run verify && astro build && node scripts/check-server-bundle.mjs && node scripts/fix-asset-cache-headers.mjs",
+    "build:unchecked": "astro build && node scripts/check-server-bundle.mjs && node scripts/fix-asset-cache-headers.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
