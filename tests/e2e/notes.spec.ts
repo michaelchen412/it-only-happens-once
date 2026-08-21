@@ -715,7 +715,19 @@ test.describe('note → log entry', () => {
 
     const sheet = page.locator('#log-sheet');
     await expect(sheet).toBeVisible();
-    await expect(sheet.locator('[data-log-body]')).toHaveValue(text);
+    // ⚠ A MINI EDITOR SINCE PLAN 43, so the dump's Markdown is RENDERED into the
+    // box rather than laid out as characters — and a real dump is several
+    // paragraphs, which arrive as separate <p> nodes. A single-string
+    // `toHaveText` would compare against all of them run together with no
+    // separator and fail on a box that is perfectly correct.
+    //
+    // Asserting per paragraph is also the stronger claim: what survives the trip
+    // is the SHAPE of what you jotted, not just its words.
+    const paragraphs = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    await expect(sheet.locator('[data-log-body] [contenteditable] p')).toHaveText(paragraphs);
 
     const save = sheet.locator('[data-log-save]');
     await expect(save).toBeDisabled();

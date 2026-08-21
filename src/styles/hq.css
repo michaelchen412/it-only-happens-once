@@ -1659,11 +1659,21 @@ a.row__t:hover {
 .logbox:focus-within {
   border-color: color-mix(in oklch, var(--cn) 55%, transparent);
 }
-.logbox textarea {
+/* ⚠ THE SURFACE IS A CONTENTEDITABLE SINCE PLAN 43, and two lines of the old
+   rule died with the textarea. `overflow: hidden` was there so `log-box.ts`
+   could measure `scrollHeight` and set the height itself — a block grows on its
+   own, so the measurement, the hack and the hidden overflow all go. `resize`
+   likewise: there was never a grabber to suppress.
+
+   A CAP AND A SCROLLER REPLACE THEM. The old box could grow without limit,
+   which on a phone walked the Save button off the bottom of the zone; a jotting
+   that passes ~14rem is a piece, not a log entry. The metrics are otherwise
+   untouched, because the register was already right. */
+.logbox :is(textarea, .tiptap-doc) {
   display: block;
   width: 100%;
-  resize: none;
-  overflow: hidden; /* the height is set from scrollHeight, so never scroll */
+  max-height: 14rem;
+  overflow-y: auto;
   background: none;
   outline: none;
   padding: 0.625rem 0.75rem;
@@ -1671,6 +1681,17 @@ a.row__t:hover {
   font-size: 0.9375rem;
   line-height: 1.55;
   cursor: text;
+}
+/* The bold/italic pair, living in the foot beside the kind and date chips (see
+   `TimelineZone`). A hairline keeps two different KINDS of control — how the
+   words look, versus what the entry is about — from reading as one row of six. */
+.logbox__fmt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin-right: 0.25rem;
+  padding-right: 0.375rem;
+  border-right: 1px solid var(--color-base-300);
 }
 .logbox__foot {
   display: flex;

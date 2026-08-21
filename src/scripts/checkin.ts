@@ -32,6 +32,8 @@
 // type-only in its imports, so it costs the bundle nothing but the functions.
 import { actions } from 'astro:actions';
 import { callAction, formatActionError } from './action-error';
+// Static, for the reason task-sheet.ts states at its own copy of this import.
+import { mountMiniEditor, type RichEditorHandle } from './rich-editor';
 import { signalAttention } from './attention';
 import {
   OPEN_ENDED_LATENCY,
@@ -89,8 +91,70 @@ if (zone) {
       const on = $<HTMLElement>(`[data-tb="${field}"].tb--on`);
       return on ? Number(on.dataset.v) : null;
     };
+    /**
+     * The two prose fields are mini editors (plan 43); every other `data-field`
+     * is still a native control. Keyed by field name so `text()` below stays the
+     * one way the form is read — a second reader for two of fourteen values is
+     * how a payload starts disagreeing with the screen.
+     *
+     * `breaks: false` MATCHES `DonePanel`, which renders both with a bare
+     * `renderMarkdown(…)`. Mounted at `true` the editor would show a line break
+     * the summary card then closed up.
+     *
+     * ⚠ `onChange` AND `focusout` ARE THE AUTOSAVE, and both have to be attached
+     * here. The old wiring hung `input`/`blur` on `textarea[data-field]` further
+     * down; a contenteditable fires no `input` this form can hear, so without
+     * these two a dream typed at 6am would have been debounced by nothing and
+     * saved by nothing. `soon`/`now` are declared below and only ever called
+     * from inside these closures, so the forward reference is fine.
+     *
+     * ⚠ `proseFields`, NOT `prose` — `syncDreamPanels` below already has a local
+     * `prose` for the `[data-dream-prose]` block, and the shorter name shadowed
+     * it there, turning `prose.get(…)` into a call on an HTMLElement. Caught by
+     * `astro check`; named apart so it cannot come back.
+     */
+    const proseFields = new Map<string, RichEditorHandle>();
+    for (const [field, id, placeholder, label] of [
+      ['dream_body', 'ci-dream-body', 'What you remember.', 'What you remember'],
+      ['note', 'ci-note', 'Anything at all.', 'A line about today'],
+    ] as const) {
+      const host = $<HTMLElement>(`[data-field="${field}"]`);
+      const el = document.getElementById(id);
+      const wrap = document.getElementById(`${id}-wrap`);
+      if (!host || !el || !wrap) continue;
+      const handle = mountMiniEditor({
+        editorEl: el,
+        toolbarRoot: wrap,
+        placeholder,
+        ariaLabel: label,
+        docClass: 'f-prose',
+        breaks: false,
+        onChange: () => soon(),
+      });
+      // `emitUpdate: false` — seeding is not typing, and `soon()` would put
+      // "Saving…" on screen and write the row back on every page load.
+      handle.editor.commands.setContent(host.querySelector<HTMLInputElement>('[data-seed]')?.value ?? '', {
+        emitUpdate: false,
+      });
+      // ⚠ FOCUS MOVING *INSIDE* THE FIELD IS NOT LEAVING IT. The toolbar is part
+      // of this widget, so pressing B blurs the editable — and a bare `focusout`
+      // turned every formatting click into an immediate flush, defeating the
+      // 800ms debounce that "typing debounces instead of saving every keystroke"
+      // exists to protect. A textarea had no controls inside it and so never
+      // posed the question. `relatedTarget` is what gains focus; null means
+      // focus left the document entirely, which IS a reason to save now.
+      el.addEventListener('focusout', (e) => {
+        const to = (e as FocusEvent).relatedTarget as Node | null;
+        if (to && host.contains(to)) return;
+        now();
+      });
+      proseFields.set(field, handle);
+    }
+
     const text = (field: string): string | null =>
-      $<HTMLTextAreaElement>(`[data-field="${field}"]`)?.value.trim() || null;
+      proseFields.has(field)
+        ? proseFields.get(field)!.getMarkdown().trim() || null
+        : $<HTMLTextAreaElement>(`[data-field="${field}"]`)?.value.trim() || null;
     const time = (field: string): string | null => $<HTMLInputElement>(`[data-field="${field}"]`)?.value || null;
     /** A time picker inside one repeater row — scoped, so rows cannot read each other. */
     const rowTime = (row: HTMLElement, name: string): string | null =>
@@ -329,8 +393,10 @@ if (zone) {
       const prose = $<HTMLElement>('[data-dream-prose]');
       if (prose) prose.hidden = !any;
       if (!any) {
-        const ta = $<HTMLTextAreaElement>('[data-field="dream_body"]');
-        if (ta) ta.value = '';
+        // `emitUpdate: false`: this clear is a CONSEQUENCE of the tone you just
+        // pressed, and that press has already scheduled a save. Letting the
+        // editor announce it too would queue a second one for the same click.
+        proseFields.get('dream_body')?.editor.commands.setContent('', { emitUpdate: false });
       }
     }
 
@@ -451,18 +517,23 @@ if (zone) {
 
     $$<HTMLButtonElement>('[data-reveal]').forEach((btn) =>
       btn.addEventListener('click', () => {
-        const ta = $<HTMLTextAreaElement>(`[data-field="${btn.dataset.reveal}"]`);
-        if (!ta) return;
-        ta.hidden = false;
+        const field = btn.dataset.reveal!;
+        const host = $<HTMLElement>(`[data-field="${field}"]`);
+        if (!host) return;
+        host.hidden = false;
         btn.hidden = true;
-        ta.focus();
+        // ⚠ FOCUS AFTER THE UNHIDE. ProseMirror cannot place a caret inside a
+        // `hidden` subtree — the command is simply dropped — where a textarea's
+        // `.focus()` did not care about the order.
+        const editor = proseFields.get(field);
+        if (editor) editor.editor.commands.focus();
+        else host.focus();
       }),
     );
 
-    $$<HTMLTextAreaElement>('textarea[data-field]').forEach((ta) => {
-      ta.addEventListener('input', soon);
-      ta.addEventListener('blur', now);
-    });
+    // The autosave listeners for the two prose fields are attached at their
+    // mount above (`onChange` + `focusout`), because a contenteditable fires no
+    // `input` this form can hear. No `textarea[data-field]` remains.
 
     // ── leaving ───────────────────────────────────────────────────────────
     // "Done" is not a submit: everything is already saved. It flushes anything

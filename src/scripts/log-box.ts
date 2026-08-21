@@ -17,6 +17,8 @@ import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
 import { wireEntryMeta } from './entry-meta';
+// Static, for the reason task-sheet.ts states at its own copy of this import.
+import { mountMiniEditor } from './rich-editor';
 
 const zone = document.querySelector<HTMLElement>('[data-timeline]');
 
@@ -27,7 +29,27 @@ if (zone) {
   const $ = <T extends HTMLElement>(sel: string) => zone.querySelector<T>(sel);
   const $$ = <T extends HTMLElement>(sel: string) => Array.from(zone.querySelectorAll<T>(sel));
 
-  const input = $<HTMLTextAreaElement>('[data-log-input]')!;
+  /**
+   * The box — a mini editor since plan 43, storing the same Markdown.
+   *
+   * `breaks: false` MATCHES `.tl__body`, which renders entries with a bare
+   * `renderMarkdown(e.body)`. Mounting at `true` would have shown a line break
+   * the timeline then closed up — and note which way round the improvement
+   * falls: the textarea used to display two lines where the row beneath it
+   * displayed one, and the editor now agrees with the row.
+   */
+  const box = mountMiniEditor({
+    editorEl: $<HTMLElement>('[data-log-input]')!,
+    // The whole zone: the two `.tt-btn`s live down in the foot, not over the
+    // box. `mountMiniEditor` takes ELEMENTS precisely so a caller can place its
+    // toolbar wherever the surface wants it.
+    toolbarRoot: zone,
+    placeholder: 'What happened?',
+    ariaLabel: `Log an entry about ${zone.dataset.personName ?? 'this person'}`,
+    docClass: 'f-prose',
+    breaks: false,
+    onChange: () => syncControls(),
+  });
   const meta = $<HTMLElement>('[data-log-meta]')!;
   const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
   const cancelBtn = $<HTMLButtonElement>('[data-log-cancel]')!;
@@ -56,31 +78,32 @@ if (zone) {
     errorEl.hidden = !message;
   }
 
-  /** One line until there are two. Reset first, or it can only ever grow. */
-  function grow() {
-    input.style.height = 'auto';
-    input.style.height = `${input.scrollHeight}px`;
-  }
+  // `grow()` used to live here — height to `auto`, then back from
+  // `scrollHeight`, on every keystroke. A contenteditable is as tall as its
+  // content, so the function, its two callers and the `overflow: hidden` that
+  // made the measurement possible are all deleted rather than ported.
 
   function syncControls() {
-    const has = input.value.trim().length > 0;
+    // ⚠ `getText().trim()`, NOT `editor.isEmpty` — AND THE SPEC SAYS WHY.
+    // "Whitespace alone is not something typed": a paragraph holding four
+    // spaces is a real node, so `isEmpty` is FALSE for it and Save would have
+    // appeared for a box containing nothing you meant. `.value.trim()` gave
+    // this for free on the textarea; the editor has to be asked.
+    const has = box.editor.getText().trim().length > 0;
     meta.hidden = !has && !editingId;
     saveBtn.hidden = !has && !editingId;
     cancelBtn.hidden = !editingId;
   }
 
-  input.addEventListener('input', () => {
-    grow();
-    syncControls();
-  });
-
   // ── writing, and correcting ──────────────────────────────────────────────
   function reset() {
     editingId = null;
-    input.value = '';
+    // `emitUpdate: false` — `onChange` calls `syncControls`, which runs on the
+    // next line anyway; letting `setContent` fire it too would sync against a
+    // half-reset box (`editingId` cleared, meta not yet).
+    box.editor.commands.setContent('', { emitUpdate: false });
     entryMeta.reset();
     showError(null);
-    grow();
     syncControls();
   }
 
@@ -94,7 +117,7 @@ if (zone) {
       const row = btn.closest<HTMLElement>('.tl')!;
       reset();
       editingId = row.dataset.entry!;
-      input.value = row.dataset.body ?? '';
+      box.editor.commands.setContent(row.dataset.body ?? '', { emitUpdate: false });
       entryMeta.set(
         row.dataset.entryOn!,
         row.dataset.entryKind!,
@@ -102,14 +125,13 @@ if (zone) {
       );
 
       zone.querySelectorAll('.tl').forEach((r) => r.classList.toggle('is-editing', r === row));
-      grow();
       syncControls();
-      input.focus();
+      box.editor.commands.focus('end');
     }),
   );
 
   saveBtn.addEventListener('click', async () => {
-    const body = input.value.trim();
+    const body = box.getMarkdown().trim();
     if (!body) return;
     showError(null);
     // The disable/label/format/restore lifecycle is `submitAction` now
@@ -159,6 +181,7 @@ if (zone) {
     }),
   );
 
-  grow();
+  // The initial paint. `grow()` used to lead here, sizing an empty textarea to
+  // one line; the editor is already the height of its own content.
   syncControls();
 }

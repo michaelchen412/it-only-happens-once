@@ -13,6 +13,8 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireEntryMeta } from './entry-meta';
+// Static, for the reason task-sheet.ts states at its own copy of this import.
+import { mountMiniEditor } from './rich-editor';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 
@@ -23,7 +25,25 @@ if (root && sheet) {
   const today = root.dataset.today!;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel);
 
-  const body = $<HTMLTextAreaElement>('[data-log-body]')!;
+  /**
+   * The box — a mini editor since plan 43, matching the profile's timeline box
+   * exactly, including `breaks: false` to agree with `.tl__body`'s renderer.
+   *
+   * ⚠ THE DUMP ARRIVES AS MARKDOWN AND IS PARSED, NOT PASTED AS CHARACTERS.
+   * `hq:log-open` hands over the note's own text, which the pile stores as
+   * Markdown — so `setContent` renders whatever marks it already carried rather
+   * than showing you its asterisks, which is the entire point of the change.
+   */
+  const box = mountMiniEditor({
+    editorEl: $<HTMLElement>('[data-log-body]')!,
+    // The sheet root: the `.tt-btn`s are down in the foot, not over the box.
+    toolbarRoot: root,
+    placeholder: 'What happened?',
+    ariaLabel: 'What happened?',
+    docClass: 'f-prose',
+    breaks: false,
+    onChange: () => syncSave(),
+  });
   const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
   const errorEl = $<HTMLElement>('[data-log-error]')!;
 
@@ -44,7 +64,10 @@ if (root && sheet) {
    * wiring. The body has to re-run it too — Save depends on both.
    */
   const syncSave = () => {
-    saveBtn.disabled = meta.people().length === 0 || !body.value.trim();
+    // `getText().trim()` rather than `isEmpty`: a paragraph of spaces is a real
+    // node, so `isEmpty` is false for a box holding nothing you meant. See the
+    // fuller note at the same line in `log-box.ts`.
+    saveBtn.disabled = meta.people().length === 0 || box.editor.getText().trim().length === 0;
   };
 
   // Kind, date and who are `entry-meta.ts` now — the same wiring the profile's
@@ -59,8 +82,6 @@ if (root && sheet) {
     onPeopleChange: syncSave,
   });
 
-  body.addEventListener('input', syncSave);
-
   // ── opening ───────────────────────────────────────────────────────────────
   function reset() {
     meta.reset(); // which ends in `syncSave`, via onPeopleChange
@@ -72,10 +93,12 @@ if (root && sheet) {
     const detail = (e as CustomEvent<{ noteId: string; text: string }>).detail;
     noteId = detail.noteId;
     reset();
-    body.value = detail.text;
+    // `emitUpdate: false` — `syncSave` runs explicitly on the next line, and
+    // letting `setContent` fire `onChange` too would just run it twice.
+    box.editor.commands.setContent(detail.text, { emitUpdate: false });
     syncSave(); // the words arrived after `reset` ran; Save depends on them
     openDialog(sheet!);
-    // NOT focusing the textarea: the words are already there, and the thing
+    // NOT focusing the box: the words are already there, and the thing
     // still missing is who it was about.
     $<HTMLElement>('[data-who-open]')?.focus();
   });
@@ -95,7 +118,7 @@ if (root && sheet) {
   // ── saving ────────────────────────────────────────────────────────────────
   saveBtn.addEventListener('click', async () => {
     const [personId, ...withIds] = meta.people();
-    if (!personId || !body.value.trim() || !noteId) return;
+    if (!personId || !box.getMarkdown().trim() || !noteId) return;
     const filing = noteId;
     showError(null);
 
@@ -113,7 +136,7 @@ if (root && sheet) {
           withIds,
           occurredOn: meta.occurredOn(),
           kind: (meta.kind() ?? 'hangout') as 'hangout',
-          body: body.value.trim(),
+          body: box.getMarkdown().trim(),
         }),
       { button: saveBtn, busy: 'Saving…', onError: showError, reusable: true },
     );

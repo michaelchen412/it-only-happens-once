@@ -44,6 +44,7 @@ import {
   type WakingEntry,
 } from '../../../lib/hq/checkin';
 import { headerDate } from '../../../lib/hq/dates';
+import MiniEditor from '../MiniEditor.astro';
 
 interface Props {
   /** The date being looked at. */
@@ -185,15 +186,34 @@ const timeable = TIMEABLE_WAKINGS.includes(row?.awakenings as never);
       <button type="button" class="addline mt-2" data-reveal="dream_body" hidden={!!row?.dream_body}>
         <Icon name="ph:plus" /> What you remember
       </button>
-      <textarea
-        rows="3"
-        class="ta mt-2"
+      {
+        /* ⚠ A MINI EDITOR SINCE PLAN 43, and this `data-src` was already telling
+          on the old one: it has said `(Markdown)` since the field was written,
+          `DonePanel` renders it through `renderMarkdown`, and the box you typed
+          it into showed you asterisks. That is the whole defect, annotated in
+          place for months.
+
+          THE CHROME IS THE KNOWN COST. This surface is answered half awake and
+          its argument is that answering must be cheap, so a toolbar over a
+          two-sentence box is not free — but `CaptureDialog` settled exactly this
+          trade when the rule "no rich editor here, ever" was reversed: the same
+          formatting is wanted in the quick surfaces *"even though they take up a
+          little bit of UI space"*. The box still costs one tap to reveal and
+          nothing to skip.
+
+          `data-field` AND `hidden` STAY ON THE WRAPPER, because that is what
+          `[data-reveal]` unhides and what `text()` looks up — the script's two
+          hooks are unchanged in shape, only in what they find inside. */
+      }
+      <div
+        class="mt-2"
         hidden={!row?.dream_body}
         data-field="dream_body"
-        placeholder="What you remember."
         data-src="daily_checkins.dream_body (Markdown)"
-        set:text={row?.dream_body ?? ''}
-      />
+      >
+        <MiniEditor id="ci-dream-body" wrapId="ci-dream-body-wrap" size="max-h-[24vh] min-h-[3.5rem]" />
+        <input type="hidden" data-seed value={row?.dream_body ?? ''} />
+      </div>
     </div>
   </fieldset>
 
@@ -487,15 +507,17 @@ const timeable = TIMEABLE_WAKINGS.includes(row?.awakenings as never);
     <button type="button" class="addline mt-3" data-reveal="note" hidden={!!row?.note}>
       <Icon name="ph:plus" /> A line about today
     </button>
-    <textarea
-      rows="2"
-      class="ta mt-2"
-      hidden={!row?.note}
-      data-field="note"
-      placeholder="Anything at all."
-      data-src="daily_checkins.note"
-      set:text={row?.note ?? ''}
-    />
+    {
+      /* A mini editor too — see the dream body above. ⚠ The `data-src` gains its
+        `(Markdown)` here: `DonePanel` has always rendered this column through
+        `renderMarkdown`, so the annotation was simply wrong by omission, and a
+        provenance note that understates the format is the kind of thing the
+        next reader trusts. */
+    }
+    <div class="mt-2" hidden={!row?.note} data-field="note" data-src="daily_checkins.note (Markdown)">
+      <MiniEditor id="ci-note" wrapId="ci-note-wrap" size="max-h-[20vh] min-h-[3.25rem]" />
+      <input type="hidden" data-seed value={row?.note ?? ''} />
+    </div>
   </fieldset>
 
   {

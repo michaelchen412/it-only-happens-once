@@ -402,7 +402,10 @@ test.describe('answering it', () => {
     // ⚠ `pressSequentially`, NOT `fill`. This types character by character on
     // purpose — the assertion below is about the DEBOUNCE, and `fill` sets the
     // value in one shot, which would make the test pass without exercising it.
-    await page.locator('[data-field="dream_body"]').pressSequentially('a long corridor');
+    // The field is a mini editor since plan 43, so the surface is the
+    // contenteditable inside the mount point — `pressSequentially` still types
+    // character by character, which is the whole point of the assertion below.
+    await page.locator('[data-field="dream_body"] [contenteditable]').pressSequentially('a long corridor');
     // Fifteen characters must not be fifteen round trips.
     await expect.poll(() => seen().length, { timeout: 3000 }).toBe(2);
   });
@@ -503,4 +506,42 @@ test.describe('backfill', () => {
     await expect(page.locator('[data-checkin]')).toHaveAttribute('data-writable', 'false');
     await expect(page.getByRole('button', { name: 'Start' })).toHaveCount(0);
   });
+});
+
+/**
+ * ⚠ THE TOOLBAR LIVES INSIDE THE FIELD, SO BLURRING ONTO IT IS NOT LEAVING IT.
+ *
+ * The two prose fields became mini editors in plan 43, and the autosave's "save
+ * on the way out" moved from a textarea's `blur` to the editable's `focusout`.
+ * Those are not the same event on this widget: a textarea had no controls inside
+ * it, and this one has two. Pressing B moves focus to a button that is part of
+ * the same field, and the first version read that as leaving — so every
+ * formatting click fired an immediate flush and defeated the 800ms debounce that
+ * "typing debounces instead of saving every keystroke" exists to protect.
+ *
+ * ⚠ AND THAT SPEC COULD NOT HAVE CAUGHT IT, which is why this one is separate.
+ * It runs behind `startBlank`, so it skips on any day Michael has already
+ * answered — most days, and it skipped on the day this was written. This one
+ * takes `openForm` (either door) and asserts a property of a CONTROL, which is
+ * true of a prefilled form and an empty one alike — the distinction
+ * `startBlank`'s own note draws when it explains why it refuses the pencil.
+ *
+ * NO DEBOUNCE IS PENDING WHEN THE CLICK HAPPENS — nothing has been typed — so
+ * the assertion needs no timing window: a save appearing here can only have come
+ * from the click itself.
+ */
+test('⚠ pressing B is not "leaving the field", so it does not post', async ({ page }) => {
+  const { seen } = await stub(page);
+  await page.goto('/admin');
+  await openForm(page);
+
+  const reveal = page.getByRole('button', { name: 'A line about today' });
+  if (await reveal.isVisible()) await reveal.click();
+  const box = page.locator('[data-field="note"] [contenteditable]');
+  await box.click();
+
+  const before = seen().length;
+  await page.locator('#ci-note-wrap .tt-btn[data-cmd="bold"]').click();
+  await expect(page.locator('#ci-note-wrap .tt-btn[data-cmd="bold"]')).toHaveAttribute('aria-pressed', 'true');
+  expect(seen().length, 'a formatting click is not an edit and must not save').toBe(before);
 });

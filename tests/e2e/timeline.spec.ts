@@ -32,10 +32,21 @@ async function openProfile(page: Page): Promise<boolean> {
   return true;
 }
 
+/**
+ * ⚠ THE BOX IS A MINI EDITOR SINCE PLAN 43. `[data-log-input]` is the element
+ * TipTap mounts INTO; the surface you type on is the contenteditable it renders
+ * inside that. Everything here addresses the surface, except the two height
+ * assertions, which want the box.
+ *
+ * `fill` still works — Playwright drives a contenteditable through the same
+ * insert-text path ProseMirror's DOM observer watches — but the manual
+ * `dispatchEvent('input')` is gone: the editor reports changes through its own
+ * `onChange`, and a synthetic `input` event is not how it hears them.
+ */
+const boxOf = (page: Page) => page.locator('[data-log-input] [contenteditable]');
+
 const type = async (page: Page, text: string) => {
-  const box = page.locator('[data-log-input]');
-  await box.fill(text);
-  await box.dispatchEvent('input');
+  await boxOf(page).fill(text);
 };
 
 test.describe('the log box', () => {
@@ -44,7 +55,7 @@ test.describe('the log box', () => {
   test('is open at the head of the timeline, never behind a dialog', async ({ page }) => {
     // §6: "a dialog you must open first is a dialog you don't open at fifteen
     // seconds' notice." Typing IS the action.
-    await expect(page.locator('[data-log-input]')).toBeVisible();
+    await expect(boxOf(page)).toBeVisible();
     await expect(page.locator('dialog[open]')).toHaveCount(0);
   });
 
@@ -199,7 +210,7 @@ test.describe('saving', () => {
     await expect(save).toBeEnabled();
     await expect(save).toHaveText('Save');
     // And the words are still there — a failed save must never eat them.
-    await expect(page.locator('[data-log-input]')).toHaveValue('Something worth keeping.');
+    await expect(boxOf(page)).toHaveText('Something worth keeping.');
   });
 });
 
@@ -210,7 +221,7 @@ test.describe('the timeline', () => {
     if (entries === 0) {
       await expect(page.locator('[data-timeline]')).toContainText('Nothing logged yet.');
       // The box is still there — the empty state has to invite a jot.
-      await expect(page.locator('[data-log-input]')).toBeVisible();
+      await expect(boxOf(page)).toBeVisible();
     } else {
       await expect(page.locator('[data-timeline]')).not.toContainText('Nothing logged yet.');
     }
@@ -244,7 +255,9 @@ test.describe('the timeline', () => {
 
     // ONE editor, two jobs — a profile with two places to type is a profile
     // where you have to decide which one to use.
-    await expect(page.locator('[data-log-input]')).toHaveValue(body!);
+    // The row's `data-body` is Markdown; the editor renders it, so the text is
+    // what comes back — the whole point of the field being rich.
+    await expect(boxOf(page)).toHaveText(body!);
     await expect(page.locator('[data-log-cancel]')).toBeVisible();
     await expect(page.locator('.tl.is-editing')).toHaveCount(1);
   });
@@ -255,7 +268,7 @@ test.describe('the timeline', () => {
 
     await page.locator('.tl').first().getByRole('button', { name: 'Edit entry' }).click();
     await page.locator('[data-log-cancel]').click();
-    await expect(page.locator('[data-log-input]')).toHaveValue('');
+    await expect(boxOf(page)).toHaveText('');
     await expect(page.locator('.tl.is-editing')).toHaveCount(0);
   });
 

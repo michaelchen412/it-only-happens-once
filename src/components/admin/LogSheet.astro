@@ -55,10 +55,37 @@ const { roster, today } = Astro.props;
           /* Prefilled with the dump, and editable — what you jotted at 11pm is
             usually the entry, but not always the words you want kept. */
         }
-        <textarea rows="3" data-log-body aria-label="What happened?" placeholder="What happened?"></textarea>
+        {
+          /* A mini editor since plan 43, like the profile's box — see the note
+          there. The dump arrives as Markdown and is edited as marks. */
+        }
+        <div data-log-body></div>
 
         <div class="logbox__foot">
           <div class="logbox__meta">
+            {
+              /* ⚠ THE FORMATTING PAIR SITS IN THE FOOT, NOT OVER THE BOX. This is
+                `CaptureDialog`'s ruling applied to the other quick-write surface
+                in the building: *"the toolbar sits BELOW the box … a strip of
+                controls above the words would be the first thing you meet, which
+                is chrome introducing a box that needs no introduction."* Same
+                argument, and here it is free — a foot already exists.
+
+                AND IT INHERITS THE FOOT'S DISCLOSURE. In the profile's box this
+                row is `hidden` until you have typed something, so the resting
+                state gains nothing at all; in the log sheet you opened the sheet
+                to write, so it is there from the start. One placement, two
+                behaviours, no extra wiring — which is why it goes INSIDE the
+                meta row rather than beside it. */
+            }
+            <span class="logbox__fmt" role="toolbar" aria-label="Formatting">
+              <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"
+                ><b>B</b></button
+              >
+              <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+                ><i>I</i></button
+              >
+            </span>
             {
               /* ⚠ WHO COMES FIRST, and it is the only required field here. The
                 kind and the date both have honest defaults; there is no

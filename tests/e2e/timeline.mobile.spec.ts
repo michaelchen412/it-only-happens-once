@@ -20,8 +20,10 @@ async function openProfile(page: Page) {
   test.skip(count === 0, 'no people in the roster to open');
   await page.goto((await page.locator('[data-person]').first().getAttribute('href'))!);
   await expect(page.locator('[data-timeline]')).toBeVisible();
-  await page.locator('[data-log-input]').fill('Coffee.');
-  await page.locator('[data-log-input]').dispatchEvent('input');
+  // The surface is the contenteditable TipTap renders inside the mount point —
+  // see the note on `boxOf` in timeline.spec.ts. No manual `input` dispatch: the
+  // editor reports its own changes.
+  await page.locator('[data-log-input] [contenteditable]').fill('Coffee.');
 }
 
 /** Descendants measured against the container's CONTENT edge — see people.mobile. */

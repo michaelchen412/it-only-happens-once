@@ -42,7 +42,21 @@ interface Props {
 const { person, entries, roster, today } = Astro.props;
 ---
 
-<Zone title="Timeline" icon="ph:note" accent="cn-sand" data-timeline data-person-id={person.id} data-today={today}>
+{
+  /* `data-person-name` is here so `log-box.ts` can rebuild the box's
+  accessible name — it was an `aria-label` on the textarea, and the mini
+  editor creates its own editable element, so the name has to reach the
+  script that mounts it. */
+}
+<Zone
+  title="Timeline"
+  icon="ph:note"
+  accent="cn-sand"
+  data-timeline
+  data-person-id={person.id}
+  data-person-name={person.display_name}
+  data-today={today}
+>
   {
     entries.length > 0 && (
       <span slot="actions" class="zone__count ml-auto">
@@ -53,11 +67,20 @@ const { person, entries, roster, today } = Astro.props;
 
   <div class="zone__body pb-2">
     <div class="logbox" data-logbox>
-      <textarea
-        rows="1"
-        data-log-input
-        placeholder="What happened?"
-        aria-label={`Log an entry about ${person.display_name}`}></textarea>
+      {
+        /* ⚠ A MINI EDITOR, NOT A TEXTAREA (plan 43). `.tl__body` below has always
+          rendered this column through `renderMarkdown`, so the timeline could
+          show bold and italic and only the box refused — the same one-sided
+          deal `SetSheet` describes for its description.
+
+          THE `rows="1"` GROW HACK IS GONE WITH IT. A textarea has a fixed
+          height, so `log-box.ts` carried a `grow()` that reset the height to
+          `auto` and re-set it from `scrollHeight` on every keystroke, and the
+          CSS carried `overflow: hidden` so the measurement would work. A
+          contenteditable is a block that is as tall as its content: both are
+          deleted rather than ported. */
+      }
+      <div data-log-input></div>
 
       <div class="logbox__foot">
         {
@@ -67,6 +90,28 @@ const { person, entries, roster, today } = Astro.props;
             have to be top-layer popovers at all. */
         }
         <div class="logbox__meta" data-log-meta hidden>
+          {
+            /* ⚠ THE FORMATTING PAIR SITS IN THE FOOT, NOT OVER THE BOX. This is
+                `CaptureDialog`'s ruling applied to the other quick-write surface
+                in the building: *"the toolbar sits BELOW the box … a strip of
+                controls above the words would be the first thing you meet, which
+                is chrome introducing a box that needs no introduction."* Same
+                argument, and here it is free — a foot already exists.
+
+                AND IT INHERITS THE FOOT'S DISCLOSURE. In the profile's box this
+                row is `hidden` until you have typed something, so the resting
+                state gains nothing at all; in the log sheet you opened the sheet
+                to write, so it is there from the start. One placement, two
+                behaviours, no extra wiring — which is why it goes INSIDE the
+                meta row rather than beside it. */
+          }
+          <span class="logbox__fmt" role="toolbar" aria-label="Formatting">
+            <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button
+            >
+            <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"
+              ><i>I</i></button
+            >
+          </span>
           <button type="button" class="lchip" popovertarget="log-kind" data-kind-open>
             <span class="lchip__i" data-kind-icon><Icon name="ph:users-three" /></span>
             <span data-kind-label>Hangout</span>
