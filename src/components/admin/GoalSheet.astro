@@ -38,6 +38,7 @@ import { HORIZONS } from '../../lib/hq/goals';
 import type { Tables } from '../../lib/database.types';
 import SheetHeader from './SheetHeader.astro';
 import SheetError from './SheetError.astro';
+import MiniEditor from './MiniEditor.astro';
 
 interface Props {
   /** Omitted = the New sheet. Present = the edit sheet for that goal. */
@@ -78,30 +79,48 @@ const editing = !!goal;
         </div>
       </div>
 
-      <label class="f mt-4">
+      {
+        /* ⚠ A MINI EDITOR, AND THE `breaks: false` IS THE WHOLE CARE HERE. The
+          goal page renders a why with `renderMarkdown(goal.why)` — no `breaks`
+          — on the stated reasoning that *"a why is prose, where a wrapped line
+          is not a break"*. Mounting this editor at the mini editor's old
+          hardcoded `true` would have shown you a line break the page then
+          silently closed up, which is a WYSIWYG lying about the one character
+          the field's own comment went out of its way to decide. Notes below
+          renders `{ breaks: true }` and so is mounted that way; the pair is the
+          reason `mountMiniEditor` takes the option at all.
+
+          ⚠ THE HIDDEN INPUT IS THE SERVER VALUE ARRIVING, NOT THE FORM VALUE
+          LEAVING — unlike SetSheet's, whose action reads `new FormData`. This
+          sheet is server-rendered per goal and builds its payload by hand, so
+          the script seeds the editor from here and serializes with
+          `getMarkdown()`. */
+      }
+      <div class="f mt-4">
         <span class="f__k">Why</span>
-        <textarea
-          name="why"
-          rows="4"
-          placeholder="Not a number on a scale. Being able to do the Tahoe hike in September without hating it."
-          >{goal?.why}</textarea
-        >
-      </label>
+        <MiniEditor id="goal-why" wrapId="goal-why-wrap" size="max-h-[30vh] min-h-[5rem]" />
+        <input type="hidden" data-why-value value={goal?.why ?? ''} />
+      </div>
 
       {
         /* The practice, not the reason. Roomier than Why on purpose: this is the
         field that holds a list, and a two-row box would ask you to keep it
         short on the one surface where the detail IS the point. */
       }
-      <label class="f mt-4">
+      {
+        /* Roomier than Why, as it always was: this is the field that holds a
+          list, and the header's note says a two-row box would ask you to keep
+          it short on the one surface where the detail IS the point.
+
+          `breaks: true`, matching the goal page — notes are typed as LINES
+          (`Teeth` / `Read the day` / `Move`), usually with no bullet in sight,
+          and prose rules would run all three into one sentence. */
+      }
+      <div class="f mt-4">
         <span class="f__k">Notes</span>
-        <textarea
-          name="notes"
-          rows="5"
-          placeholder="What’s actually in it. Out of bed before the phone. Teeth, water, read the day. Twenty minutes moving — a walk counts."
-          >{goal?.notes}</textarea
-        >
-      </label>
+        <MiniEditor id="goal-notes" wrapId="goal-notes-wrap" size="max-h-[38vh] min-h-[6.5rem]" />
+        <input type="hidden" data-notes-value value={goal?.notes ?? ''} />
+      </div>
     </div>
 
     <div class="border-base-300 bg-base-200 flex shrink-0 items-center gap-2 border-t px-6 py-3">

@@ -27,6 +27,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import PersonSheet from '../../../components/admin/PersonSheet.astro';
 import BackLink from '../../../components/admin/BackLink.astro';
+import MiniEditor from '../../../components/admin/MiniEditor.astro';
 import { renderMarkdown } from '../../../lib/markdown';
 import { dmd, fullDate, nextOccurrence } from '../../../lib/hq/dates';
 import { CIRCLES, hueFor, knownFor, monogram, signPhotos, upcomingBirthday, type Person } from '../../../lib/hq/people';
@@ -237,13 +238,20 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
             {/* 2 · ABOUT — "who they are", hand-authored, changes maybe twice a
             year. Set in the serif, because it is writing.
 
-            A PLAIN TEXTAREA, NOT TIPTAP, and that is a reading of §4's "full
-            editor" rather than a shortcut: this is one optional prose field on
-            a page that otherwise ships almost no JavaScript, and the admin
-            already splits minimal-editor fields from full-sheet ones (admin.md
-            §2). Pulling the whole composer bundle onto every profile for a
-            field edited twice a year is the wrong trade. It stores Markdown
-            either way, so a later change of mind costs nothing. */}
+            ⚠ IT WAS A PLAIN TEXTAREA UNTIL PLAN 43, AND THE REASON EXPIRED
+            RATHER THAN BEING OVERRULED. The note here read: *"Pulling the whole
+            composer bundle onto every profile for a field edited twice a year is
+            the wrong trade"* — sound when written, and no longer true of this
+            page. `AdminLayout` mounts `CaptureDialog`, and since 2026-08-07
+            `capture.ts` WARMS `rich-editor` on idle on every admin page, this
+            one included. The bundle is already here; refusing to use it bought
+            nothing but a field that asked for asterisks. The same note closed
+            with *"it stores Markdown either way, so a later change of mind costs
+            nothing"*, which is exactly what this is.
+
+            A MINI editor, not the composer — bold and italic, no headings and
+            no lists. That half of the original reading stands: a bio is a
+            paragraph about a person, not a document. */}
             <section class="zone cn-azure o-1">
               <div class="zone__head">
                 <span class="zone__chip">
@@ -264,20 +272,18 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
               </div>
 
               <form class="zone__body" data-bio-form hidden>
-                <label class="f">
-                  <span class="sr-only">About {person.display_name}</span>
-                  {/* On ONE line, deliberately: a textarea's value is its child
-                  text, so breaking this across lines would prepend the
-                  template's own indentation to everything Michael has written
-                  — and it would do it silently, growing by a few spaces every
-                  time the file was reformatted. */}
-                  <textarea
-                    name="bio"
-                    rows="8"
-                    placeholder="What you’d say if someone asked about them."
-                    set:text={person.bio ?? ''}
-                  />
-                </label>
+                {/* ⚠ THE ONE-LINE TRAP IS GONE WITH THE TEXTAREA, and it is worth
+                saying why rather than deleting the warning. It read: *"a
+                textarea's value is its child text, so breaking this across lines
+                would prepend the template's own indentation to everything
+                Michael has written — silently, growing by a few spaces every
+                time the file was reformatted."* An `<input value=…>` has no
+                child text and no such hazard, so the seed below may be
+                formatted like any other attribute. */}
+                <div class="f" data-bio-name={person.display_name}>
+                  <MiniEditor id="bio-editor" wrapId="bio-editor-wrap" size="max-h-[50vh] min-h-[9rem]" />
+                  <input type="hidden" data-bio-value value={person.bio ?? ''} />
+                </div>
                 <p data-bio-error hidden role="alert" class="admin-alert mt-3" />
                 <div class="mt-3 flex justify-end gap-2">
                   <button type="button" class="btn btn-ghost btn-sm font-sans" data-bio-cancel>

@@ -19,6 +19,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import EditorToolbar from '../../components/admin/EditorToolbar.astro';
 import LinkDialog from '../../components/admin/LinkDialog.astro';
+import MiniEditor from '../../components/admin/MiniEditor.astro';
 import { Icon } from 'astro-icon/components';
 import { jsonForScript } from '../../lib/serialize';
 
@@ -43,7 +44,14 @@ const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const portraitPath = me.portrait ?? '';
 const portraitUrl = portraitPath ? `${SUPABASE_URL}/storage/v1/object/public/site/${portraitPath}` : '';
 
-const aboutInit = { meBody: me.body ?? '', siteBody: site.body ?? '' };
+const aboutInit = {
+  meBody: me.body ?? '',
+  siteBody: site.body ?? '',
+  // Two more since plan 43: the blurb and the contact intro are mini editors
+  // now, and this is already how this page hands server values to its editors.
+  blurb: siteName.blurb ?? '',
+  contactIntro: contact.intro ?? '',
+};
 
 /* ⚠ THREE PAGE-LOCAL STYLE CONSTANTS USED TO LIVE HERE — `input`, `fieldLabel`
    and `groupLabel` — and they were a whole fourth form system, declared in one
@@ -182,11 +190,27 @@ const aboutInit = { meBody: me.body ?? '', siteBody: site.body ?? '' };
         </div>
 
         <p class="text-base-content/45 pt-2 font-sans text-xs tracking-widest uppercase">About the Name</p>
+        {
+          /* ⚠ THE LABEL USED TO TEACH THE ASTERISK. It read *"(Markdown —
+            *italics* for the album title)"* — a form field explaining its own
+            storage format to the one person who ever fills it in, and doing it
+            by printing the very syntax he then had to type. Michael's words on
+            the whole class of field: *"I hate that there are markdown fields …
+            I don't want to do \*hello\* if I need to bold something; it doesn't
+            feel right entering it."*
+
+            So the syntax is gone and the INTENT stays: the album title still
+            wants italics, and now ⌘I is how you say so. Same Markdown in the
+            column either way.
+
+            `id` is unchanged from the textarea's, exactly as `CaptureDialog`
+            kept `cap-box` — TipTap renders its own editable inside this
+            element, so anything hunting for the text wants
+            `#f-blurb [contenteditable]`. */
+        }
         <div class="f">
-          <label for="f-blurb" class="f__k"
-            >Where the name came from <span>(Markdown — *italics* for the album title)</span></label
-          >
-          <textarea id="f-blurb" rows="4">{siteName.blurb ?? ''}</textarea>
+          <span class="f__k">Where the name came from <span>(italicise the album title)</span></span>
+          <MiniEditor id="f-blurb" wrapId="f-blurb-wrap" size="max-h-[30vh] min-h-[5rem]" />
         </div>
         <div class="f">
           <label for="f-spotify" class="f__k">Spotify link <span>(album or track — we render the embed)</span></label>
@@ -211,12 +235,8 @@ const aboutInit = { meBody: me.body ?? '', siteBody: site.body ?? '' };
           </p>
         </div>
         <div class="f">
-          <label for="f-contact-intro" class="f__k">Intro line <span>(optional — shown above the form)</span></label>
-          <textarea
-            id="f-contact-intro"
-            rows="2"
-            placeholder="Have a thought, a question, or a hello? I read everything.">{contact.intro ?? ''}</textarea
-          >
+          <span class="f__k">Intro line <span>(optional — shown above the form)</span></span>
+          <MiniEditor id="f-contact-intro" wrapId="f-contact-intro-wrap" size="max-h-[24vh] min-h-[3.25rem]" />
         </div>
       </section>
     </form>

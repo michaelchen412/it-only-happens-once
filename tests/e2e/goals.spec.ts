@@ -106,15 +106,31 @@ test.describe('the goal sheet', () => {
     // status. Notes joined on 2026-08-10 — "the why is only half of it" — and
     // the count is asserted rather than left open precisely so a sixth has to
     // argue for itself here first.
-    await expect(page.locator('#goal-form input[type="text"], #goal-form textarea')).toHaveCount(3);
+    //
+    // ⚠ THE SELECTOR MOVED WITH THE FIELDS; THE GUARD DID NOT MOVE AT ALL. Why
+    // and Notes became mini editors in plan 43, so two of the three are
+    // `[contenteditable]` surfaces now. The hidden inputs that seed them are
+    // `type="hidden"` and so fall outside `input[type="text"]` — which is what
+    // keeps this a count of CONTROLS rather than of elements, and keeps a sixth
+    // field having to argue for itself right here.
+    await expect(
+      page.locator('#goal-form input[type="text"], #goal-form textarea, #goal-form [contenteditable]'),
+    ).toHaveCount(3);
   });
 
-  test('⚠ notes are a textarea, and nothing in the sheet can hold a tick or a date', async ({ page }) => {
+  test('⚠ notes are prose, and nothing in the sheet can hold a tick or a date', async ({ page }) => {
     // The field that most looks like a way around the table's founding rule.
     // Prose cannot be counted, and these two assertions are what stops the
     // routine you describe in it from quietly becoming a subtask list.
+    //
+    // ⚠ A MINI EDITOR SINCE PLAN 43, NOT A TEXTAREA, AND THE RULE IS UNTOUCHED.
+    // That editor is the bold/italic one: `mountMiniEditor` turns OFF headings,
+    // bullet lists, ordered lists, blockquote, code blocks and rules, and there
+    // is no task-list extension anywhere in the build. So `- [ ]` still comes
+    // back a plain bullet, exactly as the component header promises — the field
+    // changed instrument, not what it is allowed to become.
     await openSheet(page);
-    await expect(page.locator('#goal-form textarea[name="notes"]')).toBeVisible();
+    await expect(page.locator('#goal-notes [contenteditable]')).toBeVisible();
     await expect(page.locator('#goal-form input[type="checkbox"], #goal-form input[type="date"]')).toHaveCount(0);
   });
 

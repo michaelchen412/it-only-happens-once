@@ -13,6 +13,8 @@ import { actions } from 'astro:actions';
 import { options, pick, picked, wireRadioGroups } from './radio-group';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { wireSheet } from './sheet';
+// Static, for the reason task-sheet.ts states at its own copy of this import.
+import { mountMiniEditor } from './rich-editor';
 
 const sheet = document.querySelector<HTMLDialogElement>('#goal-sheet');
 const form = document.querySelector<HTMLFormElement>('#goal-form');
@@ -34,8 +36,44 @@ if (sheet && form) {
   const ui = wireSheet(sheet, { noun: 'This goal' });
   const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
   const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]')!;
-  const whyInput = form.querySelector<HTMLTextAreaElement>('textarea[name="why"]')!;
-  const notesInput = form.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!;
+  /**
+   * The two prose fields, rich since plan 43. Storage is the same Markdown.
+   *
+   * ⚠ THE TWO TAKE OPPOSITE `breaks`, AND IT IS NOT AN OVERSIGHT. The goal page
+   * renders a *why* with no `breaks` and its *notes* with `{ breaks: true }`,
+   * on the reasoning written beside those two calls — a why is prose, notes are
+   * lines. An editor whose newline behaviour disagreed with its own page would
+   * show a break the page then closed up, so each is mounted to match the call
+   * that reads it back. See `mountMiniEditor`'s `breaks`.
+   *
+   * The hidden inputs carry the SERVER value in; nothing reads them on the way
+   * out. `wireSheet.open()` deliberately does not re-fill (there is one goal per
+   * page and no row to switch between), so seeding once at mount is the whole
+   * lifecycle — the same thing the textareas' server-rendered child text did.
+   */
+  const seed = (sel: string) => form.querySelector<HTMLInputElement>(sel)!.value;
+  const why = mountMiniEditor({
+    editorEl: document.getElementById('goal-why')!,
+    toolbarRoot: document.getElementById('goal-why-wrap')!,
+    placeholder: 'Not a number on a scale. Being able to do the Tahoe hike in September without hating it.',
+    ariaLabel: 'Why',
+    docClass: 'f-prose',
+    breaks: false,
+    onChange: () => ui.dirty.touch(),
+  });
+  const notes = mountMiniEditor({
+    editorEl: document.getElementById('goal-notes')!,
+    toolbarRoot: document.getElementById('goal-notes-wrap')!,
+    placeholder:
+      'What’s actually in it. Out of bed before the phone. Teeth, water, read the day. Twenty minutes moving — a walk counts.',
+    ariaLabel: 'Notes',
+    docClass: 'f-prose',
+    onChange: () => ui.dirty.touch(),
+  });
+  // `emitUpdate: false` — v3 fires `update` from `setContent`, which would arm
+  // the exit guard on a sheet nobody has typed in.
+  why.editor.commands.setContent(seed('[data-why-value]'), { emitUpdate: false });
+  notes.editor.commands.setContent(seed('[data-notes-value]'), { emitUpdate: false });
 
   /*
     ⚠ THE SHEET NO LONGER EDITS STATUS AT ALL (plan 41 · §5a). The header's
@@ -76,8 +114,8 @@ if (sheet && form) {
         actions.goals.save({
           id: form.dataset.id || undefined,
           name: nameInput.value.trim(),
-          why: whyInput.value.trim(),
-          notes: notesInput.value.trim(),
+          why: why.getMarkdown().trim(),
+          notes: notes.getMarkdown().trim(),
           horizon: picked(form, 'horizon', 'this_year') as 'this_season' | 'this_year' | 'next_few_years',
         }),
       { button: submitBtn, busy: 'Saving…', onError: ui.showError },

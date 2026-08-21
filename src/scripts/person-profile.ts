@@ -14,6 +14,10 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { confirmDialog } from './confirm-dialog';
+// Static, for the reason task-sheet.ts states at its own copy of this import —
+// and doubly so here, where `capture.ts` has warmed this module on idle since
+// 2026-08-07 on every page that carries `AdminLayout`.
+import { mountMiniEditor } from './rich-editor';
 
 const personId = document.querySelector<HTMLElement>('[data-person-id]')?.dataset.personId;
 
@@ -22,17 +26,48 @@ const view = document.querySelector<HTMLElement>('[data-bio-view]');
 const form = document.querySelector<HTMLFormElement>('[data-bio-form]');
 const errorEl = document.querySelector<HTMLElement>('[data-bio-error]');
 
+/**
+ * The bio editor — a mini editor since plan 43, storing the same Markdown.
+ *
+ * ⚠ MOUNTED ONLY IF THE FORM IS ON THE PAGE. This module also runs the archive
+ * toggle, and every lookup around it is already null-guarded for that reason.
+ *
+ * `breaks: false` MATCHES THE VIEW ABOVE IT, which renders `renderMarkdown(bio)`
+ * with no `breaks` — a bio is a paragraph about a person, and a wrapped line in
+ * one is not a line break. See `mountMiniEditor`'s `breaks`.
+ */
+const bioSeed = form?.querySelector<HTMLInputElement>('[data-bio-value]');
+const bioEditor =
+  form && bioSeed
+    ? mountMiniEditor({
+        editorEl: document.getElementById('bio-editor')!,
+        toolbarRoot: document.getElementById('bio-editor-wrap')!,
+        placeholder: 'What you’d say if someone asked about them.',
+        // The accessible name the `sr-only` label used to carry, verbatim.
+        ariaLabel: `About ${form.querySelector<HTMLElement>('[data-bio-name]')?.dataset.bioName ?? 'this person'}`,
+        docClass: 'f-prose',
+        breaks: false,
+      })
+    : null;
+/** `emitUpdate: false` — v3 emits `update` from `setContent`. */
+const seedBio = () => bioEditor?.editor.commands.setContent(bioSeed?.value ?? '', { emitUpdate: false });
+seedBio();
+
 const showForm = (editing: boolean) => {
   if (view) view.hidden = editing;
   if (form) form.hidden = !editing;
-  if (editing) form?.querySelector('textarea')?.focus();
+  // ⚠ FOCUS AFTER THE UNHIDE, AND ON THE CONTENTEDITABLE. ProseMirror cannot
+  // place a caret in a `display: none` subtree — the call is simply dropped —
+  // so the order that worked by accident for a textarea is load-bearing now.
+  if (editing) bioEditor?.editor.commands.focus();
 };
 
 document.querySelector('[data-bio-edit]')?.addEventListener('click', () => showForm(true));
 document.querySelector('[data-bio-cancel]')?.addEventListener('click', () => {
   // Reset to what the server rendered, so cancelling really does discard.
-  const ta = form?.querySelector<HTMLTextAreaElement>('textarea');
-  if (ta) ta.value = ta.defaultValue;
+  // The hidden seed is that value and is never written to, which makes it the
+  // exact equivalent of the textarea's `defaultValue` this replaced.
+  seedBio();
   if (errorEl) errorEl.hidden = true;
   showForm(false);
 });
@@ -46,7 +81,7 @@ const showBioError = (msg: string) => {
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const save = form.querySelector<HTMLButtonElement>('[data-bio-save]')!;
-  const bio = form.querySelector<HTMLTextAreaElement>('textarea')!.value;
+  const bio = bioEditor?.getMarkdown().trim() ?? '';
   if (!personId) return showBioError('Missing person id.');
   // ⚠ THIS HANDLER HAD THE CATCH AND STILL COULD NOT SAY THE SENTENCE IT
   // CARRIED. It formatted with `err instanceof Error ? err.message : '…'`,

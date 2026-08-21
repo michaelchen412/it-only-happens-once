@@ -28,7 +28,7 @@
 // `tests/e2e/about-builder.spec.ts` now guards this, and was watched failing
 // against a deliberate break in that position before being trusted.
 import { actions } from 'astro:actions';
-import { mountRichEditor } from './rich-editor';
+import { mountMiniEditor, mountRichEditor } from './rich-editor';
 import { formatActionError, nowTime, submitAction } from './action-error';
 import { uploadImage } from './upload';
 
@@ -70,6 +70,45 @@ const siteEditor = mountRichEditor({
   ariaLabel: 'What this is — body',
   onChange: markDirty,
 });
+
+/**
+ * The two SHORT prose fields — the name blurb and the contact intro.
+ *
+ * ⚠ MINI, NOT THE COMPOSER ABOVE. Both are a sentence or two that render into
+ * the public About page's chrome, not movements you sit inside; the full
+ * toolbar's headings, lists and images have nothing to offer a one-line intro.
+ * Same split `MiniEditor`'s own header describes.
+ *
+ * `breaks: false` matches `about.astro`, which renders both with a bare
+ * `renderMarkdown(…)`.
+ *
+ * ⚠ AND THEY NEED `onChange`, WHICH THE LINE BELOW CANNOT DO FOR THEM. A
+ * contenteditable fires no `input` the form can hear, so the delegated listener
+ * that has armed Save for every other field on this page would have let an edit
+ * to either of these sit there with Save greyed out.
+ */
+const blurbEditor = mountMiniEditor({
+  editorEl: $('f-blurb'),
+  toolbarRoot: $('f-blurb-wrap'),
+  placeholder: 'Where the name came from…',
+  ariaLabel: 'Where the name came from',
+  docClass: 'f-prose',
+  breaks: false,
+  onChange: markDirty,
+});
+const introEditor = mountMiniEditor({
+  editorEl: $('f-contact-intro'),
+  toolbarRoot: $('f-contact-intro-wrap'),
+  placeholder: 'Have a thought, a question, or a hello? I read everything.',
+  ariaLabel: 'Intro line',
+  docClass: 'f-prose',
+  breaks: false,
+  onChange: markDirty,
+});
+// `emitUpdate: false` — seeding is not editing, and `markDirty` above would
+// otherwise arm Save on a page nobody has touched.
+blurbEditor.editor.commands.setContent(init.blurb || '', { emitUpdate: false });
+introEditor.editor.commands.setContent(init.contactIntro || '', { emitUpdate: false });
 
 $('about-form').addEventListener('input', markDirty);
 
@@ -148,12 +187,12 @@ saveBtn.addEventListener('click', async () => {
     site: {
       body: siteEditor.getMarkdown(),
       name: {
-        blurb: val('f-blurb'),
+        blurb: blurbEditor.getMarkdown().trim(),
         spotify_url: val('f-spotify'),
       },
     },
     contact: {
-      intro: val('f-contact-intro'),
+      intro: introEditor.getMarkdown().trim(),
     },
   };
 
