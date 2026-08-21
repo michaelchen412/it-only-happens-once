@@ -312,6 +312,35 @@ a.row__t:hover {
   margin: -0.625rem 0 -0.625rem -0.75rem;
 }
 
+/* ⚠ THE 44px FLOOR FOR A CONTROL THAT CANNOT GROW. The two ways to reach the
+   floor are to grow the box (`.zone__act`, `.datebar__step`) or to expand the
+   HIT AREA and leave the drawing alone — this is the second, for controls whose
+   drawn size is doing a job. The ↩ Today pill has to read as a pill and a 44px
+   one reads as a button; the drawer's ✕ and the header's ☰ are placed against
+   an edge that a grown box would shift.
+
+   `max(100%, 2.75rem)` is what makes it safe to apply widely: a control already
+   past the floor in one axis is not stretched in that axis, so the 58px-wide
+   Today pill gains height only.
+
+   ⚠ ONLY FOR A CONTROL WITH ROOM AROUND IT. An expanded hit area is invisible,
+   so it can silently overlap a neighbour and steal its taps — which is exactly
+   why `.datebar__step` above grows instead. Check the gap before adding this. */
+.u-tap {
+  position: relative;
+}
+@media (hover: none) {
+  .u-tap::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+  }
+}
+
 /* ── chips: the URGENCY axis (semantic only, never a domain hue) ────────── */
 .chip {
   display: inline-flex;
@@ -419,12 +448,38 @@ a.row__t:hover {
   place-items: center;
   width: 1.75rem;
   height: 1.75rem;
+  /* ⚠ A STEPPER MUST NEVER BE SQUEEZED. As a flex child of `.per` beside a
+     `min-width: 0` title it was, and only in WEEK view, where the label is
+     wider: measured 29px against the 44 the touch rule below had just given it.
+     A target that is the right size in one view and not the other is worse than
+     one that is wrong in both, because nothing looks broken. */
+  flex-shrink: 0;
   border-radius: 0.5rem;
   color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
 }
 .datebar__step:hover {
   background: var(--color-base-200);
   color: var(--color-base-content);
+}
+/* ⚠ 44px ON TOUCH, AND THE GLYPH STAYS 28px — the identical trade `.zone__act`
+   makes and argues in full further down this file, applied to the control that
+   needs it most: these arrows are on Today, on the calendar and inside the date
+   popover, and stepping a month is the most repeated tap in the building.
+   `place-items: center` keeps the caret centred in whatever the box becomes, so
+   desktop is pixel-identical.
+
+   ⚠ THE BOX GROWS RATHER THAN THE HIT AREA, and that is the whole decision. An
+   invisible `::after` would have left the drawing alone — but on Today these
+   arrows flank `.datebar__date`, a `<summary>` that IS clickable, with 2px
+   between them. An expanded hit area would have reached six pixels INTO the
+   date and stolen taps meant for the picker, which is worse than the problem it
+   fixes. Growing the box pushes its neighbour over instead, so two targets can
+   never contend for one pixel. */
+@media (hover: none) {
+  .datebar__step {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 .datebar__back {
   display: inline-flex;
@@ -3101,6 +3156,25 @@ a.row__t:hover {
    the cell is showing — so there is no breakpoint the server has to guess at,
    and rotating a phone cannot catch the grid in the wrong state. */
 @media (max-width: 40rem) {
+  /* ⚠ THE CONTROL GIVES WAY BEFORE THE TARGETS DO. Raising the steppers to the
+     44px touch floor made the whole row wider than a phone in WEEK view, whose
+     label is the longest one here — measured 403px against a 390px screen, and
+     375 against 320. Something had to yield, and it must not be the tap target:
+     that was the entire point of growing them.
+
+     So the TITLE yields instead. A smaller display size at this width costs
+     nothing — the week's dates are repeated in the seven column headers
+     directly underneath — and the row is allowed to wrap, which at 320px drops
+     the ↩ Today pill onto its own line rather than shearing it off the screen.
+     The arrows and the title still cannot be split from each other: `.per`'s
+     children are ordered so the pill is the only thing that can go, and the
+     held pill wraps identically, so nothing shifts when it appears. */
+  .per {
+    flex-wrap: wrap;
+  }
+  .per__now {
+    font-size: 1.125rem;
+  }
   /* ⚠ THE GHOSTS COME OFF ON A PHONE, and this is a trade rather than an
      oversight. Measured at 390px: month view fits (the widest title is
      `September 2026`), but WEEK view did not — the widest week range carries a

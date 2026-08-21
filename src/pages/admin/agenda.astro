@@ -310,7 +310,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
              therefore the same width, and a `<span>` rather than an `<a>` so it
              is neither focusable nor announced. */
           offPeriod ? (
-            <a class="chip u-none per__back" href={href({ date: null })}>
+            <a class="chip u-none u-tap per__back" href={href({ date: null })}>
               ↩ Today
             </a>
           ) : (
