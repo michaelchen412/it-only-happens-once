@@ -21,7 +21,8 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Tables } from '../database.types';
 import { attention, checkinSettled, dueToday, type Attention } from './attention';
-import { birthdayItem, eventItem, mirroredBetween, seenOn, type CalendarItem } from './calendar';
+import { birthdayItem, eventItem, holidayItem, mirroredBetween, seenOn, type CalendarItem } from './calendar';
+import { holidaysBetween } from './holidays';
 import type { Checkin } from './checkin';
 import { briefsFor, type Brief } from './brief';
 import { driftList, type Drift } from './drift';
@@ -326,6 +327,21 @@ export async function loadToday(sb: DB, today: Ymd): Promise<TodayData> {
     ...mirroredToday,
     ...tasks.rows.filter((t) => t.shownDueOn === today).map(taskItem),
     ...birthdays.filter((b) => b.birthday.days === 0).map((b) => withDoor(b.person, today)),
+    /* ⚠ ON THE DAY ONLY, AND DELIBERATELY NOT IN `comingItems` BELOW. Holidays
+       are computed from rules (`holidays.ts`) and carry no lead, because Coming
+       up is driven ENTIRELY by each item's own lead — see the warning on
+       `announces` — and a holiday has no honest one to give it. Every candidate
+       number (a week? a month? forty-five days for Christmas and three for
+       Halloween?) is a dial, and this file's header says what it thinks of
+       dials: *"the list is short because the leads are honest, so there is no
+       knob to fiddle with."*
+
+       So the ANSWER to "what is coming" stays where it already was — the
+       calendar, where you flip to December and see Christmas sitting on the
+       25th. Today says only what is true today. If a lead ever earns itself,
+       the honest form is a per-holiday `lead` in the definition, not a global
+       window bolted on here. */
+    ...holidaysBetween(today, today).map((h) => holidayItem(h.holiday, h.on)),
   ];
 
   const comingItems: CalendarItem[] = [

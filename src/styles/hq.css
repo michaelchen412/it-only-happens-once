@@ -2724,6 +2724,17 @@ a.row__t:hover {
   background: transparent;
   border: 1px dashed color-mix(in oklch, var(--cn-rose) 60%, transparent);
 }
+/* ⚠ DASHED, LIKE THE BIRTHDAY AND UNLIKE THE MIRROR, and that is the statement:
+   the dash is what the two DERIVED sources have in common — neither is a row
+   anywhere, neither can be edited, neither has anything behind it to open —
+   while Google's copy is a real row that simply lives elsewhere, so it gets a
+   solid ring. Violet because rose is already spoken for and the two must be
+   tellable apart at 10px; it is also the furthest hue in the set from the amber
+   that means *yours*. */
+.lg__m--holiday {
+  background: transparent;
+  border: 1px dashed color-mix(in oklch, var(--cn-violet) 65%, transparent);
+}
 
 /* ── the month grid ──────────────────────────────────────────────────────── */
 .cal {
@@ -2835,6 +2846,9 @@ a.row__t:hover {
 .cell__dots .lg__m--birthday {
   border: 1px solid color-mix(in oklch, var(--cn-rose) 85%, transparent);
 }
+.cell__dots .lg__m--holiday {
+  border: 1px solid color-mix(in oklch, var(--cn-violet) 85%, transparent);
+}
 /* "…and more", without a numeral nobody could read at this size: the same dot,
    stretched. Deliberately in the base-content grey rather than in any kind's
    colour — it stands for a mixture, and borrowing one source's hue to say
@@ -2915,6 +2929,29 @@ a.row__t:hover {
 .ev--birthday {
   background: transparent;
   color: color-mix(in oklch, var(--cn-rose) 55%, var(--color-base-content));
+}
+/* No fill, because fill means writable and a holiday is the least writable thing
+   on the grid — it is not even a row.
+
+   ⚠ MIXED `in oklab`, AND EVERY OTHER RULE IN THIS SECTION MIXES `in oklch` —
+   so this is the note that stops it being "fixed" back for consistency. It was
+   written as `oklch` first, and measured: the row came out at hue 4.85, which
+   is ROSE, which is the birthday sitting two cells away.
+
+   The cause is that oklch interpolates hue along the SHORTER ARC. Violet is hue
+   305 and `--color-base-content` is a warm cream around 65, so the short way
+   between them runs 305 → 0 → 65 — straight through red. A 55% mix lands almost
+   exactly on the rose this was picked to be distinguishable from. oklab has no
+   hue channel to rotate, so the mix passes through grey instead and arrives at
+   a muted violet that still reads as violet.
+
+   ⚠ THE SAME TRAP IS WAITING FOR THE NEXT COLD HUE ADDED HERE. `--cn-azure`
+   (222) mixed toward the same warm base in oklch rotates DOWN through green.
+   Any hue on the cold side of the wheel needs oklab; rose and amber are already
+   warm, which is the only reason the rules above get away with oklch. */
+.ev--holiday {
+  background: transparent;
+  color: color-mix(in oklab, var(--cn-violet) 55%, var(--color-base-content));
 }
 
 /* The read-only signal, said twice and neither of them a word: no lift on
@@ -3189,7 +3226,8 @@ button.drow__x:hover {
 .drow.ev--event,
 .drow.ev--task,
 .drow.ev--mirror,
-.drow.ev--birthday {
+.drow.ev--birthday,
+.drow.ev--holiday {
   background: transparent;
   color: inherit;
   padding-left: 0.75rem;
@@ -3205,6 +3243,9 @@ button.drow__x:hover {
 }
 .drow.ev--birthday {
   box-shadow: inset 3px 0 0 color-mix(in oklch, var(--cn-rose) 40%, transparent);
+}
+.drow.ev--holiday {
+  box-shadow: inset 3px 0 0 color-mix(in oklch, var(--cn-violet) 40%, transparent);
 }
 /* A task answered today stays on the day, struck through — the same promise the
    tasks room makes (§10f). `task--done` is what the shared script sets. */

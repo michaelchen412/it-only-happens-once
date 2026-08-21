@@ -100,7 +100,14 @@ const progress = progressLabel(tasks.filter((t) => answered.get(t.id) === 'done'
                     {it.kind === 'mirror' && <Icon name="ph:arrow-up-right" class="row__i" />}
                   </a>
                 ) : (
-                  <span class="row__t">{it.title}</span>
+                  /* A holiday has no door — nothing sits behind it (see
+                     `holidayItem`) — so it lands here rather than in the link
+                     above, and the glyph has to come with it or the row would be
+                     the one thing on Today with no way to tell what it is. */
+                  <span class="row__t">
+                    {it.kind === 'holiday' && <Icon name="ph:confetti" class="row__i" />}
+                    {it.title}
+                  </span>
                 )}
                 {/* Who is there is the reason 12's brief works at all, so it
                     rides the row rather than being something you open to find. */}

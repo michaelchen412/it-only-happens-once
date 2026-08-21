@@ -1,6 +1,6 @@
 // The calendar's union (docs/plans/archive/13-agenda.md §5).
 //
-// ⚠ FOUR SOURCES ON ONE GRID, AND ONLY TWO OF THEM ARE WRITABLE. That is the
+// ⚠ FIVE SOURCES ON ONE GRID, AND ONLY TWO OF THEM ARE WRITABLE. That is the
 // whole design problem of this surface, and §5's answer is that authority is
 // carried by the SHAPE of a row rather than by a label:
 //
@@ -8,6 +8,14 @@
 //   task       lighter fill + ○  yours, but not an event — it ticks off
 //   mirrored   hairline, no fill a copy of something that lives elsewhere
 //   birthday   no body at all    not a row anywhere; a cake and a name
+//   holiday    no body at all    not a row anywhere; computed from a rule
+//
+// FIVE SOURCES NOW, and the count is not the thing that matters — the split is.
+// Holidays joined `birthday` on the unwritable side (2026-08-21) and changed
+// nothing about the rule below, because they are the same kind of thing: a day
+// that is simply TRUE, derived rather than stored, with no row behind it to
+// open and nothing to tick. See `holidays.ts` for why they are computed from
+// rules rather than fetched or stored.
 //
 // FILL MEANS WRITABLE and nothing else uses it. The first draft gave tasks an
 // outline ring, which put them in the same visual class as the Google rows — so
@@ -27,13 +35,14 @@ import { spans } from './mirror';
 import { one } from './relations';
 import type { Ymd } from './time';
 
-export type ItemKind = 'event' | 'task' | 'mirror' | 'birthday';
+export type ItemKind = 'event' | 'task' | 'mirror' | 'birthday' | 'holiday';
 
 export const KINDS: Record<ItemKind, { writable: boolean; label: string }> = {
   event: { writable: true, label: 'Yours' },
   task: { writable: true, label: 'Task' },
   mirror: { writable: false, label: 'Mirrored' },
   birthday: { writable: false, label: 'Birthday' },
+  holiday: { writable: false, label: 'Holiday' },
 };
 
 export interface CalendarItem {
@@ -114,6 +123,24 @@ export function birthdayItem(person: { id: string; display_name: string }, on: Y
 }
 
 /**
+ * A holiday as a grid item — computed, never a row (`holidays.ts`).
+ *
+ * Same shape as `birthdayItem` above and for the same reason: there is no
+ * `holidays` table to select from, and taking a row here would be the first step
+ * toward one. The id is the holiday's stable `key` rather than anything
+ * per-year, so the same Christmas is the same item in every December.
+ *
+ * ⚠ NO `href`, and unlike `eventItem` this is not a rule the page can bend —
+ * there is nowhere for it to go. A birthday at least has a person behind it,
+ * which is why Today gives that one a door; Christmas has nothing behind it at
+ * all, and a link that opened a page saying "Christmas" would be chrome
+ * pretending to be an affordance.
+ */
+export function holidayItem(holiday: { key: string; name: string }, on: Ymd): CalendarItem {
+  return { kind: 'holiday', id: holiday.key, on, title: holiday.name, at: null };
+}
+
+/**
  * The order items sit in on a day, and it is the same order everywhere — the
  * grid, the week column and the day panel — because they are one union, not
  * three.
@@ -123,8 +150,18 @@ export function birthdayItem(person: { id: string; display_name: string }, on: Y
  * dinner because it has no time would read as a mistake. Untimed TASKS sort
  * after untimed events for the same reason they sort last in the tasks room: a
  * task with no time does not claim a slot in the day.
+ *
+ * ⚠ A HOLIDAY IS THE SAME KIND OF FACT, so it joined the front rather than the
+ * middle (2026-08-21). Christmas is not an appointment you keep at some
+ * o'clock. A birthday still outranks it: one is a person you know, the other is
+ * on everybody's calendar.
+ *
+ * The numbers were RENUMBERED to make room rather than fractional, and every
+ * relative order this comment describes survives intact:
+ * birthday < holiday < untimed event < timed < untimed task.
  */
-const rank = (i: CalendarItem) => (i.kind === 'birthday' ? 0 : i.at ? 2 : i.kind === 'task' ? 3 : 1);
+const rank = (i: CalendarItem) =>
+  i.kind === 'birthday' ? 0 : i.kind === 'holiday' ? 1 : i.at ? 3 : i.kind === 'task' ? 4 : 2;
 
 export function byTime(a: CalendarItem, b: CalendarItem): number {
   const ra = rank(a);

@@ -35,10 +35,12 @@ import {
   byDay,
   byTime,
   eventItem,
+  holidayItem,
   legendFor,
   mirroredBetween,
   type CalendarItem,
 } from '../../lib/hq/calendar';
+import { holidaysBetween } from '../../lib/hq/holidays';
 import { staleness } from '../../lib/hq/mirror';
 import { liveAndAnswered } from '../../lib/hq/today-data';
 import { renderMarkdown } from '../../lib/markdown';
@@ -169,6 +171,14 @@ const items: CalendarItem[] = [
     // No door either: there is no row to open, and the profile is a click away
     // in People. Today offers one because Today is a summary you read out of.
     .map((b) => birthdayItem(b.person, b.ymd)),
+  // ⚠ HOLIDAYS ARE NOT ROWS EITHER, and they are not even a query — computed
+  // from rules in `holidays.ts`, which makes this the one source on the grid
+  // that costs nothing and cannot go stale. Same treatment as a birthday: no
+  // body, no door, nothing to press. There is no row to open.
+  //
+  // It takes `from`/`to` rather than a year because a month view is 42 cells and
+  // spans two years at both ends of December — see `holidaysBetween`.
+  ...holidaysBetween(from, to).map((h) => holidayItem(h.holiday, h.on)),
   // Google's copy. Its rows carry `href` — the event on Google — which is the
   // whole of their read-only explanation: the one door a mirrored row offers
   // leads to the only place it can be changed.
@@ -340,6 +350,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     >
                       <span class="wev__t">
                         {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                        {it.kind === 'holiday' && <Icon name="ph:confetti" class="ev__i" />}
                         {it.kind === 'task' && <Icon name="ph:circle" class="ev__i" />}
                         {it.at ? clockTime(it.at) : it.kind === 'task' ? 'anytime' : 'all day'}
                         {!KINDS[it.kind].writable && <Icon name="ph:lock-simple" class="ev__lock" />}
@@ -411,6 +422,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                       class:list={['ev', `ev--${it.kind}`, !KINDS[it.kind].writable && 'ev--ro']}
                     >
                       {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                      {it.kind === 'holiday' && <Icon name="ph:confetti" class="ev__i" />}
                       {it.kind === 'task' && <Icon name="ph:circle" class="ev__i" />}
                       {it.at && <span class="ev__t">{clockTime(it.at).replace(':00', '')}</span>}
                       <span class="ev__x">{it.title}</span>
@@ -486,13 +498,13 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
 
                         ⚠ AND THE FIX IS PER-KIND, NOT GLOBAL, which is why the
                         first draft of this finding was wrong. This panel carries
-                        FOUR kinds and only one of them is ours to edit: a
+                        FIVE kinds and only one of them is ours to edit: a
                         mirrored row's title stays a link to Google (the only
                         place it CAN be changed — that door is the explanation of
-                        read-only, and it cannot go stale), and a birthday stays
-                        inert because there is nothing behind it. An inert title
-                        is correct here; an inert title beside an Edit chip was
-                        not. */}
+                        read-only, and it cannot go stale), and a birthday or a
+                        holiday stays inert because there is nothing behind it.
+                        An inert title is correct here; an inert title beside an
+                        Edit chip was not. */}
                     {it.kind === 'mirror' && it.href ? (
                       <a class="drow__x row-open" href={it.href} target="_blank" rel="noreferrer">
                         {it.title}
@@ -505,6 +517,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                     ) : (
                       <span class="drow__x">
                         {it.kind === 'birthday' && <Icon name="ph:cake" class="ev__i" />}
+                        {it.kind === 'holiday' && <Icon name="ph:confetti" class="ev__i" />}
                         {it.title}
                       </span>
                     )}
@@ -550,7 +563,8 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
                       <Icon name="ph:users-three" /> {it.people?.length ? 'Who’s there' : 'Tag someone'}
                     </button>
                   )}
-                  {/* A birthday offers nothing. There is no row to open. */}
+                  {/* A birthday offers nothing, and neither does a holiday.
+                      Neither is a row, so there is nothing to open. */}
                 </li>
               ))}
             </ul>

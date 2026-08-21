@@ -96,6 +96,59 @@ test.describe('the month grid', () => {
   });
 });
 
+/* Holidays (2026-08-21). `hq-holidays.test.ts` already pins the DATES — sixteen
+   known Easters, fifty years of invariants — and pins them far harder than a
+   browser could. So this file deliberately does not re-check arithmetic. It
+   checks the one thing a unit test cannot: that the computed date actually
+   REACHES THE PAGE, on the right cell, wearing the read-only shape §5 is about.
+
+   The failure this guards is specific and silent. `holidaysBetween` is called
+   with the grid's `from`/`to`, and a grid is 42 days spanning two years at both
+   ends of December — so a wiring bug drops holidays off exactly the views most
+   likely to be looking for them, while every unit test stays green. */
+test.describe('holidays on the grid', () => {
+  test('⚠ the computed date lands on the right cell, not merely in the month', async ({ page }) => {
+    await calendar(page, '?date=2026-12-01');
+    await expect(page.locator('.month__grid .ev[href*="day=2026-12-25"]')).toContainText('Christmas');
+
+    // The nth-weekday rules are where a plausible implementation is a week out,
+    // so one of them is checked through the page rather than only in isolation.
+    // The third Sunday of June 2026 is the 21st.
+    await calendar(page, '?date=2026-06-01');
+    await expect(page.locator('.month__grid .ev[href*="day=2026-06-21"]')).toContainText('Father');
+  });
+
+  test('⚠ crosses the year the six-week grid actually spans', async ({ page }) => {
+    // December 2026's grid runs to 2 January 2027, so New Year's Day is on it —
+    // and it comes from a year the page was never asked about.
+    await calendar(page, '?date=2026-12-01');
+    await expect(page.locator('.month__grid .ev[href*="day=2027-01-01"]')).toContainText('New Year');
+  });
+
+  test('is read-only in shape, like a birthday and unlike an event', async ({ page }) => {
+    await calendar(page, '?date=2026-12-01');
+    const christmas = page.locator('.month__grid .ev--holiday').first();
+    await expect(christmas).toHaveClass(/ev--ro/);
+    // FILL MEANS WRITABLE, and this is the least writable thing on the grid —
+    // it is not even a row. So it has none.
+    const fill = await christmas.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(['rgba(0, 0, 0, 0)', 'transparent']).toContain(fill);
+  });
+
+  test('the day panel offers it no verb, because there is nothing to open', async ({ page }) => {
+    await calendar(page, '?date=2026-12-01&day=2026-12-25');
+    const row = page.locator('.drow.ev--holiday').first();
+    await expect(row).toContainText('Christmas');
+    // No link, no button, no tick — the same nothing a birthday gets.
+    await expect(row.locator('a, button')).toHaveCount(0);
+  });
+
+  test('the legend keys it once it is on the grid', async ({ page }) => {
+    await calendar(page, '?date=2026-12-01');
+    await expect(page.locator('.legend')).toContainText('Holiday');
+  });
+});
+
 test.describe('the day panel', () => {
   const openADay = async (page: Page) => {
     await calendar(page);

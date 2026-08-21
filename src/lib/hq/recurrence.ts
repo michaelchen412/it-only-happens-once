@@ -29,7 +29,7 @@
 // rather than searching a calendar from scratch, which is what keeps
 // `INTERVAL=2` in phase: "every 2 weeks" disposed of three weeks late must land
 // on the right Monday, not merely on a Monday.
-import { shiftYmd, ymdOf, ymdToUtc, type Ymd } from './time';
+import { nthWeekdayOf, shiftYmd, ymdOf, ymdToUtc, type Ymd } from './time';
 import { ordinal } from './dates';
 
 /** The six named schedules the editor offers. Nobody hand-writes RRULE (§4). */
@@ -198,19 +198,6 @@ export function parse(rrule: string): Rule | null {
 /** Is this a rule we can actually expand? The action's guard on the column. */
 export function isSupported(rrule: string): boolean {
   return parse(rrule) !== null;
-}
-
-/** The nth (or last) `weekday` of a month, as a local date. */
-function nthWeekdayOf(year: number, month: number, weekday: number, nth: number): Ymd | null {
-  if (nth > 0) {
-    const first = new Date(Date.UTC(year, month, 1));
-    const shift = (weekday - first.getUTCDay() + 7) % 7;
-    const d = new Date(Date.UTC(year, month, 1 + shift + (nth - 1) * 7));
-    return d.getUTCMonth() === month ? ymdOf(d) : null;
-  }
-  const last = new Date(Date.UTC(year, month + 1, 0));
-  const back = (last.getUTCDay() - weekday + 7) % 7;
-  return ymdOf(new Date(Date.UTC(year, month, last.getUTCDate() - back)));
 }
 
 /**

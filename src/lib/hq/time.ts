@@ -212,6 +212,38 @@ export function daysBetween(a: Ymd, b: Ymd): number {
 }
 
 /**
+ * The nth `weekday` of a month, as a local date — `nth: -1` for the LAST one.
+ *
+ * `month` is 0-INDEXED, like `Date.UTC`, because both callers are already
+ * holding one of those. `weekday` is 0 = Sunday, like `getUTCDay`. Returns null
+ * when the month has no nth such weekday — there is no fifth Monday in most
+ * Februaries — and never for `-1`, because a last one always exists.
+ *
+ * ⚠ LIFTED OUT OF `recurrence.ts` (2026-08-21), where it was private and
+ * expanded `FREQ=MONTHLY;BYDAY=3MO`. `holidays.ts` needs the identical
+ * arithmetic for "the third Sunday of June", and the alternative was a second
+ * copy — which is precisely the mistake `daysBetween` above already documents,
+ * having been imported out of `people.ts` while `tasks.ts` "quietly kept a
+ * second copy by a different route". Generic calendar arithmetic belongs beside
+ * `shiftYmd`, not inside a domain module.
+ *
+ * ⚠ BYTE-IDENTICAL TO THE VERSION IT REPLACES, deliberately. Every recurring
+ * task in the database is scheduled through this; a tidy-up here reschedules
+ * them all, silently, and `hq-recurrence.test.ts` is what would notice.
+ */
+export function nthWeekdayOf(year: number, month: number, weekday: number, nth: number): Ymd | null {
+  if (nth > 0) {
+    const first = new Date(Date.UTC(year, month, 1));
+    const shift = (weekday - first.getUTCDay() + 7) % 7;
+    const d = new Date(Date.UTC(year, month, 1 + shift + (nth - 1) * 7));
+    return d.getUTCMonth() === month ? ymdOf(d) : null;
+  }
+  const last = new Date(Date.UTC(year, month + 1, 0));
+  const back = (last.getUTCDay() - weekday + 7) % 7;
+  return ymdOf(new Date(Date.UTC(year, month, last.getUTCDate() - back)));
+}
+
+/**
  * How far ahead of UTC `tz` is at a given instant, in milliseconds.
  *
  * There is no direct API for this, so it is read back out of a formatter: ask

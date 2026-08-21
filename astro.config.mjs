@@ -226,6 +226,12 @@ export default defineConfig({
           // roster, and one glyph meaning two things is how a timeline stops
           // being scannable.
           'gift',
+          // The calendar's holidays (2026-08-21). ⚠ Its own mark, for exactly
+          // the reason `gift` gives just above: `cake` already means a birthday
+          // on the grid, and one glyph meaning two things is how a calendar
+          // stops being scannable. Deliberately not `gift` either — that means
+          // an interaction KIND on a person's timeline, a thing you did.
+          'confetti',
           // People (12 · Piece 3): the Shared shelf, where the glyph carries
           // what KIND of corpus row this is — the same job TypeMark does in the
           // fragment manager, done with icons because the shelf is a rail.
