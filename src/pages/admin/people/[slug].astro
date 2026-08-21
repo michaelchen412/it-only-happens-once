@@ -160,7 +160,7 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
               <h1 class="font-display text-3xl font-light">{person.display_name}</h1>
               <span class="chip u-none">{circleLabel}</span>
             </div>
-            {person.epithet && <p class="text-base-content/70 mt-1 font-serif text-base">{person.epithet}</p>}
+            {person.epithet && <p class="text-muted mt-1 font-serif text-base">{person.epithet}</p>}
 
             {/* `lastContact` belongs in this condition, not just in the strip.
                 It was left out at first and a person whose only fact was a

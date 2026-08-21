@@ -125,7 +125,7 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
       title.className = 'font-serif';
       title.textContent = s.title;
       const artist = document.createElement('span');
-      artist.className = 'text-sm text-base-content/50';
+      artist.className = 'text-sm text-whisper';
       artist.textContent = s.artist;
       btn.append(title, artist);
 
@@ -133,13 +133,13 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
       // don't, and the annotated few are the ones worth reaching for.
       if (s.annotated) {
         const mark = document.createElement('span');
-        mark.className = 'ml-auto text-xs text-base-content/35';
+        mark.className = 'ml-auto text-xs text-whisper';
         mark.textContent = 'annotated';
         btn.append(mark);
       }
       if (s.id === current?.id) {
         const mark = document.createElement('span');
-        mark.className = 'ml-auto text-xs text-base-content/35';
+        mark.className = 'ml-auto text-xs text-whisper';
         mark.textContent = 'paired';
         btn.append(mark);
       }
@@ -220,13 +220,13 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
       'rounded-field border-primary/30 bg-primary/5 flex flex-wrap items-center gap-x-2 gap-y-1 border px-3 py-2 text-sm';
 
     const label = document.createElement('span');
-    label.className = 'text-base-content/60 text-xs';
+    label.className = 'text-faint text-xs';
     label.textContent = 'Not in the corpus yet:';
     const title = document.createElement('span');
     title.className = 'font-serif';
     title.textContent = song.title || '(untitled)';
     const artist = document.createElement('span');
-    artist.className = 'text-base-content/55 text-sm';
+    artist.className = 'text-whisper text-sm';
     // ⚠ Says so rather than showing a gap. An empty artist here is a real state
     // — the keyless oEmbed tier answers with a title and no artist — and a blank
     // reads as a bug in the panel rather than as a fact about the lookup.

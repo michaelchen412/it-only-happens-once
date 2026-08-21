@@ -94,7 +94,7 @@ const { subjects, constellations = [] } = Astro.props;
         }
         <span
           id="ws-heading"
-          class="text-base-content/40 flex shrink-0 items-center font-sans text-xs tracking-widest uppercase"
+          class="text-whisper flex shrink-0 items-center font-sans text-xs tracking-widest uppercase"
         >
           <span class="sr-only">writing</span>
           <span id="ws-heading-label" hidden>Note</span>
@@ -165,12 +165,8 @@ const { subjects, constellations = [] } = Astro.props;
             `#ws-count` stays neutral while `#ws-status-text` beside it goes
             warning/error — the number is never the thing shouting. */
         }
-        <div
-          id="ws-status"
-          class="text-base-content/55 ml-auto flex items-center gap-2 font-sans text-xs"
-          aria-live="polite"
-        >
-          <span id="ws-count" hidden class="text-base-content/40 whitespace-nowrap tabular-nums"></span>
+        <div id="ws-status" class="text-whisper ml-auto flex items-center gap-2 font-sans text-xs" aria-live="polite">
+          <span id="ws-count" hidden class="text-whisper whitespace-nowrap tabular-nums"></span>
           {
             /* No `hidden` on the spinner: app.css hides it with `visibility` so
               it never gives its width back. A draft autosaves every 1.2s, so
@@ -201,7 +197,7 @@ const { subjects, constellations = [] } = Astro.props;
               type="button"
               id="ws-pf-dismiss"
               aria-label="Dismiss proofreading"
-              class="text-base-content/40 hover:text-base-content">✕</button
+              class="text-whisper hover:text-base-content">✕</button
             >
           </span>
         </div>
@@ -332,11 +328,8 @@ const { subjects, constellations = [] } = Astro.props;
             is the gap that makes them two targets instead of one strip. */
         }
         <span class="bg-base-300 ml-1 h-5 w-px shrink-0" aria-hidden="true"></span>
-        <button
-          type="button"
-          data-ws-close
-          class="text-base-content/50 hover:text-base-content shrink-0"
-          aria-label="Close">✕</button
+        <button type="button" data-ws-close class="text-whisper hover:text-base-content shrink-0" aria-label="Close"
+          >✕</button
         >
       </div>
     </div>
@@ -532,7 +525,7 @@ const { subjects, constellations = [] } = Astro.props;
     }
     <div class="pop" popover id="ws-pf-pop">
       <p class="px-1 py-0.5 text-sm">
-        <s id="ws-pf-before" class="text-base-content/50"></s>
+        <s id="ws-pf-before" class="text-whisper"></s>
         <span aria-hidden="true">→</span>
         <strong id="ws-pf-after"></strong>
       </p>

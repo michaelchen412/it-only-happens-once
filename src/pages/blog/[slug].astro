@@ -107,10 +107,8 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
   {
     !found ? (
       <div class="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-5 text-center">
-        <p class="text-base-content/70 font-serif text-2xl">This piece isn’t here.</p>
-        <p class="text-base-content/45 mt-2 font-sans text-sm">
-          It may have been unpublished, or the link is off by a letter.
-        </p>
+        <p class="text-muted font-serif text-2xl">This piece isn’t here.</p>
+        <p class="text-whisper mt-2 font-sans text-sm">It may have been unpublished, or the link is off by a letter.</p>
         <a href="/blog" class="text-primary mt-6 inline-flex items-center gap-1 font-sans text-sm hover:underline">
           <Icon name="ph:caret-left" class="size-3.5" /> Back to the blog
         </a>
@@ -128,7 +126,7 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
         <a
           href="/blog"
-          class="text-base-content/45 hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
+          class="text-whisper hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
         >
           <Icon name="ph:caret-left" class="size-3.5" /> The blog
         </a>

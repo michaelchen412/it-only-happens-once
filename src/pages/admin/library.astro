@@ -90,7 +90,7 @@ const mergeOptions = {
         class="btn btn-ghost btn-sm normal-case"
         title="Everything in one JSON file — the whole corpus and every private HQ table. The most sensitive file this site can produce; keep it somewhere you'd keep a password."
       >
-        <Icon name="ph:arrow-down" class="text-base-content/60" /> Export everything
+        <Icon name="ph:arrow-down" class="text-faint" /> Export everything
       </a>
     </PageHeader>
     <p id="lib-error" hidden role="alert" class="admin-alert mb-4"></p>
@@ -150,7 +150,7 @@ const mergeOptions = {
                   class="input input-xs w-full"
                 />
               </td>
-              <td class="text-base-content/60 px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
+              <td class="text-faint px-3 py-2 text-right">{subjCount[s.id] ?? 0}</td>
               <td class="px-3 py-2">
                 <VocabActions entity="subject" id={s.id} name={s.name} />
               </td>
@@ -192,7 +192,7 @@ const mergeOptions = {
                   class="input input-xs w-full"
                 />
               </td>
-              <td class="text-base-content/60 px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
+              <td class="text-faint px-3 py-2 text-right">{authorCount[a.id] ?? 0}</td>
               <td class="px-3 py-2">
                 <VocabActions entity="author" id={a.id} name={a.name} />
               </td>
@@ -247,7 +247,7 @@ const mergeOptions = {
                   class="input input-xs w-16"
                 />
               </td>
-              <td class="text-base-content/60 px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
+              <td class="text-faint px-3 py-2 text-right">{workCount[w.id] ?? 0}</td>
               <td class="px-3 py-2">
                 <input data-field="kind" type="hidden" value={w.kind ?? ''} />
                 <VocabActions entity="work" id={w.id} name={w.title} />

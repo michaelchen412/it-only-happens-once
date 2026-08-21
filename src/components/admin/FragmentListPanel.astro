@@ -119,7 +119,7 @@ const COLUMNS = [
 
     {/* search — icon lives inside the field (daisyUI pattern; no overlay) */}
     <label class="input input-sm flex min-w-[12rem] flex-1 items-center gap-2 font-sans md:max-w-xs">
-      <Icon name="ph:magnifying-glass" class="text-base-content/50 shrink-0" />
+      <Icon name="ph:magnifying-glass" class="text-whisper shrink-0" />
       <input
         type="search"
         name="q"
@@ -181,7 +181,7 @@ const COLUMNS = [
         ))
       }
     </select>
-    <button type="button" data-clear class="text-base-content/60 hover:text-base-content underline">clear</button>
+    <button type="button" data-clear class="text-faint hover:text-base-content underline">clear</button>
   </form>
 
   {/* The table (swapped in place on filter/sort) */}
@@ -258,7 +258,7 @@ const COLUMNS = [
                       scope="col"
                       class:list={[
                         c.cls,
-                        'text-base-content/60 px-3 py-2.5 font-sans text-xs font-normal tracking-wide uppercase',
+                        'text-faint px-3 py-2.5 font-sans text-xs font-normal tracking-wide uppercase',
                         c.align === 'right' ? 'text-right' : 'text-left',
                       ]}
                       aria-sort={
@@ -294,7 +294,7 @@ const COLUMNS = [
                     {c.field === 'title' && view !== 'trash' && (
                       <th
                         scope="col"
-                        class="text-base-content/60 hidden px-3 py-2.5 text-left font-sans text-xs font-normal tracking-wide uppercase lg:table-cell"
+                        class="text-faint hidden px-3 py-2.5 text-left font-sans text-xs font-normal tracking-wide uppercase lg:table-cell"
                       >
                         Constellations
                       </th>
@@ -304,7 +304,7 @@ const COLUMNS = [
                 {mode !== 'manage' && (
                   <th
                     scope="col"
-                    class="text-base-content/60 px-3 py-2 text-right font-sans text-xs font-normal tracking-wide uppercase"
+                    class="text-faint px-3 py-2 text-right font-sans text-xs font-normal tracking-wide uppercase"
                   >
                     <span class="sr-only">{pair ? 'Pair' : epigraph ? 'Use as the epigraph' : 'Place'}</span>
                   </th>
@@ -312,7 +312,7 @@ const COLUMNS = [
                 {view === 'trash' && (
                   <th
                     scope="col"
-                    class="text-base-content/60 px-3 py-2 text-right font-sans text-xs font-normal tracking-wide uppercase"
+                    class="text-faint px-3 py-2 text-right font-sans text-xs font-normal tracking-wide uppercase"
                   >
                     Actions
                   </th>
@@ -350,7 +350,7 @@ const COLUMNS = [
               tail. Rendered below the rows rather than above them because it is
               a fact about where the list ENDS, and that is where you meet it. */
             data.truncated && (
-              <p class="border-base-300 text-base-content/60 border-t px-3 py-2 text-sm">
+              <p class="border-base-300 text-faint border-t px-3 py-2 text-sm">
                 Showing the first {data.rows.length}. Filter or search to reach the rest.
               </p>
             )

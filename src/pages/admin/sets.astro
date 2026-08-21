@@ -105,7 +105,7 @@ const payload = (s: (typeof rows)[number]) =>
             return (
               <li class="group flex items-center gap-3 px-4 py-3" data-id={s.id} data-set={payload(s)} draggable="true">
                 <span
-                  class="text-base-content/25 group-hover:text-base-content/50 shrink-0 cursor-grab transition-colors select-none"
+                  class="text-base-content/25 group-hover:text-whisper shrink-0 cursor-grab transition-colors select-none"
                   title="Drag to reorder (or Alt+↑/↓)"
                   aria-hidden="true"
                 >
@@ -122,7 +122,7 @@ const payload = (s: (typeof rows)[number]) =>
                   </div>
                   {/* One fact, and it is the one you cannot check by reading the
                       row: whether the link still resolves to a playlist. */}
-                  <p class="text-base-content/45 mt-0.5 font-sans text-xs">
+                  <p class="text-whisper mt-0.5 font-sans text-xs">
                     {ref ? 'playlist attached' : 'no playable link'}
                     {s.quote_fragment_id && ' · quote'}
                   </p>

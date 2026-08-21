@@ -282,7 +282,9 @@ export function wireMusicSets(): void {
       // one, so it has to be creatable rather than merely fillable.
       if (!work && author?.parentElement) {
         work = document.createElement('span');
-        work.className = 'text-base-content/20';
+        // Must match MusicSets.astro's server-rendered span — see the note there
+        // for why the work is italic rather than fainter.
+        work.className = 'italic';
         work.dataset.quoteWork = '';
         author.parentElement.appendChild(work);
       }
@@ -297,7 +299,7 @@ export function wireMusicSets(): void {
     links.forEach((a) => {
       const on = a.dataset.set === slug;
       a.classList.toggle('text-primary', on);
-      a.classList.toggle('text-base-content/40', !on);
+      a.classList.toggle('text-whisper', !on);
       a.classList.toggle('hover:text-base-content/75', !on);
       if (on) a.setAttribute('aria-current', 'true');
       else a.removeAttribute('aria-current');

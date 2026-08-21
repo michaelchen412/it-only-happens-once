@@ -185,7 +185,7 @@ const allSubjectsHref =
 }
 <div
   class:list={[
-    'text-base-content/40 relative flex flex-wrap items-center gap-x-5 gap-y-3 font-sans text-sm',
+    'text-whisper relative flex flex-wrap items-center gap-x-5 gap-y-3 font-sans text-sm',
     // The mark straddles the rule, so it only needs room reserved when there IS
     // one; unruled, it sits at the end of the row like any other item.
     ruled ? 'border-base-content/10 mt-12 border-t pt-5 pr-12 sm:pr-14' : 'mt-6',
@@ -198,7 +198,7 @@ const allSubjectsHref =
       <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         {subjects.map((s) => (
           <li>
-            <a href={`/blog?${subjectQ}subject=${s.slug}`} class="hover:text-base-content/70 transition-colors">
+            <a href={`/blog?${subjectQ}subject=${s.slug}`} class="hover:text-muted transition-colors">
               {s.name}
             </a>
           </li>
@@ -346,7 +346,7 @@ const allSubjectsHref =
     font-size: 0.66rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+    color: var(--text-whisper);
     margin-bottom: 0.6rem;
   }
   .qp-list {
@@ -382,7 +382,7 @@ const allSubjectsHref =
     display: block;
     margin-top: 0.15rem;
     font-size: 0.78rem;
-    color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+    color: var(--text-whisper);
     font-variant: all-small-caps;
     letter-spacing: 0.06em;
   }

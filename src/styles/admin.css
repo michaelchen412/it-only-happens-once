@@ -312,7 +312,7 @@ html.scroll-locked {
   border-radius: var(--radius-field);
   font-family: var(--font-sans);
   font-size: 0.875rem;
-  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  color: var(--text-whisper);
   cursor: pointer; /* Tailwind 4 preflight sets buttons to `default` (trap 4) */
   transition: color 0.15s ease;
 }
@@ -622,9 +622,17 @@ html.scroll-locked {
   font-variant: all-small-caps;
   white-space: nowrap;
 }
+/* ⚠ THIS USED TO REST AT 30% AND THE WHISPER IS NOW THE FLOOR (`--text-whisper`,
+   app.css). 30% measured 2.35:1 on dusk and 1.83:1 on paper — text you cannot
+   read, on every row of the Sky except the one row `.is-focus` happens to be on.
+   The design intent was "a hint that resolves as you arrive", and the intent is
+   intact: what announces arrival is the shift to the constellation's OWN colour,
+   plus the drop-shadow glow and the beckon animation below. Opacity was never
+   carrying that signal — it was only making the label illegible while it waited.
+   Do not lower it again; there is nothing legal below the whisper rung. */
 .sky-cta__word,
 .sky-cta__arrow {
-  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  color: var(--text-whisper);
   transition:
     color 0.45s ease,
     filter 0.45s ease;
@@ -743,7 +751,7 @@ html.scroll-locked {
   height: 2.75rem;
   border: 1px solid var(--color-base-300);
   border-radius: 999px;
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  color: var(--text-faint);
   background: color-mix(in oklab, var(--color-base-100) 80%, transparent);
   backdrop-filter: blur(6px);
   box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--shadow-color) 50%, transparent);
@@ -897,16 +905,23 @@ html.scroll-locked .sky-return {
   color: color-mix(in oklab, var(--lamp) 24%, var(--color-base-content));
   text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 20%, transparent);
 }
-/* the attribution warms with its quote — same light, a step quieter. */
+/* the attribution warms with its quote — same light, a step quieter.
+   ⚠ `--text-faint` AND NOT `--text-whisper`, which is the rung this would
+   otherwise take. This is the one place a lamp tint sits ON TOP OF quiet ink,
+   and mixing 30% of a lamp INTO the ink lightens it — so it lands a rung below
+   whatever it starts from. Measured on paper across all eight lamps: from the
+   whisper it comes out 4.21–4.74 (gold, ice and amber below AA); from the faint,
+   4.91–5.46, all clear. The hand-written 58% it replaces was 4.02 under ember.
+   Anything else that tints quiet ink with a lamp owes the same one-rung tax. */
 .suite-item.is-lit figcaption {
-  color: color-mix(in oklab, var(--lamp) 30%, color-mix(in oklab, var(--color-base-content) 58%, transparent));
+  color: color-mix(in oklab, var(--lamp) 30%, var(--text-faint));
 }
 .suite-item.is-lit .sw-title {
   color: color-mix(in oklab, var(--lamp) 42%, var(--color-base-content));
   text-shadow: 0 0 28px color-mix(in oklab, var(--lamp) 18%, transparent);
 }
 .suite-item.is-lit .sw-excerpt {
-  color: color-mix(in oklab, var(--lamp) 14%, color-mix(in oklab, var(--color-base-content) 76%, transparent));
+  color: color-mix(in oklab, var(--lamp) 14%, var(--text-muted));
 }
 
 /* ── The invitation, inside a constellation ──────────────────────────────────
@@ -1116,9 +1131,12 @@ html.scroll-locked .sky-return {
   font-variant: all-small-caps;
   white-space: nowrap;
 }
+/* Same move, same reason as `.sky-cta__word` above: this rested at 30%, which is
+   2.35:1 on dusk and 1.83:1 on paper. The arrival is carried by colour and glow,
+   not by how invisible the label is beforehand. */
 .suite-cta__word,
 .suite-cta__arrow {
-  color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  color: var(--text-whisper);
   transition:
     color 0.45s ease,
     filter 0.45s ease;
@@ -1373,14 +1391,14 @@ html.scroll-locked .sky-return {
   background: color-mix(in oklab, var(--color-primary) 15%, transparent);
 }
 .admin-chip--off {
-  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  color: var(--text-muted);
   background: var(--color-base-300);
 }
 /* A note sits one step below a draft, so it reads one step quieter: outlined
    rather than filled, the same way `--none` says absence in the membership
    column. Nothing about it should look unfinished-and-worrying. */
 .admin-chip--note {
-  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  color: var(--text-whisper);
   background: transparent;
   border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
 }
@@ -1445,7 +1463,7 @@ html.scroll-locked .sky-return {
   font-size: 0.7rem;
   line-height: 1.15rem;
   text-align: center;
-  color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  color: var(--text-whisper);
   opacity: 0.45;
   transition: opacity 0.12s ease;
 }
@@ -1500,7 +1518,7 @@ html.scroll-locked .sky-return {
   font-weight: 500;
 }
 .admin-stat__label {
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  color: var(--text-whisper);
 }
 /* A stat you can act on — the publish preflight's constellations chip opens the
    tab that would change the number. Still reads as a chip, not a button: the
@@ -1580,7 +1598,7 @@ html.scroll-locked .sky-return {
   gap: 0.35rem;
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  color: var(--text-whisper);
   transition: color 0.12s;
 }
 .admin-back:hover {
@@ -1692,7 +1710,7 @@ html.scroll-locked .sky-return {
   font-size: 0.65rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  color: var(--text-whisper);
 }
 
 /* The row's star, once it became a control. It has to read as pressable
@@ -1768,7 +1786,7 @@ html.scroll-locked .sky-return {
   font-family: var(--font-sans);
   font-size: 0.8rem;
   white-space: nowrap;
-  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  color: var(--text-whisper);
   border-bottom: 2px solid transparent;
   transition:
     color 0.12s,
@@ -2017,7 +2035,7 @@ html.scroll-locked .sky-return {
   font-family: var(--font-sans);
   font-size: 0.8rem;
   text-transform: capitalize;
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  color: var(--text-whisper);
   border-radius: calc(var(--radius-field) - 0.15rem);
   transition:
     background 0.12s,
@@ -2182,7 +2200,7 @@ html.scroll-locked .sky-return {
   padding: 0 0.4rem;
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  color: var(--text-faint);
   border-radius: var(--radius-field);
   transition:
     background 0.12s,
@@ -2237,7 +2255,7 @@ html.scroll-locked .sky-return {
 .tiptap-doc p.is-editor-empty:first-child::before,
 .tiptap-doc .is-empty::before {
   content: attr(data-placeholder);
-  color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  color: var(--text-whisper);
   float: left;
   height: 0;
   pointer-events: none;
@@ -2351,7 +2369,7 @@ html.scroll-locked .sky-return {
 
    ⚠ UNLAYERED, AND THAT IS WHAT MAKES IT WORK. The nav rows carry their state
    as Tailwind utilities (`bg-base-200 text-base-content font-medium` against
-   `text-base-content/60`), and utilities live in `@layer utilities`. Unlayered
+   `text-faint`), and utilities live in `@layer utilities`. Unlayered
    author CSS beats every layered rule regardless of specificity, so these two
    rules win without an `!important` and without touching the markup. Move this
    block inside a layer and it silently stops working.
@@ -2377,6 +2395,6 @@ html.scroll-locked .sky-return {
 }
 #sidebar nav:has(a[data-nav-pending]) a[aria-current='page']:not([data-nav-pending]) {
   background: transparent;
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  color: var(--text-faint);
   font-weight: 400;
 }

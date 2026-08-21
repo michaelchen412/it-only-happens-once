@@ -35,7 +35,7 @@ import { Icon } from 'astro-icon/components';
 <dialog id="push-dialog" class="modal-dialog w-full max-w-md" aria-labelledby="push-title">
   <div id="push-body" data-state="loading" class="flex flex-col gap-4 p-6 font-sans">
     <h2 id="push-title" class="font-display flex items-center gap-2 text-xl">
-      <Icon name="ph:bell" class="text-base-content/60 text-lg" />
+      <Icon name="ph:bell" class="text-faint text-lg" />
       Notifications
     </h2>
 
@@ -45,7 +45,7 @@ import { Icon } from 'astro-icon/components';
         the whole content of this dialog, and a reader (or a future edit) should
         be able to see every one of them in the markup at once. */
     }
-    <div class="text-base-content/70 space-y-3 text-sm">
+    <div class="text-muted space-y-3 text-sm">
       <p data-when="loading">Checking this device…</p>
 
       <p data-when="unsupported">

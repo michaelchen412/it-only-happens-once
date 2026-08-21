@@ -214,7 +214,7 @@ const { returnLabel } = Astro.props;
 
     const seq = ++fillSeq;
     const waiting = document.createElement('p');
-    waiting.className = 'text-base-content/40 py-16 text-center font-serif italic';
+    waiting.className = 'text-whisper py-16 text-center font-serif italic';
     waiting.textContent = 'Opening…';
     inner.replaceChildren(waiting);
     show(d, slug);

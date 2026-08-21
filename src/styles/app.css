@@ -94,7 +94,22 @@
   --color-base-300: oklch(90% 0.014 82);
   --color-base-content: oklch(28% 0.02 58); /* warm ink, not black */
 
-  --color-primary: oklch(56% 0.11 62);
+  /* ⚠ 52%, DOWN FROM 56%, AND THE FOUR POINTS ARE LOAD-BEARING. `text-primary`
+     is a text colour here — the ✦ on /reading, links, the lit title in a suite —
+     and at 56% it measured 4.44:1 on `base-100`, which is a WCAG failure by
+     0.06. Not a visible difference in the amber; the whole gap between "passes"
+     and "fails" for this hue is about three points of lightness:
+         56% → 4.44 / 4.07    (base-100 / base-200)
+         53% → 5.06 / 4.64
+         52% → 5.29 / 4.84   ← here, with headroom
+     `base-300` still misses (4.22) and is deliberately not chased: the site puts
+     primary text on `base-100` and `base-200` only — `bg-base-300` appears five
+     times and never under `text-primary`. If that ever changes, this number has
+     to go to 50% and this note is the reason why.
+
+     Dusk needs none of this: its primary is 76% against a near-black ground and
+     clears AA on every surface untouched. */
+  --color-primary: oklch(52% 0.11 62);
   --color-primary-content: oklch(98% 0.01 62);
 
   --color-secondary: oklch(52% 0.08 232);
@@ -361,7 +376,7 @@
   --cn-ice: oklch(54% 0.05 248); /* same ink weight, least colour — see ICE */
   --cn-azure: oklch(50% 0.11 222);
   --cn-gold: oklch(58% 0.11 98);
-  --cn-amber: oklch(56% 0.11 62); /* = primary */
+  --cn-amber: oklch(52% 0.11 62); /* = primary — moved with it, see that note */
   --cn-sand: oklch(54% 0.11 45);
   --cn-ember: oklch(52% 0.13 25);
   --cn-rose: oklch(52% 0.12 5);
@@ -623,7 +638,7 @@
   color: var(--color-base-content);
 }
 :is(.site-menu, .site-foot__group):has([data-nav-pending]) [aria-current='page']:not([data-nav-pending]) {
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  color: var(--text-faint);
 }
 
 /* ---------------------------------------------------------------------------
@@ -760,7 +775,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  color: var(--text-whisper);
   transition: color 150ms;
   cursor: pointer;
   /* ⚠ A NO-OP TODAY, AND KEPT ON PURPOSE. The small caps here come from
@@ -884,7 +899,7 @@
      inherits nothing and lands as bare text against the margin. */
   .reading img[alt] {
     font-size: 0.9rem;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    color: var(--text-whisper);
   }
   /* An italic line straight after an image reads as its caption. Markdown has
      no caption primitive and we deliberately didn't invent one — this is the
@@ -895,7 +910,7 @@
     margin-top: -1.6em;
     text-align: center;
     font-size: 0.9rem;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    color: var(--text-faint);
   }
 
   /* ------------------------------------------------------------------------
@@ -953,6 +968,71 @@
 }
 [data-theme='paper'] {
   --shadow-color: oklch(42% 0.02 60);
+}
+
+/* ===========================================================================
+   QUIET TEXT — the three rungs below full-strength ink.
+
+   ⚠ USE THESE INSTEAD OF `text-base-content/NN`. A bare alpha on the ink is the
+   obvious way to write "quieter", and it is wrong here for one reason: THE SAME
+   ALPHA IS NOT THE SAME CONTRAST IN THE TWO THEMES, and it is not close.
+   Measured against the real rendered colours on 2026-08-21:
+
+       alpha    dusk    paper          (WCAG AA body text needs 4.5:1)
+        40%     3.21     2.31
+        55%     4.94     3.41
+        60%     5.65     3.93
+        65%     6.42     4.55
+        70%     7.27     5.30
+
+   Blending light ink toward a near-black ground loses contrast slowly; blending
+   dark ink toward near-white paper loses it fast, because luminance is not
+   linear in the ramp. So one ladder cannot serve both rooms — `/55` is a
+   comfortable secondary on dusk and an accessibility failure on paper, and
+   every value the site used below `/55` failed in BOTH.
+
+   Nor can it be fixed by darkening paper's ink: solving `/55 = 4.5:1` against
+   `--color-base-100` there needs an ink near oklch(7%), which is the black that
+   "warm ink, not black" exists to refuse.
+
+   The rungs are therefore per-theme, chosen so that each one reads at the same
+   PERCEPTUAL weight in both — the same argument `--cn-trace` makes above. The
+   floor is the worst surface a slot can land on (`base-300`), not the easiest,
+   so a slot is safe anywhere without the call site having to know:
+
+       slot            dusk   paper    ratio on base-100 / 200 / 300
+       text-muted       73%     85%    7.80 7.30 6.50  |  8.54 8.00 7.23
+       text-faint       65%     77%    6.42 6.08 5.49  |  6.60 6.26 5.76
+       text-whisper     57%     69%    5.22 5.00 4.58  |  5.14 4.92 4.60
+
+   `whisper` is the FLOOR, not a decorative tier: 57/69 are the lowest values
+   that still clear 4.5:1 on `base-300`. There is nothing legal below it, which
+   is the real lesson — hierarchy quieter than this has to come from size,
+   weight, letter-spacing or family, because more transparency is no longer
+   available. Anything that wants to be fainter than `whisper` is either not
+   text or not accessible.
+   ======================================================================== */
+[data-theme='dusk'] {
+  --text-muted: color-mix(in oklab, var(--color-base-content) 73%, transparent);
+  --text-faint: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  --text-whisper: color-mix(in oklab, var(--color-base-content) 57%, transparent);
+}
+[data-theme='paper'] {
+  --text-muted: color-mix(in oklab, var(--color-base-content) 85%, transparent);
+  --text-faint: color-mix(in oklab, var(--color-base-content) 77%, transparent);
+  --text-whisper: color-mix(in oklab, var(--color-base-content) 69%, transparent);
+}
+
+/* Utilities rather than raw `var()` at call sites, so `hover:`, `sm:` and the
+   rest come free and the three names are greppable as one set. */
+@utility text-muted {
+  color: var(--text-muted);
+}
+@utility text-faint {
+  color: var(--text-faint);
+}
+@utility text-whisper {
+  color: var(--text-whisper);
 }
 
 /* ===========================================================================

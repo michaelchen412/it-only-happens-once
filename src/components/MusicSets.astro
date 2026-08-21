@@ -76,8 +76,8 @@ const INDEX_ITEM = 'font-display block text-xl leading-snug font-light transitio
 /* Italic against the description's upright, because both are serif at a similar
    size and without a slant they read as one block of small text. Italic for a
    borrowed voice is also what the constellation epigraph already does. */
-const QUOTE_TEXT = 'font-serif text-xl leading-relaxed italic text-base-content/70 sm:text-2xl';
-const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all-small-caps] text-base-content/30';
+const QUOTE_TEXT = 'font-serif text-xl leading-relaxed italic text-muted sm:text-2xl';
+const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all-small-caps] text-whisper';
 ---
 
 {
@@ -106,10 +106,7 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
                     href={setHref(s.slug, base)}
                     data-set={s.slug}
                     aria-current={isOpen ? 'true' : undefined}
-                    class:list={[
-                      INDEX_ITEM,
-                      isOpen ? 'text-primary' : 'text-base-content/40 hover:text-base-content/75',
-                    ]}
+                    class:list={[INDEX_ITEM, isOpen ? 'text-primary' : 'text-whisper hover:text-base-content/75']}
                   >
                     {s.title}
                   </a>
@@ -139,8 +136,16 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
               </blockquote>
               <figcaption class:list={['mt-2', QUOTE_CITE]}>
                 <span data-quote-author>{open.quote?.author}</span>
+                {/* ⚠ ITALIC, NOT FAINTER, AND THAT IS THE WHOLE POINT. The work
+                    used to sit at 20% ink so it would read as subordinate to the
+                    author — 1.5:1 on dusk, unreadable. The citation as a whole is
+                    already on `--text-whisper`, which is the floor, so there is no
+                    transparency left to spend. Italic does the same subordinating
+                    job, and it is what a work title wants anyway. Keep this in
+                    step with `scripts/music-sets.ts`, which builds the same span
+                    when a quote arrives client-side. */}
                 {open.quote?.work && (
-                  <span class="text-base-content/20" data-quote-work>
+                  <span class="italic" data-quote-work>
                     , {open.quote.work}
                   </span>
                 )}
@@ -149,7 +154,7 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
 
             <div
               id="set-desc"
-              class="cn-desc prose-measure text-base-content/60 mt-7 font-serif text-lg empty:mt-0"
+              class="cn-desc prose-measure text-faint mt-7 font-serif text-lg empty:mt-0"
               set:html={descOf(open)}
             />
 

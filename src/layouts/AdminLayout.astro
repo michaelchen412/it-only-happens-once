@@ -231,7 +231,7 @@ const nav = [
         </a>
         <button
           id="sb-close"
-          class="u-tap rounded-field text-base-content/50 hover:bg-base-200 hover:text-base-content ml-auto p-1 md:hidden"
+          class="u-tap rounded-field text-whisper hover:bg-base-200 hover:text-base-content ml-auto p-1 md:hidden"
           aria-label="Close menu"
         >
           <Icon name="ph:x" class="text-lg" />
@@ -263,7 +263,7 @@ const nav = [
                   'rounded-field flex items-center gap-3 px-3 py-2 text-sm transition-colors',
                   active === item.key
                     ? 'bg-base-200 text-base-content font-medium'
-                    : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content',
+                    : 'text-faint hover:bg-base-200/60 hover:text-base-content',
                 ]}
               >
                 <Icon name={item.icon} class="text-lg" />
@@ -290,8 +290,8 @@ const nav = [
       </nav>
 
       <div class="border-base-300 shrink-0 space-y-2 border-t p-3">
-        <div class="text-base-content/40 truncate px-1 text-xs" title={user?.email}>{user?.email}</div>
-        <div class="text-base-content/50 flex items-center gap-1 text-xs">
+        <div class="text-whisper truncate px-1 text-xs" title={user?.email}>{user?.email}</div>
+        <div class="text-whisper flex items-center gap-1 text-xs">
           <button
             id="theme-toggle"
             class="theme-toggle rounded-field hover:bg-base-200 hover:text-base-content p-1.5"
@@ -352,7 +352,7 @@ const nav = [
         }
         <button
           id="sb-open"
-          class="u-tap rounded-field text-base-content/70 hover:bg-base-200 hover:text-base-content -ml-1 p-1.5"
+          class="u-tap rounded-field text-muted hover:bg-base-200 hover:text-base-content -ml-1 p-1.5"
           aria-label={total > 0 ? `Open menu, ${total} waiting` : 'Open menu'}
           aria-controls="sidebar"
           aria-expanded="false"
@@ -384,7 +384,7 @@ const nav = [
           because at render time the served day IS today. */
       }
       <div id="day-turn" hidden class="border-base-300 bg-base-200/60 border-b px-4 py-2 text-sm sm:px-6">
-        <a href="/admin" class="text-base-content/70 hover:text-base-content underline-offset-2 hover:underline">
+        <a href="/admin" class="text-muted hover:text-base-content underline-offset-2 hover:underline">
           The day has turned — this page is about yesterday →
         </a>
       </div>

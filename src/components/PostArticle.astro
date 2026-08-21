@@ -94,7 +94,7 @@ const pairedTitle = item.paired?.title
     commit: when it was written, and how long it will take.
   */
   }
-  <div class="text-base-content/40 mt-5 flex flex-wrap items-center gap-3 text-sm">
+  <div class="text-whisper mt-5 flex flex-wrap items-center gap-3 text-sm">
     <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
     <span class="font-sans">·</span>
     <span class="font-sans">{item.readMinutes} min read</span>

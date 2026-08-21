@@ -44,7 +44,7 @@ const { title, count, columns } = Astro.props;
 <section class="mb-12" data-vocab>
   <h2 class="font-display mb-3 text-lg">
     {title}
-    <span class="text-base-content/40 text-sm">({count})</span>
+    <span class="text-whisper text-sm">({count})</span>
   </h2>
   {
     /* Whatever a vocabulary needs to say before its table. Unused since the
@@ -62,9 +62,7 @@ const { title, count, columns } = Astro.props;
   <div class="rounded-box border-base-300 overflow-x-auto border">
     <table class="w-full font-sans text-sm">
       <thead>
-        <tr
-          class="border-base-300 bg-base-200/50 text-base-content/60 border-b text-left text-xs tracking-wide uppercase"
-        >
+        <tr class="border-base-300 bg-base-200/50 text-faint border-b text-left text-xs tracking-wide uppercase">
           {
             columns.map((c) => (
               <th scope="col" class:list={['px-3 py-2 font-normal', c.w, c.right && 'text-right']}>

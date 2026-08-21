@@ -94,7 +94,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
     {
       !hasMe && !hasSite ? (
         <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-          <p class="text-base-content/55 font-serif text-lg">This page is being composed.</p>
+          <p class="text-whisper font-serif text-lg">This page is being composed.</p>
         </div>
       ) : (
         <>
@@ -164,9 +164,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
                       style="aspect-ratio: 4 / 5"
                     />
                     {me.portrait_caption && (
-                      <figcaption class="text-base-content/40 mt-2 font-serif text-sm italic">
-                        {me.portrait_caption}
-                      </figcaption>
+                      <figcaption class="text-whisper mt-2 font-serif text-sm italic">{me.portrait_caption}</figcaption>
                     )}
                   </figure>
                 )}
@@ -234,7 +232,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
             {contactIntroHtml ? (
               <div class="reading mt-6 max-w-lg" set:html={contactIntroHtml} />
             ) : (
-              <p class="text-base-content/70 mt-6 max-w-lg font-serif text-lg leading-relaxed">
+              <p class="text-muted mt-6 max-w-lg font-serif text-lg leading-relaxed">
                 Have a thought, a question, or a hello? I read everything.
               </p>
             )}
@@ -243,7 +241,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 
           {/* Authorship attestation — hardcoded so it is always present. */}
           <div class="border-base-300 mt-16 border-t pt-6">
-            <p class="text-base-content/55 font-serif text-sm leading-relaxed italic">
+            <p class="text-whisper font-serif text-sm leading-relaxed italic">
               There is no AI-generated content on this blog; all content is authored, edited, and compiled by me. Claude
               Code was only used to streamline the development process of the site itself.
             </p>

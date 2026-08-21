@@ -216,13 +216,13 @@ const pair = mode === 'pair';
       <button
         type="button"
         data-fb-close
-        class:list={['text-base-content/50 hover:text-base-content', !pick && 'ml-auto']}
+        class:list={['text-whisper hover:text-base-content', !pick && 'ml-auto']}
         aria-label="Close">✕</button
       >
     </header>
 
     <div class="fb-panel grow overflow-y-auto overscroll-contain px-6 py-4">
-      <p class="text-base-content/50 font-sans text-sm">Loading fragments…</p>
+      <p class="text-whisper font-sans text-sm">Loading fragments…</p>
     </div>
 
     <BackToTop scroller={`#${id} .fb-panel`} inDialog class="bottom-20" />
@@ -245,7 +245,7 @@ const pair = mode === 'pair';
           class="fb-bulkbar border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
           hidden
         >
-          <span class="fb-bulkcount text-base-content/70 whitespace-nowrap">0 selected</span>
+          <span class="fb-bulkcount text-muted whitespace-nowrap">0 selected</span>
           <button class="fb-place-selected btn btn-primary btn-xs normal-case">Place in constellation</button>
           <button class="fb-clear-selected btn btn-ghost btn-xs ml-auto normal-case">Clear</button>
         </footer>

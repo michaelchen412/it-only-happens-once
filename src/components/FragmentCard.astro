@@ -76,14 +76,14 @@ const cfg = { ...TYPE_META[type], ...CARD };
       ) : (
         <>
           {title && <h3 class="line-clamp-1 text-xl leading-snug">{title}</h3>}
-          {body && <p class="text-base-content/60 mt-1 line-clamp-2">{body}</p>}
+          {body && <p class="text-faint mt-1 line-clamp-2">{body}</p>}
         </>
       )
     }
-    {attribution && <p class="text-base-content/50 mt-2 line-clamp-1 font-sans text-sm">{attribution}</p>}
+    {attribution && <p class="text-whisper mt-2 line-clamp-1 font-sans text-sm">{attribution}</p>}
   </div>
 
-  <footer class="text-base-content/30 mt-4 flex items-center gap-1 font-sans text-xs">
+  <footer class="text-whisper mt-4 flex items-center gap-1 font-sans text-xs">
     {date && <Timestamp date={date} updated={updated} kind={cfg.kind as 'posted' | 'added'} precision={precision} />}
     {meta && <span>· {meta}</span>}
   </footer>

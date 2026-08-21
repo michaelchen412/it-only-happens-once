@@ -64,7 +64,7 @@ const showWindows = searching && windows.length > 0;
       </a>
     </h2>
 
-    <div class="text-base-content/40 mt-3 flex flex-wrap items-center gap-3 text-sm">
+    <div class="text-whisper mt-3 flex flex-wrap items-center gap-3 text-sm">
       <Timestamp
         date={item.occurredAt}
         updated={item.updatedAt ?? undefined}
@@ -77,7 +77,7 @@ const showWindows = searching && windows.length > 0;
 
     {
       showWindows ? (
-        <div class="text-base-content/70 mt-4 space-y-1.5 font-serif leading-relaxed">
+        <div class="text-muted mt-4 space-y-1.5 font-serif leading-relaxed">
           {windows.map((w) => (
             <p>
               {w.lead && '… '}
@@ -86,7 +86,7 @@ const showWindows = searching && windows.length > 0;
             </p>
           ))}
           {more > 0 && (
-            <p class="text-base-content/40 font-sans text-xs">
+            <p class="text-whisper font-sans text-xs">
               +{more} more {more === 1 ? 'match' : 'matches'}
             </p>
           )}
@@ -95,7 +95,7 @@ const showWindows = searching && windows.length > 0;
         <a href={`/blog/${item.slug}`} data-read={item.slug} class="mt-4 block cursor-pointer">
           <p
             class:list={[
-              'post-excerpt text-base-content/70 font-serif leading-relaxed',
+              'post-excerpt text-muted font-serif leading-relaxed',
               item.hasMore && 'post-excerpt-fade line-clamp-5',
             ]}
           >

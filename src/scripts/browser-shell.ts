@@ -133,7 +133,7 @@ export function wireBrowserShell(root: HTMLDialogElement, opts: ShellOpts): Shel
     },
     reset() {
       panel = null;
-      panelHost.innerHTML = '<p class="text-base-content/50 font-sans text-sm">Loading fragments…</p>';
+      panelHost.innerHTML = '<p class="text-whisper font-sans text-sm">Loading fragments…</p>';
     },
   };
 

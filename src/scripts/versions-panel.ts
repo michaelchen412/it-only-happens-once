@@ -79,7 +79,7 @@ export function wireVersionsPanel(opts: Options): VersionsPanelHandle {
     countEl.textContent = items.length ? String(items.length) : '';
     if (!items.length) {
       listEl.innerHTML =
-        '<li class="rounded-box border border-dashed border-base-300 px-4 py-6 text-center text-sm text-base-content/50">' +
+        '<li class="rounded-box border border-dashed border-base-300 px-4 py-6 text-center text-sm text-whisper">' +
         'No other versions. Edit this piece and your changes are held here until you promote them.</li>';
       return;
     }
@@ -94,10 +94,10 @@ export function wireVersionsPanel(opts: Options): VersionsPanelHandle {
             <div class="flex items-baseline gap-2">
               <span class="admin-chip ${working ? 'admin-chip--on' : 'admin-chip--off'}">${working ? 'working' : 'kept'}</span>
               <span class="font-sans text-sm">${escapeHtml(heading)}</span>
-              <span class="ml-auto font-sans text-xs text-base-content/45">${when(working ? v.updatedAt : v.createdAt)}</span>
+              <span class="ml-auto font-sans text-xs text-whisper">${when(working ? v.updatedAt : v.createdAt)}</span>
             </div>
             ${v.title ? `<p class="mt-1.5 truncate font-display text-base">${escapeHtml(v.title)}</p>` : ''}
-            <p class="mt-1 line-clamp-2 text-sm text-base-content/60">${escapeHtml(v.preview) || '<em>empty</em>'}</p>
+            <p class="mt-1 line-clamp-2 text-sm text-faint">${escapeHtml(v.preview) || '<em>empty</em>'}</p>
             ${v.matchesCanonical ? '<p class="admin-hint mt-1.5">Identical to what’s live.</p>' : ''}
             <div class="mt-2.5 flex flex-wrap items-center gap-1">
               <button type="button" class="btn btn-ghost btn-xs normal-case" data-act="preview">${openPreview === v.id ? 'Hide' : 'Read'}</button>

@@ -187,7 +187,7 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
                     paragraphs rather than one <p> of text — see `.cn-desc`. */}
                 {c.description && (
                   <div
-                    class="cn-desc text-base-content/55 mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed"
+                    class="cn-desc text-whisper mt-3 ml-6 max-w-xl font-serif text-[0.95rem] leading-relaxed"
                     set:html={renderMarkdown(c.description)}
                   />
                 )}
@@ -212,7 +212,7 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
           ))}
         </div>
       ) : (
-        <p class="text-base-content/55 text-center font-serif text-lg">The sky is being composed.</p>
+        <p class="text-whisper text-center font-serif text-lg">The sky is being composed.</p>
       )
     }
   </section>

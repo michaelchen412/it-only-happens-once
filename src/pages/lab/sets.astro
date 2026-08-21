@@ -209,12 +209,12 @@ const benchHref = (p: Record<string, string>) => {
     <nav class="border-base-300 mb-14 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
       <a
         href="/blog"
-        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
+        class="font-display text-whisper hover:text-muted -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
         >Writing</a
       >
       <a
         href="/blog?view=quotes"
-        class="font-display text-base-content/35 hover:text-base-content/70 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
+        class="font-display text-whisper hover:text-muted -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl"
         >Quotes</a
       >
       <span
@@ -234,25 +234,20 @@ const benchHref = (p: Record<string, string>) => {
   <details
     class="border-base-300 bg-base-100/90 fixed top-20 right-4 z-50 rounded-lg border font-sans text-xs shadow-lg backdrop-blur"
   >
-    <summary class="text-base-content/50 cursor-pointer list-none px-3 py-2 tracking-wide uppercase select-none"
-      >bench</summary
-    >
+    <summary class="text-whisper cursor-pointer list-none px-3 py-2 tracking-wide uppercase select-none">bench</summary>
     <div class="border-base-300 flex flex-col gap-3 border-t px-3 py-3">
       <p class="text-warning max-w-[15rem] leading-relaxed">
         ⚠ Playlists and titles are real. Every description is invented placeholder text.
       </p>
 
       <div>
-        <p class="text-base-content/50 mb-1 tracking-wide uppercase">Embed height</p>
+        <p class="text-whisper mb-1 tracking-wide uppercase">Embed height</p>
         <div class="flex flex-wrap gap-2">
           {
             HEIGHTS.map((h) => (
               <a
                 href={benchHref({ h: String(h) })}
-                class:list={[
-                  'underline-offset-2 hover:underline',
-                  height === h ? 'text-primary' : 'text-base-content/45',
-                ]}
+                class:list={['underline-offset-2 hover:underline', height === h ? 'text-primary' : 'text-whisper']}
               >
                 {h}
               </a>
@@ -261,7 +256,7 @@ const benchHref = (p: Record<string, string>) => {
         </div>
       </div>
 
-      <p class="text-base-content/35 max-w-[15rem] leading-relaxed">
+      <p class="text-whisper max-w-[15rem] leading-relaxed">
         In <code>detail</code>, switch sets twice — the first reloads, the rest should swap in place.
       </p>
       <p class="text-warning max-w-[15rem] leading-relaxed">

@@ -83,7 +83,7 @@ const constellations = [
       <h1 class="font-display mt-4 text-5xl leading-[1.1] font-light sm:text-7xl">
         It Only <em class="text-primary not-italic">Happens</em> Once
       </h1>
-      <p class="prose-measure text-base-content/70 mt-6 text-lg">
+      <p class="prose-measure text-muted mt-6 text-lg">
         The night sky as intimacy, not as space. Warm ink, cream, lamplight — a jazz club at eleven, a porch at dusk.
         Restraint is the warmth: a good listener doesn't shout.
       </p>
@@ -92,7 +92,7 @@ const constellations = [
     <!-- ── color ──────────────────────────────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> Color </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         Every slot is <em>semantic</em> — a role, never a value. Nothing on this site may name a color directly.
       </p>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -101,7 +101,7 @@ const constellations = [
             <div>
               <div class={`rounded-box border-base-300 h-16 border ${s.cls}`} />
               <p class="mt-2 font-sans text-xs">{s.name}</p>
-              {s.note && <p class="text-base-content/40 font-sans text-xs">{s.note}</p>}
+              {s.note && <p class="text-whisper font-sans text-xs">{s.note}</p>}
             </div>
           ))
         }
@@ -114,7 +114,7 @@ const constellations = [
       <div class="space-y-6">
         <div>
           <p class="text-6xl font-light">Newsreader — display</p>
-          <p class="text-base-content/40 mt-1 font-sans text-xs">serif · the voice · reading &amp; identity</p>
+          <p class="text-whisper mt-1 font-sans text-xs">serif · the voice · reading &amp; identity</p>
         </div>
         <div>
           <p class="text-3xl font-light">A constellation is a way of seeing</p>
@@ -124,7 +124,7 @@ const constellations = [
         </div>
         <div class="border-base-300 border-t pt-6">
           <p class="font-sans text-lg">Atkinson Hyperlegible — interface</p>
-          <p class="text-base-content/40 mt-1 font-sans text-xs">
+          <p class="text-whisper mt-1 font-sans text-xs">
             sans · chrome, labels, metadata · designed by the Braille Institute so that people who struggle to read
             still can
           </p>
@@ -146,14 +146,14 @@ const constellations = [
           there is no new thing under the sun. Is there any thing whereof it may be said, See, this is new? it hath been
           already of old time, which was before us.
         </p>
-        <p class="text-base-content/40 font-sans text-sm">Ecclesiastes 1 — measure capped at 68ch, leading at 1.7</p>
+        <p class="text-whisper font-sans text-sm">Ecclesiastes 1 — measure capped at 68ch, leading at 1.7</p>
       </div>
     </section>
 
     <!-- ── fragments ──────────────────────────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> Fragments </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         The atom. Single-medium, standalone — a song, a quote, a piece of writing. Provenance is shown quietly and never
         sorts anything.
       </p>
@@ -173,7 +173,7 @@ const constellations = [
           meta="6 min"
         />
       </div>
-      <p class="text-base-content/40 mt-6 font-sans text-xs">
+      <p class="text-whisper mt-6 font-sans text-xs">
         Same frame, same width, footer on one baseline. The long quote now clamps; the essay always shows an excerpt.
         (The Spotify embed and full text live on each fragment's own page, not the card.)
       </p>
@@ -182,7 +182,7 @@ const constellations = [
     <!-- ── dates ──────────────────────────────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> Dates </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         Quiet on the surface — no verb, just the moment. Click any date for the full timestamp (and any later edit). One
         component, used everywhere.
       </p>
@@ -195,7 +195,7 @@ const constellations = [
         <Timestamp date="2019-01-01" precision="year" kind="added" />
         <Timestamp date="2023-05-31" updated={daysAgo(2)} />
       </div>
-      <p class="text-base-content/40 mt-6 font-sans text-xs">
+      <p class="text-whisper mt-6 font-sans text-xs">
         Today · Yesterday · weekday · this-year · older · year-only · edited
       </p>
     </section>
@@ -203,7 +203,7 @@ const constellations = [
     <!-- ── constellation band ─────────────────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> Constellation — the landing </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         You land <em>inside</em> a living constellation, never on a menu. Fragments are visible immediately. Scroll down crosses
         domains; swipe sideways moves through the suite. The next constellation peeks — that's what teaches the whole structure
         in one glance.
@@ -215,7 +215,7 @@ const constellations = [
             <span class="text-primary"><StarMark /></span>
             <h3 class="font-display text-3xl font-light sm:text-4xl">conditions, not character</h3>
           </div>
-          <p class="prose-measure text-base-content/50 mt-3">
+          <p class="prose-measure text-whisper mt-3">
             Outcomes are shaped by structural conditions far more than individual willpower.
           </p>
 
@@ -260,7 +260,7 @@ const constellations = [
     <!-- ── sky ────────────────────────────────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> The whole sky — zoomed out </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         One gesture. Every constellation at a glance, sized by how much of him it occupies. Uneven on purpose — weight
         is signal, not noise. This is the only index the sky gets: no pills, no dropdowns.
       </p>
@@ -288,7 +288,7 @@ const constellations = [
     <!-- ── controls (the Index register) ──────────────────────────── -->
     <section class="mb-24">
       <Label as="h2" variant="voice" class="mb-2"> Controls — the Index register </Label>
-      <p class="prose-measure text-base-content/60 mb-8">
+      <p class="prose-measure text-faint mb-8">
         None of this belongs in the sky. It lives in the Index, where finding a specific thing is the whole job.
       </p>
 
@@ -348,7 +348,7 @@ const constellations = [
       </div>
     </section>
 
-    <footer class="border-base-300 text-base-content/30 border-t pt-8 font-sans text-xs">
+    <footer class="border-base-300 text-whisper border-t pt-8 font-sans text-xs">
       Every value on this page comes from <code>src/styles/app.css</code>. Nothing here names a color.
     </footer>
   </main>

@@ -265,9 +265,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
             aria-current={t.active ? 'page' : undefined}
             class:list={[
               'font-display -mb-px border-b-2 pb-3 text-2xl leading-none font-light transition-colors sm:text-3xl',
-              t.active
-                ? 'border-primary text-base-content'
-                : 'text-base-content/35 hover:text-base-content/70 border-transparent',
+              t.active ? 'border-primary text-base-content' : 'text-whisper hover:text-muted border-transparent',
             ]}
           >
             {t.label}
@@ -297,8 +295,8 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
         an early link sees once. Same register as the room's own empty state. */
       view === 'music' && sets && sets.length === 0 && (
         <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-          <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
-          <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
+          <p class="text-whisper max-w-sm font-serif text-lg">Nothing here yet.</p>
+          <p class="text-whisper mt-2 max-w-sm font-sans text-sm">
             The playlists collect here one at a time, as they are made.
           </p>
         </div>
@@ -319,7 +317,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
             <form method="get" action="/blog" role="search" id="blog-filters" class="relative">
               <Icon
                 name="ph:magnifying-glass"
-                class="text-base-content/35 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base"
+                class="text-whisper pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-base"
               />
               <input
                 type="search"
@@ -328,7 +326,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                 placeholder={`Search ${searchNoun}…`}
                 aria-label={`Search ${searchNoun}`}
                 autocomplete="off"
-                class="rounded-field border-base-300 bg-base-100 placeholder:text-base-content/35 focus:border-base-content/30 w-full border py-2 pr-3 pl-9 font-sans text-sm focus:outline-none"
+                class="rounded-field border-base-300 bg-base-100 placeholder:text-whisper focus:border-base-content/30 w-full border py-2 pr-3 pl-9 font-sans text-sm focus:outline-none"
               />
               {/* No-JS fallback: a search submit carries the selected subjects along
               (comma-joined). With JS, the client reads the live URL instead. */}
@@ -371,7 +369,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                     class="border-base-content/30 bg-base-200 text-base-content md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors"
                   >
                     {authorName}
-                    <Icon name="ph:x" class="text-base-content/50 size-3" aria-hidden="true" />
+                    <Icon name="ph:x" class="text-whisper size-3" aria-hidden="true" />
                   </a>
                 </div>
               </div>
@@ -385,7 +383,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                     <a
                       href={clearHref}
                       data-subject-clear
-                      class="text-base-content/40 hover:text-base-content/70 inline-flex items-center gap-0.5 font-sans text-xs transition-colors"
+                      class="text-whisper hover:text-muted inline-flex items-center gap-0.5 font-sans text-xs transition-colors"
                     >
                       Clear
                       <Icon name="ph:x" class="size-3" />
@@ -416,14 +414,14 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                             'md:rounded-field inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-sans text-xs transition-colors',
                             s.selected
                               ? 'border-base-content/30 bg-base-200 text-base-content'
-                              : 'border-base-300 text-base-content/55 hover:border-base-content/25 hover:text-base-content',
+                              : 'border-base-300 text-whisper hover:border-base-content/25 hover:text-base-content',
                           ]}
                         >
                           {s.name}
                           {s.selected ? (
-                            <Icon name="ph:x" class="text-base-content/50 size-3" aria-hidden="true" />
+                            <Icon name="ph:x" class="text-whisper size-3" aria-hidden="true" />
                           ) : (
-                            <span class="text-base-content/30">{s.count}</span>
+                            <span class="text-whisper">{s.count}</span>
                           )}
                         </a>
                       )}
@@ -436,7 +434,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                     data-subjects-toggle
                     data-label-collapsed={`Show all (${subjects.length})`}
                     aria-expanded="false"
-                    class="text-base-content/45 hover:text-base-content/80 mt-2 font-sans text-xs transition-colors md:hidden"
+                    class="text-whisper hover:text-base-content/80 mt-2 font-sans text-xs transition-colors md:hidden"
                   >
                     Show all ({subjects.length})
                   </button>
@@ -449,7 +447,7 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
           <section class="min-w-0">
             <div id="blog-feed">
               {(selectedSubjects.length > 0 || q || authorName) && (
-                <p class="text-base-content/55 mb-8 font-serif italic">
+                <p class="text-whisper mb-8 font-serif italic">
                   {feed.total} {feed.total === 1 ? noun : nounPlural}
                   {/* ⚠ "by <Name>" LEADS, before the subjects. Arriving here from a
                     quote's attribution, the author is the question you asked and
@@ -481,8 +479,8 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 
               {feed.items.length === 0 ? (
                 <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-                  <p class="text-base-content/55 max-w-sm font-serif text-lg">Nothing here yet.</p>
-                  <p class="text-base-content/40 mt-2 max-w-sm font-sans text-sm">
+                  <p class="text-whisper max-w-sm font-serif text-lg">Nothing here yet.</p>
+                  <p class="text-whisper mt-2 max-w-sm font-sans text-sm">
                     {selectedSubjects.length > 0 || q || authorSlug
                       ? `No ${nounPlural} match this filter.`
                       : `The ${nounPlural} will collect here.`}
@@ -507,12 +505,12 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                   <a
                     href={nextUrl}
                     data-feed-more
-                    class="feed-more text-base-content/55 hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
+                    class="feed-more text-whisper hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
                   >
                     Load older {nounPlural}
                     <Icon name="ph:caret-down" class="size-3.5" />
                   </a>
-                  <span class="feed-spin text-base-content/40 font-sans text-sm">Loading…</span>
+                  <span class="feed-spin text-whisper font-sans text-sm">Loading…</span>
                 </div>
               )}
             </div>

@@ -188,7 +188,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               Michael's "how does the UI know to list it or not?" is answered
               here: you told it. Blank is not Me. */
             }
-            <span class="text-base-content/45 text-xs"
+            <span class="text-whisper text-xs"
               >Pick <b class="font-medium">Me</b> for your own words. Leave it blank if nobody knows — both stay quiet on
               the page, and the workshop tells them apart.</span
             >
@@ -204,7 +204,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               placeholder="Meditations · The Bible"
               options={workOptions}
             />
-            <span class="text-base-content/45 text-xs">For filing — a reader sees this only if they ask.</span>
+            <span class="text-whisper text-xs">For filing — a reader sees this only if they ask.</span>
           </label>
           {
             /* FREE TEXT, AND IT STAYS FREE TEXT. The matrix holds six different
@@ -227,7 +227,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
           <label class="f">
             <span class="f__k">Where in it</span>
             <input name="citation" id="quote-where" placeholder="Book 2:2 · John 3:16 · Letter 24:19–20 · p. 41" />
-            <span class="text-base-content/45 text-xs">The reference, exactly as you’d say it out loud.</span>
+            <span class="text-whisper text-xs">The reference, exactly as you’d say it out loud.</span>
           </label>
         </div>
 
@@ -250,18 +250,17 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
         }
         <div class="rounded-field border-base-300/70 bg-base-200/40 flex flex-col gap-1.5 border px-3 py-2.5 text-sm">
           <div class="flex items-baseline gap-2">
-            <span class="text-base-content/45 w-16 shrink-0 text-xs">Shows as</span>
+            <span class="text-whisper w-16 shrink-0 text-xs">Shows as</span>
             <span id="quote-preview-line" class="text-base-content/85 min-w-0 flex-1 font-serif break-words"></span>
             <button
               type="button"
               id="quote-attr-edit"
-              class="text-base-content/45 hover:text-primary shrink-0 text-xs underline underline-offset-2"
-              >change</button
+              class="text-whisper hover:text-primary shrink-0 text-xs underline underline-offset-2">change</button
             >
           </div>
           <div class="flex items-baseline gap-2">
-            <span class="text-base-content/45 w-16 shrink-0 text-xs">Behind it</span>
-            <span id="quote-preview-reveal" class="text-base-content/55 min-w-0 flex-1 text-xs break-words"></span>
+            <span class="text-whisper w-16 shrink-0 text-xs">Behind it</span>
+            <span id="quote-preview-reveal" class="text-whisper min-w-0 flex-1 text-xs break-words"></span>
           </div>
         </div>
 
@@ -279,17 +278,16 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
           case the matrix is missing. */
         }
         <label id="quote-attr-override" hidden class="f">
-          <span class="text-base-content/70 flex items-center gap-2">
+          <span class="text-muted flex items-center gap-2">
             Shown instead
             <button
               type="button"
               id="quote-attr-revert"
-              class="text-base-content/45 hover:text-primary text-xs underline underline-offset-2"
-              >use the derived line</button
+              class="text-whisper hover:text-primary text-xs underline underline-offset-2">use the derived line</button
             >
           </span>
           <input name="attribution" placeholder="Matthew 5:43–48" />
-          <span class="text-base-content/45 text-xs">Only when the line above is wrong for this one quote.</span>
+          <span class="text-whisper text-xs">Only when the line above is wrong for this one quote.</span>
         </label>
 
         <label class="f">
@@ -315,7 +313,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
             <input type="checkbox" id="quote-date-toggle" class="checkbox checkbox-xs" />
             <span class="f__k">Set a specific date</span>
           </label>
-          <p id="quote-date-note" class="text-base-content/45 text-xs">
+          <p id="quote-date-note" class="text-whisper text-xs">
             Dated today automatically — enable only to backdate a legacy quote.
           </p>
           <input type="datetime-local" name="occurred_at" id="quote-occurred" disabled />
@@ -341,7 +339,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
         <label class="f">
           <span class="f__k">Address <span>— the URL</span></span>
           <span class="flex items-center gap-0 pr-2 pl-3">
-            <span class="text-base-content/35 shrink-0 select-none">/blog/</span>
+            <span class="text-whisper shrink-0 select-none">/blog/</span>
             <input
               name="slug"
               id="quote-slug"
@@ -352,7 +350,7 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
               autocorrect="off"
             />
           </span>
-          <span id="quote-slug-note" class="text-base-content/45 text-xs"
+          <span id="quote-slug-note" class="text-whisper text-xs"
             >Set when you first save. Change it only if this one reads badly — any link already shared stops working.</span
           >
         </label>

@@ -30,12 +30,11 @@ const { status, editHref } = Astro.props;
     view down a long draft — the warning is worth the pixels. */
 }
 <div class="border-warning/40 bg-warning/10 sticky top-14 z-20 border-b backdrop-blur">
-  <div class="text-base-content/70 mx-auto flex max-w-2xl items-center gap-2 px-5 py-2 font-sans text-xs">
+  <div class="text-muted mx-auto flex max-w-2xl items-center gap-2 px-5 py-2 font-sans text-xs">
     <Icon name="ph:eye" class="text-warning size-4 shrink-0" />
     <p>
       <b class="font-medium">{status === 'note' ? 'A note' : 'Draft'} — only you can see this.</b>
-      <span class="text-base-content/50">This is the real page, exactly as it will look. It just isn’t public yet.</span
-      >
+      <span class="text-whisper">This is the real page, exactly as it will look. It just isn’t public yet.</span>
     </p>
     {
       editHref && (

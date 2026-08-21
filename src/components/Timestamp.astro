@@ -93,7 +93,7 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     type="button"
     popovertarget={pid}
     style={`anchor-name: --${pid}`}
-    class="hover:text-base-content/70 inline-flex cursor-pointer items-center gap-1.5 transition-colors"
+    class="hover:text-muted inline-flex cursor-pointer items-center gap-1.5 transition-colors"
   >
     {
       /* is:inline renders the clock SELF-CONTAINED (path inline; no <symbol>/<use>).
@@ -118,6 +118,6 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     class="ts-popover rounded-box border-base-300 bg-base-200 border p-4 text-sm shadow-lg"
   >
     <p class="text-base-content/80">{detail}</p>
-    {updatedDetail && <p class="text-base-content/50 mt-1">{updatedDetail}</p>}
+    {updatedDetail && <p class="text-whisper mt-1">{updatedDetail}</p>}
   </div>
 </span>

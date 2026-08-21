@@ -134,7 +134,7 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
         <span class="min-w-0 grow"><span class="block truncate text-sm leading-snug"></span></span>
       </label>
       <a target="_blank" rel="noopener"
-         class="cn-open text-base-content/40 hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
+         class="cn-open text-whisper hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
         <span aria-hidden="true">↗</span><span class="sr-only"></span>
       </a>`;
     // Set the untrusted parts as TEXT and as properties, never through the

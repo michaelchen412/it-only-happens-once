@@ -85,7 +85,7 @@ const aboutInit = {
         <h1 class="font-display text-lg">About page</h1>
         <div
           id="about-status"
-          class="text-base-content/55 ml-auto flex items-center gap-2 font-sans text-xs"
+          class="text-whisper ml-auto flex items-center gap-2 font-sans text-xs"
           aria-live="polite"
         >
           <span id="about-spinner" hidden class="loading loading-spinner loading-xs"></span>
@@ -103,7 +103,7 @@ const aboutInit = {
       <section class="space-y-6">
         <div>
           <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> Who I am</p>
-          <p class="text-base-content/45 mt-1 font-sans text-xs">
+          <p class="text-whisper mt-1 font-sans text-xs">
             The person. Weave your heritage and origin into the prose — no facts row.
           </p>
         </div>
@@ -123,7 +123,7 @@ const aboutInit = {
               <Icon
                 id="portrait-placeholder"
                 name="ph:image"
-                class:list={['text-base-content/30 text-2xl', portraitUrl ? 'hidden' : '']}
+                class:list={['text-whisper text-2xl', portraitUrl ? 'hidden' : '']}
               />
             </div>
             <div class="flex flex-col gap-2 font-sans text-sm">
@@ -134,10 +134,8 @@ const aboutInit = {
               <button
                 type="button"
                 id="portrait-remove"
-                class:list={[
-                  'text-base-content/50 hover:text-error w-fit text-left text-xs',
-                  portraitUrl ? '' : 'hidden',
-                ]}>Remove photo</button
+                class:list={['text-whisper hover:text-error w-fit text-left text-xs', portraitUrl ? '' : 'hidden']}
+                >Remove photo</button
               >
             </div>
           </div>
@@ -176,7 +174,7 @@ const aboutInit = {
       <section class="space-y-6">
         <div>
           <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> About the Blog</p>
-          <p class="text-base-content/45 mt-1 font-sans text-xs">
+          <p class="text-whisper mt-1 font-sans text-xs">
             The site and its ethos — why you write, and where the name came from.
           </p>
         </div>
@@ -189,7 +187,7 @@ const aboutInit = {
           </div>
         </div>
 
-        <p class="text-base-content/45 pt-2 font-sans text-xs tracking-widest uppercase">About the Name</p>
+        <p class="text-whisper pt-2 font-sans text-xs tracking-widest uppercase">About the Name</p>
         {
           /* ⚠ THE LABEL USED TO TEACH THE ASTERISK. It read *"(Markdown —
             *italics* for the album title)"* — a form field explaining its own
@@ -229,7 +227,7 @@ const aboutInit = {
       <section class="space-y-4">
         <div>
           <p class="fs__k"><span class="text-primary" aria-hidden="true">✦</span> Say hello</p>
-          <p class="text-base-content/45 mt-1 font-sans text-xs">
+          <p class="text-whisper mt-1 font-sans text-xs">
             The public About page closes with a contact form (name · email · message), guarded against spam. Set an
             optional line of copy to sit above it.
           </p>

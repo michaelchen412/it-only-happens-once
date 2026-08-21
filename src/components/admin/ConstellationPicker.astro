@@ -99,7 +99,7 @@ const words = new Map(constellations.map((c) => [c.id, toPlainText(c.description
               <span class="min-w-0 grow">
                 <span class="block truncate text-sm leading-snug">{c.name}</span>
                 {words.get(c.id) && (
-                  <span class="text-base-content/55 mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
+                  <span class="text-whisper mt-0.5 line-clamp-4 block font-sans text-xs leading-snug">
                     {words.get(c.id)}
                   </span>
                 )}
@@ -109,7 +109,7 @@ const words = new Map(constellations.map((c) => [c.id, toPlainText(c.description
               href={`/admin/constellations/${c.id}`}
               target="_blank"
               rel="noopener"
-              class="cn-open text-base-content/40 hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              class="cn-open text-whisper hover:text-base-content shrink-0 px-2 py-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
               title={`Open ${c.name} in a new tab`}
             >
               <span aria-hidden="true">↗</span>

@@ -273,9 +273,7 @@ const roster = rosterData ?? [];
     <div class="flex max-h-[80vh] flex-col overflow-hidden font-sans">
       <header class="border-base-300 flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3.5">
         <h2 id="note-file-title" class="font-display text-lg">Add to a piece</h2>
-        <button type="button" data-close class="text-base-content/50 hover:text-base-content" aria-label="Close"
-          >✕</button
-        >
+        <button type="button" data-close class="text-whisper hover:text-base-content" aria-label="Close">✕</button>
       </header>
 
       <div class="shrink-0 px-5 py-3">
@@ -306,9 +304,9 @@ const roster = rosterData ?? [];
             </li>
           ))
         }
-        {pieces.length === 0 && <li class="text-base-content/55 px-3 py-2 text-sm">No writing yet.</li>}
+        {pieces.length === 0 && <li class="text-whisper px-3 py-2 text-sm">No writing yet.</li>}
       </ul>
-      <p id="note-file-none" class="text-base-content/55 px-5 pb-4 text-sm" hidden>Nothing matches.</p>
+      <p id="note-file-none" class="text-whisper px-5 pb-4 text-sm" hidden>Nothing matches.</p>
     </div>
   </dialog>
 

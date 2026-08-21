@@ -24,7 +24,7 @@ const { formId, subjectNames } = Astro.props;
   <div class="flex flex-col gap-5 p-6 font-sans">
     <div>
       <h2 id="dialog-title" class="font-display text-2xl">Publish this piece</h2>
-      <p id="dialog-sub" class="text-base-content/60 mt-1 text-sm">A few last details, then it goes live.</p>
+      <p id="dialog-sub" class="text-faint mt-1 text-sm">A few last details, then it goes live.</p>
     </div>
 
     {/* Posted date — automatic unless you deliberately backdate */}
@@ -42,7 +42,7 @@ const { formId, subjectNames } = Astro.props;
         disabled
         class="w-full disabled:opacity-40"
       />
-      <p id="date-auto-note" class="text-base-content/55 text-xs">
+      <p id="date-auto-note" class="text-whisper text-xs">
         Otherwise the posted date is set automatically when you publish.
       </p>
     </div>

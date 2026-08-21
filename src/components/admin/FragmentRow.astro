@@ -258,7 +258,7 @@ const editorData =
     }
     {
       r.attribution ? (
-        <div class="text-base-content/60 truncate font-sans text-xs">
+        <div class="text-faint truncate font-sans text-xs">
           {r.type === 'quote' && '— '}
           <Highlighted text={r.attribution} term={term} />
           {quoteWork && (
@@ -276,7 +276,7 @@ const editorData =
            as data in it. (Rejected: "Myself", which reads as a value someone
            typed; and a glyph alone, which has to be learned.) */
         r.type === 'quote' && (
-          <div class="text-base-content/40 truncate font-sans text-xs italic">
+          <div class="text-whisper truncate font-sans text-xs italic">
             {r.is_self ? 'your words' : 'source unknown'}
           </div>
         )
@@ -284,7 +284,7 @@ const editorData =
     }
     {
       bodyWindows.length > 0 && (
-        <div class="text-base-content/60 mt-1 space-y-0.5 font-sans text-xs leading-relaxed">
+        <div class="text-faint mt-1 space-y-0.5 font-sans text-xs leading-relaxed">
           {bodyWindows.map((ex) => (
             <p>
               {ex.lead && '… '}
@@ -293,7 +293,7 @@ const editorData =
             </p>
           ))}
           {moreMatches > 0 && (
-            <p class="text-base-content/45">
+            <p class="text-whisper">
               +{moreMatches} more match{moreMatches === 1 ? '' : 'es'}
             </p>
           )}
@@ -392,9 +392,7 @@ const editorData =
   <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
     <StatusChip status={r.status} />
   </td>
-  <td
-    class="text-base-content/65 hidden px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap md:table-cell"
-  >
+  <td class="text-faint hidden px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap md:table-cell">
     {shortDate(r.occurred_at)}
   </td>
   {
@@ -404,7 +402,7 @@ const editorData =
       calendar date, not an instant. See `fragments-display.ts` for both halves
       and for the write-side defect neither of them fixes. */
   }
-  <td class="text-base-content/65 px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap">
+  <td class="text-faint px-3 pt-2.5 text-right align-top font-sans text-xs whitespace-nowrap">
     <time datetime={r.updated_at}>{homeDate(r.updated_at, tz)}</time>
   </td>
   {
@@ -471,10 +469,10 @@ const editorData =
   {
     trash && (
       <td class="px-3 pt-2.5 text-right align-top whitespace-nowrap" data-noedit>
-        <button class="text-base-content/70 hover:text-primary font-sans text-xs" data-act="restore" data-id={r.id}>
+        <button class="text-muted hover:text-primary font-sans text-xs" data-act="restore" data-id={r.id}>
           Restore
         </button>
-        <button class="text-base-content/70 hover:text-error ml-3 font-sans text-xs" data-act="purge" data-id={r.id}>
+        <button class="text-muted hover:text-error ml-3 font-sans text-xs" data-act="purge" data-id={r.id}>
           Delete
         </button>
       </td>

@@ -157,7 +157,7 @@ const VIS_HINT = {
           <div>
             <label class="f__k" for="cc-slug">URL</label>
             <div class="flex items-center gap-1.5">
-              <span class="text-base-content/40 font-mono text-xs">/</span>
+              <span class="text-whisper font-mono text-xs">/</span>
               <input id="cc-slug" name="slug" value={c.slug} class="input input-sm w-full font-mono text-xs" />
             </div>
             <p class="admin-hint mt-1.5">Leave blank to follow the name.</p>
@@ -448,7 +448,7 @@ const VIS_HINT = {
               data-writing={s.type === 'writing' ? s.id : undefined}
             >
               <span
-                class="text-base-content/25 group-hover:text-base-content/50 cursor-grab transition-colors select-none"
+                class="text-base-content/25 group-hover:text-whisper cursor-grab transition-colors select-none"
                 title="Drag to reorder (or Alt+↑/↓)"
                 aria-hidden="true"
               >
@@ -456,7 +456,7 @@ const VIS_HINT = {
               </span>
               <span
                 data-num
-                class="text-base-content/35 w-4 shrink-0 text-right font-sans text-xs tabular-nums"
+                class="text-whisper w-4 shrink-0 text-right font-sans text-xs tabular-nums"
                 aria-hidden="true"
               >
                 {i + 1}
@@ -468,12 +468,12 @@ const VIS_HINT = {
                 data-open
               >
                 {s.summary}
-                {s.attribution && <span class="text-base-content/45 ml-1.5 font-sans text-xs">— {s.attribution}</span>}
+                {s.attribution && <span class="text-whisper ml-1.5 font-sans text-xs">— {s.attribution}</span>}
               </button>
               {s.status === 'draft' && <StatusChip status={s.status} />}
               {s.others > 0 && (
                 <span
-                  class="text-base-content/40 font-sans text-xs"
+                  class="text-whisper font-sans text-xs"
                   title={`Also lives in ${s.others} other constellation${s.others > 1 ? 's' : ''}`}
                 >
                   <StarMark />
@@ -534,7 +534,7 @@ const VIS_HINT = {
                view exists to show what the reader gets, so the day it renders
                `**` where the page renders bold is the day it stops doing that. */
             <div
-              class="cn-desc prose-measure border-base-300 text-base-content/55 border-l pl-5 text-lg italic"
+              class="cn-desc prose-measure border-base-300 text-whisper border-l pl-5 text-lg italic"
               set:html={renderMarkdown(c.description)}
             />
           )
@@ -562,13 +562,10 @@ const VIS_HINT = {
                       (This is NOT the `.suite-mark` the figure is drawn from —
                       `drawLine()` measures `#suite .suite-item` on the public
                       page, whose gutter has been empty since 2026-08-07.) */}
-                  <span
-                    class="suite-mark text-base-content/35 min-h-6 font-serif text-base select-none"
-                    aria-hidden="true"
-                  >
+                  <span class="suite-mark text-whisper min-h-6 font-serif text-base select-none" aria-hidden="true">
                     {TYPE_META[s.type].glyph}
                   </span>
-                  <span data-num class="text-base-content/30 font-sans text-[0.65rem] tabular-nums" aria-hidden="true">
+                  <span data-num class="text-whisper font-sans text-[0.65rem] tabular-nums" aria-hidden="true">
                     {i + 1}
                   </span>
                   <button
