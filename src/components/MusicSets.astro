@@ -62,7 +62,7 @@ interface Props {
   height?: number;
   base?: string;
 }
-const { sets, selected, height = 480, base = '/blog?view=music' } = Astro.props;
+const { sets, selected, height = 480, base = '/listening' } = Astro.props;
 
 const open = sets.find((s) => s.slug === selected) ?? sets[0];
 const openEmbed = open ? embedForUrl(open.url) : null;

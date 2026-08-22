@@ -56,7 +56,7 @@ links are the first thing a stranger meets in `docs/`.)*
 
 *As of 2026-08-09.*
 
-**Built and live:** the public blog (writing / quotes / music, with search and subject filters), the **Sky** (constellation overview and typeset suites), About with a contact form, the **Workshop** (fragment manager, composer, versions, constellations, Library, About builder), and **HQ** (Today, People, the Agenda, Notes).
+**Built and live:** the public blog (writing / quotes, with search and subject filters), the **Listening** room at `/listening` — curated sets, its own route since 2026-08-21 ([0040](adr/0040-a-view-state-is-not-a-room.md)) — the **Sky** (constellation overview and typeset suites), About with a contact form, the **Workshop** (fragment manager, composer, versions, constellations, Library, About builder), and **HQ** (Today, People, the Agenda, Notes).
 
 **Since 2026-08-05, four more shipped that this block previously claimed were not coming** — it read *"what's open is not new surfaces"* while all four were being built:
 

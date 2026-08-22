@@ -9,6 +9,14 @@ along with it — 0031 had already taken that role, and this takes what 0031 put
 in its place. ADR 0009's other two roles are untouched: the constellation score
 survives, and the paired song survives and is now the only thing a song does.
 
+⚠ **Amended by [ADR 0040](0040-a-view-state-is-not-a-room.md) *(2026-08-21)* on
+one point only: the address.** The Decision below ends *"it replaces the room at
+`/blog?view=music`, and the tab strip does not move"* — the strip has since
+moved, because the room left it for `/listening` and the blog's switch is a
+pair.
+Everything this ADR decides about what a set *is* is untouched, and the old URL
+301s. The text stands as written.
+
 ## Context
 
 Two ADRs and a plan had been circling one question — *if the music speaks for

@@ -1,0 +1,109 @@
+---
+/*
+  /listening — the sets: curated listens, one Spotify playlist to a sentence
+  (plan 40 §3, ADR 0035). The room is `MusicSets.astro`; this file is only the
+  address, the read, and the empty state.
+
+  ⚠ THE ROOM IS NAMED FOR THE ACT AND NOT FOR THE ARTIFACT, AND THAT IS THE
+  SECOND HALF OF ADR 0040. It shipped as `/music` for one afternoon and Michael
+  caught what the word was doing: *"it implies too much that I may be a musician
+  and that I'm trying to share music I made, but may lead the user to be
+  disappointed that I'm merely sharing playlists."* On a personal site, beside
+  About, `Music` is the discography slot — so the label was making a claim the
+  site cannot back, which is a credibility cost before it is ever a
+  disappointment. **`Listening` cannot be misread as authorship**: it names what
+  Michael does with this music rather than what he made of it, and it is the
+  name `design.md` §13 has carried as an open question — *"whether `/listening`
+  exists"* — since July, never struck through until now.
+
+  ⚠ AND THE SCHEMA DID NOT FOLLOW, deliberately: `sets`, `songs`, `MusicSets`,
+  `scripts/music-sets.ts` and `/admin/sets` all keep their names. Those describe
+  what the corpus HOLDS; this describes what a reader is invited to do. Same
+  division `index.astro` argues for the word "jazz" — the copy a stranger reads
+  is not a column name.
+
+  ⚠ IT WAS `/blog?view=music` UNTIL 2026-08-21, AND THE MOVE REVERSES A RULING
+  (ADR 0040). Plan 33 §4 ruled the other way — *"Music is a third register"*, a
+  view of the Index rather than a room — and the code went on agreeing with it
+  right up to this commit: no rail, no feed, no search, no pagination, a
+  different vocabulary, and `view !== 'music'` guarding the two text views'
+  entire machinery. That is the case for a ROOM, made in the negative for four
+  months. What settled it was a question about chrome rather than about music:
+  Michael wanted a stranger to see the site collects more than writing, and the
+  nav could only say so by drawing three chrome links to three states of one
+  page — directly over the page's own switch, which is the thing ADR 0030 had
+  just finished making the only masthead. A view state is not a destination. So
+  the register became a route and the nav got a fourth room instead of a fork.
+
+  ⚠ NOTHING HERE DRAWS A VISIBLE HEADING, which is `/about`'s pattern and
+  `MusicSets`' own rule (see its header): the index of set titles, set in
+  display type, IS this page's masthead. A "Music" printed above it would be
+  the double print that killed the `stacked` arrangement on the `/lab/sets`
+  bench — Michael's sentence, then Spotify's copy of it, then ours. The h1 is
+  `sr-only` for the document outline and for nothing else.
+
+  ⚠ THE TAB'S "WAIT UNTIL THERE IS SOMETHING BEHIND IT" GATE RETIRES WITH THE
+  TAB, and deliberately rather than by omission. It was a gate on ANNOUNCING —
+  the route always worked, only the switch waited on one published set — and
+  the announcement has now been made in the top bar of every page on the site.
+  Re-gating it there would mean a count query in `SiteLayout` on EVERY route,
+  public and admin, to answer a question whose answer is yes and stays yes. The
+  empty state below is what covers the case instead, which is what it was
+  always for.
+*/
+import SiteLayout from '../layouts/SiteLayout.astro';
+import MusicSets from '../components/MusicSets.astro';
+import { resolveSet } from '../lib/music-sets';
+import { listSets } from '../lib/sets';
+
+const supabase = Astro.locals.supabase;
+const sets = await listSets(supabase);
+// `?set=<slug>` — ONE set open, never a combination. A stale link falls back to
+// the first rather than to an empty pane; see `resolveSet`.
+const selectedSet = resolveSet(Astro.url.searchParams.get('set'), sets);
+
+// The same 60s / SWR-a-day pair the other four public rooms answer with. No
+// `Vary` here, unlike `/blog`: nothing on this page fetches a partial, so there
+// is no second variant for the edge to hold.
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+---
+
+<SiteLayout
+  title="Listening"
+  active="listening"
+  description="What Michael has been listening to — a jazz playlist to a sentence, with the words and the quote that go with it."
+>
+  {
+    /* ⚠ MORE AIR THAN `/blog` CARRIES, AND THAT IS THE TAB'S SPACE REDISTRIBUTED
+      RATHER THAN A NEW OPINION. On the Index this room sat under a `text-3xl`
+      switch with `mb-8` beneath it — about 7rem of page above the first
+      sentence. Landing the index directly under a 3.25rem running head instead
+      starts the room abruptly against the chrome, and these lines are display
+      type, which wants the margin a title would have taken. Half of what the
+      switch occupied, kept. */
+  }
+  <div class="mx-auto w-full max-w-6xl px-5 py-10 sm:py-14">
+    <h1 class="sr-only">Listening</h1>
+    {sets.length > 0 && <MusicSets sets={sets} selected={selectedSet} />}
+    {
+      /* Michael sees this while filling the room; a stranger following a link
+        into an emptied one sees it once. Same register as the room's own. */
+      sets.length === 0 && (
+        <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
+          <p class="text-whisper max-w-sm font-serif text-lg">Nothing here yet.</p>
+          <p class="text-whisper mt-2 max-w-sm font-sans text-sm">
+            The playlists collect here one at a time, as they are made.
+          </p>
+        </div>
+      )
+    }
+  </div>
+</SiteLayout>
+
+<script>
+  // The sets take ownership of a pane the server already rendered correctly.
+  // `astro:page-load` covers every arrival AFTER the first — see the script's
+  // own note on why that listener lives in the module rather than here.
+  import { wireMusicSets } from '../scripts/music-sets';
+  wireMusicSets();
+</script>

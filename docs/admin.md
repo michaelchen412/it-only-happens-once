@@ -1212,11 +1212,13 @@ A row's title is plain text here, where in the tasks room it opens the sheet. An
 
 ## 17. Sets — a curated listen
 
-*The music page's contents (plan 40 §3). A set is one Spotify playlist, one
-quote and one description, and its whole proposition is that somebody can SAVE
-it into their own library — which is why it has no page of its own, no subjects,
-and no feed entry. `design.md`'s division of labour: **a constellation is where
-an idea is worked out; a set is where a feeling is isolated.***
+*The `/listening` room's contents (plan 40 §3; the room got its own route in
+[ADR 0040](adr/0040-a-view-state-is-not-a-room.md)). A set is one Spotify
+playlist, one quote and one description, and its whole proposition is that
+somebody can SAVE it into their own library — which is why it has no page of
+its own, no subjects, and no feed entry. `design.md`'s division of labour: **a
+constellation is where an idea is worked out; a set is where a feeling is
+isolated.***
 
 **The room is `/admin/sets`** — rows in authored order, `New` in the header, and
 the ⋯ menu described in §2. Six fields in the sheet, and three of them are worth

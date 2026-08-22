@@ -28,7 +28,7 @@
   two defaults rather than by a choice. Unified on the LARGER of the two,
   because the direction is asymmetric: showing the burger slightly early costs a
   tap that the control is designed for, while showing a desktop nav slightly
-  early crowds three links, a theme toggle and the colophon into whatever the
+  early crowds four links, a theme toggle and the colophon into whatever the
   wordmark leaves. Moving the admin down to `sm:` instead would have left a
   240px sidebar sharing a 640px viewport with the workshop.
 
@@ -46,7 +46,7 @@ interface Props {
   /** Optional meta description, passed through to <head>. */
   description?: string;
   /** Which top-nav item is highlighted. */
-  active?: 'home' | 'blog' | 'about';
+  active?: 'home' | 'blog' | 'listening' | 'about';
   /** Constellation pages bring their own floating control (the sky-return ✦)
    *  and pass false — one quiet corner control at a time. */
   backToTop?: boolean;
@@ -73,9 +73,52 @@ const pageTitle = title ? `${title} — It Only Happens Once` : 'It Only Happens
 //
 // The `key` stays `home`: it is the prop every page passes as `active`, and
 // renaming that is a six-file change for no reader-visible gain.
+//
+// ⚠ "LISTENING" IS A FOURTH ROOM AS OF 2026-08-21, AND IT IS HERE TO BE SEEN
+// RATHER THAN TO BE REACHED (ADR 0040). Michael: *"I'm kind of wanting users to
+// be able to see that I have other sections of the blog — mainly wanting to
+// highlight that I have a quote and music collection and not merely writing."*
+// The word "Blog" is a genre label that promises exactly one of the three things
+// in that room, so this row was actively misdescribing a corpus of 57 essays, 83
+// quotes and 8 sets. This item is the half of the answer that fits in chrome.
+//
+// ⚠ AND IT SAID "MUSIC" FOR ONE AFTERNOON, WHICH IS THE MORE USEFUL HALF OF THE
+// STORY. Michael: *"it implies too much that I may be a musician and that I'm
+// trying to share music I made, but may lead the user to be disappointed that
+// I'm merely sharing playlists."* He is right, and the cost lands before the
+// disappointment does: beside `About` on a personal site, `Music` is the slot a
+// discography goes in, so the word was making a claim the site cannot back.
+// **The rule that came out of it — name the ACT, not the artifact, whenever the
+// artifact would over-claim.** "Listening" cannot be read as authorship; it is
+// what Michael does with this music rather than what he made of it. It is also
+// the name design.md §13 had been holding open since July.
+//
+// The route moved with the word rather than only the label. `/` is labelled
+// `Constellations` and gets away with it because the path is a slash — a
+// `/music` under the word `Listening` would put the retired claim back in every
+// shared link, which is the one place a label cannot follow you.
+//
+// ⚠ THE ALTERNATIVE THAT LOST WAS SPLITTING THE BLOG INTO THREE ITEMS, and it
+// lost to ADR 0030 rather than to taste: on `/blog` it would print
+// Writing · Quotes · Music in this bar, directly above the page's own switch
+// printing the same three words at `text-3xl` — the two-mastheads problem that
+// ADR solved, restored, with the words matched. A dropdown (click or hover) lost
+// separately and worse: it hides the answer behind the word that already failed,
+// costs "Blog" its destination, and does not exist at all below `md:`, where
+// this row is a burger. What made a fourth ROOM available instead was that music
+// had never been a view of the blog in anything but its URL — no rail, no feed,
+// no search, its own vocabulary. See `/music`.
+//
+// ⚠ AND FOUR STILL FITS THE MEASUREMENT ABOVE — REMEASURED, NOT INFERRED. At
+// 780px, the tightest width where this row is still horizontal, "Listening" sets
+// at 70px and its `gap-5` adds 20; the space between wordmark and nav goes from
+// the 264px recorded above to **174px**. Two more items of this length would
+// still clear the wordmark, so the constraint that eventually bites this row is
+// not the fourth room.
 const nav = [
   { key: 'home', label: 'Constellations', href: '/' },
   { key: 'blog', label: 'Blog', href: '/blog' },
+  { key: 'listening', label: 'Listening', href: '/listening' },
   { key: 'about', label: 'About', href: '/about' },
 ] as const;
 ---
@@ -197,10 +240,10 @@ const nav = [
             inline row rather than a menu.
 
             ⚠ `data-nav-row` IS READ BY CSS, NOT BY THE SCRIPT — it marks the
-            three links whose ink may run ahead of the page. `data-astro-prefetch`
+            four links whose ink may run ahead of the page. `data-astro-prefetch`
             is `tap` rather than `viewport`, and the distinction is the same one
             the Sky's rows argue in the other direction: eleven links that ARE
-            the page can afford to be fetched on sight, but these three sit on
+            the page can afford to be fetched on sight, but these four sit on
             every page including the feed, so `viewport` would pull ~90 KB of
             documents a reader did not ask for on every single arrival. `tap`
             fires on pointerdown — the fetch starts a beat before the click
@@ -390,7 +433,7 @@ const nav = [
         <nav class="site-foot__group" aria-label="Site">
           {
             /* Same two attributes as the bar's copies, and for the same two
-              reasons — these are chrome links to the same three rooms, so a
+              reasons — these are chrome links to the same four rooms, so a
               press here may move the mark here, and `tap` gives the fetch its
               head start. A reader who has scrolled to the footer of a
               constellation is one press from the site's heaviest document. */

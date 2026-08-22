@@ -418,12 +418,18 @@ function bindDelegates(): void {
   });
 }
 
-// ⚠ THE RE-INIT, AND IT LIVES HERE RATHER THAN IN `blog/index.astro`. The page
-// still calls `wireMusicSets()` itself, which is what covers a first arrival
-// straight onto `?view=music`; this covers every arrival after it. Putting the
-// listener in the module means the rule travels with the thing it protects —
-// the page cannot forget it, and neither can the next surface that mounts a
-// sets pane. Registered once, because this module body runs once.
+// ⚠ THE RE-INIT, AND IT LIVES HERE RATHER THAN IN THE PAGE. `/music` still
+// calls `wireMusicSets()` itself, which is what covers a first arrival straight
+// onto the room; this covers every arrival after it. Putting the listener in the
+// module means the rule travels with the thing it protects — the page cannot
+// forget it, and neither can the next surface that mounts a sets pane.
+// Registered once, because this module body runs once.
+//
+// ⚠ AND THE BUG THIS EXISTS FOR IS NOT FIXED BY THE ROUTE MOVE (ADR 0040). It
+// was found crossing from Writing to Music inside `/blog`, but every word of it
+// is about the ROUTER rather than about that page: a module script executes once
+// per document, and a view-transition swap replaces the DOM without re-running
+// it. `Blog → Music` in the top bar is the same swap across two routes.
 document.addEventListener('astro:page-load', () => wireMusicSets());
 
 /**

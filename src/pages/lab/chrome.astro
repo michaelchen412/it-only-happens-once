@@ -147,7 +147,9 @@
   So every variant below carries exactly the same five things and differs only in
   how they sit:
 
-      Constellations · Blog · About        Say hello   ⌁ RSS   ⌗ GitHub
+      Constellations · Blog · Listening · About   Say hello  ⌁ RSS  ⌗ GitHub
+
+  (Three rooms when this was written; `Listening` joined 2026-08-21 — ADR 0040.)
 
     none    as it ships — nothing. Kept as the control, because "does the page
             end badly" was never actually judged and it is still the first
@@ -309,12 +311,21 @@ if (writing) await attachNeighbourhoods(supabase, writing.items);
 const subjects = room === 'blog' ? await listSubjects(supabase, 'writing', { selected: [], q: null }) : [];
 const refs = room === 'sky' ? await listConstellations(supabase) : [];
 
-/* The site's three destinations, for the FOOTER's copy of them. `Home` is
+/* The site's four destinations, for the FOOTER's copy of them. `Home` is
    `Constellations` here — see the rename note in the header; the bar's own copy
-   of this link is renamed by script, because that one is shipped markup. */
+   of this link is renamed by script, because that one is shipped markup.
+
+   ⚠ `Listening` JOINED 2026-08-21 (ADR 0040), AND KEEPING THIS LIST IN STEP IS
+   THE BENCH'S WHOLE VALUE. A footer bench drawing three rooms while the site draws
+   four would judge every variant below at the wrong width — and the open item
+   this bench exists for (the wordmark, design.md §14) is measured against
+   exactly that row. It needs no `room`: the bench swaps CONTENT for `sky` and
+   `blog` because those two have distinct page rhythms to stand the chrome over,
+   and the sets pane is not a rhythm this file has ever had a copy of. */
 const SITE_NAV = [
   { label: 'Constellations', href: '/', room: 'sky' },
   { label: 'Blog', href: '/blog', room: 'blog' },
+  { label: 'Listening', href: '/listening', room: '' },
   { label: 'About', href: '/about', room: '' },
 ] as const;
 

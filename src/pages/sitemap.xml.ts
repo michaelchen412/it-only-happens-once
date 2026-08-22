@@ -5,8 +5,15 @@
 
   ── WHAT IS IN IT, AND WHAT IS DELIBERATELY NOT ─────────────────────────────
 
-  In: `/`, `/blog`, `/about`, every published constellation, and every published
-  writing and quote — the six URL shapes a reader can actually reach.
+  In: `/`, `/blog`, `/listening`, `/about`, every published constellation, and
+  every published writing and quote — the seven URL shapes a reader can reach.
+
+  ⚠ `/listening` JOINED ON 2026-08-21 AND COULD NOT HAVE BEFORE (ADR 0040). As
+  `/blog?view=music` it was unlistable in principle rather than by oversight:
+  `canonicalPath` drops the query string — filter state is not a document — so
+  the room's canonical pointed at `/blog`, the writing feed. The sets have been
+  live since 2026-08-11 and no crawler has ever been told they exist. That is
+  the quietest thing the route move fixes and the one nobody would have noticed.
 
   Out, and each for its own reason rather than by oversight:
 
@@ -64,11 +71,12 @@ export const GET: APIRoute = async ({ url, locals }) => {
   ]);
 
   const entries: SitemapEntry[] = [
-    // No `lastmod` on the three static rooms — see the type's own note. `/` and
-    // `/about` genuinely cannot be dated from here, and one honest omission
-    // beats three plausible guesses.
+    // No `lastmod` on the four static rooms — see the type's own note. `/`,
+    // `/listening` and `/about` genuinely cannot be dated from here, and one
+    // honest omission beats four plausible guesses.
     { path: '/' },
     { path: '/blog' },
+    { path: '/listening' },
     { path: '/about' },
     ...constellations.map((c) => ({ path: `/${c.slug}` })),
     ...(fragments ?? []).map((f) => ({ path: `/blog/${f.slug}`, lastmod: f.updated_at })),

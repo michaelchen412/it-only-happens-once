@@ -38,7 +38,11 @@ async function cssPlacement(page: import('@playwright/test').Page) {
   }));
 }
 
-for (const path of ['/', '/blog', '/about']) {
+// The public rooms, all four of them — `/listening` joined 2026-08-21 (ADR
+// 0040). It is the one that most wants this check: it is the only public page
+// whose content mounts a third-party iframe controller, and this file exists
+// because a head a parser gives up on reparents its stylesheets into the body.
+for (const path of ['/', '/blog', '/listening', '/about']) {
   test(`every stylesheet on ${path} is inside <head>`, async ({ page }) => {
     await page.goto(path);
     const css = await cssPlacement(page);

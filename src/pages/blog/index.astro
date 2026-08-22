@@ -2,20 +2,23 @@
 /*
   /blog — the Index (design.md §4): a retrieval room, machinery register.
 
-  A prominent content-type switch (Writing · Quotes · Music) — the primary axis —
-  sits above a sticky left rail (search · subject filters) and the scrolling feed.
-  Writing renders as excerpt cards that open the full essay in an in-context
-  Reader; quotes, being short, render whole. Everything is URL-driven — `?view`,
-  `?subject`, `?q`, `?page`, `?feeling` — so any state is shareable.
+  A content-type switch (Writing · Quotes) — the primary axis — sits above a
+  sticky left rail (search · subject filters) and the scrolling feed. Writing
+  renders as excerpt cards that open the full essay in an in-context Reader;
+  quotes, being short, render whole. Everything is URL-driven — `?view`,
+  `?subject`, `?q`, `?page` — so any state is shareable.
 
-  ⚠ THE RAIL IS THE SAME FOR THE TWO TEXT VIEWS, AND MUSIC IS A THIRD REGISTER —
-  not a third list (docs/plans/33 §4, ruling 4). This comment used to say "the
-  rail is the SAME for every view", which was true of the two views that existed.
-  Quotes and writing are retrieval over a shared subject taxonomy and share the
-  rail because they are the same KIND of room. Music is filtered by a different
-  vocabulary — feelings, not subjects — in a different act, and the words are the
-  page. So `?view=music` renders the SETS full width with no rail at all —
-  curated listens (plan 40), where the room used to be.
+  ⚠ THE RAIL IS THE SAME FOR BOTH VIEWS BECAUSE BOTH ARE TEXT, and that has been
+  the load-bearing sentence here through two rewrites. Quotes and writing are
+  retrieval over a shared subject taxonomy, so they are the same KIND of room and
+  share its machinery.
+
+  ⚠ AND MUSIC LEFT ON 2026-08-21 (ADR 0040). It was a third tab here from
+  2026-08-11 — `?view=music`, no rail, no feed, no search, no pagination,
+  filtered by a different vocabulary — which is a room's worth of exceptions
+  wearing a view's clothes. It is `/listening` now, and the `?view=music`
+  redirect below is what remains of it. What is left is a two-view room whose two
+  views genuinely take the same machinery, which is what this file was built for.
 
   Search mirrors the admin (docs/search.md): a debounced fetch-and-swap of
   #blog-feed (see scripts/blog-feed.ts) with match highlighting, gated at
@@ -29,52 +32,54 @@ import PostCard from '../../components/PostCard.astro';
 import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
 import QuoteArticle from '../../components/QuoteArticle.astro';
-import MusicSets from '../../components/MusicSets.astro';
 import { Icon } from 'astro-icon/components';
 import { attachNeighbourhoods, listWriting, listQuotes, listSubjects, neighbourhoodsFor } from '../../lib/blog';
 
-import { resolveSet } from '../../lib/music-sets';
-import { listSets } from '../../lib/sets';
 import { MIN_SEARCH } from '../../lib/search-highlight';
 
 const supabase = Astro.locals.supabase;
 const params = Astro.url.searchParams;
 const raw = params.get('view');
-const view = raw === 'quotes' ? 'quotes' : raw === 'music' ? 'music' : 'writing';
+
+/*
+  ⚠ THE MUSIC ROOM'S OLD ADDRESS, AND IT IS A 301 RATHER THAN A DROP (ADR 0040).
+  `?view=music` was a public, shareable URL for ten days: it is in browser
+  histories, in two ADRs, and in whatever Michael sent anyone. `?set=` rides
+  along, because the thing worth sharing about this room was always ONE set and
+  losing the slug would land a sent link on somebody else's playlist.
+
+  ⚠ HAND-BUILT `Response`, FOR THE REASON `constellations.astro` GIVES AT
+  LENGTH: a page that RETURNS a Response short-circuits the render, so
+  `Astro.response.headers` never reaches the wire and `Astro.redirect()` builds
+  the object out of reach. Uncached, every stale link costs a function
+  invocation to be told something that is true forever. Same pair of numbers as
+  that file, and for the same asymmetry — the edge can be purged on a deploy and
+  a stranger's disk cannot, so the promise made to the CDN is the bolder one.
+
+  It sits above every read on this page on purpose: a request that is leaving
+  should not pay for the feed, the rail, or the subject taxonomy first.
+
+  ⚠ AND THE `?set=` IS READ TWICE RATHER THAN HELD IN A CONST, WHICH LOOKS LIKE
+  SOMETHING TO TIDY AND IS NOT. `astro check` reports any local whose ONLY use
+  is inside an early-returning frontmatter block as `ts(6133) declared but never
+  read` — the generated TSX loses the reference. Three shapes were tried
+  (`const set` inside the block, a derived `const to`, both hoisted above the
+  `if`) and each produced a false hint on a line that is plainly read. Reading
+  the param twice is the version that compiles clean and says something true.
+*/
+if (raw === 'music') {
+  return new Response(null, {
+    status: 301,
+    headers: {
+      Location: `/listening${params.get('set') ? `?set=${encodeURIComponent(params.get('set') ?? '')}` : ''}`,
+      'Cache-Control': 'public, max-age=3600, s-maxage=31536000',
+    },
+  });
+}
+
+const view = raw === 'quotes' ? 'quotes' : 'writing';
 const type = view === 'quotes' ? 'quote' : 'writing';
 
-/*
-  ⚠ THE TAB WAITS UNTIL THERE IS SOMETHING BEHIND IT, and the reason is now a
-  much smaller one than it used to be. The room's gate was `MUSIC_THRESHOLD =
-  40`, arguing about DENSITY: *"at 30 songs most combinations return nothing,
-  and a spectrum that keeps saying 'nothing holds all of that at once' teaches a
-  visitor that the vocabulary is decoration."* That argument retires with the
-  room (plan 40) — a set is curated rather than combined, so seven of them say
-  exactly as much as seventy would.
-
-  What survives is the shape: the ROUTE always works, so `/blog?view=music` can
-  be judged before it is announced, and only the TAB waits. It now waits on one
-  published set rather than forty tagged songs.
-*/
-const sets = view === 'music' ? await listSets(supabase) : null;
-
-/*
-  Asked on EVERY view, because the tab is about the corpus rather than about the
-  page you are standing on — and paid for once a minute rather than once a
-  request, since this route already carries `s-maxage=60`.
-
-  `head: true` so it is a count and not a page of rows: the tab needs to know
-  whether the number is zero, never what is in them.
-*/
-const { count: publishedSets } = await supabase
-  .from('sets')
-  .select('id', { count: 'exact', head: true })
-  .eq('status', 'published');
-const musicOpen = (publishedSets ?? 0) > 0;
-
-// `?set=<slug>` — ONE set open, never a combination. A stale link falls back to
-// the first rather than to an empty pane; see `resolveSet`.
-const selectedSet = sets ? resolveSet(params.get('set'), sets) : '';
 // Subjects STACK (AND). Comma-joined in the URL: ?subject=uncertainty,emotion.
 const selectedSubjects = Array.from(
   new Set(
@@ -110,13 +115,10 @@ const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 
 // narrows the corpus to one person, and a rail still counting all 77 quotes
 // would offer thirteen tags that person never used. See `listSubjects`.
 //
-// Skipped entirely for music, which has no rail: the room is filtered by
-// feelings, and asking for the subject taxonomy there would be three queries
-// spent on a control that is not on the page.
-const subjects =
-  view === 'music'
-    ? []
-    : await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null, author: authorSlug });
+// Unconditional again since music left (ADR 0040): both remaining views have the
+// rail, so there is no longer a view on this page for which these three queries
+// would be spent on a control that is not drawn.
+const subjects = await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null, author: authorSlug });
 const nameBySlug = new Map(subjects.map((s) => [s.slug, s.name]));
 // slug → GLOBAL count, so the feed's per-card subjects sort busiest-first (they
 // carry no count of their own) in an order that never shifts as you filter.
@@ -153,10 +155,6 @@ const quotes =
   view === 'quotes'
     ? await listQuotes(supabase, { page, subjects: selectedSubjects, q: q || null, author: authorSlug, subjectRank })
     : null;
-// `null` in the music view, which has no feed and no pagination — the room is
-// one page of everything that qualifies (ruling 3: card delivery is a separate,
-// swappable concern, and windowing it is a later decision with a measured
-// trigger).
 /*
   The quotes view fills the Reader from a `<template>` per card, so each one
   needs its whole apparatus — and ONE batch answers all twenty-five, the same
@@ -225,14 +223,14 @@ const authorName = authorSlug
   ? ((await supabase.from('authors').select('name').eq('slug', authorSlug).maybeSingle()).data?.name ?? authorSlug)
   : null;
 
-// Music joins the switch only once it is open (§9) — OR when you are standing in
-// it, so the room you are looking at is never missing from its own navigation.
+// ⚠ TWO TABS, AND THE SWITCH IS STILL THE MASTHEAD (ADR 0030). A third entry
+// pointing at `/listening` was the tempting version of ADR 0040 and loses twice:
+// it would put a chrome destination inside a control whose whole job is naming
+// the views of THIS page, and it would say "where you are" a second time, two
+// rows under the bar that just said it. The room left; its tab left with it.
 const tabs = [
   { key: 'writing', label: 'Writing', href: '/blog', active: view === 'writing' },
   { key: 'quotes', label: 'Quotes', href: '/blog?view=quotes', active: view === 'quotes' },
-  ...(musicOpen || view === 'music'
-    ? ([{ key: 'music', label: 'Music', href: '/blog?view=music', active: view === 'music' }] as const)
-    : []),
 ];
 
 // Infinite scroll: the next page's URL, or null at the end. The client fetches it
@@ -253,9 +251,9 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
   <div class="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
     {
       /* The page heading, for the document outline + screen readers. The visible
-        anchor is the Writing/Quotes/Music switch below, so this stays sr-only. */
+        anchor is the Writing/Quotes switch below, so this stays sr-only. */
     }
-    <h1 class="sr-only">Blog — {view === 'quotes' ? 'Quotes' : view === 'music' ? 'Music' : 'Writing'}</h1>
+    <h1 class="sr-only">Blog — {view === 'quotes' ? 'Quotes' : 'Writing'}</h1>
     {/* ─────────  PRIMARY AXIS: content-type switch  ───────── */}
     <nav class="border-base-300 mb-8 flex flex-wrap items-baseline gap-x-7 gap-y-2 border-b" aria-label="Content">
       {
@@ -273,44 +271,25 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
         ))
       }
       {
-        /* ⚠ STILL A WORD RATHER THAN A LINK, AND THE ROOM BEHIND IT IS BUILT.
-          That is §9, not an unfinished edge: a room whose combinations mostly
-          not announced until there is one published set behind it. The gate
-          above is the one line that changes. */
-      }
-      {
-        !musicOpen && view !== 'music' && (
-          <span class="font-display text-base-content/20 -mb-px border-b-2 border-transparent pb-3 text-2xl leading-none font-light sm:text-3xl">
-            Music <span class="align-middle font-sans text-xs tracking-wide">soon</span>
-          </span>
-        )
+        /* ⚠ THE GREYED-OUT "Music soon" WORD STOOD HERE AND IS GONE WITH THE
+          ROOM (ADR 0040). It was §9 made visible — a room is not announced
+          until there is something behind it — and both halves of that sentence
+          have now been answered elsewhere: eight published sets, announced in
+          the top bar of every page on the site. */
       }
     </nav>
 
-    {/* ─────────  MUSIC: a third REGISTER, so no rail and no feed  ───────── */}
-    {view === 'music' && sets && sets.length > 0 && <MusicSets sets={sets} selected={selectedSet} />}
     {
-      /* The route works before the tab opens (see the gate above), so this is
-        the state Michael sees while filling the room and a stranger following
-        an early link sees once. Same register as the room's own empty state. */
-      view === 'music' && sets && sets.length === 0 && (
-        <div class="flex min-h-[16rem] flex-col items-center justify-center px-6 py-16 text-center">
-          <p class="text-whisper max-w-sm font-serif text-lg">Nothing here yet.</p>
-          <p class="text-whisper mt-2 max-w-sm font-sans text-sm">
-            The playlists collect here one at a time, as they are made.
-          </p>
-        </div>
-      )
-    }
-
-    {
-      /* ⚠ NOT `hidden` — NOT RENDERED AT ALL. The rail and the feed are the two
-        text views' machinery, and `feed` is null in the music room, so this
-        whole subtree has nothing to read. Rendering it hidden would also ship a
-        search box and a subject taxonomy to a page that filters by neither. */
+      /* The guard is now only TypeScript's: `feed` is `writing ?? quotes` and
+        exactly one of those is populated on either remaining view, but the
+        compiler cannot see that through two ternaries. It used to carry a
+        `view !== 'music'` beside it that was a real branch — the music room had
+        no feed and no rail, and the subtree was NOT RENDERED rather than
+        hidden, so a page that filtered by neither never shipped a search box or
+        a subject taxonomy. That room is `/listening` now (ADR 0040). */
     }
     {
-      view !== 'music' && feed && (
+      feed && (
         <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
           {/* ─────────  THE RAIL: search + subjects (the two TEXT views)  ───────── */}
           <aside class="md:sticky md:top-20 md:self-start">
@@ -522,9 +501,8 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 
   {
     /* The in-context reader. The writing view fills it from a `<template>` per
-      card; the music room ships none and lets it fetch the permalink instead —
-      one room of the whole corpus would otherwise inline every essay it mentions
-      (measured at 51% of the document). See Reader.astro.
+      card — the essay is already on the page, so opening one costs no fetch.
+      See Reader.astro.
 
       ⚠ THE QUOTES VIEW USES IT TOO, as of 2026-08-10. Michael: *"when we click a
       quote, just how there's a reading viewer sheet for the writing on the blog,
@@ -534,10 +512,10 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       constellation's quote had opened a sheet since earlier the same day.
 
       The templates are cheap here in a way they are not for essays: a quote's
-      whole apparatus is a few hundred bytes, where the essay measurement above
-      was 51% of the document. */
+      whole apparatus is a few hundred bytes, where an essay's is ~51% of the
+      document. */
   }
-  {(view === 'writing' || view === 'music' || view === 'quotes') && <Reader returnLabel="Back to the blog" />}
+  <Reader returnLabel="Back to the blog" />
   {
     view === 'quotes' &&
       quotes!.items.map((q) => {
@@ -552,10 +530,9 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
 </SiteLayout>
 
 <script>
+  // ⚠ `music-sets` USED TO BE IMPORTED HERE TOO and left with the room (ADR
+  // 0040) — which is the one measurable win of the move: this route is the
+  // busiest on the site, and it was shipping a Spotify controller to two views
+  // that have never had a pane for it to take.
   import '../../scripts/blog-feed';
-  // The sets take ownership of a pane the server already rendered correctly —
-  // it returns immediately on any page without one, so the two text views pay
-  // nothing but the import.
-  import { wireMusicSets } from '../../scripts/music-sets';
-  wireMusicSets();
 </script>
