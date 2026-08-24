@@ -60,6 +60,11 @@ if (sheet && form) {
     ariaLabel: 'Notes',
     // A field's register, not an essay's — see `docClass`.
     docClass: 'f-prose',
+    // `lists: true` (plan 44) — the steps inside one event, which is the content
+    // this field was always holding as run-on prose. Must stay in step with the
+    // `lists` prop on this field's <MiniEditor>: the buttons and the nodes are
+    // two halves of one decision.
+    lists: true,
     onChange: () => ui.dirty.touch(),
   });
   /** `emitUpdate: false`: v3 emits `update` from `setContent` and would arm the

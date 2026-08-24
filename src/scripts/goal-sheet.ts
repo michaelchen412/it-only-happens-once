@@ -68,6 +68,12 @@ if (sheet && form) {
       'What’s actually in it. Out of bed before the phone. Teeth, water, read the day. Twenty minutes moving — a walk counts.',
     ariaLabel: 'Notes',
     docClass: 'f-prose',
+    // `lists: true` here and NOT on `why` above (plan 44). Same split as
+    // `breaks`, decided the same way and for the same field: a why is prose, a
+    // routine enumerates. Must stay in step with the `lists` prop on this
+    // field's <MiniEditor> — the buttons and the nodes are two halves of one
+    // decision, and either alone is a control that does nothing.
+    lists: true,
     onChange: () => ui.dirty.touch(),
   });
   // `emitUpdate: false` — v3 fires `update` from `setContent`, which would arm

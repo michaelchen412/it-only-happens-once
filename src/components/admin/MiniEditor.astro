@@ -44,20 +44,72 @@ interface Props {
    * only thing that varies between them.
    */
   size?: string;
+  /**
+   * Adds the bullet and numbered list buttons (plan 44). Must match the
+   * `lists` passed to `mountMiniEditor` for this field — the buttons are inert
+   * without it, and the commands are unreachable without them.
+   *
+   * ⚠ THREE CALLERS PASS IT: GoalSheet's *notes* (not its *why*), TaskSheet and
+   * EventSheet. The pair inside GoalSheet is the instructive one — a goal's why
+   * is prose and its notes are a routine, so the same sheet carries one field
+   * with lists and one without, a foot apart. That is the register question
+   * this prop exists to ask, and it is asked per FIELD rather than per sheet.
+   *
+   * Off by default, and deliberately opt-in for the reason the `image` prop on
+   * EditorToolbar is: rendering the buttons everywhere would put two dead
+   * controls in the eleven fields whose editor has no list nodes.
+   */
+  lists?: boolean;
 }
-const { id, wrapId, size = 'max-h-[30vh] min-h-[5rem]' } = Astro.props;
+const { id, wrapId, size = 'max-h-[30vh] min-h-[5rem]', lists = false } = Astro.props;
 ---
 
 <div id={wrapId} class="rounded-field border-base-300 focus-within:border-primary border">
   {
-    /* `role="toolbar"` with a name, because the two buttons are a group and a
+    /* `role="toolbar"` with a name, because the buttons are a group and a
       screen reader announcing "button, B" twice with no context is the reason
       this markup was worth keeping identical across four copies in the first
-      place. */
+      place. ⚠ It said "the two buttons" until plan 44 — `lists` can make it
+      four, and the naming is what stops the longer row reading as a list of
+      unrelated controls. */
   }
   <div class="border-base-300/60 flex items-center gap-0.5 border-b px-1.5 py-1" role="toolbar" aria-label="Formatting">
     <button type="button" class="tt-btn" data-cmd="bold" aria-pressed="false" title="Bold (⌘B)"><b>B</b></button>
     <button type="button" class="tt-btn" data-cmd="italic" aria-pressed="false" title="Italic (⌘I)"><i>I</i></button>
+    {
+      /* The labels and `aria-label`s are EditorToolbar's, character for
+        character. Two toolbars in one building may differ in what they offer;
+        they must not differ in what they call the same thing. ⚠ These two carry
+        an `aria-label` where B and I do not, and that is not an inconsistency —
+        "B" and "I" are letters a screen reader can say, "•" and "1." are not. */
+    }
+    {
+      lists && (
+        <>
+          <span class="bg-base-300 mx-1 h-5 w-px" />
+          <button
+            type="button"
+            class="tt-btn"
+            data-cmd="bulletList"
+            aria-pressed="false"
+            aria-label="Bulleted list"
+            title="Bulleted list"
+          >
+            •
+          </button>
+          <button
+            type="button"
+            class="tt-btn"
+            data-cmd="orderedList"
+            aria-pressed="false"
+            aria-label="Numbered list"
+            title="Numbered list"
+          >
+            1.
+          </button>
+        </>
+      )
+    }
   </div>
   <div id={id} class:list={['overflow-y-auto px-3 py-2', size]}></div>
 </div>

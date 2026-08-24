@@ -104,21 +104,32 @@ const editing = !!goal;
 
       {
         /* The practice, not the reason. Roomier than Why on purpose: this is the
-        field that holds a list, and a two-row box would ask you to keep it
-        short on the one surface where the detail IS the point. */
-      }
-      {
-        /* Roomier than Why, as it always was: this is the field that holds a
-          list, and the header's note says a two-row box would ask you to keep
-          it short on the one surface where the detail IS the point.
+          field that holds a list, and a two-row box would ask you to keep it
+          short on the one surface where the detail IS the point.
 
-          `breaks: true`, matching the goal page — notes are typed as LINES
-          (`Teeth` / `Read the day` / `Move`), usually with no bullet in sight,
-          and prose rules would run all three into one sentence. */
+          ⚠ `lists` HERE AND NOT ON WHY, A FOOT ABOVE — the pair is the whole
+          register question, asked per FIELD rather than per sheet. A why is the
+          reason a goal exists and reads as prose; notes are *how it is actually
+          kept*, and a morning routine is an enumeration. The alternative that
+          lost was filing the routine as five subtasks, which would have taught a
+          goal to be a project on the one surface built to refuse that
+          (docs/admin.md §14).
+
+          ⚠ THIS COMMENT SAID "usually with no bullet in sight" UNTIL PLAN 44,
+          and it was describing a limit rather than a preference: the editor had
+          no list nodes, so there was no bullet to see. Two near-identical copies
+          of this block sat here, both already calling this "the field that holds
+          a list" while the field could not make one — which is how the gap went
+          unnoticed for nine days. They are merged into this one.
+
+          `breaks: true` still matters and is unchanged, because a list is not
+          the only shape this field takes: notes typed as bare LINES (`Teeth` /
+          `Read the day` / `Move`) are still lines, and prose rules would run all
+          three into one sentence. */
       }
       <div class="f mt-4">
         <span class="f__k">Notes</span>
-        <MiniEditor id="goal-notes" wrapId="goal-notes-wrap" size="max-h-[38vh] min-h-[6.5rem]" />
+        <MiniEditor id="goal-notes" wrapId="goal-notes-wrap" size="max-h-[38vh] min-h-[6.5rem]" lists />
         <input type="hidden" data-notes-value value={goal?.notes ?? ''} />
       </div>
     </div>

@@ -368,14 +368,46 @@ export interface MiniEditorOptions {
    * were already getting.
    */
   breaks?: boolean;
+  /**
+   * Adds bullet and numbered lists to this tier — and nothing else (plan 44).
+   *
+   * ⚠ OPT-IN, AND ONLY THREE CALLERS PASS IT: a goal's *notes*, a task's notes
+   * and an event's notes. Those three are the fields whose content genuinely
+   * enumerates — a routine, the steps inside one task, what to bring. The other
+   * eleven fields on this tier stay bold-italic because their content is
+   * narrative: a quote is quoted words, a log entry answers *"What happened?"*,
+   * a bio is what you'd say if someone asked. A list there changes what the
+   * field is FOR, not just what it can hold.
+   *
+   * ⚠ LISTS AND NOT HEADINGS, WHICH IS THE WHOLE LINE THIS TIER HOLDS. A
+   * heading turns text into a sectioned document, so a field that can carry one
+   * is a page in disguise; a list is a sentence-level affordance and does
+   * nothing of the kind. That distinction is what stops the field editor
+   * drifting into `mountRichEditor` one button at a time — the same shape as the
+   * goal horizon being three buttons so it cannot say "March 3rd".
+   *
+   * ⚠ AN OPT-IN FLAG RATHER THAN A THIRD MOUNT FUNCTION — the alternative that
+   * lost. A `mountListEditor` would have duplicated `keepCaretClear`, the
+   * toolbar sync and the Markdown serializer to gain two nodes. This is the
+   * shape the file already uses three times (`images`, `proofread`,
+   * `linkDialog`), for the reason each of those states.
+   *
+   * ⚠ Nothing downstream needs changing, and that was checked rather than
+   * assumed: `renderMarkdown` emits `<ul>`/`<ol>`, the sanitizer allowlists
+   * them, `.reading` styles them and `.f-prose` — the field register — already
+   * carried a `:is(p, ul, ol, blockquote)` rule before any of this. The editor
+   * was the only layer in the building that could not hold a list.
+   */
+  lists?: boolean;
 }
 
 /**
- * The short-form editor: bold and italic, line breaks preserved, no headings /
- * lists / rules. That's the register a quote's words and a song's annotation
- * share — a sentence or a few, never an essay — so the composer's full toolbar
- * would be noise. `breaks` defaults to true, which keeps a poem's line breaks
- * through the Markdown round-trip; pass false where the render side says false.
+ * The short-form editor: bold and italic, line breaks preserved, no headings and
+ * no rules — and lists only where `lists` asks for them. That's the register a
+ * quote's words and a song's annotation share — a sentence or a few, never an
+ * essay — so the composer's full toolbar would be noise. `breaks` defaults to
+ * true, which keeps a poem's line breaks through the Markdown round-trip; pass
+ * false where the render side says false.
  *
  * Same handle as `mountRichEditor`, so callers serialize the same way.
  */
@@ -386,11 +418,14 @@ export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
     extensions: [
       StarterKit.configure({
         heading: false,
-        bulletList: false,
-        orderedList: false,
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
+        // The two nodes `lists` lets back in. Spread rather than
+        // `bulletList: opts.lists ? undefined : false` so the disabled case
+        // stays the literal `false` StarterKit documents, and the enabled case
+        // is the node's own defaults rather than a value we chose.
+        ...(opts.lists ? {} : { bulletList: false as const, orderedList: false as const }),
       }),
       Markdown.configure({ breaks: opts.breaks ?? true, transformPastedText: true }),
       Placeholder.configure({ placeholder: opts.placeholder ?? 'Write…' }),
@@ -415,6 +450,16 @@ export function mountMiniEditor(opts: MiniEditorOptions): RichEditorHandle {
     bold: () => editor.chain().focus().toggleBold().run(),
     italic: () => editor.chain().focus().toggleItalic().run(),
   };
+  // Registered only when the nodes exist, and the guard is load-bearing rather
+  // than tidy: `toggleBulletList` is contributed BY the BulletList extension, so
+  // with `lists` off it is not a command that declines — it is not on the chain
+  // at all, and calling it is a TypeError that takes the whole click handler
+  // down. Unregistered here, a stray `data-cmd` falls through `cmds[…]?.()` and
+  // does nothing, which is the failure this tier should have.
+  if (opts.lists) {
+    cmds.bulletList = () => editor.chain().focus().toggleBulletList().run();
+    cmds.orderedList = () => editor.chain().focus().toggleOrderedList().run();
+  }
   const btns = Array.from(opts.toolbarRoot.querySelectorAll<HTMLButtonElement>('.tt-btn'));
   btns.forEach((b) => b.addEventListener('click', () => cmds[b.dataset.cmd!]?.()));
 

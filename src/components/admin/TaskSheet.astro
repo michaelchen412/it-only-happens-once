@@ -92,9 +92,17 @@ const { today, goals = [] } = Astro.props;
           contenteditable, and wrapping one puts the whole surface inside a
           click target that steals the caret's column on every press. */
       }
+      {
+        /* ⚠ `lists` (plan 44). A task's notes hold the steps INSIDE one task —
+          the detail that is not worth splitting into five more rows. That is the
+          same argument the goal page makes for its own notes, and it is the
+          reason this field earns lists where a log entry or a bio does not:
+          those answer *"what happened"* and *"who they are"*, which are
+          narrative, and a list there would change what the field is for. */
+      }
       <div class="f mt-4">
         <span class="f__k">Notes</span>
-        <MiniEditor id="task-notes" wrapId="task-notes-wrap" size="max-h-[28vh] min-h-[3.25rem]" />
+        <MiniEditor id="task-notes" wrapId="task-notes-wrap" size="max-h-[28vh] min-h-[3.25rem]" lists />
       </div>
 
       <fieldset class="fs mt-4">
