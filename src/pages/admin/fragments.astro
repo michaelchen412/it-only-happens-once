@@ -60,7 +60,36 @@ const personSlug = Astro.url.searchParams.get('person');
 const linkPerson = personSlug
   ? (await supabase.from('people').select('id').eq('slug', personSlug).maybeSingle()).data
   : null;
-const autoNew = linkPerson && Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
+/*
+  ⚠ `new=quote` NO LONGER REQUIRES A PERSON (plan 45 · Piece 1). It used to be
+  `linkPerson && …`, because the only door that sent it was a profile's "Add a
+  quote". The pile's **Make it a quote…** is a second door with no person in it
+  at all, and an arrival that silently did nothing would be the worst kind of
+  dead link — one that lands you in the right room looking at the wrong screen.
+*/
+const autoNew = Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
+
+/*
+  ⚠ ARRIVING FROM A JOT — `?new=quote&from=<note id>` (plan 45 · Piece 1).
+
+  THE BODY IS FETCHED HERE RATHER THAN CARRIED IN THE URL. A jot is Markdown of
+  any length with newlines in it; putting that through a query string means
+  length limits, escaping, and the words showing up in browser history and in
+  any log that records a path. The id is the only thing that needs to travel.
+
+  ⚠ `status = 'note'` IS A GUARD, NOT A FILTER. Without it a hand-typed `from=`
+  would happily seed the quote sheet from a published essay — and then consume
+  it on save. The only rows this door may read are jots.
+
+  ⚠ AND NOTHING IS CONSUMED HERE. The jot is trashed by `fragment-sheet.ts`
+  after the quote is actually saved, which is 14 §10e's ordering rule: write the
+  destination first, so a failure leaves a dump still sitting in the pile.
+  Abandon this sheet and the jot is exactly where you left it.
+*/
+const fromId = autoNew ? Astro.url.searchParams.get('from') : null;
+const seed = fromId
+  ? (await supabase.from('fragments').select('id, body').eq('id', fromId).eq('status', 'note').maybeSingle()).data
+  : null;
 
 const TITLES = { list: 'Fragments', trash: 'Trash' } as const;
 const SUBTITLES = {
@@ -279,6 +308,8 @@ const SUBTITLES = {
     sharedBy={sharedBy}
     linkPersonId={linkPerson?.id ?? null}
     autoNew={autoNew}
+    seedBody={seed?.body ?? null}
+    seedFrom={seed?.id ?? null}
   />
   <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
   {

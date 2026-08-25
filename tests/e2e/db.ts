@@ -87,4 +87,19 @@ export async function sweepThrowaways(db: SupabaseClient<Database>): Promise<voi
   // survived a partial failure is already gone by the time the work is removed.
   await db.from('people').delete().like('slug', `${THROWAWAY}%`);
   await db.from('works').delete().like('slug', `${THROWAWAY}%`);
+
+  /*
+    Fragments — a seeded jot, and whatever the app made FROM it (plan 45 · Piece
+    1 turns one into a quote).
+
+    ⚠ MATCHED ON THE BODY AS WELL AS THE SLUG, and the second half is the one
+    that matters. A spec sets the jot's slug itself, so that row is easy. The
+    QUOTE's slug is derived on the server — `slugify(attribution + the body's
+    first seven words)` — so its shape is not something a spec can promise, and a
+    sweep that trusted it would leave the very row the test created. The body is
+    the one thing the spec controls at both ends, so it is what the net is made
+    of. Belt and braces on purpose: this runs against Michael's live corpus.
+  */
+  await db.from('fragments').delete().like('slug', `${THROWAWAY}%`);
+  await db.from('fragments').delete().like('body', `${THROWAWAY}%`);
 }

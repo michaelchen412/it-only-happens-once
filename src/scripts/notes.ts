@@ -411,6 +411,29 @@ if (undoBar) {
           new CustomEvent('hq:log-open', { detail: { noteId: card.dataset.note, text: plainOf(card) } }),
         );
         break;
+      case 'quote':
+        /*
+          ⚠ THE ONE DESTINATION THAT LEAVES THIS ROOM, and the reason is the
+          SHEET rather than the motion. A task's sheet and a log entry's sheet
+          are mounted here — small forms over data this page already holds. The
+          quote sheet is two `EntityCombo`s over every author and every work,
+          plus subjects, plus Shared by; mounting it here would hang three more
+          queries on a room whose whole job is a pile you can open fast.
+
+          So the jot travels as an ID and the corpus room does the collecting —
+          the same arrival `?person=…&new=quote` has used from a profile since
+          12 · Piece 3. The body is fetched there, never carried in the URL.
+
+          ⚠ NO UNDO STRIP FOR THIS ONE, and that follows from leaving rather than
+          from a change of mind about undo: the strip lives on this page and you
+          will not be on this page. What stands in for it is stronger for being
+          immediate — nothing leaves the pile until the quote is SAVED, and once
+          it is, the quote is the thing in front of you. Abandon the sheet and
+          the jot is exactly where you left it. (Michael ruled the same question
+          for the ✚ on 2026-08-24: *"no undo for now."*)
+        */
+        window.location.href = `/admin/fragments?new=quote&from=${encodeURIComponent(card.dataset.note ?? '')}`;
+        break;
       case 'piece':
         void promote(card);
         break;

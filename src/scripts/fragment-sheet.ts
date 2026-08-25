@@ -14,7 +14,7 @@
 import { actions } from 'astro:actions';
 import { deriveProvenance, mergePage } from '../lib/provenance';
 import { slugify } from '../lib/slug';
-import { submitAction } from './action-error';
+import { callAction, submitAction } from './action-error';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { sheetError as sheetErrorOf } from './sheet-error';
@@ -643,6 +643,35 @@ document.addEventListener('fragment:edit', (e) => {
         return;
       }
     }
+    /*
+      ⚠ THE JOT IS CONSUMED LAST — after the quote exists, never before (plan 45
+      · Piece 1, on 14 §10e's ordering rule). The other order loses a thought
+      every time the second call fails. What THIS order leaves behind on a
+      failure is a jot still sitting in the pile, which you can see and delete.
+
+      ⚠ IT IS ALSO WHY ABANDONING THIS SHEET COSTS NOTHING. Nothing has been
+      taken from the pile until a quote is saved, so closing on a seeded sheet
+      leaves the jot exactly where it was — the same promise TaskSheet makes
+      about a dump it was opened with.
+
+      Trashed, not purged: a discarded jot goes where a deleted jot goes. And
+      the failure is reported to the console rather than to the sheet, because
+      the sheet is about to close on a save that genuinely succeeded — the honest
+      summary is "your quote is saved and your jot is still in the pile", which
+      is what the pile itself will show you.
+    */
+    const jotId = sheet.dataset.seedFrom;
+    if (jotId) {
+      const consumed = new FormData();
+      consumed.set('ids', jotId);
+      consumed.set('op', 'trash');
+      const { error } = await callAction(actions.fragments.bulk(consumed));
+      if (error) console.error('[quote from a jot] the quote saved; the jot is still in the pile', error);
+      // One jot, one consumption — the sheet reopens for other quotes.
+      delete sheet.dataset.seedFrom;
+      delete sheet.dataset.seedBody;
+    }
+
     dirty = false; // saved — don't prompt the unsaved-work guard on the way out
     // The reload used to be what closed this sheet after a save. It isn't any
     // more, so the close is explicit and load-bearing rather than tidying.
@@ -694,8 +723,28 @@ document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
 // property of the room.
 if (sheet.dataset.autoNew === 'quote') {
   document.querySelector<HTMLElement>('[data-new="quote"]')?.click();
+
+  /*
+    ⚠ AFTER THE CLICK, NEVER BEFORE (plan 45 · Piece 1). That click is what
+    RESETS the form for a new quote, so a body set first is a body wiped a
+    line later — and it would have looked like the seed simply never arrived.
+
+    The Markdown is set whole, unstripped: a quote body is a rich field, so the
+    marks belong in it. That is the opposite of what the pile does on its way
+    to a task or a log entry, where the destination is a plain `<input>` and
+    `stripMarkdown` exists to keep asterisks out of it.
+  */
+  const seed = sheet.dataset.seedBody;
+  if (seed) {
+    quoteEditor.commands.setContent(seed);
+    refreshQuoteValid(); // the words are already here, so Save is already live
+  }
+
   const url = new URL(window.location.href);
   url.searchParams.delete('new');
   url.searchParams.delete('person');
+  // ⚠ `from` GOES TOO, and it matters more than the other two: left in the bar,
+  // a refresh would re-seed a sheet from a jot this save has already consumed.
+  url.searchParams.delete('from');
   history.replaceState(null, '', url.pathname + url.search + url.hash);
 }

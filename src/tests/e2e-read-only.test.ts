@@ -70,6 +70,15 @@ const OPT_OUTS: Record<string, string> = {
     'nothing; the seeding one is SKIPPED unless E2E_ALLOW_WRITES=1, so an ordinary run stays ' +
     'read-only. Throwaway rows carry the `zzz-e2e-throwaway` slug prefix and are swept both ' +
     'before and after each test, so an interrupted run cleans up on the next one.',
+  'note-to-quote.spec.ts':
+    'A jot becomes a quote across two rooms (plan 45 · Piece 1), and the assertion is the ' +
+    'ORDERING: the jot must still be in the pile when the sheet opens, and gone once the quote ' +
+    'is saved. A stub can prove `saveQuote` was called; it cannot prove the quote came out ' +
+    "holding the jot's words, nor that the consume happened after rather than before — which " +
+    'is the half 14 §10e exists to protect and the half a later edit is most likely to invert. ' +
+    'NAMED rather than lifted: only `fragments.saveQuote` and `fragments.bulk` may through, and ' +
+    'the whole describe is SKIPPED unless E2E_ALLOW_WRITES=1. Throwaway rows are matched on the ' +
+    "body as well as the slug, because the quote's slug is derived on the server.",
 };
 
 describe('the e2e suite is read-only by construction', () => {
@@ -128,18 +137,70 @@ describe('the e2e suite is read-only by construction', () => {
    * splits them and this counts them apart. Raising the write ceiling is a
    * decision about database branching; raising the read one is not.
    */
+  /**
+   * ⚠ A THIRD CATEGORY, ADDED 2026-08-24 (plan 45 · Piece 1) — **the named
+   * WRITE**, which this file had no bucket for and quietly counted as a read.
+   *
+   * The split above is `unbounded` (lifts the guard entirely) versus `reads`
+   * (names what may through). `note-to-quote.spec.ts` is neither: it names
+   * exactly two actions and both of them WRITE. Naming them makes it strictly
+   * safer than the unbounded form — nothing else on the page can reach the
+   * server — but it is not a read, and dropping it into `reads` would have
+   * grown the read ceiling with a pair of writes and told nobody.
+   *
+   * ⚠ THE DEFAULT IS "WRITE", NOT "READ", and that inversion is the point. A
+   * name not on `NAMED_READS` counts against the write ceiling, so the cost of
+   * forgetting to classify one is a failing test rather than a guard that has
+   * silently stopped guarding. To be treated as harmless, a name has to say so.
+   */
+  const NAMED_READS = new Set(['fragments.get']);
+
   it('the write-capable allowlist has not quietly become the rule (ADR 0028 · trigger 3)', () => {
     const unbounded: string[] = [];
     const reads = new Set<string>();
+    const writes = new Set<string>();
+    const writeSpecs = new Set<string>();
 
     for (const file of SPECS) {
       const src = fs.readFileSync(path.join(DIR, file), 'utf8');
       for (const m of src.matchAll(/allowActions\(\s*page\s*(?:,\s*\[([^\]]*)\])?\s*\)/g)) {
         // No name list means every action on that page — the write-capable form.
         if (!m[1]) unbounded.push(file);
-        else for (const name of m[1].match(/'([^']+)'/g) ?? []) reads.add(name.replace(/'/g, ''));
+        else
+          for (const quoted of m[1].match(/'([^']+)'/g) ?? []) {
+            const name = quoted.replace(/'/g, '');
+            if (NAMED_READS.has(name)) reads.add(name);
+            else {
+              writes.add(name);
+              writeSpecs.add(file);
+            }
+          }
       }
     }
+
+    /*
+      ⚠ A NAMED WRITE IS ONLY ACCEPTABLE IN A SPEC THAT CANNOT RUN BY ACCIDENT.
+      This is the join between ADR 0028 and ADR 0037: naming the actions bounds
+      WHAT may be written, and `writesAllowed()` bounds WHEN. Either one alone
+      leaves `npm run test:e2e` — the command you run without thinking — able to
+      write to Michael's live corpus.
+    */
+    for (const file of writeSpecs) {
+      const src = fs.readFileSync(path.join(DIR, file), 'utf8');
+      expect(
+        /test\.skip\(\s*!writesAllowed\(\)/.test(src),
+        `${file} names a write in allowActions but is not gated on writesAllowed(). A spec that ` +
+          `can write must be SKIPPED unless E2E_ALLOW_WRITES=1 (ADR 0037), or an ordinary ` +
+          `read-only run will write to the live project.`,
+      ).toBe(true);
+    }
+
+    expect(
+      [...writes],
+      `The named-WRITE allowlist has grown past what plan 45 bounded it at. Every entry here can ` +
+        `change Michael's live data. Adding one means arguing that a stub cannot prove what the ` +
+        `spec proves — the same bar as an unbounded opt-out, minus the blast radius.`,
+    ).toHaveLength(2);
 
     expect(
       unbounded,

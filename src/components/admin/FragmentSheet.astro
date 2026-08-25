@@ -55,6 +55,18 @@ interface Props {
   linkPersonId?: string | null;
   /** Open this editor on load, for the same arrival. */
   autoNew?: 'quote' | null;
+  /**
+   * Arriving from the pile's "Make it a quote…" (plan 45 · Piece 1): the jot's
+   * Markdown, to open the new-quote sheet already holding the words, and the
+   * jot's id, so saving the quote can consume it.
+   *
+   * ⚠ THE PAIR TRAVELS TOGETHER OR NOT AT ALL. A body with no id would silently
+   * leave a duplicate jot in the pile; an id with no body would consume a jot
+   * whose words never reached the quote. `fragments.astro` reads both off one
+   * row, so there is no arrangement of query params that can separate them.
+   */
+  seedBody?: string | null;
+  seedFrom?: string | null;
 }
 const {
   subjects,
@@ -65,6 +77,8 @@ const {
   sharedBy = {},
   linkPersonId = null,
   autoNew = null,
+  seedBody = null,
+  seedFrom = null,
 } = Astro.props;
 /**
  * "Me" leads the Who list (docs/plans/17a) — not a checkbox off to the side.
@@ -89,6 +103,8 @@ const workOptions = works.map((w) => ({ id: w.id, name: w.title, authorId: w.aut
   data-shared-by={JSON.stringify(sharedBy)}
   data-link-person={linkPersonId ?? undefined}
   data-auto-new={autoNew ?? undefined}
+  data-seed-body={seedBody ?? undefined}
+  data-seed-from={seedFrom ?? undefined}
 >
   <div class="flex h-full flex-col overflow-y-auto overscroll-contain">
     <SheetHeader titleId="sheet-title" title="New quote" />
