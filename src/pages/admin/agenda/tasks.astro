@@ -31,6 +31,7 @@ import TaskSheet from '../../../components/admin/TaskSheet.astro';
 import Tick from '../../../components/admin/Tick.astro';
 import { clockTime, dmd, fullDate } from '../../../lib/hq/dates';
 import { GROUPS, byWhen, effortMeta, groupOf, lateBy, recurrenceWords } from '../../../lib/hq/tasks';
+import { jotSeed } from '../../../lib/hq/jot-seed';
 import { liveAndAnswered } from '../../../lib/hq/today-data';
 import { presetLabel, presetOf } from '../../../lib/hq/recurrence';
 import type { Tables } from '../../../lib/database.types';
@@ -39,6 +40,17 @@ import { renderMarkdown } from '../../../lib/markdown';
 type Task = Tables<'tasks'>;
 
 const supabase = Astro.locals.supabase;
+/*
+  ⚠ ARRIVING FROM THE ✚ — `?from=<jot id>` (plan 45 · Piece 2). The capture
+  dialog's tab row declares a destination and navigates; this room reads the jot
+  and `scripts/jot-arrival.ts` does the rest — parse the sentence, open the
+  sheet prefilled, and consume the jot once it is actually saved.
+
+  ⚠ THE PARSE IS NOT HERE. It belongs in the browser, after this page has
+  painted: it costs 1.5–4s, and blocking a room's render on a model call would
+  make the whole agenda wait on a sentence one sheet wanted.
+*/
+const seed = await jotSeed(supabase, Astro.url);
 const { ymd: todayYmd } = Astro.locals.today;
 
 const [{ rows, error }, { data: goalData }] = await Promise.all([
@@ -244,7 +256,7 @@ const payload = (t: Task) =>
     }
   </div>
 
-  <TaskSheet today={todayYmd} goals={goals} />
+  <TaskSheet today={todayYmd} goals={goals} seedBody={seed?.body ?? null} seedFrom={seed?.id ?? null} />
 
   <script>
     import '../../../scripts/task-list';

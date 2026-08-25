@@ -79,6 +79,14 @@ const OPT_OUTS: Record<string, string> = {
     'NAMED rather than lifted: only `fragments.saveQuote` and `fragments.bulk` may through, and ' +
     'the whole describe is SKIPPED unless E2E_ALLOW_WRITES=1. Throwaway rows are matched on the ' +
     "body as well as the slug, because the quote's slug is derived on the server.",
+  'capture-declares.spec.ts':
+    'The ✚ writes the jot itself (plan 45 · Piece 2), so there is nothing to seed and nothing to ' +
+    'file until it has — a stubbed run would be testing its own fixture rather than the motion. ' +
+    'What it proves is the pair no on-screen assertion reaches: the task exists, and the jot left ' +
+    'the pile once it did. NAMED rather than lifted — saveWriting, tasks.parse, tasks.save and ' +
+    'fragments.bulk, nothing else — and the whole describe is SKIPPED unless E2E_ALLOW_WRITES=1. ' +
+    'It asserts nothing about what the model returned, because 14 §6.4 says capture must never ' +
+    'depend on it; the title is then set by hand so the sweep keys on a string this spec chose.',
 };
 
 describe('the e2e suite is read-only by construction', () => {
@@ -153,7 +161,19 @@ describe('the e2e suite is read-only by construction', () => {
    * forgetting to classify one is a failing test rather than a guard that has
    * silently stopped guarding. To be treated as harmless, a name has to say so.
    */
-  const NAMED_READS = new Set(['fragments.get']);
+  const NAMED_READS = new Set([
+    'fragments.get',
+    /*
+      ⚠ `tasks.parse` IS A READ, and the action says so in its own words:
+      *"Read-only — it writes nothing. The fields are handed to the sheet, and
+      the person saves or discards them."* It reaches a model rather than a
+      table, which is the only reason it looks like the odd one here: what the
+      ceiling above bounds is what can CHANGE Michael's data, and this changes
+      none of it. Added 2026-08-24 with plan 45 · Piece 2, whose spec drives the
+      ✚'s Agenda door and cannot reach the sheet without it.
+    */
+    'tasks.parse',
+  ]);
 
   it('the write-capable allowlist has not quietly become the rule (ADR 0028 · trigger 3)', () => {
     const unbounded: string[] = [];
@@ -200,7 +220,20 @@ describe('the e2e suite is read-only by construction', () => {
       `The named-WRITE allowlist has grown past what plan 45 bounded it at. Every entry here can ` +
         `change Michael's live data. Adding one means arguing that a stub cannot prove what the ` +
         `spec proves — the same bar as an unbounded opt-out, minus the blast radius.`,
-    ).toHaveLength(2);
+      /*
+        ⚠ 2 → 4 ON 2026-08-24, and the argument is per entry rather than "the
+        feature needed it". `fragments.saveQuote` and `fragments.bulk` came with
+        Piece 1: a stub can prove saveQuote was called, not that the quote came
+        out holding the jot's words nor that the consume ran after rather than
+        before. `fragments.saveWriting` and `tasks.save` come with Piece 2 for
+        the same reason one step further along — the ✚ writes the jot itself, so
+        a spec that stubs it has no jot to file and is testing its own fixture.
+
+        The ceiling is meant to make each of those an argument rather than a
+        habit. If a fifth wants in, that is the point at which ADR 0028's
+        trigger 3 is really firing and the answer is database branching.
+      */
+    ).toHaveLength(4);
 
     expect(
       unbounded,

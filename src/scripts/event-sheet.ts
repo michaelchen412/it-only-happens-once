@@ -10,6 +10,7 @@
 // is the date. There is no JavaScript copy of the form beside the form.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { announceFiled, wireJotArrival } from './jot-arrival';
 import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 import { wireFilterFields } from './filter-field';
@@ -262,11 +263,15 @@ if (sheet && form) {
       const noteId = filingNote;
       filingNote = null;
       void ui.close();
-      document.dispatchEvent(
-        new CustomEvent('hq:note-filed', {
-          detail: { noteId, what: 'an event', href: '/admin/agenda', undo: { kind: 'event', id: res.data?.id } },
-        }),
-      );
+      // Cancelable, for the reason written out in `jot-arrival.ts`: the pile
+      // claims it in the notes room, and nothing does when the jot arrived
+      // from the ✚ — in which case this consumes it.
+      void announceFiled({
+        noteId,
+        what: 'an event',
+        href: '/admin/agenda',
+        undo: { kind: 'event', id: res.data?.id },
+      });
       return;
     }
     location.reload();
@@ -303,4 +308,8 @@ if (sheet && form) {
     if (!res.ok) return;
     location.reload();
   });
+
+  // The calendar's half of the ✚'s Agenda door — reached either directly, when
+  // the reading says this is an event, or from the tasks room's KindBar switch.
+  wireJotArrival(sheet, 'hq:event-open');
 }

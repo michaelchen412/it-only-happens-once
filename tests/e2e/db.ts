@@ -102,4 +102,15 @@ export async function sweepThrowaways(db: SupabaseClient<Database>): Promise<voi
   */
   await db.from('fragments').delete().like('slug', `${THROWAWAY}%`);
   await db.from('fragments').delete().like('body', `${THROWAWAY}%`);
+
+  /*
+    Tasks — plan 45 · Piece 2 files a jot into one through the ✚.
+
+    ⚠ THE TITLE IS SET BY HAND IN THE SPEC, NOT LEFT TO THE PARSE, and this
+    sweep is the reason. `tasks.parse` writes the title from the sentence and is
+    free to drop words it reads as noise — including, entirely reasonably, a
+    prefix that looks like `zzz-e2e-throwaway`. A sweep keyed to a string a
+    model chose is a sweep that misses on the day the model changes its mind.
+  */
+  await db.from('tasks').delete().like('title', `${THROWAWAY}%`);
 }

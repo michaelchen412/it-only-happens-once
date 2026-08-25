@@ -18,6 +18,7 @@
 import { actions } from 'astro:actions';
 import { options, pick, picked, wireRadioGroups } from './radio-group';
 import { submitAction } from './action-error';
+import { announceFiled, wireJotArrival } from './jot-arrival';
 import { wireSheet } from './sheet';
 import { leadFor, leadLine, type Effort, type Priority } from '../lib/hq/tasks';
 import { nextOccurrences, presetLabel, rruleFor, PRESETS, type Preset } from '../lib/hq/recurrence';
@@ -449,11 +450,17 @@ if (sheet && form) {
       const noteId = filingNote;
       filingNote = null;
       void ui.close();
-      document.dispatchEvent(
-        new CustomEvent('hq:note-filed', {
-          detail: { noteId, what: 'a task', href: '/admin/agenda/tasks', undo: { kind: 'task', id: res.data?.id } },
-        }),
-      );
+      // ⚠ THE ANNOUNCEMENT IS CANCELABLE NOW (plan 45 · Piece 2). In the notes
+      // room the pile claims it and does the tidying, exactly as before; in
+      // this room nobody is listening, because the jot came from the ✚ — so
+      // `announceFiled` consumes it here instead of leaving the task written
+      // and the jot still in the pile.
+      void announceFiled({
+        noteId,
+        what: 'a task',
+        href: '/admin/agenda/tasks',
+        undo: { kind: 'task', id: res.data?.id },
+      });
       return;
     }
     location.reload();
@@ -489,6 +496,11 @@ if (sheet && form) {
     if (!res.ok) return;
     location.reload();
   });
+
+  // A jot the ✚ sent here: read the sentence, then open this sheet on it.
+  // Inert unless the room was arrived at with `?from=` — which is what keeps it
+  // out of the way in the notes room, where the pile owns the whole motion.
+  wireJotArrival(sheet, 'hq:task-open');
 }
 
 // The role promises arrow keys and one tab stop; this is what keeps it

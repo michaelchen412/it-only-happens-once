@@ -3908,6 +3908,36 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   font-size: 1.0625rem;
   line-height: 1.65;
 }
+/* The declaration row (plan 45 · Piece 2). Above the box, which CaptureDialog's
+   own comment argues against for the TOOLBAR and is reversed here for a reason
+   written out in full there.
+
+   ⚠ INK COMES FROM THE LADDER, never a hand-picked alpha: `--text-faint` is the
+   rung that passes AA in both themes (app.css §the quiet ladder), and a tab you
+   have not chosen is exactly the register that ladder exists for. The chosen one
+   goes to full ink, so the answer is the loudest thing in the row. */
+.cap-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem 0;
+}
+.cap-tab {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+.cap-tab:hover {
+  color: var(--color-base-content);
+}
+.cap-tab[aria-pressed='true'] {
+  border-color: var(--color-base-300);
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+
 /* Under the box, never over it: the dialog has no title, and a strip of
    controls above the words would be chrome introducing something that needs no
    introduction. */

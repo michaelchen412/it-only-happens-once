@@ -29,11 +29,26 @@ import MiniEditor from './MiniEditor.astro';
 interface Props {
   today: Ymd;
   people: { id: string; display_name: string }[];
+  /**
+   * A jot the ✚ sent here (plan 45 · Piece 2): its Markdown, and its id so the
+   * save can consume it. See `scripts/jot-arrival.ts` for both halves.
+   *
+   * ⚠ THE PAIR TRAVELS TOGETHER OR NOT AT ALL — the room reads both off one
+   * row, so no arrangement of query params can separate them.
+   */
+  seedBody?: string | null;
+  seedFrom?: string | null;
 }
-const { today, people } = Astro.props;
+const { today, people, seedBody = null, seedFrom = null } = Astro.props;
 ---
 
-<dialog id="event-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="event-sheet-title">
+<dialog
+  id="event-sheet"
+  class="drawer-dialog w-full max-w-md"
+  aria-labelledby="event-sheet-title"
+  data-seed-body={seedBody ?? undefined}
+  data-seed-from={seedFrom ?? undefined}
+>
   <form id="event-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
     <SheetHeader titleId="event-sheet-title" title="New event" />
 

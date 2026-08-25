@@ -463,6 +463,21 @@ if (undoBar) {
     ).detail;
     const card = pile?.querySelector<HTMLElement>(`[data-note="${noteId}"]`);
     if (!card) return;
+    /*
+      ⚠ THE PILE CLAIMS IT — and the claim has to be made HERE, after the card
+      is found and before the first await (plan 45 · Piece 2).
+
+      The sheets announce a filing to whoever is listening. This room is the one
+      that can do the whole job: trash the jot, raise the undo strip, and offer
+      the way onward. Everywhere else the same jot arrived from the ✚ and nobody
+      would answer, so `announceFiled` consumes it itself when the event comes
+      back uncancelled.
+
+      After the card check because a filing whose card is not on this page is
+      one this room CANNOT tidy — claiming that would consume nothing and
+      silently stop the sheet from doing it either.
+    */
+    e.preventDefault();
 
     try {
       await bulk(noteId, 'trash');

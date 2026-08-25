@@ -44,11 +44,26 @@ interface Props {
    * asks a question with no answers (10-hq.md §10b).
    */
   goals?: Pick<Tables<'goals'>, 'id' | 'name'>[];
+  /**
+   * A jot the ✚ sent here (plan 45 · Piece 2): its Markdown, and its id so the
+   * save can consume it. See `scripts/jot-arrival.ts` for both halves.
+   *
+   * ⚠ THE PAIR TRAVELS TOGETHER OR NOT AT ALL — the room reads both off one
+   * row, so no arrangement of query params can separate them.
+   */
+  seedBody?: string | null;
+  seedFrom?: string | null;
 }
-const { today, goals = [] } = Astro.props;
+const { today, goals = [], seedBody = null, seedFrom = null } = Astro.props;
 ---
 
-<dialog id="task-sheet" class="drawer-dialog w-full max-w-md" aria-labelledby="task-sheet-title">
+<dialog
+  id="task-sheet"
+  class="drawer-dialog w-full max-w-md"
+  aria-labelledby="task-sheet-title"
+  data-seed-body={seedBody ?? undefined}
+  data-seed-from={seedFrom ?? undefined}
+>
   <form id="task-form" class="flex h-full flex-col overflow-hidden font-sans" data-today={today}>
     <SheetHeader titleId="task-sheet-title" title="New task" />
 

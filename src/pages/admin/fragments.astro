@@ -23,6 +23,7 @@ import FragmentSheet from '../../components/admin/FragmentSheet.astro';
 import SongSheet from '../../components/admin/SongSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
+import { jotSeed } from '../../lib/hq/jot-seed';
 import { allFragmentPeople } from '../../lib/hq/links';
 
 const supabase = Astro.locals.supabase;
@@ -72,24 +73,18 @@ const autoNew = Astro.url.searchParams.get('new') === 'quote' ? 'quote' : null;
 /*
   ⚠ ARRIVING FROM A JOT — `?new=quote&from=<note id>` (plan 45 · Piece 1).
 
-  THE BODY IS FETCHED HERE RATHER THAN CARRIED IN THE URL. A jot is Markdown of
-  any length with newlines in it; putting that through a query string means
-  length limits, escaping, and the words showing up in browser history and in
-  any log that records a path. The id is the only thing that needs to travel.
-
-  ⚠ `status = 'note'` IS A GUARD, NOT A FILTER. Without it a hand-typed `from=`
-  would happily seed the quote sheet from a published essay — and then consume
-  it on save. The only rows this door may read are jots.
-
-  ⚠ AND NOTHING IS CONSUMED HERE. The jot is trashed by `fragment-sheet.ts`
-  after the quote is actually saved, which is 14 §10e's ordering rule: write the
+  ⚠ NOTHING IS CONSUMED HERE. The jot is trashed by `fragment-sheet.ts` after
+  the quote is actually saved, which is 14 §10e's ordering rule: write the
   destination first, so a failure leaves a dump still sitting in the pile.
   Abandon this sheet and the jot is exactly where you left it.
+
+  ⚠ THE READ MOVED TO `lib/hq/jot-seed.ts` IN PIECE 2, and it was not tidying.
+  The agenda rooms answer the same arrival and destroy what they read, so the
+  rule about which rows a destroying door may open — `status = 'note'`, or a
+  hand-typed `from=` seeds a sheet from a published essay and then consumes it —
+  has to have one owner rather than three copies (29).
 */
-const fromId = autoNew ? Astro.url.searchParams.get('from') : null;
-const seed = fromId
-  ? (await supabase.from('fragments').select('id, body').eq('id', fromId).eq('status', 'note').maybeSingle()).data
-  : null;
+const seed = autoNew ? await jotSeed(supabase, Astro.url) : null;
 
 const TITLES = { list: 'Fragments', trash: 'Trash' } as const;
 const SUBTITLES = {

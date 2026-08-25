@@ -23,6 +23,7 @@ import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AgendaTabs from '../../components/admin/AgendaTabs.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
+import { jotSeed } from '../../lib/hq/jot-seed';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TagSheet from '../../components/admin/TagSheet.astro';
 import { parseYmd, shiftYmd, ymdToUtc, type Ymd } from '../../lib/hq/time';
@@ -46,6 +47,17 @@ import { liveAndAnswered } from '../../lib/hq/today-data';
 import { renderMarkdown } from '../../lib/markdown';
 
 const supabase = Astro.locals.supabase;
+/*
+  ⚠ ARRIVING FROM THE ✚ — `?from=<jot id>` (plan 45 · Piece 2). The capture
+  dialog's tab row declares a destination and navigates; this room reads the jot
+  and `scripts/jot-arrival.ts` does the rest — parse the sentence, open the
+  sheet prefilled, and consume the jot once it is actually saved.
+
+  ⚠ THE PARSE IS NOT HERE. It belongs in the browser, after this page has
+  painted: it costs 1.5–4s, and blocking a room's render on a model call would
+  make the whole agenda wait on a sentence one sheet wanted.
+*/
+const seed = await jotSeed(supabase, Astro.url);
 const { ymd: todayYmd } = Astro.locals.today;
 
 const anchor = parseYmd(Astro.url.searchParams.get('date')) ?? todayYmd;
@@ -633,7 +645,7 @@ const dowOf = (ymd: Ymd) => DOW[ymdToUtc(ymd).getUTCDay()];
     }
   </div>
 
-  <EventSheet today={todayYmd} people={roster} />
+  <EventSheet today={todayYmd} people={roster} seedBody={seed?.body ?? null} seedFrom={seed?.id ?? null} />
   <TagSheet people={roster} />
 
   <script>

@@ -81,6 +81,50 @@ import AltTextDialog from './AltTextDialog.astro';
       what you type wants `#cap-box [contenteditable]`.
     */
     }
+    {
+      /*
+        ⚠ ABOVE THE BOX — WHICH REVERSES THIS FILE'S OWN RULE, and the reversal
+        is the decision (plan 45 · Piece 2).
+
+        The rule three paragraphs up says the toolbar sits BELOW the box because
+        "a strip of controls above the words would be the first thing you meet,
+        which is chrome introducing a box that needs no introduction." That
+        argument is about FORMATTING controls, and it still holds for them. This
+        row is not chrome about the box; it is the answer to *where is this
+        going*, and it has to be reachable before you leave rather than after.
+
+        It was judged on screen rather than on paper. `/lab/capture` put five
+        propositions side by side — the chooser in the footer, a menu before the
+        box, chips in the footer, tabs, and tabs narrowed — and Michael picked
+        tabs on 2026-08-24: *"I think Kind tabs in the box is the best
+        implementation thus far."*
+
+        ⚠ AND THE TAB ONLY DECLARES. The box goes on autosaving a NOTE whichever
+        tab is lit, because a half-typed task cannot be saved as a task
+        (`tasks.save` wants a title, `interactions.save` wants a person uuid)
+        and the whole promise here is that the thought survives the typing of
+        it. The tab decides where **Done** sends it, and the destination room
+        does the collecting.
+
+        ⚠ NO `role="tab"`, DELIBERATELY. Tab semantics promise roving tabindex
+        and arrow-key movement, and this row has neither — `AgendaTabs` is the
+        house precedent and it is a `<nav>` with `aria-current` for the same
+        reason. A group of pressed buttons is what this actually is, and it is
+        what a screen reader is told. Whether it should GROW real tab semantics
+        is plan 45 · §9's open question, not something to imply in the meantime.
+
+        ⚠ LOG IS NOT HERE YET. Its destination needs a person before a row can
+        exist at all, so it arrives with its picker in Piece 3 — an inert tab
+        would be the exact fault 14 §10f caught with a screenshot.
+      */
+    }
+    <div class="cap-tabs" role="group" aria-label="Where this is going">
+      <button type="button" class="cap-tab" data-cap-tab="jot" aria-pressed="true">Jot</button>
+      <button type="button" class="cap-tab" data-cap-tab="agenda" aria-pressed="false">Agenda</button>
+      <button type="button" class="cap-tab" data-cap-tab="quote" aria-pressed="false">Quote</button>
+      <button type="button" class="cap-tab" data-cap-tab="piece" aria-pressed="false">Piece</button>
+    </div>
+
     <div id="cap-box" class="cap-box"></div>
 
     {

@@ -40,6 +40,7 @@
 // pressed in anger. `pointerdown`/`focusin` are belt and braces for the tap
 // that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
+import { callAction } from './action-error';
 import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
 
@@ -284,7 +285,81 @@ async function boot(dialog: HTMLDialogElement) {
   // ⚠ NOT `fab.addEventListener('click', open)` ANY MORE — the door is wired
   // below, outside `boot`, because by the time this line runs the click that
   // caused the boot has already happened and would never be replayed.
-  doneBtn.addEventListener('click', () => void close());
+  /* ---- the declaration row (plan 45 · Piece 2) ----------------------------
+     ⚠ THE TAB CHANGES WHERE **Done** GOES AND NOTHING ELSE. It does not change
+     what is written while you type — that is always a note, because only the
+     note tier can hold a half-typed thought (`tasks.save` wants a title,
+     `saveQuote` wants words, `interactions.save` wants a person uuid). So the
+     autosave above is untouched, and everything below is about the exit.
+
+     ⚠ AND THE BUTTON SAYS WHERE IT IS TAKING YOU. Filing leaves the room you
+     were standing in, which is a real cost and the one thing this dialog has
+     always protected you from — Escape puts you back exactly where you were.
+     A primary still reading "Done" while it navigates elsewhere would be the
+     affordance lying. Naming the destination is how the control says it, so no
+     sentence has to (10-hq §10i). */
+  const ROUTES: Record<string, (id: string) => string> = {
+    // Built in Piece 1: the corpus room fetches the jot by id and opens the
+    // quote sheet already holding the words.
+    quote: (id) => `/admin/fragments?new=quote&from=${encodeURIComponent(id)}`,
+    agenda: (id) => `/admin/agenda/tasks?from=${encodeURIComponent(id)}`,
+    // No `from=` for a piece, because there is nothing to consume: the jot IS
+    // the draft after a status flip, which is what the pile's own "Make a
+    // piece" does. The hash is the writing sheet's own door.
+    piece: (id) => `/admin/fragments#edit=${id}`,
+  };
+  const DONE_LABEL: Record<string, string> = {
+    jot: 'Done',
+    agenda: 'Agenda →',
+    quote: 'Quote →',
+    piece: 'Piece →',
+  };
+
+  let kind = 'jot';
+  const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('[data-cap-tab]')];
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      kind = tab.dataset.capTab!;
+      for (const t of tabs) t.setAttribute('aria-pressed', String(t === tab));
+      doneBtn.textContent = DONE_LABEL[kind] ?? 'Done';
+      // The words are the point; a tap on the row must not cost you the caret.
+      editor.commands.focus('end');
+    });
+  }
+
+  /**
+   * Park the thought, then go where the tab says.
+   *
+   * ⚠ THE SAVE IS AWAITED FIRST, and it has to be: every route is built from
+   * the jot's ID, and a jot that has never been saved does not have one. This
+   * is also what keeps *an empty box is never a row* true — nothing was typed,
+   * nothing was written, so there is nowhere to go and the ✚ closes as it
+   * always did rather than inventing a destination for a thought that does not
+   * exist.
+   *
+   * ⚠ THE FLIP HAPPENS BEFORE THE NAVIGATION, on purpose. `piece` is the one
+   * route that changes the row itself, and doing it here means the writing
+   * sheet opens on a draft rather than on a note it would have to promote. A
+   * failure stops the trip and says so — the words are saved either way, which
+   * is the promise that matters.
+   */
+  async function fileAs(k: string) {
+    if (k === 'jot' || !ROUTES[k]) return close();
+    window.clearTimeout(timer);
+    await save();
+    if (!currentId) return close();
+
+    if (k === 'piece') {
+      const fd = new FormData();
+      fd.set('ids', currentId);
+      fd.set('op', 'draft');
+      const { error } = await callAction(actions.fragments.bulk(fd));
+      if (error) return flash('Couldn’t make it a piece — it’s still in the pile', true);
+    }
+    window.location.href = ROUTES[k](currentId);
+  }
+
+  doneBtn.addEventListener('click', () => void fileAs(kind));
   // `cancel` fires for Escape and precedes `close`; take it over so the flush
   // has somewhere to happen before the dialog goes.
   dialog.addEventListener('cancel', (e) => {
