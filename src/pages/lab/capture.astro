@@ -1,0 +1,1880 @@
+---
+/*
+  /lab/capture — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  THE QUESTION, Michael 2026-08-24: *"I was thinking about the ✚ that appears in
+  the bottom right. My instinct tells me I should use this to add anything — a
+  task, a quote, writing. But I realize I can't, and when I want to add a quote
+  I have to shut down that idea and go to the fragment browser."*
+
+  He is describing a promise the glyph makes and the button does not keep. A
+  bare ✚ pinned bottom-right is the universal-create affordance by convention;
+  `CaptureDialog.astro` labels it *"Write something down"*, and nobody reads a
+  label on a FAB. There are only two honest endings — narrow the glyph (a
+  pencil) or widen the promise — and this bench is about the second.
+
+  ⚠ NOTHING IS BLOCKING IT TECHNICALLY, WHICH IS WHY THIS IS A UI QUESTION AND
+  NOT AN ARCHITECTURE ONE. Three pieces of the plumbing already ship:
+
+    · `notes.astro`'s → chooser already files a jot to the Agenda (a real
+      prefilled, model-parsed TaskSheet), a log entry, a piece, or an append —
+      with the undo table and the write-destination-THEN-consume ordering that
+      14 §10e settled.
+    · `?person=X&new=quote` (fragments.astro:63) already does *arrive in the
+      owning room with the sheet open and prefilled*.
+    · `/admin/notes?new=1` already opens a room's box from outside it.
+
+  So this is assembly. What is NOT settled is the shape, and the shape is worth
+  a bench because every proposition below is defensible on paper and they cost
+  different numbers of taps at 390px with one thumb.
+
+  ⚠ THE TRAP THE BENCH EXISTS TO CATCH: PUTTING THE QUESTION BEFORE THE TYPING.
+  The premise of the box ([14 §4](../../../docs/plans/archive/14-capture.md)) is
+  *as few decisions as possible between the thought and the saving of it*. A ✚
+  that opens "task? quote? note?" taxes every capture with a classification, and
+  taxes the COMMON case to serve the rare one — and it asks at the worst moment,
+  before you have written the thing and often before you know what it is. That
+  is the middle ground 14 §9a deleted, in a new costume. `menu` and `tabs` below
+  are that costume, built honestly so it can win if it deserves to.
+
+  ⚠ AND THE REAL FORK IS NOT "HOW MANY TAPS" — IT IS **WHO COLLECTS THE FIELDS**.
+  `after`, `menu` and `chips` all hand off: they hold the body and send you to
+  the room that owns the noun, whose sheet already knows about due dates,
+  attribution and recurrence. `tabs` collects here, in the ✚, and the corner box
+  slowly becomes four forms. Hold that while you look — it is the decision that
+  cannot be reversed cheaply.
+
+  ⚠ THE SAMPLE JOT DECIDES THE WINNER, so it is a control rather than a
+  constant. A line that is obviously an errand flatters the variant that guesses;
+  a line that is obviously a quote flatters the one that asks first; a line that
+  is a half-thought flatters the one that asks nothing. Cycle all four before
+  concluding anything, and use *(empty)* to type your own — the from-scratch
+  motion is the one the ✚ is actually for.
+
+  ── WHAT IS REAL HERE, AND WHAT IS NOT ──────────────────────────────────────
+
+  14 §11a's lesson, learned the expensive way on the task parser: *prototype the
+  query, not just the pixels* — a bench fed hand-written answers shows a parser
+  that is always right, which is the thing in question. So:
+
+    REAL · the editor. `mountRichEditor` from `src/scripts/rich-editor.ts`, the
+           same one the shipped box mounts. Typing, the toolbar, paste and
+           dictation behave here as they will there.
+    REAL · the parse. Choosing the Agenda calls `actions.tasks.parse` for real
+           and prints what came back and how long it took. It measured 1.5–4s
+           when it shipped; a chooser that feels instant and then stalls four
+           seconds is a different design from one that does not.
+    REAL · the cost. Taps and elapsed time are COUNTED, not claimed. Every
+           variant's badge is what you just did, not what I estimated. Same
+           argument as 38's ratios: a quoted number goes stale, a measured one
+           cannot.
+    REAL · the jot, but only when you ask. "Write for real" arms the 700ms
+           autosave against `fragments.saveWriting` with `status: note` — the
+           actual shipped write path. Each panel keeps ONE id per sample, so
+           re-typing updates a row rather than breeding them. Worst case is
+           four notes in the pile, which is four taps to delete and is what the
+           pile is for.
+    NOT  · the filing. Choosing a destination prints the row it would write and
+           links to the room it would drop you in. It does not write it — that
+           IS the feature, and building it is what this bench decides.
+    NOT  · images. `EditorToolbar` is mounted without `image`, so no upload path
+           and no Supabase browser client. The bench is about the motion; the
+           picture-into-a-jot path is already settled and unaffected.
+
+  ⚠ THE FIFTH PROPOSITION IS DELIBERATELY ABSENT. "It watches what you type and
+  offers a destination once it sees a date" was proposed and Michael said leave
+  it off (2026-08-24). Recorded rather than dropped: the recorded ban
+  ([10-hq §4.21](../../../docs/plans/archive/10-hq.md)) is on a SILENT router,
+  and an offer you confirm is arguably not that — but it is a second question,
+  and putting it on the bench would have let a good suggestion engine rescue a
+  bad chooser.
+
+  ⚠ ONE SOURCE, FOUR RENDERS — the /lab/chrome rule. The shell below is one
+  Astro fragment parameterised by `v.key`; the differences are what the
+  proposition IS, not a second copy of the box. "Walk it" then MOVES that same
+  DOM into a real `<dialog>` rather than rendering a second one, so the
+  full-motion run and the side-by-side card can never drift. (ProseMirror
+  survives the move: the editor element is the same node either side of it.)
+*/
+import Base from '../../layouts/Base.astro';
+import { Icon } from 'astro-icon/components';
+import EditorToolbar from '../../components/admin/EditorToolbar.astro';
+import EntityCombo from '../../components/admin/EntityCombo.astro';
+import LinkDialog from '../../components/admin/LinkDialog.astro';
+// ⚠ THE REAL SIX, IMPORTED RATHER THAN RETYPED. An earlier draft of this bench
+// invented a `<select>` holding note/call/meal/gift — and `meal` is not a kind
+// this app has. A bench that quietly ships a fifth vocabulary is worse than no
+// bench: it makes the wrong thing feel considered.
+import { KINDS } from '../../lib/hq/interactions';
+// The Observatory's primitives, exactly as an admin page gets them: `hq.css`
+// from AdminLayout, `admin.css` inlined by `app.css` (which `Base` brings).
+import '../../styles/hq.css';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+/*
+  ⚠ THIS QUERY IS THE OBSTACLE, NOT A CONVENIENCE. The person field has to be a
+  real search-select over real people, and a search-select needs its options —
+  so this page now does what the ✚ would have to do on EVERY admin page, since
+  `AdminLayout` mounts the dialog on all of them and today it needs no server
+  data at all. Feel the field, then remember this line is the price of it.
+
+  ⚠ AND AN EMPTY ROSTER REMOVES THE TAB, which is 10-hq §10b's rule, not a bug:
+  a picker with nothing in it is a control that asks a question with no answers.
+  Signed out, RLS returns nothing and Log disappears from both tab rows — the
+  header says so, so it does not read as breakage.
+*/
+const roster =
+  (await Astro.locals.supabase.from('people').select('id, display_name').is('archived_at', null).order('display_name'))
+    .data ?? [];
+const people = roster.map((p) => ({ id: p.id, name: p.display_name }));
+
+/**
+ * The samples. Single-paragraph plain text on purpose — `setContent` is fed
+ * these verbatim, and a bench is not the place to also be testing Markdown
+ * round-tripping.
+ *
+ * Each one is a different SHAPE of thought, and that is the whole point of the
+ * control: they do not all want the same door.
+ */
+const JOTS = [
+  { key: 'errand', label: 'An errand', text: 'Call the dentist Friday and ask about the night guard' },
+  {
+    key: 'quote',
+    label: 'A quote',
+    text: '“The past is never dead. It’s not even past.” — William Faulkner, Requiem for a Nun',
+  },
+  { key: 'person', label: 'About a person', text: 'Coffee with Sam — he’s leaving the lab in October, wants to talk' },
+  {
+    key: 'seed',
+    label: 'A half-thought',
+    text: 'something about how the sky lab taught me that the thing you build to decide with is not the thing you ship',
+  },
+  { key: 'empty', label: '(empty)', text: '' },
+] as const;
+
+/**
+ * The destinations.
+ *
+ * `arrival: true` is the short list — thoughts that ARRIVE and want somewhere
+ * to go. The rest are curation-shaped: you do not dump a constellation, you sit
+ * down and build one, and their rooms already carry a New door that
+ * `PageHeader.astro`'s naming rule governs. The Everything/Arrival toggle is
+ * here so the weight of the long list can be FELT rather than argued — six
+ * rows is a chooser, twelve is a nav menu, and 14 §10a already called six grey
+ * glyphs under one card a smell.
+ */
+const NOUNS = [
+  {
+    key: 'jot',
+    label: 'Write it down',
+    short: 'Jot',
+    icon: 'ph:note',
+    arrival: true,
+    row: 'fragments · kind writing, status note',
+    where: '/admin/notes',
+    whereLabel: 'the pile',
+  },
+  {
+    key: 'agenda',
+    label: 'Add to the Agenda…',
+    short: 'Task',
+    icon: 'ph:calendar-blank',
+    arrival: true,
+    row: 'tasks — or events; the reading decides and the sheet says which',
+    where: '/admin/agenda/tasks',
+    whereLabel: 'Tasks',
+  },
+  {
+    key: 'quote',
+    label: 'Make it a quote…',
+    short: 'Quote',
+    icon: 'ph:quotes',
+    arrival: true,
+    row: 'fragments · kind quote — NOT a status flip: a different kind, and it wants attribution',
+    where: '/admin/fragments',
+    whereLabel: 'the Fragment Manager',
+  },
+  {
+    key: 'piece',
+    label: 'Make a piece',
+    short: 'Piece',
+    icon: 'ph:pen-nib',
+    arrival: true,
+    row: 'fragments · status note → draft (one flip, reversible)',
+    where: '/admin/fragments',
+    whereLabel: 'the writing sheet',
+  },
+  {
+    key: 'append',
+    label: 'Add to a piece…',
+    short: 'Append',
+    icon: 'ph:article',
+    arrival: true,
+    row: 'appended into another body — ⚠ the one motion with no undo (14 §10e)',
+    where: '/admin/fragments',
+    whereLabel: 'the piece it joined',
+  },
+  {
+    key: 'log',
+    label: 'Log an entry…',
+    short: 'Log',
+    icon: 'ph:note-pencil',
+    arrival: true,
+    row: 'interactions — needs a person, so the row is absent on an empty roster',
+    where: '/admin/people',
+    whereLabel: 'their profile',
+  },
+  {
+    key: 'person',
+    label: 'Add a person',
+    short: 'Person',
+    icon: 'ph:users-three',
+    arrival: false,
+    row: 'people',
+    where: '/admin/people',
+    whereLabel: 'the roster',
+  },
+  {
+    key: 'goal',
+    label: 'New goal',
+    short: 'Goal',
+    icon: 'ph:target',
+    arrival: false,
+    row: 'goals',
+    where: '/admin/agenda/goals',
+    whereLabel: 'Goals',
+  },
+  {
+    key: 'song',
+    label: 'New song',
+    short: 'Song',
+    icon: 'ph:music-notes',
+    arrival: false,
+    row: 'fragments · kind song',
+    where: '/admin/sets',
+    whereLabel: 'Listening',
+  },
+  {
+    key: 'set',
+    label: 'New set',
+    short: 'Set',
+    icon: 'ph:playlist',
+    arrival: false,
+    row: 'sets',
+    where: '/admin/sets',
+    whereLabel: 'Sets',
+  },
+  {
+    key: 'constellation',
+    label: 'New constellation',
+    short: 'Suite',
+    icon: 'ph:star',
+    arrival: false,
+    row: 'constellations',
+    where: '/admin/constellations',
+    whereLabel: 'the Sky',
+  },
+  {
+    key: 'vocab',
+    label: 'New term',
+    short: 'Term',
+    icon: 'ph:book-open',
+    arrival: false,
+    row: 'vocabulary',
+    where: '/admin/library',
+    whereLabel: 'the Library',
+  },
+] as const;
+
+/**
+ * The NARROWED tabs (`lite`), added 2026-08-24 after the full-tabs column was
+ * picked and then costed against the real schemas and the real phone.
+ *
+ * Three things separate it from `tabs`, and each one is a named obstacle:
+ *
+ *  1. ⚠ THE TAB DECLARES; IT DOES NOT COLLECT. The box goes on autosaving a
+ *     NOTE no matter which tab is lit — because a half-typed task cannot be
+ *     saved as a task (`tasks.save` wants a title, `interactions.save` wants a
+ *     person uuid), and the ✚'s whole promise is that the thought survives the
+ *     typing of it. So the tab only decides where **Done** sends it, and the
+ *     shipped note→X plumbing does the rest, ordering and undo included.
+ *
+ *  2. ⚠ AT MOST ONE FIELD, AND ONLY WHERE IT SAVES THE TRIP. Measured on the
+ *     `tabs` column at 390px: its Task tab costs 319px of chrome, and with a
+ *     keyboard up on a 390×844 phone that leaves ~157px for your words — on a
+ *     375×667 phone, ~16px. One field folds that back to something a thumb can
+ *     use. The field is `When` on the Agenda, `Said by` on a quote, `Who` on a
+ *     log, and nothing at all on the other two.
+ *
+ *  3. ⚠ IT SAYS "AGENDA", NOT "TASK". 14 §10a settled that as ONE row for a
+ *     reason Michael gave in his own words — *"I don't want the cognitive
+ *     expenditure of thinking: is this more of an event or more of a task?"*
+ *     A tab labelled Task reinstates exactly that, and moves it BEFORE the
+ *     typing. `tabs` keeps the word so the two can be read side by side.
+ *
+ * `there` is what the destination room still has to ask for. It is on screen
+ * because the only question that matters here is *did this trip get shorter*,
+ * and a bench that shows what you collected without showing what you did not
+ * would answer it dishonestly.
+ */
+const LITE = [
+  { key: 'jot', label: 'Jot', field: null, kinds: false, becomes: '', there: '' },
+  {
+    key: 'agenda',
+    label: 'Agenda',
+    field: { label: 'When', type: 'date', placeholder: '' },
+    kinds: false,
+    becomes: 'Your words become — title: first line · notes: the rest',
+    there: 'the time, effort, lead, repeat and goal — and whether this is a task or an event',
+  },
+  {
+    key: 'quote',
+    label: 'Quote',
+    field: { label: 'Said by', type: 'text', placeholder: 'Who said it' },
+    kinds: false,
+    becomes: 'Your words become the quote itself',
+    there: 'from what, where in it, the source link, shared by, subjects',
+  },
+  {
+    key: 'piece',
+    label: 'Piece',
+    field: null,
+    kinds: false,
+    becomes: 'Your words become the draft — nothing to collect',
+    there: 'the title, and the writing',
+  },
+  {
+    key: 'log',
+    label: 'Log',
+    /*
+      ⚠ `combo`, NOT A TEXT INPUT — and the difference is the whole reason this
+      tab is the one that tests the design. `interactions.save` wants
+      `personId: z.uuid()`; a typed name is not a person. So the control has to
+      CONSTRAIN, which is exactly what `EntityCombo` was built to do for the
+      quote sheet's provenance facets: pick an existing row and commit its id,
+      or explicitly choose to create one.
+
+      ⚠ ITS "＋ Add «name»" ROW IS A REAL OPEN QUESTION, left visible on purpose.
+      Logging about somebody not yet on the roster — "coffee with Sam" where Sam
+      is new — is an ordinary capture, and the log action cannot do it: it would
+      need a `people` row written first. Either the ✚ owns that two-step or the
+      combo has to refuse names it does not know. The receipt says which of the
+      two happened, so the case can be met rather than discovered later.
+    */
+    field: { label: 'Who', type: 'combo', placeholder: 'Who was it?' },
+    kinds: true,
+    becomes: 'Your words become the entry’s note',
+    there: 'the others who were there, and the date',
+  },
+] as const;
+
+/**
+ * ⚠ THE LOG TAB IS CONDITIONAL, in both tab rows (10-hq §10b, the same rule
+ * `notes.astro` applies to its chooser row and `TaskSheet` to its goal picker).
+ */
+const LITE_TABS = LITE.filter((t) => t.key !== 'log' || people.length > 0);
+
+/** The chooser never offers "write it down" as a destination — you are already there. */
+const DESTINATIONS = NOUNS.filter((n) => n.key !== 'jot');
+/** `tabs` and `chips` need a few short labels, not twelve. These four are the arrival-shaped ones that collect fields. */
+const FEW = (['agenda', 'quote', 'piece', 'log'] as const).filter((k) => k !== 'log' || people.length > 0);
+
+/**
+ * The four propositions. `claim` is what each one asserts; `cost` is what it
+ * asks of you BEFORE you have typed anything, which is the axis 14 §4 cares
+ * about most.
+ */
+const VARIANTS = [
+  {
+    key: 'after',
+    name: 'Box first, file after',
+    claim:
+      'Today’s box, plus the pile’s own → chooser in the footer. Type first, classify after — usually you only know what it is once it is written.',
+    cost: 'nothing before typing · two taps to file',
+  },
+  {
+    key: 'menu',
+    name: 'Menu first',
+    claim:
+      'The ✚ opens the list of nouns, “Write it down” on top. Honest about the glyph. Asks the question at the moment you may not be able to answer it.',
+    cost: 'one decision before typing · one tap to file',
+  },
+  {
+    key: 'chips',
+    name: 'Chips in the footer',
+    claim:
+      'Destinations always visible under the box. One tap instead of two — at the price of permanent chrome under a box whose design says it needs no introduction.',
+    cost: 'nothing before typing · one tap to file',
+  },
+  {
+    key: 'lite',
+    name: 'Kind tabs, narrowed',
+    claim:
+      'The tab DECLARES where this is going; the box keeps writing notes underneath. One field per kind at most, folded on a phone, and Done never blocks — the room collects the rest.',
+    cost: 'one decision before typing · one field, at most',
+  },
+  {
+    key: 'tabs',
+    name: 'Kind tabs in the box',
+    claim:
+      'The ✚ becomes a small composer: pick a kind and the box grows the fields that kind needs. Fastest when you already know — and the only one that collects HERE rather than handing off.',
+    cost: 'one decision before typing · fields collected in the corner',
+  },
+] as const;
+---
+
+<Base title="Capture — bench">
+  <div class="lab" data-view="grid" data-w="wide" data-nouns="arrival" data-write="off">
+    <header class="lab__head">
+      <h1>What the ✚ is for</h1>
+      <p>
+        Five propositions for one button, on one jot. The editor is the real one and the Agenda parse is a real model
+        call — see the file header for what is simulated and why. Judge <strong
+          >how many decisions come before the typing</strong
+        >, and <strong>who collects the fields</strong>.
+      </p>
+
+      <div class="lab__ctl">
+        <button type="button" data-view="grid" aria-pressed="true">Side by side</button>
+        <button type="button" data-view="solo" aria-pressed="false">One at a time</button>
+        <span class="lab__sep" aria-hidden="true"></span>
+        <button type="button" data-w="wide" aria-pressed="true">Desk</button>
+        <button type="button" data-w="phone" aria-pressed="false">390px</button>
+        <span class="lab__sep" aria-hidden="true"></span>
+        <button type="button" data-nouns="arrival" aria-pressed="true">Arrival-shaped (6)</button>
+        <button type="button" data-nouns="all" aria-pressed="false">Everything (12)</button>
+        <span class="lab__sep" aria-hidden="true"></span>
+        <button type="button" data-theme-flip>Flip theme</button>
+      </div>
+
+      <div class="lab__ctl lab__ctl--jots">
+        <span class="lab__ctlk">Jot</span>
+        {
+          JOTS.map((j, i) => (
+            <button type="button" data-jot={j.key} data-text={j.text} aria-pressed={i === 0 ? 'true' : 'false'}>
+              {j.label}
+            </button>
+          ))
+        }
+        <span class="lab__sep" aria-hidden="true"></span>
+        {
+          /* ⚠ OFF BY DEFAULT AND SAYING SO. The switch arms the real shipped
+            write path against the real pile — it is the only thing on this page
+            that touches the database, and a bench that quietly wrote rows would
+            be the kind of surprise the ground rules exist to prevent. */
+        }
+        <span class="lab__ctlk">Jot writes</span>
+        <button type="button" data-write="off" aria-pressed="true">Dry run</button>
+        <button type="button" data-write="on" aria-pressed="false">For real → the pile</button>
+      </div>
+
+      {
+        people.length === 0 && (
+          <p class="lab__q">
+            <b>No roster on this session, so the Log tab is absent from both tab rows.</b> That is 10-hq §10b's rule
+            rather than a fault — a picker with nothing in it asks a question with no answers. Sign in to the admin in
+            this browser and reload to see the person field for real.
+          </p>
+        )
+      }
+
+      <p class="lab__q">
+        <b>The question to hold while you look:</b> the ✚ exists so a thought survives the ten seconds between having it and
+        saving it. Every tap you add is spent from that budget — but so is every trip to another room afterwards, and
+        <em>that</em> is the cost you are currently paying for a quote. Which of these spends the budget in the place you
+        would rather spend it?
+      </p>
+    </header>
+
+    <div class="lab__grid">
+      {
+        VARIANTS.map((v) => (
+          <section class="prop" data-prop={v.key}>
+            <header class="prop__head">
+              <div class="prop__title">
+                <span class="prop__fab" aria-hidden="true">
+                  <Icon name="ph:plus" />
+                </span>
+                <h2>{v.name}</h2>
+              </div>
+              <p class="prop__claim">{v.claim}</p>
+              <p class="prop__cost">{v.cost}</p>
+            </header>
+
+            {/* ── ONE SOURCE. This frame is what "Walk it" moves into the dialog. ── */}
+            <div class="prop__frame" data-frame={v.key}>
+              <div class="cap-shell font-sans">
+                {/* `menu` only: the dialog opens on the list, and choosing swaps
+                    it for the box. Deliberately INSIDE the dialog rather than a
+                    popover at the corner — a corner popover is the cheaper reach
+                    for a thumb and is the sub-variant this bench does not build;
+                    it keeps the ✚'s job single ("open the thing") at the price of
+                    a full dialog you may not have wanted yet. */}
+                {v.key === 'menu' && (
+                  <div class="lab-menu" data-menu>
+                    <p class="lab-menu__k">What is it?</p>
+                    <div class="lab-menu__list">
+                      {NOUNS.map((n) => (
+                        <button
+                          type="button"
+                          class="pop__row"
+                          data-pick={n.key}
+                          data-label={n.label}
+                          data-row={n.row}
+                          data-where={n.where}
+                          data-where-label={n.whereLabel}
+                          data-arrival={String(n.arrival)}
+                          data-tap
+                        >
+                          <Icon name={n.icon} /> {n.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div class="lab-body" data-body>
+                  {/* `tabs` only: the box grows a kind, and the kind grows fields. */}
+                  {v.key === 'tabs' && (
+                    <div class="lab-tabs" role="tablist" aria-label="What kind of thing">
+                      <button type="button" class="lab-tab" role="tab" aria-selected="true" data-tab="jot" data-tap>
+                        Jot
+                      </button>
+                      {FEW.map((k) => {
+                        const n = NOUNS.find((x) => x.key === k)!;
+                        return (
+                          <button type="button" class="lab-tab" role="tab" aria-selected="false" data-tab={k} data-tap>
+                            {n.short}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* `lite` only: the same row, saying Agenda where the full one
+                      says Task — see the LITE note in the frontmatter. */}
+                  {v.key === 'lite' && (
+                    <div class="lab-tabs" role="tablist" aria-label="Where this is going">
+                      {LITE_TABS.map((t, i) => (
+                        <button
+                          type="button"
+                          class="lab-tab"
+                          role="tab"
+                          aria-selected={i === 0 ? 'true' : 'false'}
+                          data-tab={t.key}
+                          data-field={t.field?.label}
+                          data-becomes={t.becomes}
+                          data-there={t.there}
+                          data-tap
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div class="cap-box" data-box />
+
+                  <EditorToolbar class="cap-tools" />
+
+                  {/* `tabs` only: the fields the chosen kind needs, in the ✚.
+
+                      ⚠ BELOW THE TOOLBAR, NOT ABOVE IT — and the first draft of
+                      this bench had it the other way, which looked wrong the
+                      moment it was on screen. `.cap-tools` belongs to the box:
+                      it formats the words directly above it, and a pair of text
+                      inputs wedged between them breaks that adjacency. The rule
+                      `CaptureDialog` already states for the toolbar ("under the
+                      box, never over it") is really a rule about the toolbar
+                      TOUCHING the box.
+
+                      ⚠ THIS IS THE PROPOSITION'S WHOLE CLAIM AND ITS WHOLE RISK.
+                      Two fields look harmless; the shipped TaskSheet has date,
+                      time, effort, lead, recurrence and a goal picker, and the
+                      quote sheet has attribution, source and a subject field.
+                      Whatever is not here is a second trip anyway — so read
+                      these as the FLOOR, not the finished form. */}
+                  {v.key === 'tabs' && (
+                    <div class="lab-fields" data-fields hidden>
+                      {/* ⚠ EVERY SET SAYS WHAT BECOMES OF YOUR WORDS, because
+                          the question "what happens to what I already typed"
+                          is the first one this proposition provokes and the
+                          box was answering it silently. The split for a task
+                          is not invented here — it is what 14 §10c already
+                          settled for a dump filed from the pile: the first
+                          line is the title, the rest is the notes, because a
+                          task title is a row you scan on a Tuesday morning. */}
+                      <div class="lab-fields__set" data-for="agenda" hidden>
+                        <p class="lab-becomes">
+                          Your words become — <b>title:</b> first line · <b>notes:</b> the rest
+                        </p>
+                        <label class="f">
+                          <span class="f__k">Date</span>
+                          <input type="date" class="f--narrow" />
+                        </label>
+                        <label class="f">
+                          <span class="f__k">Time</span>
+                          <input type="time" class="f--narrow" />
+                        </label>
+                        <button type="button" class="lab-mini" data-parse data-tap>
+                          Read the sentence
+                        </button>
+                      </div>
+                      <div class="lab-fields__set" data-for="quote" hidden>
+                        <p class="lab-becomes">
+                          Your words become <b>the quote itself</b>
+                        </p>
+                        <label class="f" data-hold="Said by">
+                          <span class="f__k">
+                            Said by <em>required</em>
+                          </span>
+                          <input type="text" placeholder="Who said it" />
+                        </label>
+                        <label class="f" data-hold="Where in it">
+                          <span class="f__k">Where in it</span>
+                          <input type="text" placeholder="Source" />
+                        </label>
+                      </div>
+                      {people.length > 0 && (
+                        <div class="lab-fields__set" data-for="log" hidden>
+                          <p class="lab-becomes">
+                            Your words become <b>the entry’s note</b>
+                          </p>
+                          <label class="f" data-hold="Who">
+                            <span class="f__k">
+                              Who <em>required</em>
+                            </span>
+                            <EntityCombo
+                              id="combo-tabs-log"
+                              name="name-tabs-log"
+                              idName="id-tabs-log"
+                              noun="person"
+                              options={people}
+                              placeholder="Who was it?"
+                            />
+                          </label>
+                          {/* ⚠ WAS A `<select>` HOLDING FOUR INVENTED VALUES, one of
+                            which (`meal`) is not a kind this app has. Six chips,
+                            one tap, the real `KINDS` with the marks 12 §6 chose
+                            to keep distinct — a menu you have to open to see is
+                            the wrong shape for six options that fit on screen. */}
+                          <div class="lab-kinds" data-hold="Kind" data-hold-default role="group" aria-label="Kind">
+                            {KINDS.map((k, i) => (
+                              <button
+                                type="button"
+                                class="lab-kind"
+                                data-kind={k.key}
+                                data-kind-label={k.label}
+                                aria-pressed={i === 0 ? 'true' : 'false'}
+                                data-tap
+                              >
+                                <Icon name={k.icon} /> {k.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div class="lab-fields__set" data-for="piece" hidden>
+                        <p class="lab-becomes">
+                          Your words become <b>the draft</b> — nothing to collect. One flip, reversible.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* `lite` only: the one control, and it is NOT here at rest.
+
+                      ⚠ MEASURED, THEN REDRAWN. The first cut put a folded chip
+                      inside its own bordered section and it saved almost
+                      nothing: 258px of chrome against the full column's 319px,
+                      because a section with padding, a gap and a border costs
+                      ~96px to hold one chip. The tab row is cheap (36px); the
+                      SECTION was the expense.
+
+                      So at rest this does not exist. The kind's one control is a
+                      chip in the foot — a row that is already there and already
+                      paid for — and this section unfolds only once you ask for
+                      it. Resting chrome is then 162px on every tab, which is the
+                      36px of tabs and nothing else.
+
+                      ⚠ AND THE EXPLANATION MOVED OUT OF THE BOX ENTIRELY. "What
+                      your words become" and "what the room still asks for" now
+                      sit under the card, because bench annotation inside the
+                      frame is chrome the product would never ship — and it was
+                      being counted against the very budget this column exists to
+                      protect. A bench that inflates what it is measuring is
+                      measuring itself. */}
+                  {v.key === 'lite' && (
+                    <div class="lab-fields lab-fields--lite" data-fields hidden>
+                      {LITE_TABS.filter((t) => t.field).map((t) => (
+                        <div class="lab-fields__set" data-for={t.key} hidden>
+                          <label class="f" data-hold={t.field!.label}>
+                            <span class="f__k">
+                              {t.field!.label}
+                              {t.key === 'log' && <em>required</em>}
+                            </span>
+                            {t.field!.type === 'combo' ? (
+                              <EntityCombo
+                                id={`combo-lite-${t.key}`}
+                                name={`name-lite-${t.key}`}
+                                idName={`id-lite-${t.key}`}
+                                noun="person"
+                                options={people}
+                                placeholder={t.field!.placeholder}
+                              />
+                            ) : (
+                              <input
+                                type={t.field!.type}
+                                placeholder={t.field!.placeholder}
+                                class={t.field!.type === 'date' ? 'f--narrow' : ''}
+                              />
+                            )}
+                          </label>
+
+                          {/* ⚠ THE KIND RIDES ALONG, AND IT COSTS NOTHING AT REST.
+                              "One field per kind" is about what you must ANSWER,
+                              not about how many controls exist once you have
+                              opened the disclosure — and LogSheet already states
+                              the split this depends on: *"the kind and the date
+                              both have honest defaults; there is no defensible
+                              default for whose life this was."* So Who is the
+                              field, and the kind sits beside it already answered,
+                              changeable in one tap. */}
+                          {t.kinds && (
+                            <div class="lab-kinds" data-hold="Kind" data-hold-default role="group" aria-label="Kind">
+                              {KINDS.map((k, i) => (
+                                <button
+                                  type="button"
+                                  class="lab-kind"
+                                  data-kind={k.key}
+                                  data-kind-label={k.label}
+                                  aria-pressed={i === 0 ? 'true' : 'false'}
+                                  data-tap
+                                >
+                                  <Icon name={k.icon} /> {k.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div class="cap-foot">
+                    <span class="cap-status" data-status aria-live="polite" />
+
+                    {/* `chips` only: the destinations, always on screen. */}
+                    {v.key === 'chips' && (
+                      <div class="lab-chips" data-chips>
+                        {DESTINATIONS.map((n) => (
+                          <button
+                            type="button"
+                            class="lab-chip"
+                            data-pick={n.key}
+                            data-label={n.label}
+                            data-row={n.row}
+                            data-where={n.where}
+                            data-where-label={n.whereLabel}
+                            data-arrival={String(n.arrival)}
+                            data-tap
+                          >
+                            {n.short}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {v.key !== 'chips' && <span class="lab-spacer" />}
+
+                    {/* The kind's one control, in a row that already exists. */}
+                    {v.key === 'lite' && (
+                      <button type="button" class="lab-fold" data-fold hidden data-tap>
+                        <Icon name="ph:plus" /> <span data-fold-label />
+                      </button>
+                    )}
+
+                    {/* `after` only: the pile's own control, moved to the box. */}
+                    {v.key === 'after' && (
+                      <button
+                        type="button"
+                        class="btn btn-sm font-sans"
+                        popovertarget={`pop-${v.key}`}
+                        data-chooser
+                        data-tap
+                      >
+                        <Icon name="ph:arrow-right" /> Turn it into…
+                      </button>
+                    )}
+
+                    <button type="button" class="btn btn-sm font-sans" data-newjot data-tap>
+                      <Icon name="ph:plus" /> New
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm font-sans" data-done data-tap>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ⚠ INSIDE THE FRAME, AND THAT IS TRAP 7 ARRIVING ON SCHEDULE.
+                This chooser was mounted at page level first — the way
+                `notes.astro` mounts its one menu for the whole pile — and it
+                worked on the card and was DEAD in the walk-through: `showModal`
+                makes everything outside the dialog inert, so a popover sitting
+                out there cannot be shown from a button sitting in here. It
+                failed silently, which is the signature of the whole trap 7
+                family: no error, no console, a control that simply does
+                nothing.
+
+                Nesting is safe for a popover in a way it is not for a
+                `<dialog>` (CaptureDialog's own note): the top layer takes it
+                above its modal opener, and there is no second focus trap to
+                fight. And because it lives in the frame, it MOVES with the
+                frame — one chooser, both contexts, nothing to keep in step. */}
+              {v.key === 'after' && (
+                <div class="pop pop--wide" popover id={`pop-${v.key}`}>
+                  {DESTINATIONS.map((n) => (
+                    <button
+                      type="button"
+                      class="pop__row"
+                      data-pick={n.key}
+                      data-label={n.label}
+                      data-row={n.row}
+                      data-where={n.where}
+                      data-where-label={n.whereLabel}
+                      data-arrival={String(n.arrival)}
+                      data-tap
+                    >
+                      <Icon name={n.icon} /> {n.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bench annotation, deliberately OUTSIDE the frame — see the note
+              on the fields section above. */}
+            <p class="prop__note" data-note hidden />
+
+            {/* The card keeps its place in the grid while the frame is on stage. */}
+            <p class="prop__onstage" data-onstage hidden>
+              …in the dialog. Close it to bring the box back here.
+            </p>
+
+            <div class="prop__foot">
+              <button type="button" class="lab-mini" data-walk={v.key}>
+                Walk it from the corner ↗
+              </button>
+              <span class="prop__cost prop__cost--live" data-meter>
+                not touched yet
+              </span>
+            </div>
+
+            <output class="prop__receipt" data-receipt hidden />
+          </section>
+        ))
+      }
+    </div>
+  </div>
+
+  {/* The corner ✚ — the shipped `.cap-fab`, appearing only during a walk. */}
+  <button id="lab-fab" class="cap-fab" type="button" aria-label="Write something down" hidden>
+    <Icon name="ph:plus" class="text-2xl" />
+  </button>
+
+  <dialog id="lab-stage" class="modal-dialog w-full max-w-xl" aria-label="Write something down"></dialog>
+
+  {
+    /* ⚠ ONE PER EDITOR, NOT ONE SHARED. `mountRichEditor` wires its link
+      command to the dialog it is handed, so a single dialog behind four
+      editors would apply the link you just typed to all four of them — a bench
+      artefact that would read as a bug in the box. */
+  }
+  {VARIANTS.map((v) => <LinkDialog id={`lab-link-${v.key}`} />)}
+</Base>
+
+<style>
+  /* The bench's own furniture only. Everything inside `.prop__frame` is the
+     Observatory's own primitives, unmodified — if a box looks wrong here it
+     looks wrong there. */
+  .lab {
+    max-width: 84rem;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 6rem;
+  }
+  .lab__head h1 {
+    font-family: var(--font-display, inherit);
+    font-size: 1.75rem;
+    font-weight: 300;
+  }
+  .lab__head > p {
+    max-width: 62ch;
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
+  }
+  .lab__ctl {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 1.25rem;
+  }
+  .lab__ctl--jots {
+    margin-top: 0.5rem;
+  }
+  .lab__ctlk {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  }
+  .lab__ctl button {
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.375rem);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+  .lab__ctl button[aria-pressed='true'] {
+    border-color: transparent;
+    background: var(--color-base-content);
+    color: var(--color-base-100);
+  }
+  .lab__sep {
+    width: 1px;
+    height: 1.25rem;
+    background: var(--color-base-300);
+    margin: 0 0.375rem;
+  }
+  .lab__q {
+    max-width: 62ch;
+    margin-top: 1.25rem;
+    padding: 0.75rem 1rem;
+    border-left: 2px solid var(--color-base-300);
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: color-mix(in oklch, var(--color-base-content) 78%, transparent);
+  }
+
+  .lab__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem;
+    margin-top: 2.5rem;
+  }
+  .lab[data-view='solo'] .lab__grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 44rem;
+  }
+
+  .prop {
+    min-width: 0;
+  }
+  .prop__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .prop__title h2 {
+    font-family: var(--font-display, inherit);
+    font-size: 1.125rem;
+    font-weight: 400;
+  }
+  /* A miniature of the real thing, so the card says which button it is about. */
+  .prop__fab {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    font-size: 0.75rem;
+  }
+  .prop__claim {
+    margin-top: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+  }
+  .prop__cost {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+  }
+  .prop__cost--live {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .prop__frame {
+    margin-top: 0.875rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.75rem);
+    background: var(--color-base-100);
+    overflow: hidden;
+  }
+  :root[data-w='phone'] .prop__frame {
+    max-width: 390px;
+  }
+  /* The walk-through obeys the width control too, or "feel it on a phone" stops
+     being true for the one run that is closest to the real thing. */
+  :root[data-w='phone'] #lab-stage {
+    max-width: 390px;
+  }
+  /* ⚠ BENCH ANNOTATION, AND IT LIVES OUTSIDE THE FRAME ON PURPOSE. Inside, it
+     would be chrome the product never ships, counted against the phone budget
+     the narrowed column exists to defend — the bench would be measuring itself.
+     Quiet, because it explains rather than instructs. */
+  .prop__note {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+    color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+  }
+  .prop__note span {
+    color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  }
+  .prop__onstage {
+    margin-top: 0.875rem;
+    padding: 2rem 1rem;
+    border: 1px dashed var(--color-base-300);
+    border-radius: var(--radius-box, 0.75rem);
+    text-align: center;
+    font-size: 0.8125rem;
+    color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  }
+  .prop__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.625rem;
+  }
+  .lab-mini {
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.375rem);
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  .prop__receipt {
+    display: block;
+    margin-top: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-base-300);
+    border-left-width: 2px;
+    border-left-color: var(--color-primary);
+    border-radius: var(--radius-box, 0.75rem);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+  .prop__receipt dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.5rem;
+  }
+  .prop__receipt dt {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+    padding-top: 0.125rem;
+  }
+  .prop__receipt dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .prop__receipt code {
+    font-size: 0.75rem;
+  }
+
+  /* ── the propositions' own parts ───────────────────────────────────────── */
+  .lab-menu {
+    padding: 0.5rem;
+  }
+  .lab-menu__k {
+    padding: 0.25rem 0.5rem 0.5rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+  }
+  .lab-menu__list {
+    display: flex;
+    flex-direction: column;
+  }
+  /* The long list is a toggle, not a rebuild — the rows are always in the DOM so
+     the two lengths are the same markup at two heights.
+
+     ⚠ SCOPED TO :root, NOT TO .lab, AND THAT IS THE FOURTH TIME THIS BENCH PAID
+     THE SAME BILL. The frame travels into `#lab-stage`, which is a sibling of
+     `.lab` — so every rule, listener and lookup written as "inside the lab" or
+     "inside the card" quietly stops applying the moment a walk-through starts.
+     It showed here as the chooser offering all twelve nouns in the dialog while
+     the toggle plainly said six. THE RULE, since it earned one: anything that
+     has to reach the box must be scoped to the document or to the frame — never
+     to a parent the frame can leave. */
+  :root[data-nouns='arrival'] [data-arrival='false'] {
+    display: none;
+  }
+  .lab-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem 0.625rem 0;
+  }
+  .lab-tab {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.1875rem 0.625rem;
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  }
+  .lab-tab[aria-selected='true'] {
+    border-color: var(--color-base-300);
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+  }
+  /* A tab holding something wears a dot. Deliberately not a count and not a
+     preview — the question it answers is only *is anything still in there*, and
+     a number would invite you to read the tab instead of opening it. */
+  .lab-tab[data-held='true']::after {
+    content: '';
+    display: inline-block;
+    width: 0.3125rem;
+    height: 0.3125rem;
+    margin-left: 0.375rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    vertical-align: 0.0625rem;
+  }
+  /* ⚠ THE SIX KINDS AS A ROW, WHICH IS THE ACTUAL PROPOSAL HERE. The shipped
+     LogSheet puts the kind behind an `.lchip` + `.pop` — right there, where the
+     chip row is already three controls wide and a fourth would crowd it. In the
+     ✚ there is no chip row to crowd, six options fit on one or two lines, and a
+     menu you must open to see what is in it is the wrong shape for a list this
+     short. Same register as `.lchip` deliberately, so it reads as the same
+     family; the pressed state is `aria-pressed`, so there is no second source of
+     truth to keep in step. */
+  .lab-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    flex-basis: 100%;
+  }
+  .lab-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-height: 1.875rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.6875rem;
+    color: color-mix(in oklch, var(--color-base-content) 58%, transparent);
+    white-space: nowrap;
+  }
+  .lab-kind:hover {
+    background: var(--color-base-100);
+    border-color: var(--color-base-300);
+    color: var(--color-base-content);
+  }
+  .lab-kind[aria-pressed='true'] {
+    background: var(--color-base-200);
+    border-color: var(--color-base-300);
+    color: var(--color-base-content);
+  }
+  /* The combo is a block element; inside a `.f` it should fill the field slot. */
+  .lab-fields .entity-combo {
+    min-width: 12rem;
+  }
+
+  /* One control, on one line, and only once you have asked for it. */
+  .lab-fields--lite {
+    align-items: flex-end;
+  }
+  .lab-fold {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    padding: 0.125rem 0.625rem 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
+  }
+  .lab-fold:hover {
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+  }
+  .lab-becomes {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 62%, transparent);
+  }
+  .lab-becomes b {
+    font-weight: 500;
+    color: color-mix(in oklch, var(--color-base-content) 82%, transparent);
+  }
+  .lab-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+  .lab-fields__set {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+  .lab-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+  .lab-chip {
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+  }
+  .lab-chip:hover {
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+  }
+  .lab-spacer {
+    margin-left: auto;
+  }
+
+  /* The stage. `[open]` is load-bearing for the same reason `#cap-dialog`'s is:
+     without it a `display: flex` rule beats the UA's `display: none`. */
+  #lab-stage[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  #lab-stage .prop__frame {
+    margin: 0;
+    border: 0;
+    max-width: none;
+  }
+
+  @media (max-width: 60rem) {
+    .lab__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
+
+<script>
+  /* The bench's behaviour. Kept in this file on purpose — a lab that reaches
+     into `src/scripts/` leaves something behind when it is deleted. The three
+     imports below are the exception and are the point: they are the SHIPPED
+     editor, the SHIPPED popover arithmetic and the SHIPPED dialog exit, so what
+     you are judging is the real feel of each, not a re-implementation that is
+     kinder than the original. */
+  import { actions } from 'astro:actions';
+  // ⚠ NOT a bare `await actions.…`, here of all places. `astro:actions` THROWS
+  // on a dead network instead of returning `{ error }`, and a bench whose
+  // "Saved" silently never arrives would teach the wrong lesson about the very
+  // thing it is measuring. `src/tests/action-guard.test.ts` enforces this.
+  import { callAction, formatActionError } from '../../scripts/action-error';
+  import { mountRichEditor } from '../../scripts/rich-editor';
+  import { anchorPopover } from '../../scripts/pop-anchor';
+  import { closeWithExit, openDialog } from '../../scripts/dialog-close';
+
+  const lab = document.querySelector('.lab') as HTMLElement;
+  const stage = document.getElementById('lab-stage') as HTMLDialogElement;
+  const fab = document.getElementById('lab-fab') as HTMLButtonElement;
+
+  /* ⚠ NOTHING FROM THE FRONTMATTER IS RESTATED DOWN HERE. The samples and the
+     destination facts are rendered onto the buttons as data attributes and read
+     back off them — one owner per fact (29). A second copy of the noun list in
+     this script is exactly the drift that would let the bench print a
+     destination the chooser no longer offers. */
+  const NOUN_META = new Map<string, { label: string; row: string; where: string; whereLabel: string }>();
+
+  // ---- controls ------------------------------------------------------------
+  function group(attr: string, value: string) {
+    document.querySelectorAll<HTMLButtonElement>(`.lab__ctl [${attr}]`).forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value));
+    });
+  }
+  /* Written to BOTH the lab and the document element. The lab copy drives the
+     page's own layout; the root copy is the one that still reaches the box
+     after it has moved into the dialog — see the `:root[data-nouns]` note in
+     the stylesheet. */
+  const settings = ['view', 'w', 'nouns', 'write'] as const;
+  const put = (k: string, v: string) => {
+    lab.setAttribute(`data-${k}`, v);
+    document.documentElement.setAttribute(`data-${k}`, v);
+    // The narrowed column folds its field by width, and CSS cannot express
+    // "start closed on a phone" — so the panels are told when the width moves.
+    window.dispatchEvent(new CustomEvent('lab:settings'));
+  };
+  settings.forEach((k) => {
+    put(k, lab.getAttribute(`data-${k}`) ?? '');
+    document.querySelectorAll<HTMLButtonElement>(`.lab__ctl [data-${k}]`).forEach((b) =>
+      b.addEventListener('click', () => {
+        const v = b.getAttribute(`data-${k}`)!;
+        put(k, v);
+        group(`data-${k}`, v);
+      }),
+    );
+  });
+  document.querySelector('[data-theme-flip]')?.addEventListener('click', () => {
+    const root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === 'paper' ? 'dusk' : 'paper';
+  });
+
+  // ---- one panel -----------------------------------------------------------
+  type Panel = ReturnType<typeof wire>;
+  const panels = new Map<string, Panel>();
+
+  function wire(section: HTMLElement) {
+    const key = section.dataset.prop!;
+    const frame = section.querySelector<HTMLElement>('[data-frame]')!;
+    const home = document.createComment(`frame:${key}`); // where the frame lives when not on stage
+    frame.before(home);
+    const boxEl = section.querySelector<HTMLElement>('[data-box]')!;
+    const statusEl = section.querySelector<HTMLElement>('[data-status]')!;
+    const meterEl = section.querySelector<HTMLElement>('[data-meter]')!;
+    const receiptEl = section.querySelector<HTMLElement>('[data-receipt]')!;
+    const menuEl = section.querySelector<HTMLElement>('[data-menu]');
+    const bodyEl = section.querySelector<HTMLElement>('[data-body]')!;
+    const fieldsEl = section.querySelector<HTMLElement>('[data-fields]');
+
+    /* THE MEASUREMENT. Taps and seconds are counted from the first thing you do
+       to the moment you file — because "fast" is the whole question here and an
+       estimate written into the markup would be me marking my own homework.
+       Reset by picking a sample, so each run is one clean read. */
+    let taps = 0;
+    let t0 = 0;
+    let tick: number | undefined;
+    /* ⚠ IT HAS TO TICK. The first version repainted only on a tap, so the meter
+       showed the time of your PREVIOUS click — a stopwatch that reads 0.0s
+       while you sit deciding what the thing is, which is precisely the interval
+       this bench is trying to measure. */
+    const startClock = () => {
+      if (t0) return;
+      t0 = performance.now();
+      tick = window.setInterval(() => paint(), 100);
+    };
+    const stopClock = () => {
+      window.clearInterval(tick);
+      tick = undefined;
+    };
+    const bump = () => {
+      startClock();
+      taps += 1;
+      paint();
+    };
+    function paint(filedAs?: string) {
+      const secs = t0 ? ((performance.now() - t0) / 1000).toFixed(1) : '0.0';
+      meterEl.textContent = t0
+        ? `${taps} tap${taps === 1 ? '' : 's'} · ${secs}s${filedAs ? ` → ${filedAs}` : ''}`
+        : 'not touched yet';
+    }
+    /* ⚠ ON THE FRAME, NOT ON THE CARD. The frame is the thing that moves into
+       the dialog for a walk-through; a delegated listener left on the section
+       would stop hearing its own buttons the moment they left it — and, like
+       the popover above, it would fail silently and only during the walk. */
+    frame.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-tap]')) bump();
+    });
+
+    // ---- the real editor ---------------------------------------------------
+    const { editor, getMarkdown } = mountRichEditor({
+      editorEl: boxEl,
+      toolbarRoot: section.querySelector<HTMLElement>('.cap-tools')!,
+      linkDialog: document.getElementById(`lab-link-${key}`) as HTMLDialogElement | null,
+      placeholder: 'Write it down…',
+      ariaLabel: 'What are you thinking?',
+      breaks: true, // a jot's line breaks ARE its structure — the shipped box's setting
+      docClass: 'jot-prose',
+      onChange: () => {
+        startClock();
+        paint();
+        marks();
+        queueSave();
+      },
+    });
+
+    /* ---- the jot's own save ------------------------------------------------
+       Armed only by the "For real" switch. This is `fragments.saveWriting` with
+       `status: note` — the SAME call the shipped box makes, debounce and all,
+       including sending the slug back so it is minted once instead of churning
+       on every keystroke (14 §9f). One id per sample per panel: re-typing
+       updates that row rather than breeding new ones. */
+    let noteId: string | null = null;
+    let baseUpdatedAt = '';
+    let slug = '';
+    let lastSaved = '';
+    let timer: number | undefined;
+    let fadeTimer: number | undefined;
+
+    function flash(text: string, sticky = false) {
+      window.clearTimeout(fadeTimer);
+      statusEl.textContent = text;
+      statusEl.style.opacity = '1';
+      if (sticky) return;
+      fadeTimer = window.setTimeout(() => (statusEl.style.opacity = '0'), 1400);
+    }
+    function queueSave() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(save, 700);
+    }
+    async function save() {
+      const text = getMarkdown();
+      if (!text.trim() || text === lastSaved) return;
+      if (lab.dataset.write !== 'on') {
+        lastSaved = text;
+        flash('Saved (dry run)');
+        return;
+      }
+      const id = (noteId ??= crypto.randomUUID());
+      const fd = new FormData();
+      fd.set('id', id);
+      fd.set('body', text);
+      fd.set('status', 'note');
+      if (slug) fd.set('slug', slug);
+      if (baseUpdatedAt) fd.set('base_updated_at', baseUpdatedAt);
+      const { data, error } = await callAction(actions.fragments.saveWriting(fd));
+      if (error || !data) return flash(formatActionError(error), true);
+      noteId = data.id;
+      baseUpdatedAt = data.updated_at;
+      slug = data.slug;
+      lastSaved = text;
+      flash('Saved');
+    }
+
+    // ---- proposition-specific behaviour ------------------------------------
+    // `menu`: the list is the first screen; picking swaps it for the box.
+    function showMenu(on: boolean) {
+      if (!menuEl) return;
+      menuEl.hidden = !on;
+      bodyEl.hidden = on;
+    }
+    showMenu(Boolean(menuEl));
+
+    // `tabs`: the kind decides which fields exist.
+    function setTab(kind: string) {
+      // ⚠ `frame`, not `section` — see the trigger-lookup note further down.
+      frame.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((t) => {
+        t.setAttribute('aria-selected', String(t.dataset.tab === kind));
+      });
+      if (!fieldsEl) return;
+      let any = false;
+      fieldsEl.querySelectorAll<HTMLElement>('[data-for]').forEach((set) => {
+        const on = set.dataset.for === kind;
+        set.hidden = !on;
+        any ||= on;
+      });
+      fieldsEl.hidden = !any;
+      syncLite();
+    }
+
+    /** Which kind the box is currently claiming to be. `jot` everywhere else. */
+    const activeKind = () => frame.querySelector<HTMLElement>('[data-tab][aria-selected="true"]')?.dataset.tab ?? 'jot';
+
+    /* ⚠ THE ANSWER TO "DO MY FIELDS SURVIVE A TAB SWITCH?" HAS TO BE VISIBLE.
+       They always did — the sets are hidden, never emptied — but Michael could
+       not tell by looking (2026-08-24), and a persistence guarantee you have to
+       test by hand is not a guarantee anybody trusts. A mark on every tab that
+       is holding something answers it at a glance, and it answers it for the
+       BODY too: the jot tab carries the words every other kind is built from. */
+    function marks() {
+      const bodyHeld = getMarkdown().trim().length > 0;
+      frame.querySelectorAll<HTMLElement>('[data-tab]').forEach((t) => {
+        const kind = t.dataset.tab!;
+        if (kind === 'jot') return void (t.dataset.held = String(bodyHeld));
+        t.dataset.held = String(heldIn(fieldsEl?.querySelector<HTMLElement>(`[data-for="${kind}"]`), false).length > 0);
+      });
+    }
+    fieldsEl?.addEventListener('input', marks);
+
+    /* ---- the narrowed column, in one place ---------------------------------
+       Everything `lite` does differently — which control is offered, whether it
+       is folded, and what the card says the room will still ask for — is one
+       function, because these are four faces of a single question ("what is
+       this thought going to be?") and splitting them across handlers is how
+       they drift apart.
+
+       ⚠ A FIELD THAT HOLDS SOMETHING IS NEVER FOLDED, whatever the width says.
+       Folding buys pixels back on a phone; hiding a value you already typed is
+       the one thing it must never do — that is a field lying about being empty,
+       and the tab's dot alone would be too quiet to correct it. */
+    function syncLite() {
+      if (!fieldsEl?.classList.contains('lab-fields--lite')) return;
+      const tab = frame.querySelector<HTMLElement>('[data-tab][aria-selected="true"]');
+      const kind = tab?.dataset.tab ?? 'jot';
+      const set = fieldsEl.querySelector<HTMLElement>(`[data-for="${kind}"]`);
+      const input = set?.querySelector<HTMLInputElement>('input') ?? null;
+      const phone = document.documentElement.getAttribute('data-w') === 'phone';
+      const held = heldIn(set, false).length > 0;
+      const open = !!input && (held || !phone || set!.dataset.open === 'true');
+
+      fieldsEl.hidden = !open;
+      fieldsEl.querySelectorAll<HTMLElement>('[data-for]').forEach((one) => (one.hidden = one !== set || !open));
+
+      const chip = frame.querySelector<HTMLElement>('[data-fold]');
+      if (chip) {
+        chip.hidden = !input || open;
+        const label = chip.querySelector<HTMLElement>('[data-fold-label]');
+        if (label) label.textContent = tab?.dataset.field ?? '';
+      }
+
+      // The annotation lives on the card, not in the box.
+      const note = section.querySelector<HTMLElement>('[data-note]');
+      if (note) {
+        const becomes = tab?.dataset.becomes ?? '';
+        const there = tab?.dataset.there ?? '';
+        note.hidden = !becomes;
+        note.innerHTML = becomes
+          ? `${escapeHtml(becomes)}${there ? ` <span>· the room still asks for ${escapeHtml(there)}</span>` : ''}`
+          : '';
+      }
+    }
+    fieldsEl?.addEventListener('input', syncLite);
+
+    /* One tap, and the pressed state IS the value — no hidden input to keep in
+       step, and `aria-pressed` carries it to a screen reader without a second
+       label. */
+    frame.querySelectorAll<HTMLButtonElement>('.lab-kinds').forEach((group) =>
+      group.addEventListener('click', (e) => {
+        const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-kind]');
+        if (!chip) return;
+        group.querySelectorAll('[data-kind]').forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+      }),
+    );
+
+    /**
+     * What a field set is currently holding, as "Label: value" lines.
+     *
+     * ⚠ THREE KINDS OF CONTROL AND ONE READER. A plain input has `.value`; the
+     * kind chips keep their answer in `aria-pressed`; and `EntityCombo` is a
+     * custom element whose committed name lives behind `getName()` — reaching
+     * into the `<input>` it renders would read half-typed text as a choice, and
+     * a person who is not on the roster is not a `personId`.
+     *
+     * `data-hold-default` marks a control that answers itself (the kind). It
+     * counts for the receipt, which reports what would be written, and NOT for
+     * the tab's dot, which asks whether you have put anything in — a dot lit by
+     * a default is a dot that is always lit.
+     */
+    function heldIn(set: HTMLElement | null | undefined, includeDefaults: boolean) {
+      if (!set) return [] as string[];
+      return [...set.querySelectorAll<HTMLElement>('[data-hold]')]
+        .filter((el) => includeDefaults || el.dataset.holdDefault === undefined)
+        .map((el) => {
+          const label = el.dataset.hold!;
+          const combo = el.querySelector('entity-combo') as (HTMLElement & { getName?: () => string }) | null;
+          if (combo) {
+            const name = combo.getName?.() ?? '';
+            return name ? `${label}: ${name}` : '';
+          }
+          const chip = el.querySelector<HTMLElement>('[aria-pressed="true"]');
+          if (chip) return `${label}: ${chip.dataset.kindLabel ?? chip.textContent?.trim() ?? ''}`;
+          const input = el.querySelector<HTMLInputElement>('input');
+          return input?.value.trim() ? `${label}: ${input.value.trim()}` : '';
+        })
+        .filter(Boolean);
+    }
+
+    frame.querySelector<HTMLElement>('[data-fold]')?.addEventListener('click', () => {
+      const kind = activeKind();
+      const set = fieldsEl?.querySelector<HTMLElement>(`[data-for="${kind}"]`);
+      if (!set) return;
+      set.dataset.open = 'true';
+      syncLite();
+      set.querySelector<HTMLInputElement>('input')?.focus();
+    });
+    frame.addEventListener('combo:change', () => {
+      syncLite();
+      marks();
+    });
+    window.addEventListener('lab:settings', syncLite);
+
+    frame.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((t) =>
+      t.addEventListener('click', () => {
+        /* ⚠ THE TEXT FOLLOWS THE TAB, AND SO DO THE FIELDS. Anything else is
+           hostile: you typed a sentence and then said what it was, and a form
+           that empties on that answer has thrown away the reason you opened it.
+           The sets are hidden, never cleared — leave Quote half-filled, go to
+           Task and back, and "said by" is still there. Only ＋ New and a new
+           sample wipe them, because those are the two motions that mean "this
+           is a different thought now". */
+        setTab(t.dataset.tab!);
+        marks();
+      }),
+    );
+    marks();
+
+    // `after`: the shipped popover arithmetic against this panel's trigger.
+    const pop = frame.querySelector<HTMLElement>('.pop');
+    /* ⚠ THE TRIGGER LOOKUP IS SCOPED TO THE FRAME, and this is the third face
+       of the same bug the popover and the delegation already showed. When
+       `anchorPopover` cannot find a trigger it returns early — leaving the
+       `visibility: hidden` it set at `beforetoggle` in place. So a stale scope
+       does not throw and does not mis-position: it opens a popover you cannot
+       see, which is the most expensive way for this to fail. Anything that
+       holds a reference into the frame must be looked up THROUGH the frame. */
+    if (pop) anchorPopover(pop, () => frame.querySelector<HTMLElement>('[data-chooser]'));
+
+    /** Everything that makes this thought THIS thought, put back to nothing. */
+    function resetThought() {
+      window.clearTimeout(timer);
+      editor.commands.clearContent(true);
+      frame.querySelectorAll<HTMLInputElement>('.lab-fields input').forEach((i) => (i.value = ''));
+      // `clear()` is the combo's own API — blanking its <input> would leave the
+      // committed id behind, so the next thought would be logged against the
+      // last one's person.
+      frame.querySelectorAll('entity-combo').forEach((c) => (c as HTMLElement & { clear?: () => void }).clear?.());
+      frame
+        .querySelectorAll<HTMLElement>('.lab-kinds')
+        .forEach((group) =>
+          group.querySelectorAll('[data-kind]').forEach((c, i) => c.setAttribute('aria-pressed', String(i === 0))),
+        );
+      noteId = null;
+      baseUpdatedAt = '';
+      slug = '';
+      lastSaved = '';
+      stopClock();
+      taps = 0;
+      t0 = 0;
+      setTab('jot');
+      // A new thought re-folds everything: the last one's disclosures are not
+      // this one's business.
+      frame.querySelectorAll<HTMLElement>('.lab-fields__set').forEach((set) => delete set.dataset.open);
+      syncLite();
+      marks();
+      paint();
+    }
+
+    // ---- filing ------------------------------------------------------------
+    /* Every route in — a chooser row, a chip, a menu row — lands here, so there
+       is exactly one description of what filing WOULD do. */
+    async function file(nounKey: string) {
+      const meta = NOUN_META.get(nounKey);
+      if (!meta) return;
+
+      const body = getMarkdown().trim();
+
+      /* The narrowed column is the only one that collects anything, so it is the
+         only one that owes an account of it. Read off the set rather than from a
+         table in this script — one owner per fact, and `there` is written once,
+         in the frontmatter, next to the field it is about. */
+      const liteTab = frame.querySelector<HTMLElement>(`.lab-fields--lite`)
+        ? frame.querySelector<HTMLElement>(`[data-tab="${nounKey}"]`)
+        : null;
+      const held = heldIn(frame.querySelector<HTMLElement>(`.lab-fields--lite [data-for="${nounKey}"]`), true);
+      const here = liteTab
+        ? `<dt>collected here</dt><dd>${escapeHtml(held.join(' · ') || 'nothing — the tab only declared where it goes')}</dd>` +
+          `<dt>still asked there</dt><dd>${escapeHtml(liteTab.dataset.there || 'nothing')}</dd>`
+        : '';
+
+      stopClock();
+      paint(meta.label.replace('…', ''));
+      const secs = t0 ? ((performance.now() - t0) / 1000).toFixed(1) : '0.0';
+
+      /* ⚠ `jot` IS A DESTINATION LIKE ANY OTHER HERE, and making it one is what
+         gave Done something to say. It used to early-return, so pressing Done
+         on a jot did nothing visible — the button read as broken when it was
+         merely finished. Parking a thought IS an outcome; it deserves the same
+         receipt as filing one. */
+      receiptEl.hidden = false;
+      receiptEl.innerHTML = `
+        <strong>${nounKey === 'jot' ? 'Parked as a jot' : `Filed as ${escapeHtml(meta.label.replace('…', ''))}`}</strong>
+        <dl>
+          <dt>would write</dt><dd><code>${escapeHtml(meta.row)}</code></dd>
+          <dt>body</dt><dd><code>${escapeHtml(body || '(empty — the shipped box never writes an empty row)')}</code></dd>
+          <dt>you land at</dt><dd><a href="${meta.where}">${escapeHtml(meta.where)}</a> — ${escapeHtml(meta.whereLabel)}</dd>
+          ${here}
+          <dt>cost</dt><dd>${taps} tap${taps === 1 ? '' : 's'} · ${secs}s</dd>
+          ${
+            nounKey === 'jot'
+              ? ''
+              : `<dt>and then</dt><dd>this jot is consumed — the destination is written first, so a failure leaves a dump you can still see (14 §10e)</dd>`
+          }
+        </dl>`;
+      // Filing is the end of the run: in the real thing you have left for
+      // another room, so the walk-through ends here too.
+      if (stage.open) void closeWithExit(stage);
+
+      /* ⚠ THE ONE REAL QUERY. 14 §11a: a lab fed hand-written answers shows a
+         parser that is always right, which is the thing in question. The Agenda
+         route is the only destination whose feel depends on something other
+         than markup — it waits on a model — so it is the one this bench
+         actually calls. A dead key or a dead network prints the degraded path,
+         which is itself the finding worth seeing (§6.4: capture must never
+         depend on the model). */
+      if (nounKey === 'agenda' && body) {
+        const line = document.createElement('p');
+        line.style.marginTop = '0.5rem';
+        line.textContent = 'Reading the sentence…';
+        receiptEl.append(line);
+        const t = performance.now();
+        const { data, error } = await callAction(actions.tasks.parse({ text: body }));
+        const ms = Math.round(performance.now() - t);
+        if (error || !data?.parsed) {
+          const why = data?.error ?? (error ? formatActionError(error) : 'unavailable');
+          line.textContent = `No parse after ${ms}ms — ${why}. The sheet would open unparsed, which must always work.`;
+          return;
+        }
+        line.innerHTML = `<code>${escapeHtml(JSON.stringify(data.parsed))}</code><br>parsed in <strong>${ms}ms</strong> — that wait is part of this design.`;
+      }
+    }
+
+    /* One delegated handler for every route in — a chooser row, a chip, a menu
+       row. The popover now lives inside the section, so this catches it too and
+       the tap counter (which keys off `[data-tap]`) sees it like any other. */
+    frame.addEventListener('click', (e) => {
+      const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-pick]');
+      if (!pick) return;
+      pop?.hidePopover();
+      // In the `menu` proposition, "Write it down" is not a destination — it is
+      // the door to the box. Everywhere else `jot` files, and Done sends it.
+      if (pick.dataset.pick === 'jot' && menuEl && !menuEl.hidden) return showMenu(false);
+      void file(pick.dataset.pick!);
+    });
+    /* ⚠ BOTH OF THESE WERE INERT AND READ AS BROKEN (Michael, 2026-08-24:
+       *"I don't really get any feedback that something happens"*). An inert
+       control that looks live is the exact fault 14 §10f caught with a
+       screenshot after a spec had passed — you press it, nothing moves, and
+       nothing tells you why. A bench cannot ask "does this feel fast" through
+       buttons that do not answer. */
+
+    // ＋ New — park what is there under its own id, hand over a blank one.
+    frame.querySelector('[data-newjot]')?.addEventListener('click', () => {
+      const had = getMarkdown().trim().length > 0;
+      // `save()` reads the body before its first await, so parking-then-clearing
+      // in this order cannot race the write. (The shipped box serialises the
+      // same pair behind a lock; the bench has one box and needs no lock.)
+      void save();
+      resetThought();
+      receiptEl.hidden = true;
+      flash(had ? 'Parked. Next thought.' : 'Cleared.');
+      editor.commands.focus();
+    });
+
+    /* Done — files as WHATEVER KIND THE BOX IS CLAIMING TO BE, which for three
+       of the four propositions is always a jot and for `tabs` is the selected
+       tab. That is not a bench convenience: it is the tabs proposition's actual
+       semantics, and without it the tab is decoration. It also fixes the tap
+       count in the tabs column, which was quietly charging for a chooser it
+       does not have. */
+    frame.querySelector('[data-done]')?.addEventListener('click', () => void file(activeKind()));
+
+    frame.querySelector('[data-parse]')?.addEventListener('click', () => void file('agenda'));
+
+    return {
+      key,
+      section,
+      frame,
+      home,
+      onstage: section.querySelector<HTMLElement>('[data-onstage]')!,
+      seed(text: string) {
+        resetThought();
+        editor.commands.setContent(text);
+        receiptEl.hidden = true;
+        receiptEl.innerHTML = '';
+        statusEl.textContent = '';
+        showMenu(Boolean(menuEl));
+        marks();
+      },
+      focus() {
+        editor.commands.focus('end');
+      },
+    };
+  }
+
+  /* The receipt prints your own words back at you, so it escapes them. Written
+     out rather than reached for `sanitize-html`: this is four replacements into
+     a bench, not the public renderer. */
+  function escapeHtml(s: string) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ---- boot ----------------------------------------------------------------
+  /* All four editors mount up front. One module, four instances — the parse
+     cost `24 · Piece 5` measured is per MODULE, and lazy-mounting here would
+     have made "does it feel instant" depend on which panel you clicked first,
+     which is a bench artefact and not a property of any proposition. */
+  document.querySelectorAll<HTMLElement>('.prop').forEach((s) => panels.set(s.dataset.prop!, wire(s)));
+
+  // The noun metadata, read off the rendered rows so the script never restates
+  // the frontmatter list (one owner per fact).
+  document.querySelectorAll<HTMLElement>('[data-pick]').forEach((el) => {
+    const k = el.dataset.pick!;
+    if (NOUN_META.has(k)) return;
+    NOUN_META.set(k, {
+      label: el.dataset.label ?? k,
+      row: el.dataset.row ?? '',
+      where: el.dataset.where ?? '/admin',
+      whereLabel: el.dataset.whereLabel ?? '',
+    });
+  });
+
+  // ---- samples -------------------------------------------------------------
+  document.querySelectorAll<HTMLButtonElement>('[data-jot]').forEach((b) =>
+    b.addEventListener('click', () => {
+      document
+        .querySelectorAll<HTMLButtonElement>('[data-jot]')
+        .forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      const text = b.dataset.text ?? '';
+      panels.forEach((p) => p.seed(text));
+    }),
+  );
+
+  // ---- the walk ------------------------------------------------------------
+  /* ⚠ THE FRAME MOVES; IT IS NOT COPIED. A second rendering of the box would
+     drift from the card within a day — the /lab/chrome rule. ProseMirror keeps
+     working across the move because the editor's element is the same node on
+     both sides of it; only focus is lost, and it is restored on open. */
+  let walking: Panel | null = null;
+
+  document.querySelectorAll<HTMLButtonElement>('[data-walk]').forEach((b) =>
+    b.addEventListener('click', () => {
+      walking = panels.get(b.dataset.walk!) ?? null;
+      if (!walking) return;
+      // `body:has([contenteditable]:focus) .cap-fab` hides the corner button
+      // while you are typing — shipped behaviour, and it would hide the very
+      // control we are asking you to tap.
+      (document.activeElement as HTMLElement | null)?.blur();
+      fab.hidden = false;
+      fab.focus();
+    }),
+  );
+
+  fab.addEventListener('click', () => {
+    if (!walking) return;
+    stage.append(walking.frame);
+    walking.onstage.hidden = false;
+    fab.hidden = true;
+    openDialog(stage);
+    walking.focus();
+  });
+
+  stage.addEventListener('close', () => {
+    if (!walking) return;
+    walking.home.after(walking.frame);
+    walking.onstage.hidden = true;
+    walking = null;
+  });
+</script>
