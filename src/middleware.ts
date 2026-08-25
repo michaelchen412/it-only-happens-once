@@ -216,6 +216,29 @@ export const onRequest = defineMiddleware(async (context, next) => {
       ? await loadAttention(supabase, context.locals.today.ymd)
       : NOTHING;
 
+    /*
+      ⚠ WHETHER THE ROSTER HAS ANYBODY — one fact, not the roster (plan 45 ·
+      Piece 3). The ✚ is mounted by the layout on every admin page, and its Log
+      tab may not exist on an empty roster: a control that asks a question with
+      no answers is what 10-hq §10b forbids. So the tab's PRESENCE is decided
+      here, and the roster itself is fetched by `people.roster` the first time
+      somebody actually opens that tab.
+
+      `head: true` — PostgREST returns the count in a header and no rows at all,
+      which is the difference between this and the thing §4d warned about. Under
+      the same `rendersChrome` gate as the badge, for the same reason: no public
+      page view pays for a number only Michael can see.
+    */
+    if (rendersChrome(context.request, context.url.pathname)) {
+      const { count } = await supabase
+        .from('people')
+        .select('id', { count: 'exact', head: true })
+        .is('archived_at', null);
+      context.locals.hasRoster = (count ?? 0) > 0;
+    } else {
+      context.locals.hasRoster = false;
+    }
+
     // Admin HTML is database-backed, per-user, and was never revalidated on
     // the server's instruction — so the browser was free to hand back a
     // snapshot on a soft reload, and bfcache would restore one wholesale on

@@ -101,6 +101,34 @@ export const people = {
    * avoided form means an empty roster, which is the failure mode the whole
    * workstream is written against.
    */
+  /**
+   * The roster, for a picker that is opened rather than rendered (plan 45 ·
+   * Piece 3). **Read-only.**
+   *
+   * ⚠ IT EXISTS SO THE LAYOUT DOES NOT HAVE TO CARRY THE LIST. `AdminLayout`
+   * mounts the ✚ on every admin page and needs to know only whether the Log tab
+   * should be there at all — `locals.hasRoster`, one `head: true` count. The
+   * names are wanted by whoever actually opens that tab, which is where this is
+   * called from.
+   *
+   * The slug travels because the ✚'s Log door navigates to a profile: the
+   * person picked in the corner IS the address of the destination, not a field
+   * in it.
+   */
+  roster: defineAction({
+    handler: async (_input, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase as DB;
+      const { data, error } = await sb
+        .from('people')
+        .select('id, display_name, slug')
+        .is('archived_at', null)
+        .order('display_name');
+      if (error) throw fail(error.message);
+      return data;
+    },
+  }),
+
   save: defineAction({
     accept: 'json',
     input: facts,

@@ -15,6 +15,7 @@
 // time the phone locked.
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
+import { announceFiled } from './jot-arrival';
 import { confirmDialog } from './confirm-dialog';
 import { wireEntryMeta } from './entry-meta';
 // Static, for the reason task-sheet.ts states at its own copy of this import.
@@ -151,6 +152,29 @@ if (zone) {
       { button: saveBtn, busy: 'Saving…', onError: showError },
     );
     if (!res.ok) return;
+
+    /*
+      ⚠ THE JOT IS CONSUMED LAST, after the entry exists (plan 45 · Piece 3, on
+      14 §10e's ordering). `announceFiled` reloads for us — and it is the same
+      call the task and event sheets make, so the one rule about who cleans up
+      after a filing has one implementation: the pile claims the event when it
+      can do the job, and nothing claims it here, so the jot is trashed.
+
+      Only on a NEW entry: correcting an existing one is not a filing, and
+      `editingId` is what tells them apart.
+    */
+    const jotId = editingId ? null : zone.dataset.seedFrom;
+    if (jotId) {
+      delete zone.dataset.seedFrom;
+      void announceFiled({
+        noteId: jotId,
+        what: 'an entry',
+        href: null,
+        undo: { kind: 'interaction', id: res.data?.id },
+      });
+      return;
+    }
+
     // Reload rather than patching: the count, the ordering, the last-contact
     // fact in the header and the card on the roster are all functions of the
     // row that just changed, and re-deriving four of them by hand is four
@@ -180,6 +204,29 @@ if (zone) {
       location.reload();
     }),
   );
+
+  /*
+    A jot the ✚ sent here (plan 45 · Piece 3). The Log tab named this person and
+    navigated; the words arrive with the page and go straight into the box.
+
+    ⚠ NO PARSE, UNLIKE THE AGENDA'S ARRIVAL. There is nothing here for a model
+    to read: what an entry needs beyond the words is a kind and a date, and both
+    already have honest defaults sitting in the meta row — hangout, today. The
+    agenda has to guess a date out of a sentence; this does not.
+
+    ⚠ `from` IS SCRUBBED, or a refresh re-seeds the box from a jot the save has
+    already consumed — and this box, unlike a dialog, is on screen the moment
+    the page loads.
+  */
+  const seedBody = zone.dataset.seedBody;
+  if (seedBody) {
+    delete zone.dataset.seedBody;
+    box.editor.commands.setContent(seedBody);
+    box.editor.commands.focus('end');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('from');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }
 
   // The initial paint. `grow()` used to lead here, sizing an empty textarea to
   // one line; the editor is already the height of its own content.

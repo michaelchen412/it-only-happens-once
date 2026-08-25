@@ -35,12 +35,21 @@ import TimelineZone, { type TimelineEntry } from '../../../components/admin/Time
 import SharedZone from '../../../components/admin/SharedZone.astro';
 import LinkSheet from '../../../components/admin/LinkSheet.astro';
 import { since } from '../../../lib/hq/interactions';
+import { jotSeed } from '../../../lib/hq/jot-seed';
 import { pickerOptions, sharedFor, type Shared } from '../../../lib/hq/links';
 
 const { slug } = Astro.params;
 const supabase = Astro.locals.supabase;
 
 const { data: person } = await supabase.from('people').select('*').eq('slug', slug!).maybeSingle<Person>();
+
+/*
+  ⚠ ARRIVING FROM THE ✚ — `?from=<jot id>` (plan 45 · Piece 3). The Log tab
+  names a person and navigates here, because a log entry's room IS somebody's
+  profile: the person is the address, not a field. The box below opens holding
+  the jot, and `log-box.ts` consumes it once the entry is actually saved.
+*/
+const seed = await jotSeed(supabase, Astro.url);
 
 // The blog's pattern rather than a redirect: a real 404 status with a page that
 // says so. A redirect to the roster would lose the fact that the address was
@@ -230,7 +239,14 @@ const birthdaySoon = !!(person && upcomingBirthday(person, todayYmd));
         <div class="hq-grid mt-6">
           <div class="col-main">
             <div class="o-2">
-              <TimelineZone person={person} entries={entries} roster={roster} today={todayYmd} />
+              <TimelineZone
+                person={person}
+                entries={entries}
+                roster={roster}
+                today={todayYmd}
+                seedBody={seed?.body ?? null}
+                seedFrom={seed?.id ?? null}
+              />
             </div>
           </div>
 

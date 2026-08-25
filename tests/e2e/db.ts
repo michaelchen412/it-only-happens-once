@@ -85,6 +85,13 @@ export async function sweepThrowaways(db: SupabaseClient<Database>): Promise<voi
   // People first: `person_works` carries a key into both, and deleting the
   // person takes its shelf rows with it. Works second, so a link whose person
   // survived a partial failure is already gone by the time the work is removed.
+  /*
+    Interactions first: a log entry written against a REAL person is not carried
+    away by any of the deletes below, and plan 45 · Piece 3 files a jot into one.
+    Keyed on the body, which is the field a spec — or a hand-driven check —
+    controls at both ends.
+  */
+  await db.from('interactions').delete().like('body', `${THROWAWAY}%`);
   await db.from('people').delete().like('slug', `${THROWAWAY}%`);
   await db.from('works').delete().like('slug', `${THROWAWAY}%`);
 

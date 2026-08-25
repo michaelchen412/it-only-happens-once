@@ -313,7 +313,49 @@ async function boot(dialog: HTMLDialogElement) {
     agenda: 'Agenda →',
     quote: 'Quote →',
     piece: 'Piece →',
+    log: 'Log →',
   };
+
+  /* ---- the Log tab's picker (plan 45 · Piece 3) ---------------------------
+     ⚠ THE PERSON IS THE ADDRESS, NOT A FIELD. Every other tab declares a room
+     and goes; a log entry's room is somebody's profile, so there is nowhere to
+     go until you have said who. Everything else an entry needs — the kind, the
+     date, who else was there — has an honest default and is collected there,
+     which is `LogSheet`'s own rule: *"there is no defensible default for whose
+     life this was."*
+
+     ⚠ AND THE ROSTER LOADS ON FIRST USE, not on render. The layout mounts this
+     dialog on every admin page and knows only `locals.hasRoster` — one count.
+     Fetching the names here would be plan 45 · §4d's cost paid by every page
+     view for a tab most of them never open. */
+  const whoRow = dialog.querySelector<HTMLElement>('[data-cap-who]');
+  const combo = document.getElementById('cap-who') as
+    | (HTMLElement & {
+        setOptions?: (o: { id: string; name: string }[]) => void;
+        getId?: () => string;
+        getName?: () => string;
+      })
+    | null;
+  /** `person id → slug`, because the profile is addressed by slug. */
+  const slugs = new Map<string, string>();
+  let rosterLoaded = false;
+
+  async function loadRoster() {
+    if (rosterLoaded || !combo) return;
+    rosterLoaded = true;
+    const { data, error } = await callAction(actions.people.roster());
+    if (error || !data) {
+      rosterLoaded = false; // let the next open try again
+      return flash('Couldn’t load the roster', true);
+    }
+    slugs.clear();
+    combo.setOptions?.(
+      data.map((p) => {
+        slugs.set(p.id, p.slug);
+        return { id: p.id, name: p.display_name };
+      }),
+    );
+  }
 
   let kind = 'jot';
   const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('[data-cap-tab]')];
@@ -322,7 +364,17 @@ async function boot(dialog: HTMLDialogElement) {
       kind = tab.dataset.capTab!;
       for (const t of tabs) t.setAttribute('aria-pressed', String(t === tab));
       doneBtn.textContent = DONE_LABEL[kind] ?? 'Done';
-      // The words are the point; a tap on the row must not cost you the caret.
+      if (whoRow) whoRow.hidden = kind !== 'log';
+      if (kind === 'log') {
+        void loadRoster();
+        // The words are usually already written by the time you say what they
+        // are; on this tab the unanswered question is who, so the caret goes
+        // there rather than back to a box you have finished with.
+        combo?.querySelector('input')?.focus();
+        return;
+      }
+      // Everywhere else the words are the point, and a tap on the row must not
+      // cost you the caret.
       editor.commands.focus('end');
     });
   }
@@ -344,10 +396,67 @@ async function boot(dialog: HTMLDialogElement) {
    * is the promise that matters.
    */
   async function fileAs(k: string) {
-    if (k === 'jot' || !ROUTES[k]) return close();
+    if (k === 'jot' || (!ROUTES[k] && k !== 'log')) return close();
     window.clearTimeout(timer);
     await save();
     if (!currentId) return close();
+
+    /*
+      ⚠ WHO FIRST, THEN THE PERSON ROW, THEN THE TRIP — and the jot is consumed
+      last of all, in the room at the other end. Every step leaves something you
+      can see if the next one fails: a jot in the pile, or a person on the roster
+      with no entry against them yet.
+
+      ⚠ CREATING SOMEBODY IS ALLOWED HERE (Michael, 2026-08-24: *"yes we can
+      create"*). "Coffee with Sam" where Sam is new is an ordinary capture, and
+      refusing it would send you to the roster and back for a name you have
+      already typed. `EntityCombo`'s own *＋ Add «name»* row is the affordance;
+      this is the write behind it.
+
+      ⚠ THE CIRCLE IS A PLACEHOLDER, AND IT HAS TO BE ONE. `people.save` demands
+      family | friends | professional and the ✚ was told a NAME — guessing which
+      circle somebody belongs to is a judgement about a relationship, and this
+      box has no business making it silently. What saves it is where you land:
+      their profile, with the circle on screen and one tap from correct. Any
+      default would be wrong sometimes; this one is wrong visibly.
+    */
+    if (k === 'log') {
+      const id = combo?.getId?.() ?? '';
+      const name = (combo?.getName?.() ?? '').trim();
+      if (!id && !name) {
+        // Not a disabled button — an inert control that looks live is the fault
+        // 14 §10f caught with a screenshot. It says what is missing, and puts
+        // the caret where the answer goes.
+        flash('Who was it?', true);
+        combo?.querySelector('input')?.focus();
+        return;
+      }
+      let slug = id ? slugs.get(id) : undefined;
+      if (!slug) {
+        // ⚠ THE NULLS ARE SPELLED OUT because `facts` is the PersonSheet's own
+        // schema, and that form submits every field. Nothing here is unknown in
+        // a way the sheet's blanks are not — a person the ✚ just met has no
+        // epithet and no birthday either — so the shape is honest rather than
+        // padding: what the ✚ was given is a name, and it says so in eight
+        // fields' worth of nothing.
+        const { data, error } = await callAction(
+          actions.people.save({
+            displayName: name,
+            circle: 'friends',
+            epithet: null,
+            location: null,
+            birthMonth: null,
+            birthDay: null,
+            birthYear: null,
+            knownSinceYear: null,
+          }),
+        );
+        if (error || !data) return flash('Couldn’t add them — the jot is still here', true);
+        slug = data.slug;
+      }
+      window.location.href = `/admin/people/${slug}?from=${encodeURIComponent(currentId)}`;
+      return;
+    }
 
     if (k === 'piece') {
       const fd = new FormData();

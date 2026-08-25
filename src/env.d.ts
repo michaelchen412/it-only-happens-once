@@ -44,6 +44,20 @@ declare global {
        * never has to ask whether it was computed.
        */
       attention: Attention;
+      /**
+       * Does the roster have anybody unarchived?
+       *
+       * ⚠ A FACT, NOT A LIST, and the distinction is the whole point (plan 45 ·
+       * Piece 3). The ✚'s Log tab must be ABSENT rather than empty when nobody
+       * is on the roster (10-hq §10b), so its presence has to be decided while
+       * the layout renders — but the people themselves are only wanted by the
+       * one person in a hundred page views who opens that tab, and fetching
+       * them here would put a roster read on every admin page. `people.roster`
+       * is where the list comes from, on demand.
+       *
+       * False on any request that renders no chrome.
+       */
+      hasRoster: boolean;
     }
   }
 }

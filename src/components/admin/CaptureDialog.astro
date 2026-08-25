@@ -46,8 +46,20 @@
 */
 import { Icon } from 'astro-icon/components';
 import EditorToolbar from './EditorToolbar.astro';
+import EntityCombo from './EntityCombo.astro';
 import LinkDialog from './LinkDialog.astro';
 import AltTextDialog from './AltTextDialog.astro';
+
+interface Props {
+  /**
+   * Does the roster have anybody? **The fact, not the list** — see
+   * `env.d.ts`'s note on `locals.hasRoster`. With nobody on it the Log tab is
+   * ABSENT rather than empty (10-hq §10b), which is the same rule `notes.astro`
+   * applies to its chooser row and `TaskSheet` to its goal picker.
+   */
+  hasRoster?: boolean;
+}
+const { hasRoster = false } = Astro.props;
 ---
 
 {
@@ -113,9 +125,20 @@ import AltTextDialog from './AltTextDialog.astro';
         what a screen reader is told. Whether it should GROW real tab semantics
         is plan 45 · §9's open question, not something to imply in the meantime.
 
-        ⚠ LOG IS NOT HERE YET. Its destination needs a person before a row can
-        exist at all, so it arrives with its picker in Piece 3 — an inert tab
-        would be the exact fault 14 §10f caught with a screenshot.
+        ⚠ LOG CARRIES A PICKER, AND IT IS THE ONLY TAB THAT DOES (Piece 3). The
+        other three declare a room and go; a log entry's room is a PERSON'S
+        profile, so the person is not a field in the destination — it is the
+        address of it, and there is nowhere to go until you have said who. Every
+        other thing an entry needs (the kind, the date, who else was there) has
+        an honest default and is collected there, which is `LogSheet`'s own
+        rule: *"there is no defensible default for whose life this was."*
+
+        ⚠ AND `When` AND `Said by` ARE NOT HERE, though plan 45 · §4c drew them.
+        Piece 2 put the parse in the DESTINATION room, which took the trip they
+        were saving: the task sheet reads "Friday" out of the sentence itself,
+        and the quote sheet asks who said it the moment you land in it. A field
+        in the corner that the next screen asks for anyway is not a shortcut,
+        it is the same question twice.
       */
     }
     <div class="cap-tabs" role="group" aria-label="Where this is going">
@@ -123,6 +146,13 @@ import AltTextDialog from './AltTextDialog.astro';
       <button type="button" class="cap-tab" data-cap-tab="agenda" aria-pressed="false">Agenda</button>
       <button type="button" class="cap-tab" data-cap-tab="quote" aria-pressed="false">Quote</button>
       <button type="button" class="cap-tab" data-cap-tab="piece" aria-pressed="false">Piece</button>
+      {
+        hasRoster && (
+          <button type="button" class="cap-tab" data-cap-tab="log" aria-pressed="false">
+            Log
+          </button>
+        )
+      }
     </div>
 
     <div id="cap-box" class="cap-box"></div>
@@ -134,6 +164,33 @@ import AltTextDialog from './AltTextDialog.astro';
         the thought all the way into a published essay. */
     }
     <EditorToolbar class="cap-tools" image />
+
+    {
+      /*
+        ⚠ SHOWN WITH THE TAB, NOT FOLDED BEHIND A CHIP. `/lab/capture`'s narrowed
+        column folded its one field on a phone to buy back pixels, and that was
+        right for a field you might not want. This is not one: press Log with
+        nobody named and there is no room to go to. Hiding the only question the
+        tab cannot proceed without would be hiding the tab's own meaning.
+
+        ⚠ THE OPTIONS ARRIVE LATE, ON PURPOSE. This renders empty and
+        `capture.ts` fills it the first time the tab is opened — `locals.hasRoster`
+        is what the layout knows, and the names are what one page view in a
+        hundred actually wants (plan 45 · §4d).
+      */
+    }
+    {
+      hasRoster && (
+        <div class="cap-who" data-cap-who hidden>
+          <label class="f">
+            <span class="f__k">
+              Who <em>required</em>
+            </span>
+            <EntityCombo id="cap-who" name="cap-who-name" idName="cap-who-id" noun="person" placeholder="Who was it?" />
+          </label>
+        </div>
+      )
+    }
 
     <div class="cap-foot">
       {

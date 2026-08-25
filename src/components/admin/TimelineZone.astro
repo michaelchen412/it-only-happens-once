@@ -38,8 +38,17 @@ interface Props {
   /** The rest of the roster, for the `with` picker. */
   roster: Pick<Person, 'id' | 'display_name' | 'photo_path'>[];
   today: Ymd;
+  /**
+   * A jot the ✚ sent here (plan 45 · Piece 3): its Markdown, and its id so the
+   * save can consume it. The box opens holding the words; everything else an
+   * entry needs — the kind, the date, who else was there — has an honest
+   * default and is answered in this room, which is why only the PERSON had to
+   * be named in the corner.
+   */
+  seedBody?: string | null;
+  seedFrom?: string | null;
 }
-const { person, entries, roster, today } = Astro.props;
+const { person, entries, roster, today, seedBody = null, seedFrom = null } = Astro.props;
 ---
 
 {
@@ -53,6 +62,8 @@ const { person, entries, roster, today } = Astro.props;
   icon="ph:note"
   accent="cn-sand"
   data-timeline
+  data-seed-body={seedBody ?? undefined}
+  data-seed-from={seedFrom ?? undefined}
   data-person-id={person.id}
   data-person-name={person.display_name}
   data-today={today}

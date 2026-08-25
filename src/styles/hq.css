@@ -3938,6 +3938,16 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   color: var(--color-base-content);
 }
 
+/* The Log tab's picker. One control, on its own line, between the toolbar and
+   the foot — where `/lab/capture` put a field once it was unfolded. */
+.cap-who {
+  padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--color-base-300);
+}
+.cap-who .entity-combo {
+  max-width: 20rem;
+}
+
 /* Under the box, never over it: the dialog has no title, and a strip of
    controls above the words would be chrome introducing something that needs no
    introduction. */

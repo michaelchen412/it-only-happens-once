@@ -425,7 +425,7 @@ const nav = [
     /* The ✚ belongs to the building, not to a room (10-hq §10c) — so it is
       mounted here, once, and every admin page gets it. */
   }
-  <CaptureDialog />
+  <CaptureDialog hasRoster={Astro.locals.hasRoster} />
   {/* Where the building is granted permission to speak first (21 · Phase 2). */}
   <NotificationsDialog />
   {/* the manager and library run long; the sheets bring their own */}
