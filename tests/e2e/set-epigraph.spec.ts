@@ -101,7 +101,16 @@ test.describe('the epigraph picker', () => {
       return { id: q.id, body: (q.body ?? '').replace(/\s+/g, ' ').trim() };
     });
 
-    await first.getByRole('button', { name: 'Use' }).click();
+    /*
+      ⚠ `exact`, AND WITHOUT IT THIS SPEC ROTS WITH THE CORPUS (2026-08-25).
+      Playwright matches an accessible name by SUBSTRING, case-insensitively —
+      and a fragment row's own text is a `<button>` too, the one that opens it.
+      So any first row whose words contain "use" matched as well: "used",
+      "house", "pause", and — the one that actually broke it — "because". The
+      failure was a strict-mode violation, which reads like a duplicated control
+      and is really a locator that depends on what Michael last wrote.
+    */
+    await first.getByRole('button', { name: 'Use', exact: true }).click();
 
     // The drawer goes — the decision is made, and there is only one to make.
     await expect(drawer).toBeHidden();

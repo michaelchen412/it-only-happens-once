@@ -25,11 +25,25 @@ export function stripMarkdown(md: string): string {
       // nothing. Before links, or the `!` would be left behind.
       .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      // Block marks, at the start of a line only.
-      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-      .replace(/^\s{0,3}>\s?/gm, '')
-      .replace(/^\s{0,3}([-*+]|\d+[.)])\s+/gm, '')
-      .replace(/^\s{0,3}([-*_])(\s*\1){2,}\s*$/gm, '')
+      /*
+        Block marks, at the start of a line only.
+
+        ⚠ `[ \t]`, NEVER `\s`, AND THIS COST A PARAGRAPH (2026-08-25). These
+        read `\s{0,3}` — "up to three spaces of indentation" — but `\s` matches
+        a NEWLINE, and with the `m` flag `^` sits immediately after one. So on
+        `care.\r\n\r\n### Part Two`, the three-character allowance happily ate
+        the `\r\n` that was the blank LINE, and the heading's words were left
+        joined to the end of the paragraph above it: `care.\rPart Two`.
+
+        It surfaced as a jot with headings arriving in a log entry one paragraph
+        short, and it is worth being exact about what was wrong: not the
+        stripping, which did its job, but the boundary the marker was also
+        carrying. CommonMark's allowance is horizontal space, and so is this.
+      */
+      .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')
+      .replace(/^[ \t]{0,3}>[ \t]?/gm, '')
+      .replace(/^[ \t]{0,3}([-*+]|\d+[.)])[ \t]+/gm, '')
+      .replace(/^[ \t]{0,3}([-*_])([ \t]*\1){2,}[ \t]*$/gm, '')
       // Inline marks. `~~` before `*`/`_` so a struck **bold** unwraps cleanly.
       .replace(/~~([^~]+)~~/g, '$1')
       .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')

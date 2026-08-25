@@ -201,6 +201,32 @@ describe('renderMarkdown — a task list is not a task', () => {
 });
 
 describe('stripMarkdown — the words, for a field that cannot render them', () => {
+  /*
+    ⚠ THE BLANK LINE IS PART OF THE WORDS. `\s{0,3}` allowed three characters of
+    "indentation" before a block marker — and `\s` matches a newline, so with
+    the `m` flag the allowance reached back across the blank LINE and deleted
+    it. A jot with headings then arrived in a log entry a paragraph short, its
+    heading run onto the end of the paragraph above.
+
+    Both endings are asserted because the body that found this was pasted, and
+    pasted text is where `\r\n` comes from.
+  */
+  it('⚠ keeps the blank line before a heading — both line endings', () => {
+    expect(stripMarkdown('One.\n\n## Two\n\nThree.')).toBe('One.\n\nTwo\n\nThree.');
+    expect(stripMarkdown('One.\r\n\r\n## Two\r\n\r\nThree.')).toBe('One.\r\n\r\nTwo\r\n\r\nThree.');
+  });
+
+  it('keeps the blank line before a quote, a list and a rule too', () => {
+    expect(stripMarkdown('One.\n\n> Two\n\nThree.')).toBe('One.\n\nTwo\n\nThree.');
+    expect(stripMarkdown('One.\n\n- Two\n\nThree.')).toBe('One.\n\nTwo\n\nThree.');
+    expect(stripMarkdown('One.\n\n---\n\nThree.')).toBe('One.\n\n\n\nThree.');
+  });
+
+  it('still allows the three spaces of indentation CommonMark does', () => {
+    expect(stripMarkdown('   ### Indented')).toBe('Indented');
+    expect(stripMarkdown('   - item')).toBe('item');
+  });
+
   it('unwraps inline marks', () => {
     expect(stripMarkdown('**call** the *dentist* about ~~the~~ `thing`')).toBe('call the dentist about the thing');
   });

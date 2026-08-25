@@ -165,6 +165,21 @@ test.describe('one goal', () => {
     if ((await card.count()) === 0) return false;
     await card.click();
     await expect(page.locator('.ghead')).toBeVisible();
+    /*
+      ⚠ WAIT FOR THE SCRIPT, NOT FOR THE MARKUP — and this cost four specs
+      (2026-08-25). `.ghead` is server-rendered: it is visible in the first
+      paint, and it says nothing whatever about whether `goal-sheet.ts` has
+      executed. So the clicks below were landing on controls with no listener
+      behind them yet, and three assertions failed on a page that was perfectly
+      correct. Driving the same click by hand after a settle showed the control
+      moving, staying moved, and no error — the product was never the problem.
+
+      `wireRadioGroups()` is the LAST line of `goal-sheet.ts`, after the status
+      and pin handlers are attached, and it stamps a roving tabindex on every
+      option. So the attribute is not a proxy for readiness — it is proof that
+      the code above it has run.
+    */
+    await expect(page.locator('[data-goal] [data-status]').first()).toHaveAttribute('tabindex', /^-?\d+$/);
     return true;
   };
 
@@ -173,7 +188,12 @@ test.describe('one goal', () => {
     // Not hidden behind a menu, and not a delete: abandoning a goal should be a
     // dignified act you take.
     for (const s of ['Active', 'Paused', 'Achieved', 'Let go']) {
-      await expect(page.locator('[data-goal]').getByRole('button', { name: s, exact: true })).toBeVisible();
+      // ⚠ `radio`, NOT `button`. These are `<button role="radio">` inside a
+      // `role="radiogroup"` (plan 38 · §6.3 made the group announce itself as
+      // one), and an explicit role REPLACES the implicit one — so a query for
+      // a button matched nothing and had been failing on every run since. The
+      // role in the query has to be the role in the markup.
+      await expect(page.locator('[data-goal]').getByRole('radio', { name: s, exact: true })).toBeVisible();
     }
   });
 
