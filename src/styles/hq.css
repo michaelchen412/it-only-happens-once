@@ -3932,7 +3932,7 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .cap-tab:hover {
   color: var(--color-base-content);
 }
-.cap-tab[aria-pressed='true'] {
+.cap-tab[aria-checked='true'] {
   border-color: var(--color-base-300);
   background: var(--color-base-200);
   color: var(--color-base-content);

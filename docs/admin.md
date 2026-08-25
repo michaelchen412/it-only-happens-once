@@ -29,8 +29,8 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Profile** | `/admin/people/[slug]` | One person, as a **full page** — a deliberate departure from §3.6's overlay rule, explained in §12. Fixed facts in a `dt`/`dd` strip, the **timeline** in the main column with its log box open at the head, **About** and **Shared** in the rail, and a pencil on the block it edits. On a phone the order inverts: About first, because you open a profile there to remember who somebody is, not to scroll a year of entries. |
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
-| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one box — a TipTap editor with the writing sheet's toolbar under it — that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
-| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil opens the room's one editor **in that card**, a bin deletes softly with an undo strip, and **→** opens the chooser holding all four destinations (task · log entry · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one box — a TipTap editor with the writing sheet's toolbar under it — that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. A row above the box **declares where the thought is going** — Jot · Agenda · Quote · Piece · Log — and **Done** names the room it takes you to. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil opens the room's one editor **in that card**, a bin deletes softly with an undo strip, and **→** opens the chooser holding all five destinations (task · log entry · quote · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
 | **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5d). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
@@ -373,6 +373,38 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   ⌘/Ctrl+Enter) parks the thought under its own id and hands over a blank. An
   empty box is never a row. It is a `<dialog>`, so you keep the room you were
   standing in, and there is no title field anywhere.
+- **The tab row declares a destination; it never becomes that destination's
+  form** ([ADR 0041](adr/0041-a-capture-surface-declares-a-destination.md)).
+  Whichever tab is lit, what the box writes while you type is a **note** —
+  because only the note tier can hold a half-typed thought, where `tasks.save`
+  wants a title, `interactions.save` wants a person and `saveQuote` wants words
+  and a sheet of provenance. The tab decides where **Done** sends you, and every
+  route goes through the same note→X plumbing the pile's chooser uses, ordering
+  and all: **write the destination, then consume the jot.** Abandon the sheet at
+  the other end and the jot is exactly where you left it.
+
+  | tab | where Done takes you |
+  | --- | --- |
+  | **Jot** | nowhere — it is already parked |
+  | **Agenda** | `/admin/agenda/tasks`, which reads the sentence and opens the task sheet on it; *make it an event instead* carries the same jot to the calendar |
+  | **Quote** | the Fragment Manager, with the quote sheet already holding the words |
+  | **Piece** | a status flip to `draft`, then the writing sheet on it |
+  | **Log** | a person's profile, with the log box holding the words |
+
+  ⚠ **Log is the only tab that asks for anything, and only because the person is
+  the ADDRESS.** An entry's room is somebody's profile, so there is nowhere to
+  go until you have said who; the kind and the date have honest defaults and are
+  answered there. It is absent entirely on an empty roster. The picker is
+  `EntityCombo` over the roster — loaded on first use, not on render, so an
+  admin page pays one `head: true` count and nothing more — and it **can create
+  somebody**, with a placeholder `circle` you land on the profile to correct.
+
+  ⚠ **The row is a `radiogroup`, not tabs**: it is an exclusive choice, arrow
+  keys walk it, and it takes one tab stop rather than five. `role="tab"` is
+  refused — there are no tabpanels and the row does not change what you are
+  looking at. **⌘/Ctrl+Enter stays a jot action** whatever is lit: it parks and
+  hands over a blank, which is the opposite of leaving the room.
+
 - **⚠ Both note editors are TipTap, since 2026-08-06 — and until then the ✚
   box was required to be a plain `<textarea>`, forever.** The decision, its
   alternatives and the trade it accepts are
@@ -410,7 +442,11 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   (`lib/markdown-plain.ts` — dependency-free, because the real renderer must
   never reach the browser). **Add to a piece…** is the exception and appends
   Markdown to Markdown on the server, which is the one destination that wants
-  it whole.
+  it whole. ⚠ **Stripping keeps the line structure, including the blank line
+  before a block marker** — the allowance for indentation is horizontal space
+  only. It read `\s{0,3}` until 2026-08-25, and `\s` matches a newline, so
+  removing a `###` ate the blank line before it and ran a heading onto the end
+  of the paragraph above.
 - **Its own room, showing the words.** `/admin/notes` renders each dump as its
   own text, newest-touched first, with an elapsed stamp. A pencil puts an
   editor in the card in place — reading is the dominant motion there, so a tap
@@ -434,9 +470,9 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   "you're done here" under the `blur` rule a textarea could use. What means
   done is a pointer landing somewhere that is neither the card nor a window the
   card opened.
-- **Four ways out, behind one → chooser.** Reading (a pencil) and discarding (a
-  bin) are direct; the four destinations sit behind one control, because they
-  are not four questions — they are one question, *what kind of thing is this?*,
+- **Five ways out, behind one → chooser.** Reading (a pencil) and discarding (a
+  bin) are direct; the destinations sit behind one control, because they are not
+  several questions — they are one question, *what kind of thing is this?*,
   asked once. The menu is a top-layer popover (trap 7) positioned against the
   card that opened it.
   - **Add to the Agenda…** reads the sentence first (§5d) and opens whichever
@@ -447,6 +483,16 @@ an uncomfortable third thing between a piece of writing and a scratch line.
     and date have honest defaults; there is no defensible default for whose life
     this was, so Save stays disabled until somebody is named. **The row is
     absent entirely when the roster is empty.**
+  - **Make it a quote…** is the only destination that **leaves the room**, and
+    the reason is the sheet rather than the motion: the quote sheet is two
+    `EntityCombo`s over every author and work, plus subjects and Shared by, and
+    mounting that here would hang three more queries on a room whose whole job
+    is opening fast. So the jot travels as an id and the corpus room does the
+    collecting — the same arrival a profile's *Add a quote* has always used.
+    **Not a status flip** like its neighbour below: a quote is a different
+    *kind* and wants attribution the jot never carried, so it is a create, and
+    the jot is consumed only when the quote is saved. **No undo strip**, which
+    follows from leaving: the strip is on this page and you will not be.
   - **Make it a piece** flips the row to `draft`: same id, same text, same
     history, no copy.
   - **Add to a piece…** picks an existing writing fragment and appends the dump

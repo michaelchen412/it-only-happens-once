@@ -41,6 +41,7 @@
 // that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
 import { callAction } from './action-error';
+import { pick, wireRadioGroups } from './radio-group';
 import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
 
@@ -216,6 +217,18 @@ async function boot(dialog: HTMLDialogElement) {
   // toolbar and the foot as well, and a keystroke inside the editor bubbles
   // here anyway. Nothing in TipTap binds Mod-Enter, so nothing is being stolen.
   dialog.addEventListener('keydown', (e) => {
+    /*
+      ⚠ ⌘/Ctrl+Enter STAYS A JOT ACTION, whatever the tab says (Piece 4, closing
+      plan 45 · §9's third question). It parks this thought and hands over a
+      blank one — a motion for emptying your head, three or four dumps in a row
+      without leaving the box.
+
+      Filing is the opposite of that: it takes you out of the room. Binding the
+      same keys to it would mean the fastest way to keep dumping had quietly
+      become the fastest way to be somewhere else, and the difference would only
+      show up once you had already gone. Done is where leaving lives, and it
+      names the room it is taking you to.
+    */
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       void startNew();
@@ -359,14 +372,34 @@ async function boot(dialog: HTMLDialogElement) {
 
   let kind = 'jot';
   const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('[data-cap-tab]')];
+  // Arrow keys and one tab stop, from the same wiring every other segmented
+  // control in the Observatory uses. It only FOLLOWS `aria-checked`; `pick` is
+  // what moves it (see radio-group.ts).
+  wireRadioGroups(dialog);
   for (const tab of tabs) {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', (e) => {
       kind = tab.dataset.capTab!;
-      for (const t of tabs) t.setAttribute('aria-pressed', String(t === tab));
+      // ⚠ `'cap-tab'` — the attribute as it is SPELLED IN THE MARKUP, never the
+      // camel-case `dataset` key. radio-group.ts carries the whole account of
+      // what that confusion cost the goal sheet.
+      pick(dialog, 'cap-tab', kind);
       doneBtn.textContent = DONE_LABEL[kind] ?? 'Done';
       if (whoRow) whoRow.hidden = kind !== 'log';
+      if (kind === 'log') void loadRoster();
+
+      /*
+        ⚠ ONLY A POINTER MOVES THE CARET, AND ARROW KEYS MUST NOT (Piece 4).
+        `wireRadioGroup` walks this row by calling `.click()` on the next
+        option — so putting the caret back in the box on every click meant the
+        FIRST arrow key yanked focus out of the group and the second one went
+        to the editor instead. The row was navigable exactly one step, which is
+        the sort of half-working a keyboard user meets and a mouse never does.
+
+        `detail` is the discriminator the DOM already provides: a real press
+        counts clicks and reports 1 or more; a synthesised one reports 0.
+      */
+      if (e.detail === 0) return;
       if (kind === 'log') {
-        void loadRoster();
         // The words are usually already written by the time you say what they
         // are; on this tab the unanswered question is who, so the caret goes
         // there rather than back to a box you have finished with.

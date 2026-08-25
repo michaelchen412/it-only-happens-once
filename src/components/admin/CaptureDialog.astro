@@ -118,12 +118,19 @@ const { hasRoster = false } = Astro.props;
         it. The tab decides where **Done** sends it, and the destination room
         does the collecting.
 
-        ⚠ NO `role="tab"`, DELIBERATELY. Tab semantics promise roving tabindex
-        and arrow-key movement, and this row has neither — `AgendaTabs` is the
-        house precedent and it is a `<nav>` with `aria-current` for the same
-        reason. A group of pressed buttons is what this actually is, and it is
-        what a screen reader is told. Whether it should GROW real tab semantics
-        is plan 45 · §9's open question, not something to imply in the meantime.
+        ⚠ A RADIOGROUP, NOT TABS AND NOT PRESSED BUTTONS (Piece 4, closing
+        plan 45 · §9's fourth question). Piece 2 shipped this as `role="group"`
+        with `aria-pressed`, deliberately refusing to imply keyboard behaviour
+        it did not have. What it is, though, is an exclusive choice among five —
+        which is the distinction `goal-sheet.ts` already draws beside its own
+        pin: *"status is a CHOICE between four exclusive options, and the pin is
+        one switch that is either on or off."* So it takes the shape the
+        Observatory already has for that (plan 38 · §6.3), and `wireRadioGroups`
+        gives it arrow keys and ONE tab stop instead of five — which on a box
+        you reach by keyboard is the difference that matters.
+
+        `role="tab"` stays refused: there are no tabpanels here, and the row
+        does not switch what you are looking at. It says where the words go.
 
         ⚠ LOG CARRIES A PICKER, AND IT IS THE ONLY TAB THAT DOES (Piece 3). The
         other three declare a room and go; a log entry's room is a PERSON'S
@@ -141,14 +148,36 @@ const { hasRoster = false } = Astro.props;
         it is the same question twice.
       */
     }
-    <div class="cap-tabs" role="group" aria-label="Where this is going">
-      <button type="button" class="cap-tab" data-cap-tab="jot" aria-pressed="true">Jot</button>
-      <button type="button" class="cap-tab" data-cap-tab="agenda" aria-pressed="false">Agenda</button>
-      <button type="button" class="cap-tab" data-cap-tab="quote" aria-pressed="false">Quote</button>
-      <button type="button" class="cap-tab" data-cap-tab="piece" aria-pressed="false">Piece</button>
+    {
+      /*
+        ⚠ THE ROVING TABINDEX IS IN THE MARKUP, NOT ONLY IN THE SCRIPT, and an
+        a11y spec caught the difference. `wireRadioGroups` maintains it — but it
+        runs inside `boot()`, which is the LAZY half of this dialog (24 · Piece
+        5), so between first paint and the composer warming, a `role="radiogroup"`
+        was sitting there with five tab stops in it. Nobody could reach them
+        through a closed `<dialog>`, which is exactly why it would have gone
+        unnoticed: the contract the role promises was false in the DOM, and only
+        a check that reads the DOM would ever say so.
+
+        The server knows which one is checked, so it can say so. `pick()` and
+        the roving tabindex take over from here.
+      */
+    }
+    <div class="cap-tabs" role="radiogroup" aria-label="Where this is going">
+      <button type="button" class="cap-tab" role="radio" data-cap-tab="jot" aria-checked="true" tabindex="0">Jot</button
+      >
+      <button type="button" class="cap-tab" role="radio" data-cap-tab="agenda" aria-checked="false" tabindex="-1">
+        Agenda
+      </button>
+      <button type="button" class="cap-tab" role="radio" data-cap-tab="quote" aria-checked="false" tabindex="-1">
+        Quote
+      </button>
+      <button type="button" class="cap-tab" role="radio" data-cap-tab="piece" aria-checked="false" tabindex="-1">
+        Piece
+      </button>
       {
         hasRoster && (
-          <button type="button" class="cap-tab" data-cap-tab="log" aria-pressed="false">
+          <button type="button" class="cap-tab" role="radio" data-cap-tab="log" aria-checked="false" tabindex="-1">
             Log
           </button>
         )
