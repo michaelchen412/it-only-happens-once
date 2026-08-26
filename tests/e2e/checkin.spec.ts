@@ -151,8 +151,14 @@ test.describe('the check-in, before it has been answered', () => {
     await expect(zone.getByRole('button', { name: 'Start' })).toBeVisible();
     await expect(zone.getByRole('button', { name: 'Skip', exact: true })).toBeVisible();
 
-    // NOT A WALL. On a bad morning the day has to be reachable in one tap, so
-    // there is no dialog and nothing is modal.
+    // NOT A WALL, and this line is the whole of that rule (11-checkin.md §4.1).
+    //
+    // ⚠ IT SURVIVED THE FORM BECOMING A SHEET ON 2026-08-26 UNCHANGED, AND THAT
+    // IS THE POINT — what the rule forbids is a modal you WAKE UP BEHIND, so it
+    // is a claim about ARRIVAL. Nothing is open when the page loads; the drawer
+    // exists only after you press Start. Do not weaken this to
+    // `dialog[data-panel="fill"]:not([open])` if some other dialog ever lands on
+    // Today: the assertion that matters is that NOTHING greets you modally.
     await expect(page.locator('dialog[open]')).toHaveCount(0);
     await expect(zone).toBeVisible();
 
@@ -171,8 +177,16 @@ test.describe('the check-in, before it has been answered', () => {
     await page.goto('/admin');
     await startBlank(page);
 
-    await expect(page.locator('[data-panel="fill"]')).toBeVisible();
-    await expect(page.locator('[data-panel="ask"]')).toBeHidden();
+    // ⚠ THE FORM ARRIVES AS A MODAL SHEET, AND THE ASK IS DELIBERATELY STILL
+    // THERE BEHIND IT. This asserted `[data-panel="ask"]` was HIDDEN until
+    // 2026-08-26, when the fill panel became a `<dialog>` — and the card
+    // underneath is now left in its resting state on purpose, the way every
+    // page in this building is left under a sheet. Hiding it would mean the
+    // 0.28s slide out of a dismissal played over an empty card.
+    const sheet = page.locator('dialog[data-panel="fill"]');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveJSProperty('open', true);
+    await expect(page.locator('[data-panel="ask"]')).toBeVisible();
     // Opening a form is not an answer, so it must not write one.
     expect(seen()).toEqual([]);
   });
@@ -544,4 +558,103 @@ test('⚠ pressing B is not "leaving the field", so it does not post', async ({ 
   await page.locator('#ci-note-wrap .tt-btn[data-cmd="bold"]').click();
   await expect(page.locator('#ci-note-wrap .tt-btn[data-cmd="bold"]')).toHaveAttribute('aria-pressed', 'true');
   expect(seen().length, 'a formatting click is not an edit and must not save').toBe(before);
+});
+
+/**
+ * ⚠ THE FORM BECAME A SHEET ON 2026-08-26, AND A SHEET OWES ADR 0032 AN ANSWER
+ * ON ALL THREE WAYS OUT. Before that there was exactly one — a Done button —
+ * and none of the three gestures below existed to be got wrong.
+ *
+ * They take `openForm` (either door) rather than `startBlank`, deliberately:
+ * every one asserts a property of the SHEET, which is as true of a prefilled
+ * form as of an empty one, and `startBlank` skips on any day Michael has
+ * already answered — which is most days, and would have left the new exits
+ * covered by nothing at all.
+ *
+ * Nothing here writes: `stub` answers every check-in call with the row it asked
+ * for, and each test touches no control before leaving, so no save is even
+ * pending. Leaving reloads (the summary is rendered from the ROW, never from
+ * the browser's idea of it), which is why each assertion is about the sheet
+ * being GONE rather than about what replaced it.
+ */
+test.describe('leaving the form', () => {
+  test('⚠ Escape gets out from INSIDE a mini editor, where ProseMirror eats the key', async ({ page }) => {
+    await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+    const sheet = page.locator('dialog[data-panel="fill"]');
+
+    // ⚠ THE CARET HAS TO BE IN THE EDITOR, or this passes on the wrong thing.
+    // `prosemirror-view`'s `captureKeyDown` preventDefaults Escape
+    // unconditionally, so the keydown's default never survives to become the
+    // dialog's `cancel` — the event `wireSheetDismiss` binds. With focus
+    // anywhere else on the card the native path works and this proves nothing;
+    // with focus in here, only `checkin.ts`'s own keydown can close the sheet.
+    // capture.ts paid for this lesson first, in the box you dump thoughts into.
+    const reveal = page.getByRole('button', { name: 'A line about today' });
+    if (await reveal.isVisible()) await reveal.click();
+    await page.locator('[data-field="note"] [contenteditable]').click();
+
+    await page.keyboard.press('Escape');
+    await expect(sheet, 'Escape inside the note left the sheet standing').toBeHidden();
+  });
+
+  test('the backdrop is a way out, and the card behind is still the card', async ({ page }) => {
+    await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+    const sheet = page.locator('dialog[data-panel="fill"]');
+
+    // ⚠ THE PRESS IS AT VIEWPORT COORDINATES, NOT AT A `position` INSIDE THE
+    // SHEET, and the difference is the whole mechanism. `.drawer-dialog` pins
+    // itself right at `max-w-lg`, so the <dialog> element's own box IS the
+    // drawer — `position: { x: 4 }` lands on the sheet's left edge, inside it.
+    // What `backdrop-close.ts` waits for is `e.target === dialog`, which is what
+    // the dimmed area to the LEFT of the drawer reports.
+    //
+    // down and up at one point, because the press has to both start and end
+    // there: a text selection dragged out of a sheet is not a dismissal.
+    const box = (await sheet.boundingBox())!;
+    await page.mouse.move(box.x - 60, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect(sheet, 'a press on the backdrop left the sheet standing').toBeHidden();
+
+    // And Morning is still Morning: the zone is not a panel the sheet took with
+    // it, and the routine at its foot is outside every panel by design.
+    await expect(page.locator('[data-checkin]')).toBeVisible();
+  });
+
+  test('Done is the same exit as the other two, not a fourth thing', async ({ page }) => {
+    await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+    const sheet = page.locator('dialog[data-panel="fill"]');
+
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(sheet, 'Done left the sheet standing').toBeHidden();
+  });
+
+  test('⚠ and there is no discard guard on the way out, because nothing is unsaved', async ({ page }) => {
+    // ADR 0032's FIRST legal answer, asserted rather than asserted-in-a-comment:
+    // every tap on this card wrote immediately and every keystroke is flushed on
+    // the way past, so dismissing costs nothing and must not stop to ask. A
+    // confirm over a form with nothing to lose is the kind readers learn to
+    // click through — and then it protects nothing anywhere in the building.
+    //
+    // ⚠ THE ONE STATE THAT DOES GUARD IS A FAILED SAVE (`checkin.ts`), which is
+    // not reachable here: `stub` answers every call. That branch is the reason
+    // this assertion has to be narrow — "no confirm" is true of the happy path
+    // only, and the happy path is the whole of ordinary use.
+    await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+
+    await page.locator('[data-star="sleep_quality"][data-v="3"]').click();
+    await expect(page.locator('[data-saved]')).toHaveText(/Saved/);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog').filter({ hasText: 'Discard changes?' })).toHaveCount(0);
+    await expect(page.locator('dialog[data-panel="fill"]')).toBeHidden();
+  });
 });

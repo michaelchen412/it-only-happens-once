@@ -90,21 +90,38 @@ test.describe('the check-in at 390px', () => {
     await ensureOn(page.locator('[data-wake="many"]'));
     await ensureOn(page.locator('[data-aid="antihistamine"]'));
     await page.getByRole('button', { name: 'A long waking' }).click();
-    await page.getByRole('button', { name: 'Add a nap' }).first().click();
+    // ⚠ `[data-add-nap]`, NOT `getByRole('Add a nap').first()`. TWO buttons wear
+    // that name — the form's, and the summary's shortcut into it
+    // (`data-add-nap-from-done`) — and until 2026-08-26 only one was ever in the
+    // tree at a time, because opening the form HID the summary. It is a sheet
+    // now, so the card behind keeps its panel and `.first()` resolves to the
+    // summary's, which sits under a modal backdrop and can never be clicked.
+    // The role query was always the loose one; the attribute says which button.
+    await page.locator('[data-add-nap]').click();
 
-    const escaping = await page.locator('.zone').evaluateAll((zones) =>
-      zones.flatMap((zone) => {
+    // ⚠ A SHEET IS MEASURED AGAINST ITSELF, NOT AGAINST THE CARD IT SITS IN.
+    // Since 2026-08-26 the fill form is a `<dialog>` INSIDE `[data-checkin]`
+    // (FillPanel.astro says why it stays in the tree), which makes it a DOM
+    // descendant of `.zone` and a TOP-LAYER sibling of it: its box is the
+    // viewport's, not the card's. Measured against the zone's inset content
+    // edge, every control in the form would report an overflow of exactly the
+    // card's own padding — a page-wide red that says nothing about whether
+    // anything is sheared. So each container is measured against its own
+    // descendants, and `closest('dialog')` is what assigns an element to one.
+    const escaping = await page.locator('.zone, dialog[data-panel="fill"][open]').evaluateAll((containers) =>
+      containers.flatMap((zone) => {
         const box = zone.getBoundingClientRect();
         const cs = getComputedStyle(zone);
         const right = box.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
         const left = box.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+        const own = zone.tagName === 'DIALOG' ? zone : null;
         return (
           [...zone.querySelectorAll('*')]
             // Only what is actually drawn — see the note in
             // admin-layout.mobile.spec.ts. A hidden panel and an SVG sprite both
             // report an all-zero rect, which reads as an overflow of exactly the
             // zone's left inset on every single element.
-            .filter((el) => el.getClientRects().length > 0 && !el.closest('svg'))
+            .filter((el) => el.getClientRects().length > 0 && !el.closest('svg') && el.closest('dialog') === own)
             .map((el) => {
               const r = el.getBoundingClientRect();
               return {
@@ -117,7 +134,7 @@ test.describe('the check-in at 390px', () => {
         );
       }),
     );
-    expect(escaping, `content escaping its card at 390px: ${JSON.stringify(escaping)}`).toHaveLength(0);
+    expect(escaping, `content escaping its card or sheet at 390px: ${JSON.stringify(escaping)}`).toHaveLength(0);
   });
 
   test('the value words are measured, not assumed to fit', async ({ page }) => {

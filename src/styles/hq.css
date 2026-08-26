@@ -687,6 +687,9 @@ a.row__t:hover {
 .ck [data-fs='naps'] {
   order: 4;
 }
+/* Vestigial in the fill SHEET, where the foot is a sibling of the scroller
+   rather than a child of `.ck` — and kept because it still says the true thing
+   in the one place it can still apply. */
 .ck__foot {
   order: 9;
 }
@@ -1207,14 +1210,25 @@ a.row__t:hover {
   border-color: var(--cn);
 }
 
+/* The fill sheet's footer, and it is the building's sheet footer with ONE
+   deviation: `space-between` rather than `gap-2`, because this is a three-part
+   foot — Skip, the save state, Done — and the save state is a sentence about the
+   whole form rather than a control queuing behind the others. Everything else
+   (the `bg-base-200` band, the rule, `shrink-0`, `py-3`) is GoalSheet's. */
 .ck__foot {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-top: 1.125rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-base-300);
+  background: var(--color-base-200);
+}
+@media (min-width: 640px) {
+  .ck__foot {
+    padding-inline: 1.5rem;
+  }
 }
 
 /* The backfill banner. Filling in a past day must never feel like filling in

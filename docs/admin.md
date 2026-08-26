@@ -114,6 +114,16 @@ second primary; an HQ sheet is a short form where *abandon* is a real intention.
 ⚠ This is **not** the column ADR 0032 settled — that record's table has exactly
 these columns minus this one. Do not add Cancels to make the halves match.
 
+⚠ **The check-in sheet is a third shape and is exempt from both halves** (§11):
+it has **no Save**, because every tap already wrote, and therefore **no Cancel**,
+because a Cancel means *abandon* and there is nothing here to abandon — offering
+one would promise an undo the card cannot perform. Its foot is Skip · the save
+state · **Done**, and *Done* means leave. It is the same exemption
+[`sheet.ts`](../src/scripts/sheet.ts) grants `writing-sheet.ts` for the same
+reason, and the test of it is the one that file states: a sheet belongs to the
+shared shell only if it has **something to lose, an error line, and an explicit
+save**. This one has the middle term and neither of the others.
+
 **A primary names what it commits** — *Save quote*, *Save song*, *Save set*,
 *Add task*, *Save changes*. ⚠ **A bare `Save` is legal when the surface commits
 exactly one object and something above it names that object**: the composer's
@@ -937,18 +947,26 @@ theme you actually chose. *(It followed the system colour scheme until
 
 *The first HQ surface. Schema in [data-model.md](data-model.md) §6b; the boundary it sits behind in [ADR 0012](adr/0012-hq-is-a-private-second-domain.md).*
 
-It is the **Morning zone on Today**, pinned first and always present — answered or not. It is deliberately **not a modal and not a wall**: it is a card that dismisses, so the day behind it is reachable in one tap.
+It is the **Morning zone on Today**, pinned first and always present — answered or not. It is deliberately **not a wall**: what greets you is a card that dismisses, so the day behind it is reachable in one tap.
 
-**It is not a form you submit.** One row per local date, upserted as you go. A tap saves immediately; typing debounces and flushes on blur. There is no Save button, because the thing a Save button implies — that the answers are provisional until you press it — is false. "Done" only closes the card.
+**It is not a form you submit.** One row per local date, upserted as you go. A tap saves immediately; typing debounces and flushes on blur. There is no Save button, because the thing a Save button implies — that the answers are provisional until you press it — is false. "Done" only leaves.
 
-**Four states, all rendered from the same row:**
+**Four states, all rendered from the same row — and one of them is a sheet:**
 
 | State | What it is |
 |---|---|
-| **ask** | The prompt. One tap to start, one to skip. |
-| **fill** | The form, prefilled from the row — or, on today only, from your recent medians. |
-| **done** | A compact summary with a pencil back into the form. |
-| **skipped** | Explicit, recorded, and reversible. Skipping never wipes answers already given. |
+| **ask** | The prompt, inline on the card. One tap to start, one to skip. |
+| **fill** | **A `<dialog>` drawer** (`max-w-lg`) — the form, prefilled from the row, or on today only from your recent medians. |
+| **done** | A compact summary, inline, with a pencil back into the form. |
+| **skipped** | Explicit, recorded, and reversible, inline. Skipping never wipes answers already given. |
+
+**⚠ `fill` became a sheet on 2026-08-26, and it does not reopen "not a wall".** Michael, from use: *"why is the sleep form not a sheet? it's kind of annoyingly stretched out the today summary."* It had — open, ~500 lines of controls sat inside `col-main`, so Agenda and Coming up were pushed a screen down and the rail was stranded beside a column three times its height. The rule the card is built on guards **arrival**: a modal you *wake up behind* on a despair morning is what the original brief forbids, and the ask, the skip and the summary are all still inline on a card you can scroll straight past. A drawer you reach by pressing **Start** is a door you opened. Skip is one tap on both sides of it.
+
+Three things it gained beyond the column. The `<dialog>` **lives inside the zone**, so `checkin.ts`'s single `[data-checkin]` root still finds every control by selector and the zone's cascade (`--cn`, `.zone fieldset`) still reaches it — the top layer escapes the ancestor `overflow`/`z-index` without leaving the DOM. The **phone gains the keyboard inset**: `--kb` is only consumed by `.drawer-dialog`, so until now the two mini editors sat under the software keyboard with no runway to lift the caret. And at 390px the form is **~29px wider** than it was inside the card.
+
+**Four ways out, and they are one decision** — Done, the ✕, Escape and the backdrop all run the same exit: flush anything pending, let the 0.28s slide finish, then reload so the summary behind is rendered from the **row** rather than from the browser's idea of it. ⚠ **Escape is claimed by hand**, because ProseMirror `preventDefault`s it unconditionally and the sheet holds two mini editors — without that, Escape from inside the dream field would do nothing at 7am.
+
+**⚠ What dismissing costs, per [ADR 0032](adr/0032-a-sheet-is-dismissible-and-says-what-that-costs.md): nothing, unless the save failed.** Every tap wrote immediately, so the happy path has **no discard guard and must never grow one**. The one exception is a save that genuinely failed — and there it **confirms rather than refuses**, because offline a refusal would trap you inside a modal that will not close, which is the exact failure that ADR names. ⚠ This also **changed Done**: it used to flush and reload unconditionally, so a Done pressed over a dead network discarded the morning *and* the sentence saying it had.
 
 **What it records, and why those shapes**, is in [data-model.md](data-model.md) §6b — the two star scales that must not be merged, the two affect axes that must not become one, and the buckets that are honest where a number would be a guess.
 

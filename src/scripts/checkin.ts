@@ -32,6 +32,8 @@
 // type-only in its imports, so it costs the bundle nothing but the functions.
 import { actions } from 'astro:actions';
 import { callAction, formatActionError } from './action-error';
+import { closeWithExit, openDialog } from './dialog-close';
+import { confirmDiscard, wireSheetDismiss } from './sheet-dismiss';
 // Static, for the reason task-sheet.ts states at its own copy of this import.
 import { mountMiniEditor, type RichEditorHandle } from './rich-editor';
 import { signalAttention } from './attention';
@@ -59,15 +61,31 @@ if (zone) {
   const derivedEl = $<HTMLElement>('[data-derived]');
 
   // ── panels ──────────────────────────────────────────────────────────────
+  // Four of the five are inline blocks on the card; `fill` is a sheet
+  // (FillPanel.astro has the account). It keeps `data-panel="fill"` so "is the
+  // form showing?" stays one selector, which costs this loop one guard:
+  //
+  // ⚠ `:not(dialog)` IS NOT TIDINESS. A closed `<dialog>` is already
+  // `display: none`, so hiding it would be a no-op — but the ATTRIBUTE would
+  // persist, and Tailwind's preflight `[hidden] { display: none }` is an author
+  // rule that beats the UA's `dialog[open] { display: block }`. So the first
+  // `show()` after a close would arm a sheet that opens into nothing on the tap
+  // after that: `showModal()` succeeds, `[open]` is set, and the box never
+  // paints. Leave the dialog's visibility to `open`/`close` alone.
   function show(panel: string) {
-    $$('[data-panel]').forEach((p) => (p.hidden = p.dataset.panel !== panel));
+    $$('[data-panel]:not(dialog)').forEach((p) => (p.hidden = p.dataset.panel !== panel));
     const edit = $<HTMLElement>('[data-edit]');
     if (edit) edit.hidden = panel !== 'done';
   }
   show(zone.dataset.panelInitial!);
 
-  $('[data-go="fill"]')?.addEventListener('click', () => show('fill'));
-  $('[data-edit]')?.addEventListener('click', () => show('fill'));
+  // Null on a date outside the backfill window — the parent renders no form at
+  // all there, and everything below is guarded by `writable` for the same reason.
+  const sheet = $<HTMLDialogElement>('dialog[data-panel="fill"]');
+  const openFill = () => sheet && openDialog(sheet);
+
+  $('[data-go="fill"]')?.addEventListener('click', openFill);
+  $('[data-edit]')?.addEventListener('click', openFill);
 
   if (!writable) {
     // Nothing below this point can run: there is no form to run it against.
@@ -225,6 +243,18 @@ if (zone) {
     let timer: number | undefined;
     let inFlight = false;
     let dirty = false;
+    /**
+     * Has anything been answered since the last save that LANDED?
+     *
+     * ⚠ THIS IS `dirtyTracker`'s TRAP ONE, AND THE FORM CANNOT USE THE SHARED
+     * ONE. Populating is not an edit — and this form is populated by the SERVER
+     * from the row, and again by the prefill, so a DOM-event tracker would call
+     * an untouched card dirty. These two flags are set from the save path
+     * instead, which only runs when a tap or a keystroke asked it to.
+     */
+    let pending = false;
+    /** Did the last attempt fail? The one state in which leaving costs something. */
+    let failed = false;
 
     function note(msg: string, bad = false) {
       if (!savedEl) return;
@@ -251,10 +281,13 @@ if (zone) {
           if (error) {
             // Deliberately not retried on a loop and deliberately not cleared:
             // the words on screen must not outlive their truth.
+            failed = true;
             note(error.message || 'Not saved — check your connection', true);
             return;
           }
         } while (dirty);
+        pending = false;
+        failed = false;
         note('Saved');
 
         // The sidebar pill, the burger pill and the window title (20 · §7).
@@ -280,6 +313,7 @@ if (zone) {
         // subsequent save was silently swallowed as a duplicate. A check-in
         // that quietly stops saving is the exact failure this feature cannot
         // have. Caught by `checkin.spec.ts`, on its first ever run.
+        failed = true;
         note('Not saved — check your connection', true);
       } finally {
         inFlight = false;
@@ -288,11 +322,13 @@ if (zone) {
 
     /** A tap: save now. */
     const now = () => {
+      pending = true;
       clearTimeout(timer);
       void flush();
     };
     /** Typing: settle first. */
     const soon = () => {
+      pending = true;
       note('Saving…');
       clearTimeout(timer);
       timer = window.setTimeout(flush, 800);
@@ -467,7 +503,7 @@ if (zone) {
     // own way in — straight to an empty row, rather than back through a form
     // about last night.
     $('[data-add-nap-from-done]')?.addEventListener('click', () => {
-      show('fill');
+      openFill();
       const naps = $<HTMLElement>('[data-fs="naps"]');
       naps?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       addNap();
@@ -536,14 +572,84 @@ if (zone) {
     // `input` this form can hear. No `textarea[data-field]` remains.
 
     // ── leaving ───────────────────────────────────────────────────────────
-    // "Done" is not a submit: everything is already saved. It flushes anything
-    // still pending and then reloads, so the summary that replaces the form is
-    // rendered from the ROW rather than from the browser's idea of it.
-    $('[data-done]')?.addEventListener('click', async () => {
+    // "Done" is not a submit: everything is already saved. EVERY way out lands
+    // here — Done, the ✕, Escape and the backdrop — because ADR 0032's first
+    // legal answer is *almost* always true of this sheet: dismissing it costs
+    // NOTHING. A tap wrote immediately, and typing is flushed on the way past.
+    //
+    // ⚠ SO THE HAPPY PATH HAS NO DISCARD GUARD AND MUST NEVER GROW ONE. A
+    // confirm over a form with nothing to lose is the kind readers learn to
+    // click through, and then it protects nothing anywhere in the building. The
+    // single exception is the one state where the premise is false — a save
+    // that FAILED — and it is argued at the branch itself below.
+    //
+    // ⚠ THE FLUSH IS AWAITED, THE EXIT IS AWAITED, AND THE RELOAD FOLLOWS BOTH
+    // — the same order and the same two reasons as capture.ts. A `close()` in
+    // the same frame never renders the slide on any WebKit engine, and a
+    // `location.reload()` on the next line tears the page down a frame or two
+    // into it. The reload is what makes the summary behind agree with the row:
+    // it is rendered from the ROW rather than from the browser's idea of it.
+    let leaving = false;
+    async function leave() {
+      // Four listeners point here and two of them can fire on one gesture
+      // (Escape below claims the default, but a slow flush leaves a window in
+      // which Done is still clickable). Reloading twice is not a bug you would
+      // ever see; flushing twice against a half-typed dream is.
+      if (leaving) return;
+      leaving = true;
       clearTimeout(timer);
-      await flush();
+      // ⚠ ONLY IF SOMETHING IS ACTUALLY WAITING. A bare `await flush()` posts
+      // the whole form on every exit — including an exit from a card nobody
+      // touched — and offline that turns a clean dismissal into a failure, and
+      // then (below) into a confirm about edits that do not exist.
+      if (pending) await flush();
+
+      // ⚠⚠ THE ONE STATE IN WHICH DISMISSING THIS SHEET COSTS SOMETHING, and it
+      // is why the sheet has a guard at all. ADR 0032 asks every sheet what its
+      // exit costs; the honest answer here is *nothing, unless the save failed*
+      // — and it is the failure this whole file is written around ("failure is
+      // loud"; the offline outbox that reported success it did not have).
+      //
+      // ⚠ IT IS A CONFIRM, NEVER A REFUSAL. Offline, one tap on one chip would
+      // otherwise trap you inside a modal that will not close — the exact
+      // failure ADR 0032 names, whose next move is the browser Back button and
+      // costs far more than the sheet would have. So the words are still on
+      // screen and leaving is still one gesture; it just has to be meant.
+      //
+      // ⚠ AND `data-done` LANDS HERE TOO, WHICH IS A BEHAVIOUR CHANGE. Done
+      // used to `flush()` and then reload unconditionally — so a Done pressed
+      // over a dead network discarded the morning AND the sentence saying it
+      // had. Three exits had to be given an answer; giving the fourth the same
+      // one is how they stay one decision.
+      if (failed && !(await confirmDiscard('This check-in'))) {
+        leaving = false;
+        return;
+      }
+      if (sheet) await closeWithExit(sheet);
       location.reload();
-    });
+    }
+    $('[data-done]')?.addEventListener('click', () => void leave());
+
+    if (sheet) {
+      wireSheetDismiss(sheet, () => void leave());
+
+      // ⚠ ESCAPE HAS TO BE CLAIMED BY HAND ON ANY SHEET HOLDING A MINI EDITOR,
+      // and this card holds two — the dream and the note. ProseMirror's
+      // `captureKeyDown` preventDefaults Escape unconditionally, so inside
+      // either editor the keydown's default never survives to become the
+      // dialog's `cancel` — which is the event `wireSheetDismiss` binds. The
+      // sheet would simply sit there, at 7am, mid-sentence. capture.ts found
+      // this the expensive way and its note carries the full account.
+      //
+      // preventDefault here keeps the two paths mutually exclusive: focus on a
+      // chip or on Done is outside the editor, where nothing swallows the key
+      // and the native `cancel` would otherwise run a second exit on top.
+      sheet.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        void leave();
+      });
+    }
 
     const setSkipped = async (skipped: boolean) => {
       // ⚠ SKIP HAD NO CATCH while the autosave above has carried one since the
@@ -557,6 +663,10 @@ if (zone) {
         note(formatActionError(error), true);
         return;
       }
+      // Skip is reachable from the sheet's foot as well as from the ask panel,
+      // and a reload out from under an open dialog rips it off the screen
+      // mid-frame. Let it leave first; from the ask panel this is a no-op.
+      if (sheet?.open) await closeWithExit(sheet);
       location.reload();
     };
     $$<HTMLButtonElement>('[data-skip]').forEach((b) => b.addEventListener('click', () => setSkipped(true)));

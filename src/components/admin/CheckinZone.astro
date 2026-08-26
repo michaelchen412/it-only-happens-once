@@ -9,17 +9,30 @@
   below is rendered from the same row.
 
   IT IS ALSO NOT A WALL. It is the first card on Today and it dismisses; on a
-  bad morning it must be possible to reach the day in one tap. There is no
-  modal, no streak, no count of missed days, and no completeness meter — an
-  unfinished check-in is a check-in.
+  bad morning it must be possible to reach the day in one tap. No streak, no
+  count of missed days, no completeness meter — an unfinished check-in is a
+  check-in.
+
+  ⚠ THE FORM BECAME A SHEET ON 2026-08-26 AND THAT RULE IS UNTOUCHED, because
+  the rule was never about modality — it is about what greets you. What greets
+  you is `ask`: two sentences and two buttons, inline, on a card you can scroll
+  straight past. The wall 11-checkin.md §4.1 forbids is a modal you WAKE UP
+  BEHIND; a drawer you reach by pressing Start is a door you opened. Skip is one
+  tap on both sides of it, and `skipped` never leaves the card at all.
+
+  What forced the move was the column: open, the form was ~500 lines of controls
+  inside `col-main`, so Agenda and Coming up sat a screen below the fold and the
+  rail was stranded beside a column three times its height (Michael: *"kind of
+  annoyingly stretched out the today summary"*). See FillPanel.astro.
 
   FOUR PANELS, all server-rendered from the row, shown one at a time:
-    ask       no answers yet — one tap to start, one to skip
-    fill      the form, prefilled from the row (or from your medians)
-    done      the compact summary, with a pencil back into the form
+    ask       no answers yet — one tap to start, one to skip      · inline
+    done      the compact summary, with a pencil back into the form · inline
     skipped   explicit, recorded, reversible — never a gap and never a scold
+    fill      the form, prefilled from the row (or from your medians) · A SHEET
 
-  Everything that moves between them is `src/scripts/checkin.ts`.
+  Everything that moves between them is `src/scripts/checkin.ts`, which still
+  finds all four by `[data-panel]` — the dialog carries its own.
 
   ══ THE LAYOUT, REDRAWN 2026-08-06 ══════════════════════════════════════════
   The night stopped being one sleep and the dream stopped being one dream, and
