@@ -211,7 +211,7 @@ const payload = (t: Task) =>
               <ul class="zone__list pb-2">
                 {scheduled.map((t) => (
                   <li
-                    class:list={['task', `task--${t.priority}`]}
+                    class:list={['task', t.priority !== 'normal' && `task--${t.priority}`]}
                     data-task={payload(t)}
                     data-id={t.id}
                     data-due-on={t.due_on}
@@ -278,7 +278,7 @@ const payload = (t: Task) =>
               <ul class="zone__list pb-2">
                 {unscheduled.map((t) => (
                   <li
-                    class:list={['task', `task--${t.priority}`]}
+                    class:list={['task', t.priority !== 'normal' && `task--${t.priority}`]}
                     data-task={payload(t)}
                     data-id={t.id}
                     data-due-on={t.due_on}

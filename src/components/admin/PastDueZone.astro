@@ -71,7 +71,7 @@ const more = rows.length - shown.length;
           <div
             class:list={[
               'row',
-              `task--${t.priority}`,
+              t.priority !== 'normal' && `task--${t.priority}`,
               t.answeredAs === 'done' && 'task--done',
               t.answeredAs === 'skipped' && 'task--skipped',
             ]}

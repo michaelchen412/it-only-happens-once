@@ -2526,7 +2526,15 @@ a.row__t:hover {
 
 /* PRIORITY IS PROMINENCE, AND PROMINENCE IS NOT COLOUR (§3). Weight and ink
    only: a red high-priority task beside a red overdue one makes both
-   meaningless. */
+   meaningless.
+
+   ⚠ THERE IS NO `.task--normal`, AND THE FOUR TEMPLATES DO NOT EMIT ONE
+   (2026-08-26). `normal` is the baseline the other two deviate from, so a
+   modifier for it is a class that styles nothing — which is exactly what
+   `phantom-classes.spec.ts` exists to catch, and it had been red on it. The
+   alternative was the hook allowlist, and that list is for classes something
+   SELECTS; nothing selects this one. Emitting a modifier that means "no
+   modification" is how a class family starts lying about which members matter. */
 .task--high .task__t,
 .task--high .row__t {
   font-weight: 700;

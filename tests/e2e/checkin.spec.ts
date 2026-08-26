@@ -612,10 +612,17 @@ test.describe('leaving the form', () => {
     // What `backdrop-close.ts` waits for is `e.target === dialog`, which is what
     // the dimmed area to the LEFT of the drawer reports.
     //
+    // ⚠⚠ AND THE POINT IS A CONSTANT, NOT `boundingBox().x - 60`. Measuring the
+    // drawer to aim at it is measuring something MOVING: it slides in over
+    // 0.28s, so a box read on the first frame reports the sheet still most of
+    // the way off the right edge, and 60px left of *that* is inside the drawer
+    // by the time the press lands. It passed alone, where the read happened
+    // late enough, and failed inside the full suite. The far left of the window
+    // is backdrop for the whole animation and needs no measurement at all.
+    //
     // down and up at one point, because the press has to both start and end
     // there: a text selection dragged out of a sheet is not a dismissal.
-    const box = (await sheet.boundingBox())!;
-    await page.mouse.move(box.x - 60, box.y + 200);
+    await page.mouse.move(24, 300);
     await page.mouse.down();
     await page.mouse.up();
     await expect(sheet, 'a press on the backdrop left the sheet standing').toBeHidden();

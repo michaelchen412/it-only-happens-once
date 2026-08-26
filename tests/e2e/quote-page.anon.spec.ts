@@ -368,15 +368,41 @@ test.describe('an essay the Reader had to FETCH', () => {
       `.reader-scroll` is the scroller. The box kept its 8px gap while the essay
       moved out from under it. Adjacency, not a fixed edge: near the viewport
       floor the box legitimately flips above its trigger.
+
+      ⚠⚠ AND BELOW `sm` THE INVARIANT IS A DIFFERENT ONE, WHICH IS WHY THIS SPEC
+      WAS RED ON A PRODUCT THAT WAS RIGHT (fixed 2026-08-26). A `--wide` reveal
+      at ≤639px deliberately STOPS being an anchored popover and becomes a bottom
+      sheet — Reveal.astro argues it at length: a five-row box has no room under
+      a trigger halfway down a phone, and a tooltip that fills the screen "is a
+      modal pretending to be a tooltip, dismissed by tapping a part of the screen
+      whose point the reader can no longer see." `place()` returns early for it
+      and CSS pins it to the floor. Asking a sheet to sit 24px from its trigger
+      asks it to stop being a sheet; it measured 51px and was correct.
+
+      So the mobile question is the one that actually matters there: does it stay
+      PINNED while the essay scrolls under it? That is the same defect in the
+      same clothes — a box that drifts away from the reader's thumb — and it is
+      what the window-vs-scroller bug would have broken here too.
     */
-    const adjacency = async () =>
-      page.evaluate(() => {
-        const t = document.querySelector('#site-reader .reader-inner .rv__trigger')!.getBoundingClientRect();
+    const isSheet = await pop.evaluate(
+      (el) => el.classList.contains('rv__pop--wide') && matchMedia('(max-width: 639px)').matches,
+    );
+
+    /** Anchored: the gap to the trigger, whichever side it took. Sheet: the gap to the viewport floor. */
+    const drift = async () =>
+      page.evaluate((sheet) => {
         const p = document.querySelector('#site-reader .rv__pop')!.getBoundingClientRect();
+        if (sheet) return Math.abs(window.innerHeight - p.bottom);
+        const t = document.querySelector('#site-reader .reader-inner .rv__trigger')!.getBoundingClientRect();
         return Math.min(Math.abs(p.top - t.bottom), Math.abs(t.top - p.bottom));
-      });
-    expect(await adjacency()).toBeLessThan(24);
+      }, isSheet);
+
+    expect(await drift()).toBeLessThan(24);
     await page.evaluate(() => document.querySelector('#site-reader .reader-scroll')!.scrollBy(0, -120));
-    await expect.poll(adjacency, { message: 'the popover stayed put while the sheet moved' }).toBeLessThan(24);
+    await expect
+      .poll(drift, {
+        message: isSheet ? 'the sheet came unpinned from the floor' : 'the popover stayed put while the sheet moved',
+      })
+      .toBeLessThan(24);
   });
 });

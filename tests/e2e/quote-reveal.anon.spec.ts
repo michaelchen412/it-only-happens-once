@@ -110,9 +110,30 @@ test.describe('opening and closing', () => {
 // usual tooltip habit, and the reveal-lab bench showed why it is wrong here: the
 // attribution sits directly beneath the quote, so above covers the words being
 // read. This is the assertion that keeps it that way.
+//
+// ⚠ THE TRIGGER IS CENTRED, NOT `scrollIntoViewIfNeeded`, AND THAT IS THE WHOLE
+// FIX (2026-08-26). `scrollIntoViewIfNeeded` scrolls the MINIMUM, so at 390×844
+// it left the first attribution's bottom at 844.375 — a third of a pixel PAST
+// the floor. `place()` then correctly took its documented escape hatch (`below`
+// is false when `roomBelow < roomAbove` near the viewport floor, because below
+// would render off-screen entirely) and this spec read the escape hatch as a
+// regression in the default. It was red for weeks on a product that was right.
+//
+// Centring asks the question the test name asks: given room, does it open down?
+// The floor case is a separate assertion below, so weakening one does not
+// silently delete the other.
+//
+// ⚠ `behavior: 'instant'` IS LOAD-BEARING, and leaving it out cost a second
+// diagnosis. `app.css:172` sets `scroll-behavior: smooth` site-wide, so a bare
+// `scrollIntoView` returns having scrolled NOTHING — measured here at 390px:
+// `scrollY` was still 0 on the next line and only reached 429 about half a
+// second later. The click therefore landed on a trigger still sitting at the
+// floor, and the spec went on failing in exactly the way it had before, which
+// is the worst possible outcome for a fix. Playwright's own
+// `scrollIntoViewIfNeeded` waits for stability; the raw DOM call does not.
 test('opens BELOW the line, so it never covers the quote', async ({ page }) => {
   const t = page.locator(TRIGGER).first();
-  await t.scrollIntoViewIfNeeded();
+  await t.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
   await t.click();
   const trig = await t.boundingBox();
   const pop = await page.locator(`${POP}:popover-open`).boundingBox();
@@ -120,6 +141,31 @@ test('opens BELOW the line, so it never covers the quote', async ({ page }) => {
   expect(pop!.y, 'the citation opens into the gap below, not over the words').toBeGreaterThanOrEqual(
     trig!.y + trig!.height,
   );
+});
+
+// ⚠ THE ONE CASE THAT MAY GO ABOVE, PINNED SO IT STAYS A DELIBERATE EXCEPTION.
+// `reveal.ts` says it in writing: *"Above survives only for a trigger genuinely
+// at the viewport floor, where below would show nothing at all."* Between a
+// cramped box and a covered line the line wins — but between a covered line and
+// a box the reader cannot see at all, the box wins, because an invisible
+// popover is a control that did nothing.
+//
+// So what is actually guaranteed everywhere is the weaker, truer thing: the box
+// is ON SCREEN and adjacent to its trigger. Assert that, and the flip is
+// recorded as a decision rather than rediscovered as a bug.
+test('at the very floor it may flip above — but it stays on screen and stays attached', async ({ page }) => {
+  const t = page.locator(TRIGGER).first();
+  await t.scrollIntoViewIfNeeded(); // the minimum scroll — lands it at the floor
+  await t.click();
+  const trig = (await t.boundingBox())!;
+  const pop = (await page.locator(`${POP}:popover-open`).boundingBox())!;
+  const vh = page.viewportSize()!.height;
+
+  expect(pop.y, 'the citation opened off the top of the screen').toBeGreaterThanOrEqual(0);
+  expect(pop.y + pop.height, 'the citation opened off the bottom of the screen').toBeLessThanOrEqual(vh + 1);
+  // Adjacency in whichever direction it took, with the 8px GAP plus slack.
+  const gap = Math.min(Math.abs(pop.y - (trig.y + trig.height)), Math.abs(trig.y - (pop.y + pop.height)));
+  expect(gap, 'the citation detached from the words it belongs to').toBeLessThan(24);
 });
 
 // A control that opens onto an empty box teaches you to stop pressing it. Most

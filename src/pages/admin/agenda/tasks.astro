@@ -159,7 +159,7 @@ const payload = (t: Task) =>
                       <li
                         class:list={[
                           'task',
-                          `task--${t.priority}`,
+                          t.priority !== 'normal' && `task--${t.priority}`,
                           t.answeredAs === 'done' && 'task--done',
                           t.answeredAs === 'skipped' && 'task--skipped',
                         ]}

@@ -15,6 +15,42 @@
 import type { Page } from '@playwright/test';
 import { test, expect, stubActions } from './fixtures';
 
+/**
+ * The first row on the page that has NOT been answered yet.
+ *
+ * ⚠ `.first()` IS NOT SAFE HERE, AND THIS FILE IS THE THIRD PLACE THIS REPO HAS
+ * LEARNED IT. The suite runs read-only against the LIVE project, so the top row
+ * carries whatever Michael actually did this morning — and on 2026-08-26 it was
+ * *"Clean up back door area"*, already ticked, rendering `task--done` from the
+ * server. A tick on an answered row is an UNDO, so the two specs below asserted
+ * done-then-undone against a row that ran undone-then-done and failed in
+ * perfect mirror image. Neither was a product bug; the handler
+ * (`scripts/task-list.ts`) only moves the class after the action returns clean.
+ *
+ * It is the same lesson as `checkin.spec.ts`'s `startBlank` (*"unanswered is
+ * not the same as empty"*) and `checkin.mobile.spec.ts`'s `ensureOn` (an option
+ * that *"arrived already pressed"*, so a blind click switched it OFF on exactly
+ * the days the data existed). Both were written down; neither reached this
+ * file. Ask the DOM what state the row is in — never assume one.
+ */
+const UNANSWERED = ['today', 'week']
+  .map((g) => `[data-group="${g}"] [data-task]:not(.task--done):not(.task--skipped)`)
+  .join(', ');
+
+/**
+ * ⚠ AND IT RETURNS A ROW PINNED BY ID, NOT THE `:not()` LOCATOR ITSELF. A
+ * Playwright locator re-queries on every assertion, so a selector that excludes
+ * `.task--done` stops matching the instant the tick lands — the row does not
+ * fail the assertion, it VANISHES from it ("element(s) not found"), which reads
+ * as a missing row rather than a passing one. Find it by state once, then hold
+ * it by identity.
+ */
+async function unansweredId(page: Page): Promise<string | null> {
+  const first = page.locator(UNANSWERED).first();
+  return (await first.count()) === 0 ? null : first.getAttribute('data-id');
+}
+const rowById = (page: Page, id: string | null) => page.locator(`[data-task][data-id="${id}"]`);
+
 const openEditor = async (page: Page) => {
   await page.goto('/admin/agenda/tasks');
   // `.first()`, not a role query: the empty room carries BOTH "New" and "Add
@@ -259,8 +295,9 @@ test.describe('the room', () => {
 
   test('⚠ a tick STAYS, struck through, and the same click undoes it', async ({ page }) => {
     await page.goto('/admin/agenda/tasks');
-    const row = page.locator('[data-group="today"] [data-task], [data-group="week"] [data-task]').first();
-    test.skip((await row.count()) === 0, 'nothing scheduled to tick');
+    const id = await unansweredId(page);
+    test.skip(id === null, 'nothing scheduled and still unanswered to tick');
+    const row = rowById(page, id);
     await stubActions(page, {
       'tasks.dispose': () => ({ id: 'x', eventId: 'e', nextDueOn: null, archived: true }),
       'tasks.undo': () => ({ id: 'x', dueOn: '2026-08-03' }),
@@ -278,8 +315,9 @@ test.describe('the room', () => {
 
   test('a failed disposition says so and leaves the row alone', async ({ page }) => {
     await page.goto('/admin/agenda/tasks');
-    const row = page.locator('[data-group="today"] [data-task], [data-group="week"] [data-task]').first();
-    test.skip((await row.count()) === 0, 'nothing scheduled to tick');
+    const id = await unansweredId(page);
+    test.skip(id === null, 'nothing scheduled and still unanswered to tick');
+    const row = rowById(page, id);
     await stubActions(page, {});
 
     await row.locator('.tick').click();
