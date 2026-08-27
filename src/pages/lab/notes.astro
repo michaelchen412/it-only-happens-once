@@ -1,0 +1,1596 @@
+---
+/*
+  /lab/notes — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  THE QUESTION, Michael 2026-08-26: *"I noticed when I was working through my
+  notes that sometimes I wish I had a full editor. If I have to make a very
+  large document or just dump a bunch of information, it's not really super nice
+  to have to scroll the entire page. You lose context of everything else. If I
+  just dump a bunch of stuff, it becomes a huge, stretched-out editor, and I
+  can't browse anything else."*
+
+  ⚠ THE ASYMMETRY THIS BENCH IS BUILT AROUND, and it is a fact rather than a
+  preference. The pile is bounded when READING and unbounded when EDITING:
+
+    · `.dump__text--clamped` (hq.css) caps a long card at 16rem with a mask fade
+      and offers `more`.
+    · `.dump__shell .jot-prose` (hq.css) sets a `min-height` of 3.25rem and NO
+      maximum, so the one shared editor grows to the full height of whatever
+      document it is handed.
+
+  So a 900-word dump sits as a tidy card until you press ✎, and then the page
+  IS that note. That is the stretch, and it is why `capped` below is on the
+  bench as a correctness fix rather than as a proposition.
+
+  ⚠ THE TRAP: THE DEAD DOOR, REBUILT. `Add ▾ → Note` used to open a
+  near-fullscreen sheet and the pile was built to kill it — *"the exact cost §2
+  was written to remove"* (plan 14's LOG entry). Read again, the objection was
+  the TITLE FIELD, not the fullscreen: *"I have to title these things… I see
+  untitled, untitled, untitled."* So `focus` and `split` below ask for nothing
+  — no title, no slug, no tabs, no publish — and if either wins, that is the
+  line that must hold when it ships.
+
+  ⚠ AND THE RIVAL THAT IS NOT ON THE BENCH IS ALREADY IN THE ROOM. → **Make a
+  piece** is one status flip and puts the thought in the real composer. If a
+  long dump is a piece in waiting, the answer is that this bench is unnecessary
+  — which is a legitimate outcome and the first thing to check while looking.
+
+  ── WHAT IS REAL HERE, AND WHAT IS NOT ──────────────────────────────────────
+
+  14 §11a's rule: prototype the thing in question, not just the pixels.
+
+    REAL · the editor. `mountRichEditor` from `src/scripts/rich-editor.ts`, with
+           the pile's own options — `docClass: 'jot-prose'`, `breaks: true`, the
+           shipped `EditorToolbar`. Typing, the toolbar and paste behave here as
+           they do there.
+    REAL · ONE editor for the whole pile, moved. The shipped room's constraint
+           (notes.astro: *"a room that lists a hundred jottings cannot mount a
+           hundred of those"*) is what makes `focus` cheap, so the bench honours
+           it instead of mounting four. ProseMirror survives the move — same
+           node either side of it, the /lab/capture finding.
+    REAL · the CSS. `.dump`, `.dump__text`, the 16rem clamp and the shell's
+           metrics are hq.css's, not retyped. `.drawer-dialog` is admin.css's,
+           so the drawer already answers the phone keyboard (`--kb`) for free.
+    REAL · the numbers. Page height, visible editor, reachable notes and taps
+           MEASURED live, not claimed. Same argument as plan 38's ratios: a
+           quoted number goes stale, a measured one cannot.
+    NOT  · the save. `fragments.saveWriting`, the 700ms debounce and the
+           concurrency token are IDENTICAL under all four propositions — none of
+           them touches the write path, which is the argument for building any
+           of this. Writing rows here would only breed junk in the real pile.
+    NOT  · images. `EditorToolbar` is mounted without `image`, so no upload path
+           and no Supabase browser client. Settled and unaffected.
+    NOT  · the filing. Every destination — on the card, in the chooser, in the
+           drawer's foot — PRINTS the row it would write and does not write it.
+           All five already exist in the room and none of them is in question;
+           what is judged is where they LIVE once there is a drawer to hold them.
+    NOT  · the glyph. `⤢` is a character, because an icon cannot render without
+           an `astro.config` allowlist line and the MARK is not what this bench
+           decides. `/lab/chrome` added one line for `rss-simple` because there
+           the mark WAS the question; here it is not.
+
+  ⚠ THE SECOND QUESTION, ADDED AFTER THE FIRST LOOK (2026-08-26). Split won on
+  sight — *"I like the split definitely the most"* — and immediately exposed the
+  half that was not built: *"I feel like we're wasting some opportunity in that
+  view to include more actions like make this a quote, append to writing,
+  delete… it's missing a lot of obvious ui ux."* True, and the fix is not simply
+  to transplant the card's foot, because that foot's shape was ARGUED FOR at
+  card scale (14 · Piece 2: three controls, not six). The bar's second toggle
+  builds both spellings — behind → and standing in the open — so the transplant
+  has to win rather than arrive by default.
+
+  ⚠ THE PHONE, WHICH IS THE THIRD QUESTION AND THE ONE WITH A HARD ANSWER
+  (2026-08-26). Michael: *"how will this look on mobile, because it's hard to
+  have both the editor and the sidebar to browse."* At 390px it is not hard, it
+  is impossible — a 16rem rail beside a readable measure wants ~640px. So below
+  768px the two panes stop being side by side and the rail slides OVER the note,
+  reached by one button that exists only where the rail cannot be. Split does not
+  degrade into Focus: the pile stays one tap away, which is the whole
+  proposition, and the button is the only thing the phone adds.
+
+  ⚠ THE BUDGET IS MEASURED, because plan 45 proved this is the number that
+  decides a capture surface — its fields-in-the-box cost 319px of chrome at
+  390px and left *~16px of words* on a 375×667 with the keyboard up. Drive the
+  bar's `phone keyboard` control and read it here: at 390×780 with `--kb: 300px`
+  the drawer is 480px, chrome is 177px, and **303px of words survive**. That is
+  the number to argue with.
+
+  ⚠ ONE SOURCE, FOUR RENDERS — the /lab/chrome rule. There is one pile, one
+  editor and one drawer; a proposition is `data-v` on the wrapper plus where the
+  shell is put. So no variant can be a prettier copy of another, and the whole
+  experiment deletes in one file.
+
+  ⚠ THE SAMPLE DECIDES THE WINNER, so the pile is mixed on purpose. Four of
+  these are jottings, and under `focus` a jotting costs a full-screen drawer to
+  fix a typo — which is the case that can lose it the decision. The monster at
+  the bottom is the case that raised the question. Judge both, and remember the
+  pile you actually keep is mostly the short ones.
+*/
+import Base from '../../layouts/Base.astro';
+import { Icon } from 'astro-icon/components';
+import EditorToolbar from '../../components/admin/EditorToolbar.astro';
+import LinkDialog from '../../components/admin/LinkDialog.astro';
+import { renderMarkdown } from '../../lib/markdown';
+// The Observatory's primitives, exactly as an admin page gets them: `hq.css`
+// from AdminLayout, `admin.css` inlined by `app.css` (which `Base` brings).
+import '../../styles/hq.css';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+/**
+ * The four propositions. `today` is a CONTROL, not a candidate — without it the
+ * other three are judged against a memory of the problem rather than against
+ * the problem.
+ *
+ * `cost` is what shipping it would take, stated so the cheap answer cannot win
+ * by looking expensive or vice versa.
+ */
+const VARIANTS = [
+  {
+    key: 'today',
+    label: 'Today',
+    claim: 'In the card, unbounded. What ships right now.',
+    cost: 'nothing — this is the shipped room',
+  },
+  {
+    key: 'capped',
+    label: 'Capped',
+    claim: 'In the card, but the surface stops at 55vh and scrolls inside itself.',
+    cost: '~8 lines of CSS, no script',
+  },
+  {
+    key: 'focus',
+    label: 'Focus',
+    claim: 'The same editor, lifted into a near-fullscreen drawer. Nothing to fill in.',
+    cost: 'a drawer shell + ~40 lines: one more destination for a shell that already travels',
+  },
+  {
+    key: 'split',
+    label: 'Split',
+    claim: 'The drawer, with the rest of the pile as a rail you can move between.',
+    cost: 'Focus, plus a rail and note-to-note handover without closing',
+  },
+] as const;
+
+/**
+ * The pile. Written as Markdown because a dump genuinely is Markdown since
+ * 2026-08-06, and the monster carries headings, a list and bold so the drawer
+ * is judged against a document with structure rather than against a wall.
+ */
+const DUMPS = [
+  {
+    id: 'a',
+    ago: '11 minutes ago',
+    body: 'Ask the dentist about the night guard when they call back — and whether the old one can be re-fitted rather than remade.',
+  },
+  {
+    id: 'b',
+    ago: '2 hours ago',
+    body: 'A room that shows the words is a different promise from a room that shows the titles.\n\nKeep that sentence.',
+  },
+  {
+    id: 'c',
+    ago: 'yesterday',
+    body: `The thing I keep circling: every tool I have ever liked was one that let me put something down without first deciding what it was. The ones I abandoned all asked a question at the door — which notebook, which project, which tag — and the question is never expensive on its own. It is expensive because it arrives at the exact moment the thought is least willing to sit still.
+
+So the test for anything I build here is not how good it is once you are inside it. It is what it costs to get in.`,
+  },
+  {
+    id: 'd',
+    ago: 'two days ago',
+    body: `### What the check-in is actually for
+
+Not a mood tracker. A mood tracker asks you to rate a day, and a rating is a summary — by the time you can give one honestly the day has already been flattened into a number you will not recognise in a month.
+
+The check-in asks smaller questions and keeps the answers as words, which means:
+
+- the answer is re-readable later, and a number is not
+- near-synonyms are allowed to both stand, because the gap between them is the information
+- an unanswered day stays unanswered rather than defaulting to fine
+
+**The failure mode to watch** is the form growing a field every time I notice something the form did not capture. That is how a check-in becomes a chore, and a chore gets skipped, and a skipped day is worth less than a shallow one.`,
+  },
+  {
+    id: 'e',
+    ago: 'four days ago',
+    body: `## Reading dump — attention, and why the observatory metaphor keeps holding
+
+Long one, sorry. Getting it down before it evaporates.
+
+### The claim I want to steal
+
+The book's argument is that attention is not a resource you spend but a *shape* you hold. You do not run out of it the way you run out of money; you lose the shape and then everything you look at afterwards is looked at with the wrong instrument. That is a much better account of what a bad day feels like than "I was tired." I was not tired. I was holding the wrong shape and every input got processed by it.
+
+If that is right then the useful question at the end of a day is not *how much did I get done* but *what shape was I in, and what put me there*. Which is more or less what the check-in already asks, by accident. Worth making deliberate.
+
+### Where it argues with itself
+
+Two chapters later there is a long section on interruption that quietly reverts to the resource model — interruptions are described as costing you something, with a recovery time, which is exactly the accounting the first half rejected. I do not think this is a contradiction so much as an admission that the resource model is easier to write policy with. You can say "protect two hours" and be understood. "Protect the shape" is true and unactionable.
+
+That gap is interesting. Most of the useful frameworks I have ever adopted are the *less* true one that could be acted on, plus a private awareness of the truer one that could not.
+
+### The bit about instruments
+
+There is a lovely passage about observatories — that the point of a telescope is not that it makes things bigger but that it makes a *specific* kind of seeing repeatable. Anyone can point at the sky and be impressed. The instrument is what lets you come back next week and know whether what you saw has moved.
+
+That is the whole argument for writing things down, stated better than I have managed. A jotting is not a record of a thought. It is the second observation that makes the first one mean something, and you cannot make it without an instrument you trust enough to use badly.
+
+**Which is the actual test for this room**: can I use it badly. Not can I use it carefully.
+
+### Things to look up
+
+- the source for the "shape not resource" framing — the endnote points at a paper I have not read and I suspect the book is doing a lot of work the paper does not support
+- whether the interruption-cost numbers are the old open-office studies, which were bad
+- who first used the observatory analogy; it feels borrowed and uncredited
+
+### The part I disagree with outright
+
+The prescription at the end is a routine, and it is a routine of the worst kind: it assumes the reader's problem is that they have not yet decided to be different. Every routine that has ever worked for me worked because it lowered the cost of a thing I already wanted to do. None of them worked because I resolved harder. The book knows this — it says so in the middle — and then ends with a resolution anyway, because that is what the last chapter of this kind of book is contractually required to be.
+
+### What I actually take from it
+
+1. The end-of-day question should be about shape, not output.
+2. An instrument earns its place by being usable carelessly.
+3. Coming back to a thing is the observation; the first look is only a claim.
+4. Be suspicious of any framework whose final chapter is a resolution.
+
+Enough. Most of this is one idea in four costumes, and the one idea is the observatory one.`,
+  },
+  {
+    id: 'f',
+    ago: 'last week',
+    body: 'Song for the constellation about leaving — the one with the false ending. Check whether the live version is the one with the extra verse.',
+  },
+] as const;
+
+/**
+ * Rendered and measured exactly as the room does it — `breaks: true` because a
+ * dump's newlines are its shape, and the same `long` formula so the clamp and
+ * the `more` control appear on the same cards they would appear on for real.
+ */
+/**
+ * THE FOUR WAYS OUT, PLUS DELETE — the pile's own chooser, transplanted
+ * verbatim from `notes.astro` rather than reinvented. The order is FREQUENCY,
+ * not symmetry: a dump is far more often an errand than an essay seed, and a
+ * line somebody said is commoner than a piece in waiting.
+ *
+ * ⚠ THEY ARE THE SAME FIVE IN BOTH SPELLINGS BELOW. What the bench asks is
+ * where they live in a drawer, never which ones exist — inventing a sixth here
+ * would be testing a room this building does not have.
+ */
+const WAYS_OUT = [
+  {
+    key: 'agenda',
+    icon: 'ph:calendar-blank',
+    label: 'Add to the Agenda…',
+    echo: 'opens the real TaskSheet, prefilled and model-parsed',
+  },
+  { key: 'log', icon: 'ph:note-pencil', label: 'Log an entry…', echo: 'opens the LogSheet, which asks who first' },
+  {
+    key: 'quote',
+    icon: 'ph:quotes',
+    label: 'Make it a quote…',
+    echo: 'creates a quote fragment — a different KIND, and it wants attribution',
+  },
+  {
+    key: 'piece',
+    icon: 'ph:pen-nib',
+    label: 'Make a piece',
+    echo: 'one status flip: note → draft, same id, same text, same history',
+  },
+  {
+    key: 'append',
+    icon: 'ph:article',
+    label: 'Add to a piece…',
+    echo: 'the one genuine copy — the dump is consumed, and there is no undo',
+  },
+] as const;
+
+const notes = DUMPS.map((d) => ({
+  ...d,
+  html: renderMarkdown(d.body, { breaks: true }),
+  long: d.body.split('\n').length > 10 || d.body.length > 700,
+}));
+---
+
+<Base title="Notes — the editor bench">
+  <div class="lab" data-v="today" data-acts="spread">
+    <header class="lab__head">
+      <h1>A full editor for the pile — four propositions</h1>
+      <p>
+        The pile clamps a long dump to 16rem when reading and lets it grow without limit when editing. Everything below
+        is about that one asymmetry. Press <b>✎</b> on the monster near the bottom under each proposition; the numbers on
+        the right are measured while you do it.
+      </p>
+      <p>
+        <b>⚠ Narrow the window before concluding anything.</b> At 1280px the monster below opens a ~1300px editor; the same
+        note at a phone's 390px is roughly four times that, because the measure is a third as wide. Every number here reads
+        at its most flattering on a desktop.
+      </p>
+      <p class="lab__real">
+        <b>Real:</b> the editor, the toolbar, one instance moved between cards, the pile's CSS, the numbers. <b>Not:</b>
+        the save (identical under all four — nothing here writes to the database), images, and the → / 🗑 actions, which are
+        drawn so the card is the right shape and do nothing.
+      </p>
+    </header>
+
+    {
+      /* The control bar. Sticky, because half of what is being judged is what
+        the PAGE does while you edit — a bar that scrolled away would take the
+        readout with it exactly when the readout matters. */
+    }
+    <div class="lab__bar">
+      <div class="lab__variants">
+        {
+          VARIANTS.map((v) => (
+            <button type="button" class="lab__v" data-v-pick={v.key} aria-pressed={v.key === 'today'}>
+              <span class="lab__v-label">{v.label}</span>
+              <span class="lab__v-claim">{v.claim}</span>
+              <span class="lab__v-cost">{v.cost}</span>
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        /* MEASURED, NOT CLAIMED. `reachable` is the one with a judgement inside
+          it, so the judgement is written down: a card behind an open modal is
+          NOT reachable — the drawer traps focus and light-dismisses — so Focus
+          scores 0 by definition while its backdrop is up, and Split scores its
+          rail. Under Today and Capped it is the honest count of other cards
+          intersecting the viewport. */
+      }
+      {
+        /* THE SECOND QUESTION, ADDED 2026-08-26 AFTER THE FIRST LOOK. Michael,
+          on Split: *"I feel like we're wasting some opportunity in that view to
+          include more actions like make this a quote, append to writing,
+          delete… it's missing a lot of obvious ui ux."*
+
+          He is right that the drawer was empty chrome, and the fix is not
+          simply "put the card's foot in it" — because the card's foot is the
+          way it is for a reason that a drawer does not share. 14 · Piece 2
+          settled THREE controls, not six: *"six grey glyphs under a card that
+          might hold three words is the 'many elements competing for attention'
+          smell, and the four destinations are not four questions anyway: they
+          are one question, asked once."*
+
+          Every clause of that argument is about a CARD. A full-height drawer
+          has room, is already a deliberate place you chose to be, and holds one
+          document rather than a pile of them — so the answer may honestly
+          differ. Both spellings are built; neither is the default. */
+      }
+      <div class="lab__acts-pick">
+        <span class="lab__acts-label">actions in the drawer</span>
+        <button type="button" data-acts-pick="tucked" aria-pressed="false">behind →</button>
+        <button type="button" data-acts-pick="spread" aria-pressed="true">spread out</button>
+      </div>
+
+      {
+        /* ⚠ THE PHONE KEYBOARD, FAKED HONESTLY — and it is here because plan 45
+          proved this is the measurement that decides a capture surface: chrome
+          cost 319px at 390px and left *~16px of words* on a 375×667 with the
+          keyboard up. A drawer full of chrome can fail the same way and pass
+          every desktop look.
+
+          `--kb` is the real variable (`scripts/keyboard-inset.ts`), and
+          `.drawer-dialog` already sizes itself with it — `height: calc(100dvh -
+          var(--kb))`. So setting it by hand drives the SHIPPED rule rather than
+          simulating one. 300px is a mid-range Android keyboard; the point is the
+          order of magnitude, not the exact device. */
+      }
+      <div class="lab__acts-pick">
+        <span class="lab__acts-label">phone keyboard</span>
+        <button type="button" data-kb="0" aria-pressed="true">at rest</button>
+        <button type="button" data-kb="300" aria-pressed="false">up (300px)</button>
+      </div>
+
+      <dl class="lab__meter">
+        <div><dt>page height</dt><dd id="m-page">—</dd></div>
+        <div><dt>editor visible</dt><dd id="m-editor">—</dd></div>
+        <div><dt>other notes reachable</dt><dd id="m-reach">—</dd></div>
+        <div><dt>taps this run</dt><dd id="m-taps">0</dd></div>
+      </dl>
+    </div>
+
+    <ul class="lab__pile" id="lab-pile">
+      {
+        notes.map((n) => (
+          <li class="dump" data-note={n.id}>
+            <div
+              class:list={['dump__text', 'reading', 'jot-prose', n.long && 'dump__text--clamped']}
+              data-text
+              set:html={n.html}
+            />
+            {n.long && (
+              <button type="button" class="dump__more" data-more>
+                more
+              </button>
+            )}
+            <textarea hidden data-edit-box set:text={n.body} />
+            <div class="dump__foot">
+              <time class="dump__stamp">{n.ago}</time>
+              {/* ⚠ THE ⤢ IS ON EVERY CARD UNDER EVERY PROPOSITION, and that is
+                  a deliberate simplification of the bench rather than a
+                  proposal. The TRIGGER question — explicit ⤢, or does ✎ lift a
+                  card the room already knows is long? — is downstream of the
+                  surface question, and putting both on one bench would let a
+                  good trigger rescue a bad surface. Under Today and Capped it
+                  is inert and says so. */}
+              <button
+                type="button"
+                class="dump__act"
+                data-expand
+                title="Open in the full editor"
+                aria-label="Open in the full editor"
+              >
+                ⤢
+              </button>
+              <button type="button" class="dump__act" data-edit title="Edit" aria-label="Edit">
+                ✎
+              </button>
+              <button
+                type="button"
+                class="dump__act"
+                data-inert
+                title="Turn it into… (not wired in the bench)"
+                aria-label="Turn it into"
+              >
+                →
+              </button>
+              <button
+                type="button"
+                class="dump__act dump__act--danger"
+                data-inert
+                title="Delete (not wired in the bench)"
+                aria-label="Delete"
+              >
+                🗑
+              </button>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    {
+      /* THE ONE EDITOR, and its home is outside the pile — the shipped room's
+        arrangement, kept because it is the arrangement that makes Focus cheap.
+        This element is what travels: into a card, or into the drawer. */
+    }
+    <div id="lab-shell" class="dump__shell" hidden>
+      <div id="lab-editor"></div>
+      <EditorToolbar class="dump__tools" />
+    </div>
+
+    {
+      /* The drawer serves Focus AND Split — the rail is the only difference, and
+        it is `hidden` under Focus. Two dialogs would be two shells to keep in
+        step, which is the drift the one-source rule exists to prevent.
+
+        ⚠ `.drawer-dialog` IS ADMIN.CSS'S, NOT A COPY. It brings the right-edge
+        slide, the backdrop, the exit animation and `height: calc(100dvh -
+        var(--kb))` — so the phone keyboard is already handled here, which is
+        one of the costs Focus does NOT have to pay. */
+    }
+    <dialog id="lab-drawer" class="drawer-dialog w-full" aria-label="Full editor">
+      <div class="lab__drawer" id="lab-drawer-shell">
+        {
+          /* ⚠ THE RAIL IS A COLUMN OF ITS OWN, FLOOR TO CEILING, and the foot
+            stops where it stops. Michael, 2026-08-26: *"lets make it so that the
+            footer only extends to the point where the sidebar is… I want it to
+            be more unambiguous or intuitive that those actions belong to the
+            specific note in view."*
+
+            That is the whole layout argument and it is a correct one. A foot
+            spanning both columns is making a claim about the drawer; these five
+            act on ONE note, and a control bar that underlines the list it does
+            not act on is the kind of ambiguity you feel without naming. So the
+            drawer is now two panes side by side — the pile, and the note — and
+            everything about the note lives inside the note's pane.
+
+            ⚠ THE HEAD MOVED WITH IT, and that was not asked for. The same
+            argument covers it exactly: the stamp and the word count are facts
+            about the note in view, so leaving them in a strip across the top
+            while the foot narrowed would have applied the principle to half the
+            chrome and left the other half contradicting it. Only ✕ is about the
+            drawer, and it stays with the note pane because that is where a hand
+            already is. */
+        }
+        {
+          /* The way back out of the rail on a phone — a scrim over the note,
+            never over the rail itself. Above the breakpoint it is `display:
+            none` and inert. */
+        }
+        <div class="lab__rail-scrim" data-rail-scrim></div>
+        <aside class="lab__rail" id="lab-rail-pane" aria-label="The rest of the pile">
+          <div class="lab__rail-head">
+            <span class="lab__rail-title">The pile</span>
+            {
+              /* ⚠ BENCH CHROME, MARKED AS SUCH, AND IT EARNS ITS PLACE BY BEING
+                UNREACHABLE OTHERWISE. The bar's copy of this toggle is behind a
+                modal backdrop once the drawer is up, so comparing the two
+                spellings meant closing and reopening — which reads as friction
+                in Split rather than in the bench.
+
+                ⚠ IT LIVES IN THE RAIL, NOT IN THE NOTE'S HEAD, by the same rule
+                this whole layout now follows: it is about the bench, not about
+                the note in view. */
+            }
+            <span class="lab__acts-pick lab__acts-pick--in">
+              <span class="lab__acts-label">bench</span>
+              <button type="button" data-acts-pick="tucked" aria-pressed="false">behind →</button>
+              <button type="button" data-acts-pick="spread" aria-pressed="true">spread</button>
+            </span>
+          </div>
+          {
+            /* Rows are built from the cards at open time rather than rendered
+              here, so the rail cannot describe a pile that is one edit out of
+              date. */
+          }
+          <div class="lab__rail-rows" id="lab-rail"></div>
+        </aside>
+
+        <div class="lab__note">
+          {
+            /* ⚠ THE HEAD SAYS WHAT THIS IS AND WHEN IT MOVED, AND NOTHING ELSE.
+              No title field, no slug, no tabs — that is the line plan 14 drew
+              and the one thing a drawer for a jotting must not cross. The word
+              count is here because a drawer is where a long dump is read, and it
+              is the one fact about a 900-word note the card cannot show. */
+          }
+          <header class="lab__drawer-head">
+            {
+              /* The way to the pile when there is no room for it beside the
+                words. Absent above the breakpoint, where the rail is simply
+                there — a control that duplicates a visible one is worse than no
+                control (10-hq §10b). */
+            }
+            <button type="button" class="lab__pile-btn" id="lab-pile-btn" aria-expanded="false">
+              <Icon name="ph:list" /> The pile
+            </button>
+            <span class="lab__drawer-title" id="lab-drawer-title">Note</span>
+            <span class="lab__drawer-stamp" id="lab-drawer-stamp">
+              <Icon name="ph:clock-light" /><span data-ago></span>
+            </span>
+            <span class="lab__drawer-words" id="lab-drawer-words"></span>
+            <button type="button" class="lab__drawer-x" data-drawer-close aria-label="Close">✕</button>
+          </header>
+
+          <div class="lab__doc" id="lab-drawer-slot"></div>
+
+          {
+            /* THE FOOT — the half that was missing. Both spellings live here and
+              `data-acts` picks one, so they cannot drift into being two
+              different sets of destinations dressed differently.
+
+              ⚠ SPREAD IS THE DEFAULT SINCE 2026-08-26 — Michael, on seeing both:
+              *"spread out is better than behind the arrow."* The toggle stays so
+              the losing spelling can still be looked at rather than remembered.
+
+              ⚠ DELETE IS OUTSIDE THE TOGGLE, in the corner, under both. It is
+              not a way OUT of the pile — it is the end of the thought — and
+              putting it in a row with five reversible destinations is how a menu
+              teaches you to aim carefully instead of reading (hq.css,
+              `.pop__row--danger`). */
+          }
+          <footer class="lab__foot">
+            <div class="lab__foot-acts">
+              <button type="button" class="lab__foot-btn" data-open-chooser>
+                <Icon name="ph:arrow-right" />
+                <span class="lab__foot-word">Turn it into…</span>
+              </button>
+              {
+                WAYS_OUT.map((w) => (
+                  <button
+                    type="button"
+                    class="lab__foot-btn lab__foot-btn--spread"
+                    data-way={w.key}
+                    data-echo={w.echo}
+                    title={w.label}
+                    aria-label={w.label}
+                  >
+                    <Icon name={w.icon} /> <span class="lab__foot-word">{w.label}</span>
+                  </button>
+                ))
+              }
+            </div>
+            {
+              /* Where an inert action reports itself — /lab/capture's rule: a
+                bench prints the row it WOULD write rather than pretending. */
+            }
+            <span class="lab__echo" id="lab-echo" role="status" aria-live="polite"></span>
+            <button
+              type="button"
+              class="lab__foot-btn lab__foot-btn--danger"
+              data-way="delete"
+              data-echo="soft-deletes the row and drops the undo strip — 8 seconds to change your mind"
+              title="Delete"
+              aria-label="Delete"
+            >
+              <Icon name="ph:trash" />
+              <span class="lab__foot-word">Delete</span>
+            </button>
+          </footer>
+        </div>
+
+        {
+          /* The chooser, for the `tucked` spelling — the pile's own popover markup.
+
+            ⚠ INSIDE THE DIALOG, AND IT HAD TO MOVE HERE. The first cut put it at
+            page level, where the shipped room keeps it. It rendered perfectly:
+            open, anchored, `:popover-open` true, in the top layer, painted above
+            the drawer — and completely dead. `showModal()` makes everything
+            OUTSIDE the dialog inert, and a top-layer popover is no exception, so
+            every row was unclickable while looking right; `elementFromPoint` at
+            the menu's own centre returned the rail behind it. Trap 7 in a new
+            costume — typecheck, build and a screenshot all pass.
+
+            ⚠ AND THE COST THIS WAS EXPECTED TO CARRY IS NOT REAL, which is the
+            other half worth writing down. `.drawer-dialog` sets `translate`, and
+            a non-`none` translate normally makes an element a containing block
+            for `position: fixed` descendants — so `.pop` + `anchorPopover`, which
+            think in viewport coordinates, looked like they would land ~320px off
+            once they moved in here. They do not: a TOP-LAYER element's containing
+            block is the viewport whatever its ancestors do. Measured rather than
+            reasoned — anchored at left 77px it renders at x=77 either side of the
+            move. The shipped primitives survive the drawer unchanged. */
+        }
+        <div class="pop pop--wide" popover id="lab-chooser">
+          {
+            WAYS_OUT.map((w) => (
+              <button type="button" class="pop__row" data-way={w.key} data-echo={w.echo}>
+                <Icon name={w.icon} /> {w.label}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+    </dialog>
+
+    <LinkDialog id="lab-link-dialog" />
+  </div>
+</Base>
+
+<style is:global>
+  /* ⚠ EVERYTHING IS SCOPED UNDER `.lab` BY HAND, and the block is `is:global`
+     rather than scoped because TipTap builds its editable surface at runtime —
+     a node created after the build carries no scope attribute, so a scoped rule
+     could never reach the one element this bench is about. */
+  .lab {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 6rem;
+  }
+  .lab__head h1 {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    margin-bottom: 0.75rem;
+  }
+  .lab__head p {
+    max-width: 46rem;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+  .lab__real {
+    color: var(--text-faint);
+  }
+
+  .lab__bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin: 1.5rem 0;
+    padding: 0.75rem;
+    background: color-mix(in oklab, var(--color-base-100) 92%, transparent);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+  }
+  .lab__variants {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.5rem;
+    flex: 1 1 34rem;
+  }
+  .lab__v {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    cursor: pointer;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+  }
+  .lab__v[aria-pressed='true'] {
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+  }
+  .lab__v-label {
+    font-size: 0.9rem;
+  }
+  .lab__v-claim {
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+  }
+  .lab__v-cost {
+    font-size: 0.68rem;
+    color: var(--text-whisper);
+  }
+
+  .lab__meter {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.15rem 1.25rem;
+    font-family: var(--font-sans);
+  }
+  .lab__meter dt {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-whisper);
+  }
+  .lab__meter dd {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lab__pile {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  /* ── the propositions ────────────────────────────────────────────────────
+     Each one is a rule or two keyed off `data-v`. That is the whole delta
+     between them, which is the finding as much as the mechanism. */
+
+  /* CAPPED — the surface stops and scrolls inside itself. The cap is on the
+     HOST, not on the shell, so the toolbar stays put directly under the words
+     instead of scrolling away with them. `.tt-host > .tiptap-doc { flex: 1 0
+     auto }` (admin.css) is what lets the document grow past a scrolling host. */
+  .lab[data-v='capped'] #lab-editor {
+    max-height: 55vh;
+    overflow-y: auto;
+  }
+
+  /* The ⤢ only means something under the two drawer propositions. Dimmed rather
+     than removed, so the card's foot does not change shape between variants and
+     take the comparison with it. */
+  .lab[data-v='today'] [data-expand],
+  .lab[data-v='capped'] [data-expand] {
+    opacity: 0.25;
+  }
+
+  /* TWO PANES SIDE BY SIDE — the pile and the note. Everything about the note
+     lives in the right-hand column, foot included, so the action bar underlines
+     the thing it acts on and nothing else. */
+  .lab__drawer {
+    position: relative; /* the phone's rail slides against this */
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+  }
+  .lab__note {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    /* ⚠ A CONTAINER, AND THE MEDIA QUERY BELOW COULD NOT HAVE DONE THIS JOB.
+       The foot's labels do not depend on the window — they depend on how much
+       room the RAIL LEFT THEM, which is a different number in Focus and Split at
+       the same width. Measured at 768px with the rail still a column: five
+       labelled buttons in a 512px pane wrapped to THREE rows, 136px of chrome
+       eaten out of the words, while every viewport rule in the file said the
+       desktop layout was fine. A window-width breakpoint can only guess at
+       that; a container query asks the question that is actually being asked. */
+    container-type: inline-size;
+  }
+
+  /* Below this the five destinations stop fitting on one line as words. The
+     number is measured, not chosen: the labelled row needs ~40rem, and one that
+     wraps costs more than the labels are worth. */
+  @container (max-width: 40rem) {
+    .lab__foot-word {
+      display: none;
+    }
+    .lab__foot-btn {
+      min-width: 2.75rem;
+      justify-content: center;
+      padding: 0.25rem;
+    }
+    .lab[data-acts='tucked'] .lab__foot-btn[data-open-chooser] .lab__foot-word {
+      display: inline; /* the one door keeps its name — that is what it is for */
+    }
+    .lab__echo {
+      display: none;
+    }
+  }
+  .lab__drawer-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--color-base-300);
+    font-family: var(--font-sans);
+  }
+  .lab__drawer-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+  }
+  .lab__drawer-hint {
+    font-size: 0.72rem;
+    color: var(--text-whisper);
+  }
+  /* ⚠ `margin-left: auto` IS WHAT PUTS IT IN THE CORNER, and it went missing for
+     one commit — the bench toggle briefly held that job, then moved to the rail
+     with the two-pane layout and took the push with it, leaving ✕ butted up
+     against the word count. It is the ONLY thing in this head that is about the
+     drawer rather than about the note, so it is also the only thing that should
+     be nowhere near the note's facts.
+
+     Sized down to the head's own register as well: it was inheriting 1rem beside
+     0.72rem labels, which is why it read as the loudest thing in a strip of
+     quiet ones. */
+  .lab__drawer-x {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-left: auto;
+    border-radius: var(--radius-field);
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-faint);
+  }
+  .lab__drawer-x:hover {
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+  }
+  .lab__doc {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+  }
+  /* The measure, not the drawer's width — WritingSheet's arrangement (a 5xl
+     sheet around an independently centred 2xl column), because a document set
+     the full width of a wide drawer is a worse thing to read than the card was. */
+  .lab__doc .dump__shell {
+    display: flex;
+    flex-direction: column;
+    max-width: 42rem;
+    min-height: 100%;
+    margin: 0 auto;
+  }
+  /* ⚠ THE TOOLBAR FLIPS ABOVE THE WORDS, AND ONLY HERE. The pile's rule (below
+     the surface, so entering edit mode does not move the words) is a CARD-scale
+     argument: at card scale the toolbar is 30px under a short thought. In a
+     full-height drawer the same markup would put the controls at the bottom of
+     a 4,000px document, reachable only by scrolling past the thing you wanted
+     to format. Same DOM, one `order`, and it is a finding this bench produced
+     rather than a decision it was built to test. */
+  .lab__doc .dump__tools {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-base-100);
+    border-top: 0;
+    border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+  }
+  .lab__doc #lab-editor {
+    flex: 1;
+  }
+  .lab__doc .jot-prose {
+    padding: 1.5rem 1.25rem 4rem;
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+
+  /* The head's two quiet facts. `--text-whisper` is the AA floor in both
+     themes (app.css, the quiet ladder) — never a hand-picked alpha. */
+  /* ⚠ THE CLOCK IS `ph:clock-light`, WHICH THE ALLOWLIST ALREADY CARRIES — no
+     `astro.config` line, and no new mark entering the building through a bench.
+     It is the same glyph in both places a stamp appears, because a rail row and
+     a note's head are saying the identical thing about the identical fact. */
+  .lab__drawer-stamp,
+  .lab__drawer-words {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.72rem;
+    color: var(--text-whisper);
+  }
+  .lab__drawer-stamp svg,
+  .lab__rail-ago svg {
+    width: 0.85em;
+    height: 0.85em;
+    flex-shrink: 0;
+  }
+  .lab__rail-ago {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+  }
+  .lab__drawer-words {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The foot. A filled strip rather than a hairline, because unlike the card's
+     foot it is a fixed rail against a scrolling document and needs to read as
+     the floor rather than as the end of the words. */
+  .lab__foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--color-base-300);
+    background: var(--color-base-200);
+  }
+  .lab__foot-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .lab__foot-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+  .lab__foot-btn:hover {
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+  }
+  .lab__foot-btn--danger {
+    margin-left: auto;
+  }
+  .lab__foot-btn--danger:hover {
+    color: var(--color-error);
+  }
+  /* The toggle, and it is the ONLY difference between the two spellings: the
+     same five buttons either behind one door or standing in the open. */
+  .lab[data-acts='tucked'] .lab__foot-btn--spread,
+  .lab[data-acts='spread'] [data-open-chooser] {
+    display: none;
+  }
+  /* The way to the pile, and the scrim that takes you back out of it. Both are
+     phone-only: above the breakpoint the rail is simply THERE, and a control
+     duplicating a visible one is worse than no control (10-hq §10b). */
+  .lab__pile-btn,
+  .lab__rail-scrim {
+    display: none;
+  }
+  .lab__pile-btn {
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.5rem;
+    margin-right: 0.25rem;
+    cursor: pointer;
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .lab__pile-btn:hover {
+    background: var(--color-base-200);
+  }
+
+  .lab__echo {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--text-faint);
+  }
+  .lab__acts-pick {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+  }
+  .lab__acts-label {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-whisper);
+  }
+  .lab__acts-pick button {
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+  }
+  .lab__acts-pick--in {
+    margin-left: auto;
+    margin-right: 0.5rem;
+  }
+  .lab__acts-pick--in button {
+    border-style: dashed;
+  }
+  .lab__acts-pick button[aria-pressed='true'] {
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+  }
+  /* The rail's second line — when it moved. A pile is ordered by touch, so the
+     stamp is what tells you which end of it you are looking at. */
+  .lab__rail-ago {
+    margin-top: 0.2rem;
+    font-size: 0.65rem;
+    color: var(--text-whisper);
+  }
+
+  /* SPLIT — the rail. Absent under Focus rather than empty: 10-hq §10b's rule,
+     and here it is also what keeps the two propositions honestly different. */
+  .lab__rail {
+    display: none;
+    flex: 0 0 16rem;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--color-base-300);
+    background: color-mix(in oklab, var(--color-base-200) 55%, var(--color-base-100));
+  }
+  .lab[data-v='split'] .lab__rail {
+    display: flex;
+  }
+  .lab__rail-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+  /* Its own line. At 16rem the title and the bench toggle were fighting and the
+     title lost, wrapping to two lines under a control that is not even part of
+     the room. */
+  .lab__rail-title {
+    flex: 1 0 100%;
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+  }
+  .lab__rail-rows {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+  .lab[data-v='split'] #lab-drawer {
+    max-width: 76rem;
+  }
+  .lab[data-v='focus'] #lab-drawer {
+    max-width: 60rem;
+  }
+  .lab__rail-row {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.15rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-field);
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+  .lab__rail-row:hover {
+    background: var(--color-base-200);
+  }
+  .lab__rail-row[aria-current='true'] {
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    color: var(--color-base-content);
+  }
+
+  /* ── the phone ─────────────────────────────────────────────────────────────
+     ⚠ THE QUESTION MICHAEL ASKED, AND IT HAS ONLY ONE HONEST ANSWER AT 390px:
+     *"it's hard to have both the editor and the sidebar to browse."* It is not
+     hard, it is impossible — a 16rem rail beside a readable measure needs about
+     640px and there are 390. So the two panes stop being side by side and
+     become one pane with the other sliding over it, which is the master/detail
+     shape every phone reader already knows.
+
+     ⚠ SPLIT DOES NOT DEGRADE INTO FOCUS, and that distinction is the whole
+     reason this is worth building rather than conceding. Focus on a phone gives
+     you no way to the pile at all; this keeps the proposition — the pile is one
+     tap away and you never left the note — and pays for it with a button that
+     exists only where the rail cannot.
+
+     The breakpoint is 768px, the one the building already collapses its chrome
+     at (plan 43's anon-mobile findings). */
+  @media (max-width: 47.99rem) {
+    .lab[data-v='split'] #lab-drawer,
+    .lab[data-v='focus'] #lab-drawer {
+      max-width: 100%;
+    }
+    .lab[data-v='split'] .lab__rail {
+      position: absolute;
+      inset: 0 auto 0 0;
+      z-index: 2;
+      width: min(19rem, 86%);
+      translate: -100% 0;
+      transition: translate 0.22s ease;
+      box-shadow: 8px 0 30px -12px color-mix(in oklab, var(--shadow-color) 50%, transparent);
+    }
+    .lab__drawer[data-rail-open] .lab__rail {
+      translate: 0 0;
+    }
+    .lab[data-v='split'] .lab__drawer[data-rail-open] .lab__rail-scrim {
+      display: block;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background: color-mix(in oklab, var(--color-base-100) 45%, transparent);
+    }
+    .lab[data-v='split'] .lab__pile-btn {
+      display: inline-flex;
+    }
+
+    /* ⚠ THE FOOT'S LABELS ARE THE CONTAINER'S BUSINESS, NOT THIS BLOCK'S — see
+       `@container` above. What is left here is genuinely about the window.
+
+       ⚠ AND LOSING THE LABELS IS A REAL COST OF `spread`, not a detail: it is
+       the argument `tucked` still has on a phone, where one labelled door can
+       beat five unlabelled glyphs. The toggle stays so the two widths can be
+       judged separately — they do not have to give the same answer. */
+    .lab__drawer-words {
+      display: none; /* the stamp is the fact worth the width */
+    }
+
+    /* ⚠ THE TOOLBAR GOES BACK UNDER THE WORDS, which is the shipped rule in
+       both directions and my `order: -1` was the odd one out. `admin.css` moves
+       `#ws-toolbar` to the bottom below this same breakpoint — *"formatting is
+       the chrome you reach for WHILE typing, so on a phone it belongs against
+       the keyboard rather than at the far end of the screen from your thumbs"* —
+       and the pile's card editor has never put it anywhere else.
+
+       The desktop flip stands: there the toolbar would otherwise sit at the
+       bottom of a 4,000px document. Same markup, one `order`, and the answer
+       genuinely differs by width. */
+    .lab__doc .dump__tools {
+      order: 0;
+      top: auto;
+      bottom: 0;
+      border-top: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
+      border-bottom: 0;
+    }
+  }
+</style>
+
+<script>
+  /*
+    The bench's controls. Written plainly and kept in this file — the /lab/fields
+    rule: a lab that reaches into `src/scripts/` leaves something behind when it
+    is deleted. The two things it DOES import are the two things under test.
+  */
+  import { mountRichEditor } from '../../scripts/rich-editor';
+  import { closeWithExit, openDialog } from '../../scripts/dialog-close';
+  // ⚠ THE DISMISS RULE IS THE BUILDING'S, NOT THIS FILE'S — and the first cut of
+  // the bench hand-rolled it and got it wrong in the way the helper exists to
+  // prevent. Michael, 2026-08-26: *"the sheet doesn't close when I click on the
+  // outside of it."* `wireSheetDismiss` is Escape + the ✕ + a backdrop press
+  // that both STARTED and ENDED on the backdrop, which is the part worth
+  // importing: a text selection dragged out of a paragraph and released over
+  // the backdrop must not count as a dismissal, and this editor is exactly the
+  // surface where that gesture happens (`backdrop-close.ts` has the account).
+  import { wireSheetDismiss } from '../../scripts/sheet-dismiss';
+  import { anchorPopover } from '../../scripts/pop-anchor';
+
+  const lab = document.querySelector('.lab') as HTMLElement;
+  const pile = document.getElementById('lab-pile') as HTMLElement;
+  const shell = document.getElementById('lab-shell') as HTMLElement;
+  const shellHome = shell.parentElement as HTMLElement;
+  const drawer = document.getElementById('lab-drawer') as HTMLDialogElement;
+  const slot = document.getElementById('lab-drawer-slot') as HTMLElement;
+  const rail = document.getElementById('lab-rail') as HTMLElement;
+  const drawerTitle = document.getElementById('lab-drawer-title') as HTMLElement;
+
+  const variant = () => lab.dataset.v as 'today' | 'capped' | 'focus' | 'split';
+  const lifts = () => variant() === 'focus' || variant() === 'split';
+
+  const boxOf = (card: HTMLElement) => card.querySelector('[data-edit-box]') as HTMLTextAreaElement;
+  const textOf = (card: HTMLElement) => card.querySelector('[data-text]') as HTMLElement;
+
+  let editing: HTMLElement | null = null;
+  let taps = 0;
+
+  /* ── the one editor, with the pile's own options ─────────────────────────── */
+
+  const { editor, getMarkdown } = mountRichEditor({
+    editorEl: document.getElementById('lab-editor') as HTMLElement,
+    toolbarRoot: shell.querySelector('[role="toolbar"]') as HTMLElement,
+    linkDialog: document.getElementById('lab-link-dialog') as HTMLDialogElement,
+    placeholder: 'Write it down…',
+    ariaLabel: 'Edit this note',
+    docClass: 'jot-prose',
+    breaks: true,
+    // ⚠ NO SAVE. Every proposition shares the shipped write path untouched, so
+    // there is nothing here for a round trip to tell us — and a bench that
+    // wrote would leave six junk rows in the real pile. `onChange` only keeps
+    // the meter honest while you type, which is the one thing that does move.
+    onChange: () => {
+      measure();
+      if (editing && drawer.open) reflectHead(editing);
+    },
+  });
+
+  /* ── editing ─────────────────────────────────────────────────────────────── */
+
+  function homeShell() {
+    shell.hidden = true;
+    shellHome.append(shell);
+  }
+
+  function enterEdit(card: HTMLElement) {
+    if (editing === card) return;
+    if (editing) leaveEdit(editing);
+    editing = card;
+    editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
+
+    if (lifts()) {
+      slot.append(shell);
+      shell.hidden = false;
+      buildRail(card);
+      drawerTitle.textContent = 'Note';
+      reflectHead(card);
+      echoEl.textContent = '';
+      setRail(false);
+      if (!drawer.open) openDialog(drawer);
+    } else {
+      card.insertBefore(shell, card.querySelector('.dump__foot'));
+      shell.hidden = false;
+      textOf(card).hidden = true;
+      card.querySelector('[data-more]')?.setAttribute('hidden', '');
+    }
+    editor.commands.focus('end');
+    measure();
+  }
+
+  function leaveEdit(card: HTMLElement) {
+    const box = boxOf(card);
+    box.value = getMarkdown();
+    const text = textOf(card);
+    // The rendered twin from the editor's own document, exactly as notes.ts
+    // does it — no Markdown round trip, and no parser in the browser.
+    text.innerHTML = editor.getHTML();
+    homeShell();
+    text.hidden = false;
+    const long = box.value.split('\n').length > 10 || box.value.length > 700;
+    text.classList.toggle('dump__text--clamped', long && !text.dataset.expanded);
+    const more = card.querySelector('[data-more]') as HTMLElement | null;
+    if (more) more.hidden = !long || !!text.dataset.expanded;
+    editing = null;
+    measure();
+  }
+
+  /* ── the rail (Split) ────────────────────────────────────────────────────── */
+
+  /**
+   * Built from the cards themselves at open time, so the rail can never
+   * describe a pile that is one edit out of date. The label is the note's first
+   * line — the pile's own rule, and the reason the room has no titles.
+   */
+  function buildRail(current: HTMLElement) {
+    rail.textContent = '';
+    pile.querySelectorAll<HTMLElement>('.dump').forEach((card) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'lab__rail-row';
+      row.dataset.railFor = card.dataset.note ?? '';
+      const first = (
+        boxOf(card)
+          .value.split('\n')
+          .find((l) => l.trim()) ?? ''
+      ).replace(/^#+\s*/, '');
+      const line = document.createElement('span');
+      line.textContent = first.slice(0, 70) + (first.length > 70 ? '…' : '');
+      row.append(line);
+      const ago = document.createElement('span');
+      ago.className = 'lab__rail-ago';
+      // ⚠ CLONED FROM THE HEAD'S STAMP rather than hand-rolled as inline SVG.
+      // `astro-icon` renders at build time, so a row built in the browser has no
+      // way to ask for one — and an SVG retyped here would be a second copy of a
+      // mark the allowlist owns, free to drift from it.
+      const clock = stampEl.querySelector('svg');
+      if (clock) ago.append(clock.cloneNode(true));
+      const when = document.createElement('span');
+      when.textContent = card.querySelector('.dump__stamp')?.textContent ?? '';
+      ago.append(when);
+      row.append(ago);
+      if (card === current) row.setAttribute('aria-current', 'true');
+      rail.append(row);
+    });
+  }
+
+  /* ── the phone's rail ─────────────────────────────────────────────────────
+     ⚠ IT CLOSES ON PICK, AND THAT IS THE HALF THAT MAKES IT A DETAIL VIEW
+     RATHER THAN A MENU LEFT OPEN. Choosing a note is choosing to read it, so
+     the pane that was covering it gets out of the way in the same gesture.
+     Above the breakpoint `data-rail-open` is inert — the rail is a column, not
+     an overlay, and nothing about it moves. */
+  const drawerShell = document.getElementById('lab-drawer-shell') as HTMLElement;
+  const pileBtn = document.getElementById('lab-pile-btn') as HTMLButtonElement;
+
+  function setRail(open: boolean) {
+    if (open) drawerShell.dataset.railOpen = '1';
+    else delete drawerShell.dataset.railOpen;
+    pileBtn.setAttribute('aria-expanded', String(open));
+  }
+  pileBtn.addEventListener('click', () => setRail(!drawerShell.dataset.railOpen));
+  drawerShell.querySelector('[data-rail-scrim]')?.addEventListener('click', () => setRail(false));
+
+  rail.addEventListener('click', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-rail-for]');
+    if (!row) return;
+    const card = pile.querySelector<HTMLElement>(`[data-note="${row.dataset.railFor}"]`);
+    if (!card || card === editing) return;
+    if (editing) leaveEdit(editing);
+    enterEdit(card);
+    setRail(false);
+  });
+
+  /* ── the drawer's head and foot ──────────────────────────────────────────── */
+
+  const stampEl = document.getElementById('lab-drawer-stamp') as HTMLElement;
+  const wordsEl = document.getElementById('lab-drawer-words') as HTMLElement;
+  const echoEl = document.getElementById('lab-echo') as HTMLElement;
+  const chooser = document.getElementById('lab-chooser') as HTMLElement;
+
+  /**
+   * ⚠ COUNTED OFF THE EDITOR'S TEXT, NOT ITS MARKDOWN. `getMarkdown()` would
+   * count `**` and `###` as part of the words they format, so a note full of
+   * headings would read heavier than it is. This is the same reason the pile
+   * renders rather than prints.
+   */
+  function words(): number {
+    const t = editor.getText().trim();
+    return t ? t.split(/\s+/).length : 0;
+  }
+
+  function reflectHead(card: HTMLElement) {
+    // ⚠ THE INNER SPAN, NOT THE ELEMENT — the stamp holds a clock now, and
+    // `textContent =` on the wrapper would delete the glyph on the first note
+    // opened and never put it back.
+    (stampEl.querySelector('[data-ago]') as HTMLElement).textContent =
+      card.querySelector('.dump__stamp')?.textContent ?? '';
+    const n = words();
+    wordsEl.textContent = n === 1 ? '1 word' : n + ' words';
+  }
+
+  /* The inert destinations. /lab/capture's rule: a bench PRINTS the row it would
+     write and links nowhere, because building the write is what the decision
+     is for — and here it is not even in question. All five already exist in the
+     room; what is being judged is whether they read better behind one door or
+     standing in the open. */
+  function wireWay(root: HTMLElement) {
+    root.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-way]');
+      if (!btn) return;
+      chooser.hidePopover?.();
+      echoEl.textContent = `${btn.dataset.way} — ${btn.dataset.echo}`;
+    });
+  }
+  wireWay(document.querySelector('.lab__foot') as HTMLElement);
+  wireWay(chooser);
+
+  // Positioned against the button that opened it — the pile's own helper.
+  anchorPopover(chooser, () => document.querySelector<HTMLElement>('[data-open-chooser]'));
+
+  /* ── the drawer ──────────────────────────────────────────────────────────── */
+
+  async function closeDrawer() {
+    if (editing) leaveEdit(editing);
+    await closeWithExit(drawer);
+    measure();
+  }
+
+  // Escape, the ✕ and the backdrop, all three at once and all three flushing
+  // first — `closeDrawer` is what dismissal MEANS here, which is the argument
+  // the helper's signature makes for taking a callback rather than closing.
+  wireSheetDismiss(drawer, () => void closeDrawer(), '[data-drawer-close]');
+
+  /*
+    ⚠ AND ESCAPE STILL HAS TO BE CLOSED BY HAND ON TOP OF THAT, which the bench
+    found the way capture.ts found it: by sitting there.
+
+    A `<dialog>` turns Escape into a close request only if the keydown's default
+    survives, and ProseMirror's `captureKeyDown` preventDefaults keyCode 27
+    unconditionally — so inside this editor the `cancel` event that
+    `wireSheetDismiss` listens for never fires at all. The helper is right and
+    complete for a sheet full of inputs; it is half a rule for a sheet whose
+    body is a rich editor, and both of the shipped ones that qualify (the ✚,
+    the check-in's mini fields) carry this second half.
+
+    ⚠ FOUND HERE, WHICH IS AN ARGUMENT FOR THE BENCH RATHER THAN A FOOTNOTE.
+    The drawer is a NEW modal holding an editor, so it inherits a trap that has
+    already been paid for twice — `notes.spec.ts` and `checkin.spec.ts` both pin
+    it. Whatever ships out of this file needs the pin as well.
+
+    `preventDefault` here too, deliberately: focus on the toolbar or the foot is
+    OUTSIDE the editor, where nothing swallows the key and the native `cancel`
+    fires — claiming the default keeps the two paths from running two closes.
+  */
+  drawer.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    void closeDrawer();
+  });
+
+  /* ── the pile's clicks ───────────────────────────────────────────────────── */
+
+  pile.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>(
+      '[data-edit], [data-expand], [data-more], [data-inert], [data-text]',
+    );
+    if (!el) return;
+    const card = el.closest<HTMLElement>('.dump');
+    if (!card) return;
+
+    if (el.hasAttribute('data-inert')) return;
+
+    if (el.hasAttribute('data-more')) {
+      const text = textOf(card);
+      text.dataset.expanded = '1';
+      text.classList.remove('dump__text--clamped');
+      el.hidden = true;
+      measure();
+      return;
+    }
+
+    // ⚠ THE ⤢ FORCES THE DRAWER EVEN UNDER TODAY AND CAPPED — no. It is inert
+    // there, and deliberately: a control that works under a proposition which
+    // does not include it would make that proposition look better than it is.
+    if (el.hasAttribute('data-expand') && !lifts()) return;
+
+    if (el.hasAttribute('data-text') && editing === card) return;
+
+    if (editing === card && el.hasAttribute('data-edit')) {
+      if (drawer.open) void closeDrawer();
+      else leaveEdit(card);
+      return;
+    }
+    enterEdit(card);
+  });
+
+  /* ── switching propositions ──────────────────────────────────────────────── */
+
+  document.querySelectorAll<HTMLButtonElement>('[data-v-pick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.vPick as string;
+      if (next === lab.dataset.v) return;
+      // Close whatever is open BEFORE the switch: a shell mid-flight between a
+      // card and a drawer under two different sets of rules is a bug the bench
+      // would be reporting about itself.
+      if (drawer.open) void closeDrawer();
+      else if (editing) leaveEdit(editing);
+      lab.dataset.v = next;
+      document
+        .querySelectorAll<HTMLButtonElement>('[data-v-pick]')
+        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vPick === next)));
+      // Taps reset per run — the number is "what this proposition cost me just
+      // now", which is only readable if it does not carry the last one's total.
+      taps = 0;
+      measure();
+    });
+  });
+
+  /* ── where the actions live ──────────────────────────────────────────────── */
+
+  document.querySelectorAll<HTMLButtonElement>('[data-acts-pick]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.actsPick as string;
+      lab.dataset.acts = next;
+      chooser.hidePopover?.();
+      document
+        .querySelectorAll<HTMLButtonElement>('[data-acts-pick]')
+        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.actsPick === next)));
+    });
+  });
+
+  /* Drives `--kb` on the root, which is where `keyboard-inset.ts` puts it and
+     where `.drawer-dialog`'s `height: calc(100dvh - var(--kb))` reads it. */
+  document.querySelectorAll<HTMLButtonElement>('[data-kb]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const px = btn.dataset.kb ?? '0';
+      document.documentElement.style.setProperty('--kb', px + 'px');
+      document
+        .querySelectorAll<HTMLButtonElement>('[data-kb]')
+        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kb === px)));
+      measure();
+    });
+  });
+
+  document
+    .querySelectorAll('[data-open-chooser]')
+    .forEach((el) => el.addEventListener('click', () => chooser.showPopover?.()));
+
+  /* ── the meter ───────────────────────────────────────────────────────────── */
+
+  const mPage = document.getElementById('m-page') as HTMLElement;
+  const mEditor = document.getElementById('m-editor') as HTMLElement;
+  const mReach = document.getElementById('m-reach') as HTMLElement;
+  const mTaps = document.getElementById('m-taps') as HTMLElement;
+
+  function measure() {
+    mPage.textContent = Math.round(document.documentElement.scrollHeight) + 'px';
+    /*
+      ⚠ THE VISIBLE INTERSECTION, NOT A BOX HEIGHT — and both simpler answers
+      were tried first and are wrong, each in its own direction.
+
+      `.tiptap-doc` is the document's full height under EVERY proposition, since
+      the surface is free to grow past a scrolling host (admin.css, `.tt-host`);
+      it reported 1310px for a `capped` box you can see 440px of. The host's own
+      box is right in a card and wrong in the drawer, where `flex: 1` inside a
+      scroller stretches it to the content again.
+
+      What the eye actually gets is the part of the host inside the window, so
+      that is what this counts. It is the number that separates the two bounded
+      propositions: `capped` and `focus` both stop the page stretching, and only
+      one of them gives you a screen to write on while doing it.
+    */
+    const host = document.getElementById('lab-editor') as HTMLElement;
+    const r = host.getBoundingClientRect();
+    const seen = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+    mEditor.textContent = shell.hidden ? '—' : Math.round(seen) + 'px';
+
+    /*
+      ⚠ THE JUDGEMENT INSIDE THIS NUMBER, WRITTEN DOWN. A card behind an open
+      modal is not reachable: the drawer traps focus and light-dismisses, so
+      "visible through a blurred backdrop" is not the same as "you can get to
+      it". Focus therefore scores 0 while it is open, by definition rather than
+      by measurement — and Split scores its rail, which is exactly the thing
+      Split is proposing to buy.
+    */
+    if (drawer.open) {
+      mReach.textContent = variant() === 'split' ? String(rail.childElementCount - 1) : '0';
+    } else {
+      const h = window.innerHeight;
+      let n = 0;
+      pile.querySelectorAll<HTMLElement>('.dump').forEach((card) => {
+        if (card === editing) return;
+        const r = card.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < h) n += 1;
+      });
+      mReach.textContent = String(n);
+    }
+    mTaps.textContent = String(taps);
+  }
+
+  // Every click on a control counts, wherever it lands — the /lab/capture rule
+  // that a cost is counted rather than estimated.
+  document.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).closest('button, [data-text]')) {
+      taps += 1;
+      mTaps.textContent = String(taps);
+    }
+  });
+
+  window.addEventListener('scroll', measure, { passive: true });
+  window.addEventListener('resize', measure);
+  measure();
+</script>
