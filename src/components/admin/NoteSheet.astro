@@ -1,0 +1,182 @@
+---
+/*
+  NoteSheet — the pile's editor, as a near-fullscreen drawer with the pile
+  itself still in it (plan 46).
+
+  ⚠ IT ASKS NOTHING, AND THAT IS THE WHOLE LINE. No title, no slug, no tabs, no
+  publish. `Add ▾ → Note` once opened a near-fullscreen sheet with a title field
+  and plan 14 killed it — *"the exact cost §2 was written to remove"* — but the
+  objection was the TITLE, not the fullscreen: *"I have to title these things…
+  I see untitled, untitled, untitled."* A room that asks for nothing is not that
+  door, and the day this grows a field it becomes it again.
+
+  ⚠ NOT `WritingSheet`, AND THE REFUSAL IS THE SAME ARGUMENT. That drawer
+  already handles `status: 'note'` — the chip flips, the status line says "A
+  note — autosaves, never public", there is a note→draft button. Reusing it
+  would have brought title, slug, subjects, constellations, music, versions and
+  the publish dialog along, and its first field is a title. → **Make a piece**
+  is still how a dump graduates; that is what the composer is for.
+
+  ⚠ AND IT WRITES NOTHING OF ITS OWN. Every destination in the foot dispatches
+  into `notes.ts`'s existing `fileAs`, the same function the pile's → chooser
+  calls, with the same undo table and the same write-destination-THEN-consume
+  ordering 14 §10e settled. There is no second implementation of "make it a
+  quote" in this building and this component must never become one.
+
+  ── THE LAYOUT ──────────────────────────────────────────────────────────────
+
+  Two panes: the pile, and the note. Michael, 2026-08-26: *"lets make it so that
+  the footer only extends to the point where the sidebar is… I want it to be
+  more unambiguous or intuitive that those actions belong to the specific note
+  in view."* A foot spanning both columns makes a claim about the DRAWER; these
+  five act on ONE note. So the rail runs floor to ceiling and everything about
+  the note — head, document, toolbar, foot — lives inside the note's pane.
+
+  The head moved with the foot by the same argument, which was not asked for and
+  follows anyway: a stamp and a word count are facts about the note in view.
+  Only ✕ is about the drawer, and it keeps the corner.
+*/
+import { Icon } from 'astro-icon/components';
+import EditorToolbar from './EditorToolbar.astro';
+
+interface Props {
+  /**
+   * Does the roster have anybody? With nobody on it the Log destination is
+   * ABSENT rather than disabled — 10-hq §10b, the rule `notes.astro`'s chooser
+   * and `TaskSheet`'s goal picker both apply. A control that asks a question
+   * with no answers is worse than no control.
+   */
+  hasRoster?: boolean;
+}
+const { hasRoster = false } = Astro.props;
+
+/*
+  THE FIVE, IN FREQUENCY ORDER — the pile's chooser list, kept in step by
+  carrying the same `data-as` keys it dispatches on. ⚠ The order is not
+  symmetry: a dump is far more often an errand than an essay seed, and a line
+  somebody said is commoner than a piece in waiting.
+*/
+const WAYS = [
+  { as: 'agenda', icon: 'ph:calendar-blank', label: 'Add to the Agenda…' },
+  { as: 'log', icon: 'ph:note-pencil', label: 'Log an entry…', needsRoster: true },
+  { as: 'quote', icon: 'ph:quotes', label: 'Make it a quote…' },
+  { as: 'piece', icon: 'ph:pen-nib', label: 'Make a piece' },
+  { as: 'append', icon: 'ph:article', label: 'Add to a piece…' },
+].filter((w) => !w.needsRoster || hasRoster);
+---
+
+{
+  /* max-w-6xl, wider than the composer's 5xl, and the rail is the whole reason:
+    the document column below is independently capped at its own measure, so the
+    extra room goes to the pile rather than to the words. */
+}
+<dialog id="nsheet" class="drawer-dialog w-full max-w-6xl" aria-label="Note">
+  <div class="nsheet" id="nsheet-shell">
+    {
+      /* The way back out of the rail on a phone — over the note, never over the
+        rail itself. Above the breakpoint it is `display: none` and inert. */
+    }
+    <div class="nsheet__scrim" data-ns-scrim></div>
+
+    {
+      /* THE PILE, STILL THERE. Rows are built from the cards themselves when
+        the sheet opens (`notes.ts`), never rendered here — a rail rendered on
+        the server would describe a pile one edit out of date the moment you
+        typed, and this room's whole ordering is "by when it was last touched". */
+    }
+    <aside class="nsheet__rail" aria-label="The rest of the pile">
+      <div class="nsheet__rail-head">
+        <span class="nsheet__rail-title">The pile</span>
+      </div>
+      <div class="nsheet__rail-rows" id="ns-rail"></div>
+    </aside>
+
+    <div class="nsheet__note">
+      <header class="nsheet__head">
+        {
+          /* The way to the pile when there is no room for it beside the words.
+            Absent above the breakpoint, where the rail is simply there — a
+            control duplicating a visible one is worse than no control. */
+        }
+        <button type="button" class="nsheet__pile" id="ns-pile" aria-expanded="false">
+          <Icon name="ph:list" /> The pile
+        </button>
+        <span class="nsheet__kind">Note</span>
+        {
+          /* ⚠ THE CLOCK IS A SIBLING OF THE `<time>`, NOT A CHILD OF IT, and
+            that is load-bearing rather than tidy: `notes.ts` writes elapsed text
+            with `textContent`, which would delete a glyph nested inside and
+            never put it back. The card's stamp is wrapped the same way for the
+            same reason. */
+        }
+        <span class="nsheet__when">
+          <Icon name="ph:clock-light" />
+          {
+            /* No class of its own: `.nsheet__when` above carries the styling for
+            both halves, and `notes.ts` reaches this element by id. A class that
+            selects nothing is what `phantom-classes.spec.ts` exists to catch,
+            and it caught this one. */
+          }
+          <time id="ns-stamp" data-ago></time>
+        </span>
+        <span class="nsheet__words" id="ns-words"></span>
+        <button type="button" class="nsheet__x" data-ns-close aria-label="Close">✕</button>
+      </header>
+
+      {
+        /* ⚠ THE TOOLBAR IS A SIBLING OF THE SCROLLER, not inside it, which is
+          what lets a phone put it under the words — the same arrangement
+          `WritingSheet` had to reach for, for the same reason.
+
+          ⚠ AND THE MARKUP ORDER IS THE DESKTOP ORDER, deliberately, after the
+          first cut got this wrong in a way that only a screenshot showed: the
+          toolbar was placed after the document and pulled back with `order:
+          -1`, which lands it before the HEAD rather than before the document —
+          so the sheet opened with a formatting strip above the word "NOTE".
+          Ordering by CSS is now the phone's business alone. */
+      }
+      <EditorToolbar class="nsheet__tools" image />
+      <div class="nsheet__doc" id="ns-doc">
+        <div class="nsheet__col">
+          <div id="ns-editor"></div>
+        </div>
+      </div>
+
+      <footer class="nsheet__foot">
+        {
+          /* ⚠ FIVE IN THE OPEN, NOT ONE → AND A MENU. The pile's card settled
+            three controls, not six — *"six grey glyphs under a card that might
+            hold three words is the many-elements-competing smell"* — and every
+            clause of that argument is about a CARD. This is a full-height pane
+            you deliberately opened, holding ONE document. Both spellings were
+            built at /lab/notes and Michael read them side by side on
+            2026-08-26: *"spread out is better than behind the arrow."*
+
+            ⚠ THE LABELS COME OFF WHEN THE PANE IS NARROW, by container query
+            rather than by viewport — see hq.css. What decides is how much room
+            the RAIL LEFT, which is a different number in the same window. */
+        }
+        <div class="nsheet__acts">
+          {
+            WAYS.map((w) => (
+              <button type="button" class="nsheet__act" data-as={w.as} title={w.label} aria-label={w.label}>
+                <Icon name={w.icon} /> <span class="nsheet__act-word">{w.label}</span>
+              </button>
+            ))
+          }
+        </div>
+        {
+          /* ⚠ OUTSIDE THE GROUP, IN THE CORNER. Delete is not a way OUT of the
+            pile — it is the end of the thought — and standing it in a row with
+            five reversible destinations is how a bar teaches you to aim
+            carefully instead of reading. Colour only, and only on hover: the
+            undo strip behind it is the real guard, exactly as on the card. */
+        }
+        <button type="button" class="nsheet__act nsheet__act--danger" data-ns-delete title="Delete" aria-label="Delete">
+          <Icon name="ph:trash" />
+          <span class="nsheet__act-word">Delete</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</dialog>

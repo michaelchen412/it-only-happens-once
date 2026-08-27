@@ -32,11 +32,11 @@
 import { Icon } from 'astro-icon/components';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AltTextDialog from '../../components/admin/AltTextDialog.astro';
-import EditorToolbar from '../../components/admin/EditorToolbar.astro';
 import EmptyState from '../../components/admin/EmptyState.astro';
 import EventSheet from '../../components/admin/EventSheet.astro';
 import LinkDialog from '../../components/admin/LinkDialog.astro';
 import LogSheet from '../../components/admin/LogSheet.astro';
+import NoteSheet from '../../components/admin/NoteSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TaskSheet from '../../components/admin/TaskSheet.astro';
 import { elapsedSince } from '../../lib/hq/dates';
@@ -191,10 +191,33 @@ const roster = rosterData ?? [];
                   question, asked once. So reading (✎) and discarding (🗑) stay
                   direct, and → opens the chooser. */}
               <div class="dump__foot">
-                <time class="dump__stamp" datetime={n.updatedAt} data-ago>
-                  {n.ago}
-                </time>
-                <button type="button" class="dump__act" data-edit title="Edit" aria-label="Edit">
+                {/* ⚠ THE CLOCK IS A SIBLING OF THE `<time>`, NOT A CHILD (plan
+                  46). `notes.ts` writes the elapsed text with `textContent` —
+                  on every save, on every error, and on load — so a glyph nested
+                  inside would be deleted by the first one and never restored.
+                  The wrapper also carries the `margin-right: auto` that pushes
+                  the actions to the right, which the `<time>` used to hold. */}
+                <span class="dump__when">
+                  <Icon name="ph:clock-light" />
+                  <time class="dump__stamp" datetime={n.updatedAt} data-ago>
+                    {n.ago}
+                  </time>
+                </span>
+                {/* ⚠ IT OPENS THE ROOM NOW, NOT AN EDITOR IN THE CARD (plan
+                  46, ruled 2026-08-26). The card used to fold into an editor
+                  that grew without limit: a 900-word dump took the page from
+                  2,122px to 3,181px at a desk and to 5,444px at 390px, and
+                  every other thought in the pile went off screen. Michael:
+                  *"it becomes a huge, stretched-out editor, and I can't browse
+                  anything else."*
+
+                  The alternative that lost was a THRESHOLD — edit in place
+                  while short, open the drawer once long. It was refused for
+                  being invisible from the card: one button that does two things
+                  depending on a length you cannot see is a rule you can only
+                  learn by being surprised by it. So the pencil means one thing
+                  everywhere, and the card is never anything but words. */}
+                <button type="button" class="dump__act" data-edit title="Open" aria-label="Open">
                   <Icon name="ph:pencil-simple" />
                 </button>
                 <button type="button" class="dump__act" data-file title="Turn it into…" aria-label="Turn it into">
@@ -352,26 +375,20 @@ const roster = rosterData ?? [];
   </div>
 
   {
-    /* ONE EDITOR FOR THE WHOLE PILE — the same rule the chooser and the piece
-      picker already follow in this room, and here it is not just tidiness. The
-      pencil now opens a full TipTap editor (2026-08-06, Michael: the writing
-      sheet's formatting is wanted here too, *"even though they take up a
-      little bit of UI space"*), and a room that lists a hundred jottings
-      cannot mount a hundred of those. So this shell is MOVED into whichever
-      card is being edited and moved back out again, and its home is here —
-      outside `#notes-pile`, so a card leaving the pile can never take the
-      room's only editor with it.
+    /* ONE EDITOR FOR THE WHOLE PILE, and it lives in the sheet now (plan 46).
+      A room that lists a hundred jottings still cannot mount a hundred TipTap
+      instances — that part of the 2026-08-06 rule is untouched — but the editor
+      no longer TRAVELS. It used to be moved into whichever card was open and
+      back out again, with a belt in the undo strip's `finish()` in case a card
+      left the pile still holding it.
 
-      ⚠ THE TOOLBAR SITS BELOW THE SURFACE, not above it. Entering edit mode
-      must not make the words move — that is the one thing that would make
-      in-place editing feel like an "open" after all — so the editor takes the
-      text's place at the text's metrics and the controls appear underneath,
-      between the words and the card's own foot. */
+      ⚠ ALL OF THAT MACHINERY IS GONE, and deleting it is the largest thing this
+      change did to the room. The pencil opens the drawer, the drawer is the only
+      editor, and a card is words from first render to last — so there is no
+      hand-back to race, no card that can carry the room's only editor into the
+      void, and no second set of metrics for a surface at card scale. */
   }
-  <div id="dump-shell" class="dump__shell" hidden>
-    <div id="dump-editor"></div>
-    <EditorToolbar class="dump__tools" image />
-  </div>
+  <NoteSheet hasRoster={roster.length > 0} />
   <LinkDialog id="dump-link-dialog" />
   <AltTextDialog id="dump-alt-dialog" />
 

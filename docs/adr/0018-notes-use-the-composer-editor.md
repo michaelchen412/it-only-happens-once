@@ -61,7 +61,10 @@ Five things fall out of that choice and are part of it:
    `\`-terminated hard break TipTap serializes both give exactly one `<br>`;
    `src/tests/markdown.test.ts` pins that, because the day they disagree the
    whole pile reflows.
-3. **One editor per room, moved into the card you open.** A pile lists a hundred
+3. **One editor per room.** ⚠ *Amended 2026-08-26 (plan 46): it is no longer
+   moved into the card you open — the pencil opens `NoteSheet`, a drawer, and
+   the card is never editable. The reasoning below is unchanged and is why there
+   is still exactly one instance; only its address changed.* A pile lists a hundred
    jottings and cannot mount a hundred TipTap instances. Each card keeps its
    Markdown in a hidden `<textarea>` — what the four `→` destinations read from a
    card that has no editor of its own.

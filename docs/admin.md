@@ -30,7 +30,7 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 | **Link sheet** | slide-over, a profile | Attach a **work** or a single **fragment** to somebody (§12). Two modes over one drawer, a search over the whole corpus filtered in the browser, and an optional note. A drawer rather than a popover because the thing being picked is one row out of a few hundred. |
 | **Person sheet** | slide-over, either people page | Add somebody, or edit the fixed facts. **Name + circle is enough to create**; everything else is optional and fillable later, because a form that demands nine fields to add a friend is a form you avoid. Carries the photo picker, which is also the phone camera-roll path. |
 | **The ✚** | bottom-right, **every** admin page | Quick capture (§5b). A `<dialog>` holding one box — a TipTap editor with the writing sheet's toolbar under it — that saves itself on a 700ms debounce as a `note`; **＋ New** (or ⌘/Ctrl+Enter) parks it and hands over a blank. A row above the box **declares where the thought is going** — Jot · Agenda · Quote · Piece · Log — and **Done** names the room it takes you to. Mounted in `AdminLayout`, so it belongs to the building rather than to a room — and deliberately **not** a zone on Today, which answers *what is my day* and would be the wrong home for a dumping ground. |
-| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil opens the room's one editor **in that card**, a bin deletes softly with an undo strip, and **→** opens the chooser holding all five destinations (task · log entry · quote · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
+| **Notes** | `/admin/notes` | The pile (§5b). Every brain dump rendered as **its own text**, newest-touched first, with an elapsed stamp — no title, no slug, no checkbox, no table. Three controls per card: a pencil (or the words themselves) opens the note in **`NoteSheet`** — a drawer with the rest of the pile beside it — a bin deletes softly with an undo strip, and **→** opens the chooser holding all five destinations (task · log entry · quote · new piece · into an existing piece). Replaced `?view=notes` on 2026-08-03, which now redirects here. |
 | **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5d). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
 | **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
@@ -458,28 +458,49 @@ an uncomfortable third thing between a piece of writing and a scratch line.
   removing a `###` ate the blank line before it and ran a heading onto the end
   of the paragraph above.
 - **Its own room, showing the words.** `/admin/notes` renders each dump as its
-  own text, newest-touched first, with an elapsed stamp. A pencil puts an
-  editor in the card in place — reading is the dominant motion there, so a tap
-  while scrolling must not put a cursor (and on a phone, a keyboard) into a
-  thought you were only passing.
-- **⚠ One editor for the whole pile, moved into the card you open.** The same
-  rule the chooser and the piece picker follow, and here it is not just
-  tidiness: a room that lists a hundred jottings cannot mount a hundred TipTap
-  instances. Its home is outside `#notes-pile`, so a card leaving cannot take
-  the room's only editor with it, and each card keeps its Markdown in a hidden
-  `<textarea>` — what the four destinations read from a card that has no editor
-  of its own. Two consequences worth knowing: leaving a card does its DOM work
-  **before** awaiting the save (otherwise the next card's open would race the
-  hand-back), and the "did this change?" baseline is what the editor would
-  *serialize*, not what the server sent — a plain-text dump re-spells on the
-  round trip, and comparing against the server's copy would rewrite every card
-  you merely glanced at, bumping it to the top of a pile ordered by touch.
-- **⚠ Clicking away closes the card, not blurring it.** A rich editor loses
-  focus constantly and legitimately — to its own toolbar, to the link dialog,
-  to the alt-text prompt, to the file picker — and every one of those read as
-  "you're done here" under the `blur` rule a textarea could use. What means
-  done is a pointer landing somewhere that is neither the card nor a window the
-  card opened.
+  own text, newest-touched first, with an elapsed stamp. Nothing in the pile is
+  editable — reading is the dominant motion there, so a tap while scrolling must
+  not put a cursor (and on a phone, a keyboard) into a thought you were only
+  passing.
+- **⚠ The editor is a drawer, not the card (`NoteSheet`, plan 46).** The pencil
+  and the words both open it. The card used to fold into an editor that grew to
+  whatever height the document wanted: a 900-word dump took the page from
+  ~2,100px to ~3,200px at a desk and ~5,400px at 390px, with every other thought
+  pushed off screen. **A threshold was rejected** — edit in place while short,
+  open the drawer once long — because one button doing two things depending on a
+  length you cannot see is a rule you can only learn by being surprised by it.
+- **⚠ And it asks nothing.** No title, no slug, no tabs, no publish. `Add ▾ →
+  Note` once opened a near-fullscreen sheet **with a title field** and plan 14
+  killed it, but the objection was the title, not the fullscreen. `WritingSheet`
+  is refused as the vehicle for the same reason: it already handles
+  `status: 'note'`, and reusing it would bring a title field along. **→ Make a
+  piece** is still how a dump graduates.
+- **⚠ One editor for the whole pile — and it no longer travels.** A room that
+  lists a hundred jottings still cannot mount a hundred TipTap instances, so
+  there is exactly one; it now lives in the sheet instead of being moved into
+  whichever card is open. Each card keeps its Markdown in a hidden `<textarea>`
+  — what the five destinations read from a card that has no editor of its own.
+  Two consequences survive the move: leaving a note does its DOM work **before**
+  awaiting the save (or the next note's open would race the hand-over), and the
+  "did this change?" baseline is what the editor would *serialize*, not what the
+  server sent — a plain-text dump re-spells on the round trip, and comparing
+  against the server's copy would rewrite every note you merely opened, bumping
+  it to the top of a pile ordered by touch.
+- **⚠ The pile stays beside the words.** A rail lists every dump and moves
+  between them without closing; below 768px it slides **over** the note behind
+  one button rather than disappearing, because a 16rem rail beside a readable
+  measure wants ~640px and a phone has 390. Measured at 390×780 with the
+  keyboard up: 480px of drawer, 177px of chrome, **303px of words**.
+- **⚠ The foot belongs to the note, not to the drawer.** The rail runs floor to
+  ceiling and the action bar stops where it stops, so five controls that act on
+  one note never underline the list they do not act on. All five dispatch into
+  `fileAs` — the same function the card's → chooser calls — and the bin into
+  `discard`; there is no second implementation of any destination.
+- **⚠ A modal whose body is a rich editor closes by hand.** `wireSheetDismiss`
+  gives the ✕, the backdrop and Escape, but `prosemirror-view`'s `captureKeyDown`
+  preventDefaults keyCode 27 unconditionally, so `cancel` never fires from inside
+  the editor. `capture.ts` carries the same second half; `notes.spec.ts` and
+  `checkin.spec.ts` both pin it.
 - **Five ways out, behind one → chooser.** Reading (a pencil) and discarding (a
   bin) are direct; the destinations sit behind one control, because they are not
   several questions — they are one question, *what kind of thing is this?*,

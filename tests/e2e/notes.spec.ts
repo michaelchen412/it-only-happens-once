@@ -245,17 +245,21 @@ test.describe('the pile', () => {
     const card = page.locator('.dump').first();
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
 
+    // ⚠ IT OPENS THE SHEET NOW, NOT AN EDITOR IN THE CARD (plan 46). The
+    // complaint above is unchanged and so is the gesture; what changed is where
+    // it lands. The card is words from first render to last.
     await card.locator('[data-text]').click();
-    await expect(card.locator('#dump-shell')).toBeVisible();
-    await expect(card.locator('#dump-shell [contenteditable="true"]')).toBeFocused();
+    await expect(page.locator('#nsheet')).toBeVisible();
+    await expect(page.locator('#ns-editor [contenteditable="true"]')).toBeFocused();
+    await expect(card.locator('[data-text]')).toBeVisible(); // the card never folded
     await page.keyboard.press('Escape');
-    await expect(card.locator('[data-text]')).toBeVisible();
+    await expect(page.locator('#nsheet')).toBeHidden();
   });
 
   test('selecting a card’s text does not open the editor', async ({ page }) => {
     // ⚠ THE GUARD THAT MAKES THE ABOVE LIVEABLE. Dragging across a sentence to
     // copy it ends with a click on the card, so without this every copy would
-    // fold the card into an editor and drop the selection doing it.
+    // throw a drawer over the thing you were reading and drop the selection.
     await stubActions(page, {});
     const card = page.locator('.dump').first();
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
@@ -318,11 +322,11 @@ test.describe('the pile', () => {
       await page.evaluate(() => window.getSelection()?.toString().length ?? 0),
       'the drag selected nothing, so this test proves nothing',
     ).toBeGreaterThan(0);
-    await expect(card.locator('#dump-shell')).toHaveCount(0);
+    await expect(page.locator('#nsheet')).toBeHidden();
     await expect(text).toBeVisible();
   });
 
-  test('the pencil edits in place — no sheet, no navigation', async ({ page }) => {
+  test('the pencil opens the room — a drawer, not an editor in the card', async ({ page }) => {
     await stubActions(page, {});
     const card = page.locator('.dump').first();
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
@@ -330,27 +334,54 @@ test.describe('the pile', () => {
     const text = await card.locator('[data-text]').innerText();
     await card.locator('[data-edit]').click();
 
-    // ⚠ THE EDITOR IS IN THE CARD, not the card's own textarea — since
-    // 2026-08-06 the room has exactly ONE and moves it to whichever card you
-    // open. `#dump-shell` living inside `.dump` is the whole claim.
-    const shell = card.locator('#dump-shell');
-    await expect(shell).toBeVisible();
-    const box = shell.locator('[contenteditable="true"]');
+    // ⚠ THE CARD USED TO FOLD INTO AN EDITOR AND STOPPED ON 2026-08-26 (plan
+    // 46). It grew to whatever height the document wanted, which took the page
+    // from ~2,100px to ~3,200px at a desk and to ~5,400px at 390px and pushed
+    // every other thought off screen. The pile stays a pile; the words open a
+    // room.
+    const sheet = page.locator('#nsheet');
+    await expect(sheet).toBeVisible();
+    const box = page.locator('#ns-editor [contenteditable="true"]');
     await expect(box).toBeFocused();
     expect((await box.innerText()).trim()).toBe(text.trim()); // the same words, not a fetch
-    await expect(card.locator('[data-text]')).toBeHidden();
-    await expect(page).toHaveURL(/\/admin\/notes$/);
+    await expect(card.locator('[data-text]')).toBeVisible(); // ⚠ the card is untouched
+    await expect(page).toHaveURL(/\/admin\/notes$/); // still no navigation
 
-    // Escape returns to reading without asking anything, and the editor goes
-    // home — a card that kept it would leave the pencil dead everywhere else.
+    // ⚠ AND IT ASKS NOTHING. This is the line plan 14 drew — the door it killed
+    // was a near-fullscreen sheet WITH A TITLE FIELD, and the objection was the
+    // title. A field appearing here is the regression this pins.
+    await expect(sheet.locator('input:visible, textarea:visible')).toHaveCount(0);
+
+    // Escape returns to reading without asking anything.
     await page.keyboard.press('Escape');
-    await expect(shell).toHaveCount(0);
+    await expect(sheet).toBeHidden();
     await expect(card.locator('[data-text]')).toBeVisible();
   });
 
-  test('the card carries the writing sheet’s controls, and they format the words', async ({ page }) => {
+  test('the sheet keeps the pile beside the words, and moves between notes', async ({ page }) => {
+    // Split's whole proposition (plan 46): you never lose the pile to read one
+    // thought. Michael, on the bench: *"I like the split definitely the most."*
+    await stubActions(page, {});
+    const cards = page.locator('.dump');
+    test.skip((await cards.count()) < 2, 'needs two dumps to hand over between');
+
+    const second = (await cards.nth(1).locator('[data-text]').innerText()).trim();
+    await cards.first().locator('[data-edit]').click();
+
+    const rows = page.locator('#ns-rail .ns-row');
+    await expect(rows).toHaveCount(await cards.count()); // the whole pile, in the rail
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+
+    // Note to note WITHOUT leaving — the thing the rail is for.
+    await rows.nth(1).click();
+    await expect(page.locator('#nsheet')).toBeVisible();
+    await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true');
+    expect((await page.locator('#ns-editor [contenteditable="true"]').innerText()).trim()).toBe(second);
+  });
+
+  test('the sheet carries the writing sheet’s controls, and they format the words', async ({ page }) => {
     // The ask this shipped for (2026-08-06): the same toolbar the composer has,
-    // in the pile. Bold is the cheapest proof that the whole chain works —
+    // for a dump. Bold is the cheapest proof that the whole chain works —
     // toolbar → TipTap → Markdown → the body that gets saved.
     const saved: Array<string | null> = [];
     await stubActions(page, {
@@ -363,14 +394,14 @@ test.describe('the pile', () => {
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');
 
     await card.locator('[data-edit]').click();
-    const toolbar = card.locator('#dump-shell [role="toolbar"]');
+    const toolbar = page.locator('#nsheet [role="toolbar"]');
     // Not an assertion about a count: the claim is that these commands exist
     // here, the same ones EditorToolbar gives the writing sheet.
     for (const cmd of ['bold', 'italic', 'h2', 'bulletList', 'link', 'image']) {
       await expect(toolbar.locator(`[data-cmd="${cmd}"]`)).toBeVisible();
     }
 
-    const box = card.locator('#dump-shell [contenteditable="true"]');
+    const box = page.locator('#ns-editor [contenteditable="true"]');
     await box.click();
     await page.keyboard.press('ControlOrMeta+A');
     await toolbar.locator('[data-cmd="bold"]').click();
@@ -380,9 +411,12 @@ test.describe('the pile', () => {
     await expect.poll(() => saved.at(-1) ?? '').toMatch(/\*\*/); // …and bold in what was stored
   });
 
-  test('an unchanged card saves nothing when you leave it', async ({ page }) => {
+  test('an unchanged note saves nothing when you leave it', async ({ page }) => {
     // Opening a thought to re-read it must not rewrite the row — that would
-    // move it to the top of a pile ordered by when it was last touched.
+    // move it to the top of a pile ordered by when it was last touched. ⚠ And
+    // the sheet makes re-reading the COMMON case, so this guard matters more
+    // than it did: the baseline is what the editor would serialize, never what
+    // the server sent.
     const seen = await stubActions(page, {});
     const card = page.locator('.dump').first();
     test.skip((await page.locator('.dump').count()) === 0, 'the pile is empty');

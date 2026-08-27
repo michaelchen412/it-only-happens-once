@@ -5,7 +5,7 @@
 // beside the pile.
 //
 // SIX MOTIONS, and the whole room is these six:
-//   · edit in place        — the words change, nothing else does
+//   · open it              — the pencil, or the words themselves (plan 46)
 //   · delete               — soft, with a way back
 //   …and four ways OUT, behind the → chooser (14 · Piece 2):
 //   · add to the Agenda    — READ first, then a task or an event (14 · Piece 3)
@@ -14,17 +14,28 @@
 //   · add to a piece       — the one genuine copy, so the dump is consumed
 //
 // ⚠ READING IS THE DOMINANT MOTION HERE, which is why the text is a `<div>` and
-// the pencil is what puts an editor in its place. The alternative — a pile of
-// live editors, always editable — was better on paper and worse in the hand:
-// on a phone, every tap while scrolling past a thought would put a cursor in it
-// and throw the keyboard up over the pile you were trying to read.
+// nothing in the pile is ever editable. The alternative — a pile of live
+// editors — was better on paper and worse in the hand: on a phone, every tap
+// while scrolling past a thought would put a cursor in it and throw the
+// keyboard up over the pile you were trying to read.
 //
 // ⚠ AND THAT EDITOR IS TIPTAP NOW (2026-08-06), not a textarea. Michael asked
 // for the writing sheet's formatting in the pile as well — *"I think those are
 // important still to have, even though they take up a little bit of UI space"*
-// — so a dump's body is genuinely Markdown, the card renders it, and the
-// controls are the shared EditorToolbar. There is ONE editor for the whole
-// room, moved into whichever card is open; see notes.astro for why.
+// — so a dump's body is genuinely Markdown and the card renders it.
+//
+// ⚠⚠ THE EDITOR LEFT THE CARD ENTIRELY ON 2026-08-26 (plan 46). It used to be
+// one shell MOVED into whichever card was open, and the card grew to whatever
+// height the document wanted: a 900-word dump took the page from 2,122px to
+// 3,181px at a desk and to 5,444px at 390px, with every other thought pushed
+// off screen. Michael: *"it becomes a huge, stretched-out editor, and I can't
+// browse anything else."*
+//
+// So the pencil opens `NoteSheet` — a drawer with the pile beside it — and the
+// card is words from first render to last. What that DELETED is most of what
+// used to live here: the shell's travel, the hand-back ordering, the belt in
+// `finish()`, the click-away close, the in-card Escape. The hidden `<textarea>`
+// stays, because the destinations still read a card that has no editor.
 //
 // THE SHEET-BASED DESTINATIONS ANNOUNCE RATHER THAN TIDY. `hq:note-filed`
 // arrives from task-sheet.ts, event-sheet.ts and log-sheet.ts; consuming the
@@ -39,6 +50,7 @@ import { anchorPopover } from './pop-anchor';
 import { mountRichEditor } from './rich-editor';
 import { uploadImage } from './upload';
 import { closeWithExit, openDialog } from './dialog-close';
+import { wireSheetDismiss } from './sheet-dismiss';
 import { onBackdropDismiss } from './backdrop-close';
 
 const pile = document.getElementById('notes-pile');
@@ -80,10 +92,12 @@ if (undoBar) {
     window.clearTimeout(undoTimer);
     undoBar!.classList.remove('is-visible');
     if (!pending) return;
-    // Every way out flushes its edit first, so the editor should already be
-    // home. This is the belt: the room has exactly one, and a card taking it
-    // into the void would leave the pencil dead on every other card.
-    if (shell.parentElement === pending.card) homeShell();
+    // ⚠ THE BELT THAT STOOD HERE IS GONE, and its absence is the point. It read
+    // `if (shell.parentElement === pending.card) homeShell()` — because the
+    // room's one editor used to LIVE inside whichever card was open, and a card
+    // leaving the pile could carry it into the void and leave the pencil dead
+    // everywhere else. The editor lives in the sheet now (plan 46), so a card
+    // is only ever words and can be removed without consulting anything.
     pending.card.remove();
     pending = null;
     // The empty state is server-rendered, so an emptied pile would otherwise
@@ -121,8 +135,9 @@ if (undoBar) {
     }
   });
 
-  /* ── editing in place ───────────────────────────────────────────────────── */
+  /* ── the open note ──────────────────────────────────────────────────────── */
 
+  /** The card the sheet is open on, or null. The DOM is still the state. */
   let editing: HTMLElement | null = null;
   let saveTimer: number | undefined;
   let lock: Promise<unknown> = Promise.resolve();
@@ -130,25 +145,30 @@ if (undoBar) {
   const textOf = (card: HTMLElement) => card.querySelector<HTMLElement>('[data-text]')!;
   const boxOf = (card: HTMLElement) => card.querySelector<HTMLTextAreaElement>('[data-edit-box]')!;
   const stampOf = (card: HTMLElement) => card.querySelector<HTMLTimeElement>('[data-ago]')!;
-  /** Put the stamp back to what it says at rest, after it has been borrowed. */
-  const restStamp = (card: HTMLElement) => {
-    stampOf(card).textContent = elapsedSince(card.dataset.updated!);
-  };
+  /** What a card's stamp says at rest, after the line has been borrowed. */
+  const atRest = (card: HTMLElement) => (card.dataset.updated ? elapsedSince(card.dataset.updated) : '');
 
-  /* ── the one editor ─────────────────────────────────────────────────────── */
+  /* ── the sheet ──────────────────────────────────────────────────────────── */
 
-  // Its home is outside the pile, so a card leaving cannot take it along.
-  const shell = document.getElementById('dump-shell')!;
-  const shellHome = shell.parentElement!;
+  const sheet = document.getElementById('nsheet') as HTMLDialogElement | null;
+  const sheetShell = document.getElementById('nsheet-shell');
+  const doc = document.getElementById('ns-doc');
+  const railRows = document.getElementById('ns-rail');
+  const nsStamp = document.getElementById('ns-stamp') as HTMLTimeElement | null;
+  const nsWords = document.getElementById('ns-words');
+  const pileBtn = document.getElementById('ns-pile') as HTMLButtonElement | null;
 
   const { editor, getMarkdown } = mountRichEditor({
-    editorEl: document.getElementById('dump-editor')!,
-    toolbarRoot: shell.querySelector('[role="toolbar"]') as HTMLElement,
+    editorEl: document.getElementById('ns-editor')!,
+    toolbarRoot: document.querySelector('.nsheet__tools') as HTMLElement,
     linkDialog: document.getElementById('dump-link-dialog') as HTMLDialogElement,
     placeholder: 'Write it down…', // the ✚'s words, for a thought you emptied
     ariaLabel: 'Edit this note',
-    // Matches `.dump__text` exactly, so opening a card does not move its words.
-    docClass: 'jot-prose',
+    // ⚠ NOT `jot-prose` ANY MORE. That class carried the CARD's metrics so the
+    // words would not move when an editor arrived in their place — a promise
+    // this room no longer has to keep, because the editor is somewhere else
+    // entirely. The sheet sets its own, at document scale (hq.css).
+    docClass: 'ns-prose',
     // ⚠ A dump's newlines are its shape, and every one written before this
     // editor existed is plain text. See rich-editor's `breaks` for the whole
     // argument; the card renders to match.
@@ -156,8 +176,8 @@ if (undoBar) {
     images: {
       // `essays/<id>/` rather than `notes/<id>/`, because "make it a piece" is
       // a status flip on this very row — the picture must not need moving when
-      // the thought graduates. The id is read at upload time from the card
-      // that is open, which is the only card an upload can come from.
+      // the thought graduates. The id is read at upload time from the card the
+      // sheet is open on, which is the only card an upload can come from.
       upload: async (file) => {
         const id = editing?.dataset.note;
         if (!id) throw new Error('No note is open');
@@ -166,27 +186,43 @@ if (undoBar) {
         return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).embedUrl;
       },
       askAlt: wireAltDialog(document.getElementById('dump-alt-dialog') as HTMLDialogElement),
-      // The card's own stamp is the status line — this room has no other, and
-      // an upload notice belongs beside the thought it is going into.
-      onStatus: (m) => editing && (m ? (stampOf(editing).textContent = m) : restStamp(editing)),
-      onError: (m) => editing && (stampOf(editing).textContent = m),
+      // ⚠ IT HAS TO REACH THE SHEET'S STAMP, and `say` is what guarantees it:
+      // the card is behind a backdrop while an upload runs, so a notice written
+      // only there would be reported to nobody. Both stamps carry it, and both
+      // go back to the elapsed line when the upload ends.
+      onStatus: (m) => editing && say(editing, m || atRest(editing)),
+      onError: (m) => editing && say(editing, m),
     },
     onChange: () => {
       if (!editing) return;
       const card = editing;
+      sayWords();
       window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => void save(card), DEBOUNCE_MS);
     },
   });
 
   /**
-   * This card's Markdown. From the editor while it is the one being edited,
-   * from its hidden carrier otherwise — the carrier is what the other cards
-   * have instead of an editor of their own.
+   * This card's Markdown. From the editor while its note is the open one, from
+   * the hidden carrier otherwise — the carrier is what every other card has
+   * instead of an editor of its own.
    */
   const markdownOf = (card: HTMLElement) => (editing === card ? getMarkdown() : boxOf(card).value);
 
-  /** One save of the card being edited. Quiet on failure — the words are still on screen. */
+  /**
+   * ⚠ COUNTED OFF THE EDITOR'S TEXT, NOT ITS MARKDOWN. `getMarkdown()` would
+   * count `**` and `###` as part of the words they format, so a dump full of
+   * headings would read heavier than it is — the same reason the pile renders
+   * rather than prints.
+   */
+  function sayWords() {
+    if (!nsWords) return;
+    const t = editor.getText().trim();
+    const n = t ? t.split(/\s+/).length : 0;
+    nsWords.textContent = n === 1 ? '1 word' : `${n} words`;
+  }
+
+  /** One save of the open note. Quiet on failure — the words are still on screen. */
   async function persist(card: HTMLElement): Promise<void> {
     const box = boxOf(card);
     const text = markdownOf(card);
@@ -205,20 +241,30 @@ if (undoBar) {
     try {
       const { data, error } = await actions.fragments.saveWriting(fd);
       if (error || !data) {
-        stampOf(card).textContent = error?.code === 'CONFLICT' ? 'changed elsewhere — reload' : 'not saved';
+        say(card, error?.code === 'CONFLICT' ? 'changed elsewhere — reload' : 'not saved');
         return;
       }
       card.dataset.updated = data.updated_at;
       card.dataset.slug = data.slug;
       card.dataset.saved = text;
-      // The carrier follows every save, so the four destinations behind → read
-      // what is actually stored even mid-edit.
+      // The carrier follows every save, so the five destinations read what is
+      // actually stored even mid-edit.
       box.value = text;
       stampOf(card).dateTime = data.updated_at;
-      stampOf(card).textContent = elapsedSince(data.updated_at);
+      say(card, elapsedSince(data.updated_at));
     } catch {
-      stampOf(card).textContent = 'not saved';
+      say(card, 'not saved');
     }
+  }
+
+  /**
+   * Say something on this card's stamp — and on the sheet's too while it is the
+   * open one. ⚠ BOTH, because they are two renderings of one fact and the sheet
+   * is the only one you can see while it is up.
+   */
+  function say(card: HTMLElement, text: string) {
+    stampOf(card).textContent = text;
+    if (editing === card && nsStamp) nsStamp.textContent = text;
   }
 
   const save = (card: HTMLElement) => {
@@ -226,56 +272,93 @@ if (undoBar) {
     return lock;
   };
 
-  /** Move the editor out of whatever card has it and back to its home. */
-  function homeShell() {
-    shell.hidden = true;
-    shellHome.append(shell);
-  }
+  /* ── the rail ───────────────────────────────────────────────────────────── */
 
-  function enterEdit(card: HTMLElement) {
-    if (editing === card) return;
-    if (editing) void leaveEdit(editing);
-    editing = card;
+  /**
+   * Built from the cards themselves every time the sheet opens, so it can never
+   * describe a pile one edit out of date — this room is ordered by when a
+   * thought was last touched, and touching one is exactly what you came here
+   * to do.
+   *
+   * The label is the note's first non-empty line with any heading marks off:
+   * the pile has no titles, and inventing one for a rail would be the middle
+   * ground arriving in a costume (14 §9a).
+   */
+  function buildRail(current: HTMLElement) {
+    if (!railRows || !pile) return;
+    railRows.textContent = '';
+    pile.querySelectorAll<HTMLElement>('.dump').forEach((card) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'ns-row';
+      row.dataset.railFor = card.dataset.note ?? '';
 
-    editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
-    /*
-      ⚠ THE BASELINE IS WHAT THE EDITOR WOULD WRITE, not what the server sent,
-      and the difference is the whole reason this line has a comment.
+      const first = (
+        boxOf(card)
+          .value.split('\n')
+          .find((l) => l.trim()) ?? ''
+      ).replace(/^#+\s*/, '');
+      const line = document.createElement('span');
+      line.textContent = first.slice(0, 80) + (first.length > 80 ? '…' : '');
+      row.append(line);
 
-      Opening a thought to re-read it must not rewrite the row — that would
-      move it to the top of a pile ordered by when it was last touched. But a
-      dump typed before this editor existed is plain text, and a round trip
-      through TipTap re-spells it (a newline becomes Markdown's `\` hard
-      break). Comparing against the server's copy would call that a change and
-      save it, on every card you so much as glanced at. Comparing against the
-      editor's own serialization asks the question that actually matters: did
-      the DOCUMENT change?
-    */
-    card.dataset.saved = getMarkdown();
+      const when = document.createElement('span');
+      when.className = 'ns-row__when';
+      // ⚠ CLONED FROM THE HEAD'S CLOCK rather than hand-rolled as inline SVG.
+      // `astro-icon` renders at build time, so a row built in the browser cannot
+      // ask for one — and an SVG retyped here would be a second copy of a mark
+      // the `astro.config` allowlist owns, free to drift from it.
+      const clock = nsStamp?.parentElement?.querySelector('svg');
+      if (clock) when.append(clock.cloneNode(true));
+      const ago = document.createElement('span');
+      ago.textContent = card.dataset.updated ? elapsedSince(card.dataset.updated) : '';
+      when.append(ago);
+      row.append(when);
 
-    // In the card, in the text's place — the text hides rather than moves.
-    card.insertBefore(shell, card.querySelector('.dump__foot'));
-    shell.hidden = false;
-    textOf(card).hidden = true;
-    card.querySelector<HTMLElement>('[data-more]')?.setAttribute('hidden', '');
-    editor.commands.focus('end');
+      if (card === current) row.setAttribute('aria-current', 'true');
+      railRows.append(row);
+    });
   }
 
   /**
-   * Back to reading. ⚠ THE DOM WORK HAPPENS BEFORE THE AWAIT, deliberately:
-   * the editor is one element shared by the pile, so a save left in front of
-   * the hand-back would let the next card's `enterEdit` claim the shell and
-   * this card's tail then steal it away again. The promise is still returned,
-   * because the motions that move a card out of the pile need the save landed
-   * before they flip its status.
+   * The phone's rail slides OVER the note, because at 390px a 16rem rail beside
+   * a readable measure is not tight, it is impossible. ⚠ IT CLOSES ON PICK,
+   * which is what makes it a detail view rather than a menu left open: choosing
+   * a note is choosing to read it. Above the breakpoint this attribute is inert
+   * — the rail is a column and nothing about it moves.
    */
-  function leaveEdit(card: HTMLElement): Promise<unknown> {
-    window.clearTimeout(saveTimer);
-    editing = null;
+  function setRail(open: boolean) {
+    if (!sheetShell) return;
+    if (open) sheetShell.dataset.railOpen = '1';
+    else delete sheetShell.dataset.railOpen;
+    pileBtn?.setAttribute('aria-expanded', String(open));
+  }
 
+  pileBtn?.addEventListener('click', () => setRail(!sheetShell?.dataset.railOpen));
+  sheet?.querySelector('[data-ns-scrim]')?.addEventListener('click', () => setRail(false));
+
+  railRows?.addEventListener('click', (e) => {
+    const row = (e.target as Element).closest<HTMLElement>('[data-rail-for]');
+    if (!row) return;
+    const card = pile?.querySelector<HTMLElement>(`[data-note="${row.dataset.railFor}"]`);
+    if (!card || card === editing) return;
+    void handOver(card);
+  });
+
+  /* ── opening, handing over, closing ─────────────────────────────────────── */
+
+  /**
+   * ⚠ THE DOM WORK HAPPENS BEFORE THE AWAIT, deliberately, and this ordering
+   * survived the editor leaving the card. It is one editor for the whole pile,
+   * so a save left in front of the hand-over would let the next note claim the
+   * editor and the previous one's tail then overwrite it. The promise is still
+   * returned, because the motions that move a card out of the pile need the
+   * save landed before they flip its status.
+   */
+  function flush(card: HTMLElement): Promise<unknown> {
+    window.clearTimeout(saveTimer);
     const box = boxOf(card);
     box.value = getMarkdown();
-    const text = textOf(card);
     /*
       The rendered twin comes from the editor's own document rather than from a
       Markdown round trip: it is the exact thing that was on screen a moment
@@ -284,16 +367,132 @@ if (undoBar) {
       out of a schema with no script node and no event-handler attribute, so it
       cannot express one. The public renderer still sanitizes (lib/markdown).
     */
+    const text = textOf(card);
     text.innerHTML = editor.getHTML();
-    homeShell();
-    text.hidden = false;
     // An edited thought may have grown past the clamp, or shrunk under it.
     const long = box.value.split('\n').length > 10 || box.value.length > 700;
     text.classList.toggle('dump__text--clamped', long && !text.dataset.expanded);
     const more = card.querySelector<HTMLElement>('[data-more]');
     if (more) more.hidden = !long || !!text.dataset.expanded;
-
     return save(card);
+  }
+
+  function load(card: HTMLElement) {
+    editing = card;
+    editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
+    /*
+      ⚠ THE BASELINE IS WHAT THE EDITOR WOULD WRITE, not what the server sent,
+      and the difference is the whole reason this line has a comment.
+
+      Opening a thought to re-read it must not rewrite the row — that would move
+      it to the top of a pile ordered by when things were last touched. But a
+      dump typed before this editor existed is plain text, and a round trip
+      through TipTap re-spells it (a newline becomes Markdown's `\` hard break).
+      Comparing against the server's copy would call that a change and save it,
+      on every note you so much as opened. Comparing against the editor's own
+      serialization asks the question that actually matters: did the DOCUMENT
+      change?
+    */
+    card.dataset.saved = getMarkdown();
+    if (nsStamp) {
+      nsStamp.dateTime = card.dataset.updated ?? '';
+      nsStamp.textContent = card.dataset.updated ? elapsedSince(card.dataset.updated) : '';
+    }
+    sayWords();
+    buildRail(card);
+    setRail(false);
+    /*
+      ⚠ THE TOP, AND THE CARET AT THE START — ruled 2026-08-26, against the
+      card's own `focus('end')`. A card is short enough that landing at its end
+      is invisible; this drawer is where you come to RE-READ a long dump, and
+      opening one at its last line is opening it at the wrong end. `setContent`
+      has already put the selection at the start; scrolling the pane is the
+      other half, since the previous note may have left it anywhere.
+    */
+    doc?.scrollTo({ top: 0 });
+    editor.commands.focus('start');
+  }
+
+  function openSheet(card: HTMLElement) {
+    if (!sheet || editing === card) return;
+    load(card);
+    if (!sheet.open) openDialog(sheet);
+  }
+
+  /** Note to note without leaving — the rail's whole proposition. */
+  async function handOver(card: HTMLElement) {
+    if (!editing) return openSheet(card);
+    const outgoing = editing;
+    editing = null; // the DOM work below must not be attributed to the new one
+    const landed = flush(outgoing);
+    load(card);
+    setRail(false);
+    await landed;
+  }
+
+  async function closeSheet() {
+    if (!sheet?.open) return;
+    const card = editing;
+    editing = null;
+    const landed = card ? flush(card) : Promise.resolve();
+    await closeWithExit(sheet);
+    await landed;
+  }
+
+  if (sheet) {
+    // ✕, Escape and the backdrop, all three flushing first — `closeSheet` is
+    // what dismissal MEANS here, which is why the helper takes a callback
+    // rather than closing the dialog itself.
+    wireSheetDismiss(sheet, () => void closeSheet(), '[data-ns-close]');
+
+    /*
+      ⚠ AND ESCAPE STILL HAS TO BE CLOSED BY HAND ON TOP OF THAT.
+
+      A `<dialog>` turns Escape into a close request only if the keydown's
+      default survives, and `prosemirror-view`'s `captureKeyDown` preventDefaults
+      keyCode 27 unconditionally — so inside this editor the `cancel` event
+      `wireSheetDismiss` listens for never fires at all. The helper is right and
+      complete for a sheet full of inputs; it is half a rule for one whose body
+      is a rich editor. `capture.ts` carries this same second half, and
+      `notes.spec.ts` and `checkin.spec.ts` both pin it, which is why this is a
+      known trap rather than a discovery.
+
+      `preventDefault` here too, deliberately: focus on the toolbar or the foot
+      is OUTSIDE the editor, where nothing swallows the key and the native
+      `cancel` does fire — claiming the default keeps the two paths from running
+      two closes on top of each other.
+    */
+    sheet.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      void closeSheet();
+    });
+
+    // The five destinations and the bin, on the note in view. ⚠ EVERY ONE OF
+    // THEM DISPATCHES INTO THE SAME FUNCTIONS THE CARD'S → CHOOSER CALLS — see
+    // `fileAs` below. A second implementation of "make it a quote" in this
+    // building is the one outcome this foot must never produce.
+    sheet.querySelector('.nsheet__foot')?.addEventListener('click', (e) => {
+      const btn = (e.target as Element).closest<HTMLElement>('[data-as], [data-ns-delete]');
+      if (!btn || !editing) return;
+      const card = editing;
+      if (btn.hasAttribute('data-ns-delete')) void leaveThen(card, () => discard(card));
+      else void leaveThen(card, () => fileAs(card, btn.dataset.as!));
+    });
+  }
+
+  /**
+   * A destination chosen from inside the sheet. ⚠ THE SHEET GOES FIRST, and the
+   * order is not cosmetic: every one of these either moves the card out of the
+   * pile or navigates away, and a drawer still standing over a card that is
+   * fading out of the room behind it is a way to lose track of what just
+   * happened. `closeSheet` also flushes, so the destination reads the words you
+   * just typed rather than the ones the debounce had got to.
+   */
+  async function leaveThen(card: HTMLElement, act: () => unknown) {
+    await closeSheet();
+    await act();
+    void card;
   }
 
   /* ── the two ways out ───────────────────────────────────────────────────── */
@@ -396,13 +595,18 @@ if (undoBar) {
    */
   const plainOf = (card: HTMLElement) => stripMarkdown(markdownOf(card));
 
-  chooser?.addEventListener('click', (e) => {
-    const row = (e.target as Element).closest<HTMLElement>('[data-as]');
-    if (!row || !choosing) return;
-    const card = choosing;
-    chooser.hidePopover();
-
-    switch (row.dataset.as) {
+  /**
+   * ⚠ ONE IMPLEMENTATION OF "WHERE THIS THOUGHT IS GOING", called from two
+   * places (plan 46). The pile's → chooser dispatches here, and so does the
+   * sheet's foot — which is the whole reason this is a named function rather
+   * than a `switch` living inside a click handler. A second copy of "make it a
+   * quote" is the one thing that change was not allowed to produce.
+   *
+   * The caller owns getting out of the way first: the chooser hides its
+   * popover, the sheet closes and flushes.
+   */
+  function fileAs(card: HTMLElement, as: string) {
+    switch (as) {
       case 'agenda':
         void toAgenda(card);
         break;
@@ -441,6 +645,31 @@ if (undoBar) {
         openFiler(card);
         break;
     }
+  }
+
+  /**
+   * The bin, from either surface. ⚠ NO CONFIRM DIALOG — a jotting is not worth
+   * a modal, and the undo strip is a cheaper way back than a question in front
+   * of every delete. Named for the same reason `fileAs` is: the card's 🗑 and
+   * the sheet's both call it, and neither owns it.
+   */
+  async function discard(card: HTMLElement) {
+    const id = card.dataset.note!;
+    try {
+      await bulk(id, 'trash');
+    } catch {
+      say(card, 'could not delete it');
+      return;
+    }
+    showUndo('Deleted', card, () => bulk(id, 'restore'));
+  }
+
+  chooser?.addEventListener('click', (e) => {
+    const row = (e.target as Element).closest<HTMLElement>('[data-as]');
+    if (!row || !choosing) return;
+    const card = choosing;
+    chooser.hidePopover();
+    fileAs(card, row.dataset.as!);
   });
 
   /**
@@ -586,32 +815,35 @@ if (undoBar) {
    * dump costs fifteen seconds — being two gestures away from itself, because
    * the only door was a 16px glyph in the foot of the card.
    *
-   * So the rendered text opens the editor. THREE GUARDS, and each one is a real
+   * So the rendered text opens the note. THREE GUARDS, and each one is a real
    * gesture this would otherwise eat:
    *
    *  · A SELECTION IS NOT A CLICK. Dragging across a sentence to copy it ends
-   *    with a click event on the card, and without this every copy would fold
-   *    the card into an editor and drop the selection doing it. `isCollapsed`
-   *    is the question — "did this press select anything" — and it is asked of
-   *    the live selection rather than tracked across pointerdown/up, because the
-   *    browser already knows.
+   *    with a click event on the card, and without this every copy would throw
+   *    a drawer over the thing you were reading. `isCollapsed` is the question —
+   *    "did this press select anything" — and it is asked of the live selection
+   *    rather than tracked across pointerdown/up, because the browser knows.
    *  · A LINK IS A LINK. A dump can contain one, and following it must not be
-   *    reinterpreted as "edit the note that mentions it".
+   *    reinterpreted as "open the note that mentions it".
    *  · `more` STILL EXPANDS. It is a `<button>` inside the text's own region, so
    *    without an early return the same click would expand AND open — leaving
-   *    you in an editor for a reason you did not ask for.
+   *    you in a drawer for a reason you did not ask for.
    *
    * The pencil stays. It is the affordance that says the words are editable at
-   * all before you have discovered that they are, it is the keyboard path, and
-   * it is the only one of the two that also CLOSES the card.
+   * all before you have discovered that they are, and it is the keyboard path.
+   *
+   * ⚠ IT NO LONGER ALSO CLOSES. Both doors used to toggle, because the editor
+   * was in the card and there was nothing else to press; the sheet has its own
+   * ✕, Escape and backdrop, so a toggle here would be a fourth way to do what
+   * three already do — and the only one you would have to remember was a
+   * toggle.
    */
-  pile?.addEventListener('click', async (e) => {
+  pile?.addEventListener('click', (e) => {
     const target = e.target as Element;
     const el = target.closest<HTMLElement>('[data-edit], [data-more], [data-file], [data-delete], [data-text]');
     if (!el) return;
     const card = el.closest<HTMLElement>('[data-note]');
     if (!card) return;
-    const id = card.dataset.note!;
 
     if (el.hasAttribute('data-more')) {
       const text = textOf(card);
@@ -622,21 +854,16 @@ if (undoBar) {
     }
 
     if (el.hasAttribute('data-text')) {
-      if (editing === card) return; // already open — the click is inside the editor
       if (target.closest('a')) return; // following a link the dump contains
       if (!window.getSelection()?.isCollapsed) return; // selecting, not opening
-      enterEdit(card);
+      openSheet(card);
       return;
     }
 
     if (el.hasAttribute('data-edit')) {
-      if (editing === card) await leaveEdit(card);
-      else enterEdit(card);
+      openSheet(card);
       return;
     }
-
-    // Everything below moves the card out of the pile, so flush any edit first.
-    if (editing === card) await leaveEdit(card);
 
     if (el.hasAttribute('data-file')) {
       // The menu is one element for the whole pile, so it has to be told which
@@ -646,41 +873,23 @@ if (undoBar) {
       return;
     }
 
-    if (el.hasAttribute('data-delete')) {
-      // No confirm dialog. A jotting is not worth a modal, and the strip below
-      // is a cheaper way back than a question in front of every delete.
-      try {
-        await bulk(id, 'trash');
-      } catch {
-        stampOf(card).textContent = 'could not delete it';
-        return;
-      }
-      showUndo('Deleted', card, () => bulk(id, 'restore'));
-    }
+    if (el.hasAttribute('data-delete')) void discard(card);
   });
 
   /*
-   * Clicking away closes the card. ⚠ NOT `blur`, WHICH IS WHAT A TEXTAREA USED
-   * — a rich editor loses focus constantly and legitimately: to its own
-   * toolbar, to the link dialog, to the alt-text prompt, to the file picker.
-   * Every one of those would have read as "you're done here" and folded the
-   * card mid-motion. What actually means done is a pointer landing somewhere
-   * that is neither this card nor a window this card opened.
+   * ⚠ TWO HANDLERS STOOD HERE AND BOTH ARE GONE (plan 46), which is worth
+   * recording because each was load-bearing for a room that no longer exists.
+   *
+   *  · A `pointerdown` close, because a card that WAS an editor had to know
+   *    when you had finished with it — and `blur` could not answer, since a
+   *    rich editor loses focus constantly and legitimately (its own toolbar,
+   *    the link dialog, the alt prompt, the file picker). A modal drawer has no
+   *    such question: what is outside it is inert, and the backdrop press that
+   *    used to mean "done here" is now the dialog's own dismissal, guarded
+   *    against the drag-out selection by `backdrop-close.ts`.
+   *  · An Escape on the pile, for the same reason and with the same answer —
+   *    `wireSheetDismiss` plus the hand-rolled keydown above.
    */
-  document.addEventListener('pointerdown', (e) => {
-    if (!editing) return;
-    const target = e.target instanceof Element ? e.target : null;
-    if (!target) return;
-    if (target.closest('.dump') === editing) return; // the card, its editor, its toolbar
-    if (target.closest('dialog, [popover]')) return; // link, alt text, the chooser, a sheet
-    void leaveEdit(editing);
-  });
-
-  pile?.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !editing) return;
-    e.preventDefault();
-    void leaveEdit(editing);
-  });
 
   // Anything still pending when the tab goes away.
   document.addEventListener('visibilitychange', () => {
