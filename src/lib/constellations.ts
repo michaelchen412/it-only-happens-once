@@ -8,7 +8,7 @@ import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, QuoteItem, SubjectRef } from './blog';
 import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
-import { noted } from './read-log';
+import { noted, required } from './read-log';
 import { revealOf } from './provenance';
 import type { FragmentType } from './fragments-display';
 
@@ -161,7 +161,12 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
     .is('fragment_constellations.fragments.deleted_at', null)
     .order('position', { referencedTable: 'fragment_constellations' })
     .maybeSingle()
-    .then(noted(`suite: ${slug}`));
+    // ⚠ `required`, NOT `noted` (2026-08-27). `null` here means "no such
+    // constellation", and `/{slug}` answers that by drifting the reader home —
+    // *"a mistyped star is a curiosity"*. A failed read borrowed that same
+    // kindness and applied it to a constellation that exists, sweeping the
+    // reader off a real page without a word. See `required`.
+    .then(required(`suite: ${slug}`));
   if (!c) return null;
 
   const rows = c.fragment_constellations;

@@ -308,7 +308,7 @@ const measured = params.get('align') === 'measure';
    corpus — a header judged over lorem is a header judged over nothing. */
 const writing = room === 'blog' ? await listWriting(supabase, { page: 1 }) : null;
 if (writing) await attachNeighbourhoods(supabase, writing.items);
-const subjects = room === 'blog' ? await listSubjects(supabase, 'writing', { selected: [], q: null }) : [];
+const subjects = room === 'blog' ? (await listSubjects(supabase, 'writing', { selected: [], q: null })).subjects : [];
 const refs = room === 'sky' ? ((await listConstellations()) ?? []) : [];
 
 /* The site's four destinations, for the FOOTER's copy of them. `Home` is

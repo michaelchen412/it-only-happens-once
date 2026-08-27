@@ -29,3 +29,45 @@ export function noted(where: string) {
     return res;
   };
 }
+
+/**
+ * The same log line, for a read that has no honest way to degrade — it THROWS
+ * rather than handing the failure back (2026-08-27).
+ *
+ * ⚠ IT EXISTS BECAUSE A LIST AND A SINGLE ITEM DEGRADE DIFFERENTLY, and the
+ * note at the top of this file only ever reasoned about the first. A feed that
+ * loses its query renders "nothing here yet", which is a poor answer offered
+ * honestly. A PERMALINK that loses its query renders a **404** — and that is
+ * not a degraded answer, it is a confident wrong one: it tells the reader, and
+ * every crawler behind them, that a published essay does not exist. `/{slug}`
+ * did something quieter and no better, redirecting to the sky as though the
+ * constellation had been a typo.
+ *
+ * So these reads answer with a 5xx instead. `500.astro` is DB-free,
+ * session-free, sends `no-store`, and says the true thing — *"it's usually a
+ * passing thing — trying again in a moment tends to clear it."* A 500 a
+ * crawler retries costs nothing; a 404 it believes costs the page.
+ *
+ * ⚠ THROWING, RATHER THAN RETURNING SOMETHING THE CALLER MUST CHECK, IS THE
+ * POINT. A returned `failed` flag is a flag a future route can forget to read,
+ * and forgetting it restores exactly this bug — silently, in a render that
+ * looks fine. There is nothing to remember here.
+ *
+ * ⚠ ONLY FOR THE READ THE PAGE IS ABOUT. A quote's neighbourhood, an essay's
+ * related strip, the counts beside an attribution — those are furniture, and
+ * they keep `noted()`: losing them costs a section, not the page. Reach for
+ * this only where the alternative is lying about what exists.
+ *
+ * A miss is still not a failure: `.maybeSingle()` with no row resolves
+ * `data: null, error: null` and passes straight through, so a stranger's
+ * typo'd slug reaches the 404 it deserves.
+ */
+export function required(where: string) {
+  return <R extends { error: PostgrestError | null }>(res: R): R => {
+    if (res.error) {
+      console.error(`[read] ${where} — ${res.error.code}: ${res.error.message}`);
+      throw new Error(`read failed (${where}): ${res.error.code} ${res.error.message}`);
+    }
+    return res;
+  };
+}

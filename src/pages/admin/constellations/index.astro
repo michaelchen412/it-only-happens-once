@@ -12,24 +12,49 @@ import StatusChip from '../../../components/admin/StatusChip.astro';
 import EmptyState from '../../../components/admin/EmptyState.astro';
 import StarMark from '../../../components/StarMark.astro';
 import { COLOR_SLOTS } from '../../../lib/constellation-colors';
+import { noted } from '../../../lib/read-log';
 
 const sb = Astro.locals.supabase;
-const [{ data: cs }, { data: links }] = await Promise.all([
-  sb.from('constellations').select('id, name, slug, description, status, sort, color').order('sort'),
-  sb
-    .from('fragment_constellations')
-    .select('constellation_id, fragments!inner(status, deleted_at)')
-    .is('fragments.deleted_at', null),
-]);
 
-const placed = new Map<string, { total: number; published: number }>();
-for (const l of links ?? []) {
-  const e = placed.get(l.constellation_id) ?? { total: 0, published: 0 };
-  e.total++;
-  if ((l.fragments as unknown as { status: string }).status === 'published') e.published++;
-  placed.set(l.constellation_id, e);
-}
-const rows = (cs ?? []).map((c) => ({ ...c, ...(placed.get(c.id) ?? { total: 0, published: 0 }) }));
+/*
+  ⚠ ONE QUERY, NOT TWO (2026-08-27) — the same collapse `listConstellations`
+  got, from the same incident and for the same reason. This was a `Promise.all`
+  of the constellations and their placements with every count derived from the
+  second: one failure there left `placed` empty and reported "0 placed" for the
+  whole sky, on the one page you would open to find out why the sky looked
+  empty. The count now arrives in the same round trip as the row it describes,
+  so it cannot be wrong while the row beside it is right.
+
+  ⚠ THE OUTER EMBED IS A LEFT JOIN, DELIBERATELY, AND IT WAS CHECKED RATHER
+  THAN ASSUMED. `fragments!inner` drops a placement whose fragment is deleted;
+  the un-suffixed `fragment_constellations(…)` around it keeps a constellation
+  that has no placements at all — which matters here and not on `/`, because
+  this is the room where an empty one is CREATED, and an inner join would make
+  a new constellation vanish at the moment of making it. Verified against the
+  SERVICE ROLE on 2026-08-27 by filtering the embed to a status one
+  constellation has none of: all fourteen rows came back and that one carried
+  `[]`. The counts were re-checked the same way — total and published, all
+  fourteen, drafts included, identical to what the two-query form produced.
+
+  ⚠ AND A FAILED READ NOW EMPTIES THE LIST RATHER THAN THE NUMBERS. Neither
+  read was logged before, so a failure here showed a full sky of zeros and left
+  no line anywhere. `/admin` is `no-store`, so there is no cache to protect —
+  what this buys is a failure that looks like one.
+*/
+const { data: cs } = await sb
+  .from('constellations')
+  .select(
+    'id, name, slug, description, status, sort, color, fragment_constellations(fragments!inner(status, deleted_at))',
+  )
+  .is('fragment_constellations.fragments.deleted_at', null)
+  .order('sort')
+  .then(noted('admin: constellations'));
+
+const rows = (cs ?? []).map(({ fragment_constellations: placements, ...c }) => ({
+  ...c,
+  total: placements.length,
+  published: placements.filter((p) => (p.fragments as unknown as { status: string }).status === 'published').length,
+}));
 ---
 
 <AdminLayout title="Constellations" active="constellations">

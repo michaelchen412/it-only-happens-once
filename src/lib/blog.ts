@@ -11,7 +11,7 @@ import type { createSupabaseServerClient } from './supabase';
 import type { FragmentType } from './fragments-display';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { excerpt, readingMinutes } from './markdown';
-import { noted } from './read-log';
+import { noted, required } from './read-log';
 import { revealOf } from './provenance';
 
 type DB = ReturnType<typeof createSupabaseServerClient>;
@@ -124,6 +124,17 @@ export interface Page<T> {
   total: number;
   page: number;
   pageCount: number;
+  /**
+   * A read behind this page failed, so `items` is a degradation rather than an
+   * answer (2026-08-27).
+   *
+   * ⚠ IT IS NOT COSMETIC — `/blog` sends `private, no-store` when it is set.
+   * An empty feed is the right thing to show one reader and the wrong thing to
+   * leave in a shared cache, where `stale-while-revalidate` would go on
+   * serving "nothing here yet" for a day after a few seconds of trouble. The
+   * front door learned this the hard way; see `lib/constellations.ts`.
+   */
+  failed: boolean;
 }
 
 /** PostgREST `.or()` values can't contain its delimiters; strip them from search. */
@@ -250,26 +261,37 @@ function subjectsOf(
 
 /** Resolve subject slugs to the ids of the fragments tagged with EVERY one of
  *  them (AND / intersection; the caller's `.eq('type', …)` narrows by type).
- *  `null` = no subject filter (empty input). `[]` = an unsatisfiable combination
- *  — an unknown slug, or simply no fragment carries them all — so the caller
- *  renders an empty feed. */
-async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<string[] | null> {
+ *  `ids: null` = no subject filter (empty input). `ids: []` = an unsatisfiable
+ *  combination — an unknown slug, or simply no fragment carries them all — so
+ *  the caller renders an empty feed.
+ *
+ *  ⚠ `failed` IS THE THIRD ANSWER, AND IT USED TO BE THE SECOND (2026-08-27).
+ *  Both reads below degrade to nothing on error, and `[]` then said "no
+ *  fragment carries these subjects" about a query that never ran — a filtered
+ *  feed reading as a confident empty result. The same shape as the 401 that
+ *  emptied the sky, two levels down. */
+async function fragmentIdsForSubjects(
+  supabase: DB,
+  slugs: string[],
+): Promise<{ ids: string[] | null; failed: boolean }> {
   const wanted = Array.from(new Set(slugs.filter(Boolean)));
-  if (wanted.length === 0) return null;
+  if (wanted.length === 0) return { ids: null, failed: false };
 
-  const { data: subs } = await supabase
+  const { data: subs, error: subsError } = await supabase
     .from('subjects')
     .select('id, slug')
     .in('slug', wanted)
     .then(noted('blog: subject slugs'));
-  if (!subs || subs.length !== wanted.length) return []; // a slug didn't resolve → AND impossible
+  if (subsError) return { ids: [], failed: true };
+  if (!subs || subs.length !== wanted.length) return { ids: [], failed: false }; // a slug didn't resolve → AND impossible
   const ids = subs.map((s) => s.id);
 
-  const { data: links } = await supabase
+  const { data: links, error: linksError } = await supabase
     .from('fragment_subjects')
     .select('fragment_id, subject_id')
     .in('subject_id', ids)
     .then(noted('blog: subject filter'));
+  if (linksError) return { ids: [], failed: true };
   // A fragment satisfies the AND iff it links to all selected subjects. Track a
   // Set per fragment so a duplicate link can never fake a match.
   const perFragment = new Map<string, Set<string>>();
@@ -280,7 +302,7 @@ async function fragmentIdsForSubjects(supabase: DB, slugs: string[]): Promise<st
   }
   const result: string[] = [];
   for (const [fid, set] of perFragment) if (set.size === ids.length) result.push(fid);
-  return result;
+  return { ids: result, failed: false };
 }
 
 /** One page of published writing, newest first, optionally narrowed by an AND of
@@ -294,9 +316,13 @@ export async function listWriting(
 
   let ids: string[] | null = null;
   if (opts.subjects && opts.subjects.length > 0) {
-    ids = await fragmentIdsForSubjects(supabase, opts.subjects);
+    const selected = await fragmentIdsForSubjects(supabase, opts.subjects);
+    // A failed narrowing and an unsatisfiable one produce the same empty feed,
+    // and must not produce the same cache header — see `Page.failed`.
+    if (selected.failed) return { items: [], total: 0, page, pageCount: 0, failed: true };
+    ids = selected.ids;
     if (!ids || ids.length === 0) {
-      return { items: [], total: 0, page, pageCount: 0 };
+      return { items: [], total: 0, page, pageCount: 0, failed: false };
     }
   }
 
@@ -316,7 +342,7 @@ export async function listWriting(
   if (ids) query = query.in('id', ids);
   if (q) query = query.or(`title.ilike.%${q}%,body.ilike.%${q}%`);
 
-  const { data, count } = await query.then(noted('blog: writing'));
+  const { data, count, error } = await query.then(noted('blog: writing'));
   const items: WritingItem[] = (data ?? []).map((r) => {
     const authored = (r.excerpt ?? '').trim();
     const lede = authored || excerpt(r.body, 400);
@@ -338,7 +364,7 @@ export async function listWriting(
   });
 
   const total = count ?? items.length;
-  return { items, total, page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+  return { items, total, page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)), failed: !!error };
 }
 
 /** One page of published quotes, newest first, optionally narrowed by an AND of
@@ -370,25 +396,32 @@ export async function listQuotes(
 
   let authorId: string | null = null;
   if (opts.author) {
-    const { data: a } = await supabase
+    const { data: a, error: authorError } = await supabase
       .from('authors')
       .select('id')
       .eq('slug', opts.author)
       .maybeSingle()
       .then(noted('blog: quote author'));
+    // ⚠ BEFORE THE MISS CHECK, because the two are different answers and the
+    // line below treats every falsy `a` as "no such person". A failed lookup
+    // would otherwise render "nothing by this author" about a name that has
+    // twenty quotes, and hand that page to the edge.
+    if (authorError) return { items: [], total: 0, page, pageCount: 0, failed: true };
     // ⚠ An unknown slug matches NOTHING rather than being silently ignored —
     // the same rule `fragment-query.ts` uses for an unknown constellation. A
     // dropped filter would show the whole corpus under a heading naming one
     // person, which reads as an answer rather than as a typo.
-    if (!a) return { items: [], total: 0, page, pageCount: 0 };
+    if (!a) return { items: [], total: 0, page, pageCount: 0, failed: false };
     authorId = a.id;
   }
 
   let ids: string[] | null = null;
   if (opts.subjects && opts.subjects.length > 0) {
-    ids = await fragmentIdsForSubjects(supabase, opts.subjects);
+    const selected = await fragmentIdsForSubjects(supabase, opts.subjects);
+    if (selected.failed) return { items: [], total: 0, page, pageCount: 0, failed: true };
+    ids = selected.ids;
     if (!ids || ids.length === 0) {
-      return { items: [], total: 0, page, pageCount: 0 };
+      return { items: [], total: 0, page, pageCount: 0, failed: false };
     }
   }
 
@@ -415,7 +448,7 @@ export async function listQuotes(
   if (authorId) query = query.eq('author_id', authorId);
   if (searchTerm) query = query.or(`body.ilike.%${searchTerm}%,attribution.ilike.%${searchTerm}%`);
 
-  const { data, count } = await query.then(noted('blog: quotes'));
+  const { data, count, error } = await query.then(noted('blog: quotes'));
 
   /*
     ⚠ ONE COUNT FOR THE PAGE. Each card's attribution offers "N more lines from
@@ -455,7 +488,7 @@ export async function listQuotes(
   }));
 
   const total = count ?? items.length;
-  return { items, total, page, pageCount: Math.max(1, Math.ceil(total / QUOTES_PAGE_SIZE)) };
+  return { items, total, page, pageCount: Math.max(1, Math.ceil(total / QUOTES_PAGE_SIZE)), failed: !!error };
 }
 
 /** The tier a piece is in. Only the single-post fetch below reports it — every
@@ -508,7 +541,10 @@ export async function getWritingBySlug(
   // `fragments.slug` is UNIQUE across every type, so this stays a single row.
   if (!opts.includeUnpublished) query = query.eq('status', 'published');
 
-  const { data: r } = await query.maybeSingle().then(noted(`writing: ${slug}`));
+  // ⚠ `required`, NOT `noted` (2026-08-27) — a failed read here used to return
+  // `null`, which this route cannot tell from "no such essay" and answers with
+  // a 404. See `required` for why a 5xx is the honest answer instead.
+  const { data: r } = await query.maybeSingle().then(required(`writing: ${slug}`));
   if (!r) return null;
 
   const lede = (r.excerpt ?? '').trim() || excerpt(r.body, 400);
@@ -566,7 +602,16 @@ export async function listSubjects(
   supabase: DB,
   type: FragmentType,
   opts: { selected?: string[]; q?: string | null; author?: string | null } = {},
-): Promise<RailSubject[]> {
+): Promise<{ subjects: RailSubject[]; failed: boolean }> {
+  /*
+    ⚠ `failed` RIDES ALONGSIDE THE RAIL BECAUSE AN EMPTY RAIL IS NOT THE WORST
+    OF IT (2026-08-27). If the search read below fails, `matchIds` stays null —
+    which this function reads as *"no term, so everything matches"* — and the
+    rail renders CORPUS-WIDE counts underneath a search box with a term in it.
+    That is the dead-end the header above says is worse than having no facet at
+    all: *"a facet that ignores a filter is worse than no facet, because the
+    number reads as a promise."* Wrong numbers must not be cached for a day.
+  */
   const selected = Array.from(new Set((opts.selected ?? []).filter(Boolean)));
   const q = opts.q ? sanitizeQuery(opts.q) : '';
   const author = opts.author?.trim() || null;
@@ -579,13 +624,14 @@ export async function listSubjects(
   // no row carries matches no fragment, so every count falls to 0 and the whole
   // rail goes inert — the same "matches NOTHING rather than being silently
   // ignored" that `listQuotes` applies to the feed. One typo, one answer.
-  const { data: links } = await supabase
+  const { data: links, error: railError } = await supabase
     .from('fragment_subjects')
     .select('fragment_id, subjects(name, slug), fragments!inner(type, status, deleted_at, authors(slug))')
     .eq('fragments.type', type)
     .eq('fragments.status', 'published')
     .is('fragments.deleted_at', null)
     .then(noted('blog: subject rail'));
+  if (railError) return { subjects: [], failed: true };
 
   const fragSubs = new Map<string, Set<string>>(); // fragment id → its subject slugs
   const authorOf = new Map<string, string | null>(); // fragment id → its author's slug
@@ -614,7 +660,7 @@ export async function listSubjects(
   let matchIds: Set<string> | null = null;
   if (q) {
     const or = type === 'quote' ? `body.ilike.%${q}%,attribution.ilike.%${q}%` : `title.ilike.%${q}%,body.ilike.%${q}%`;
-    const { data } = await supabase
+    const { data, error: searchError } = await supabase
       .from('fragments')
       .select('id')
       .eq('type', type)
@@ -622,6 +668,7 @@ export async function listSubjects(
       .is('deleted_at', null)
       .or(or)
       .then(noted('blog: rail search'));
+    if (searchError) return { subjects: [], failed: true };
     matchIds = new Set((data ?? []).map((r) => r.id));
   }
 
@@ -651,13 +698,14 @@ export async function listSubjects(
   }
 
   const selectedSet = new Set(selected);
-  return Array.from(meta.entries())
+  const subjects = Array.from(meta.entries())
     .map(([slug, m]) => {
       const isSelected = selectedSet.has(slug);
       const count = ctx.get(slug) ?? 0;
       return { slug, name: m.name, total: m.total, count, selected: isSelected, disabled: count === 0 && !isSelected };
     })
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  return { subjects, failed: false };
 }
 
 /**

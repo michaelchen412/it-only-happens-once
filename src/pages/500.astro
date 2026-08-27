@@ -19,8 +19,15 @@
   ⚠ THE ERROR IS LOGGED, NEVER SHOWN. `error.message` can carry anything the
   failing layer interpolated into it — a key name, a table name, a URL with a
   token on it. The visitor gets a sentence; Vercel's function log gets the
-  stack. This is the render-path half of plan 43 §4 (the read path logs its own
-  query failures and degrades to empty states without ever reaching here).
+  stack. This is the render-path half of plan 43 §4.
+
+  ⚠ THE READ PATH REACHES HERE NOW, ON PURPOSE (2026-08-27). It used to be true
+  that it never did — every query logged its failure and degraded to an empty
+  state. That is still right for a LIST, and wrong for a permalink, where the
+  "empty state" was a 404 claiming a published essay does not exist. `required`
+  in `lib/read-log.ts` throws for those reads, which lands them on this page:
+  `no-store`, a 5xx a crawler retries, and a sentence that happens to be true —
+  it usually IS a passing thing.
 */
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { Icon } from 'astro-icon/components';

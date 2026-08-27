@@ -12,7 +12,7 @@
 // Every query here re-states `status`/`deleted_at` anyway, because the
 // neighbourhood is assembled from join tables that carry no status of their own.
 import type { createSupabaseServerClient } from './supabase';
-import { noted } from './read-log';
+import { noted, required } from './read-log';
 import type { QuoteItem } from './blog';
 import { revealOf } from './provenance';
 import { toPlainText } from './markdown';
@@ -118,7 +118,11 @@ export async function getQuotePage(
     .eq('slug', slug);
   if (!opts.includeUnpublished) query = query.eq('status', 'published');
 
-  const { data: r } = await query.maybeSingle().then(noted(`quote: ${slug}`));
+  // ⚠ `required`, NOT `noted` (2026-08-27). `/blog/[slug]` serves quotes and
+  // essays from one route: a failed read on either half returns `null`, both
+  // halves come back empty, and the route 404s a quote that exists. The
+  // neighbourhood reads below stay on `noted` — losing those costs a section.
+  const { data: r } = await query.maybeSingle().then(required(`quote: ${slug}`));
   if (!r) return null;
 
   const subjectRows = (r.fragment_subjects ?? []) as SubjectRow[];

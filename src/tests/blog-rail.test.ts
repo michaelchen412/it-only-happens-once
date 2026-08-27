@@ -13,7 +13,7 @@
 // so these fixtures are the rows the query WOULD return — which is the right
 // half to pin, because the narrowing that broke is arithmetic in TypeScript, not
 // a `.eq()`.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { listSubjects } from '../lib/blog';
 import { fakeDb } from './stubs/supabase';
 
@@ -41,7 +41,12 @@ const LINKS = [
 const db = (rows = LINKS, matches?: { id: string }[]) =>
   fakeDb({ fragment_subjects: { data: rows }, fragments: { data: matches ?? [] } });
 
-const bySlug = (rail: Awaited<ReturnType<typeof listSubjects>>) => new Map(rail.map((s) => [s.slug, s]));
+// ⚠ `listSubjects` ANSWERS `{ subjects, failed }` SINCE 2026-08-27 — the rail
+// now says whether its own reads worked, because an empty rail and a rail
+// computed from a failed search read look identical and only one of them is
+// safe to cache. These two unwrap it; the last block below tests it.
+const railOf = (r: Awaited<ReturnType<typeof listSubjects>>) => r.subjects;
+const bySlug = (r: Awaited<ReturnType<typeof listSubjects>>) => new Map(r.subjects.map((s) => [s.slug, s]));
 
 describe('listSubjects — the unfiltered taxonomy', () => {
   it('counts the whole corpus and offers everything in it', async () => {
@@ -68,8 +73,8 @@ describe('listSubjects — the author narrows it', () => {
   });
 
   it('keeps the ordering global, so tags do not reshuffle under a filter', async () => {
-    const all = (await listSubjects(db(), 'quote')).map((s) => s.slug);
-    const seneca = (await listSubjects(db(), 'quote', { author: 'seneca' })).map((s) => s.slug);
+    const all = railOf(await listSubjects(db(), 'quote')).map((s) => s.slug);
+    const seneca = railOf(await listSubjects(db(), 'quote', { author: 'seneca' })).map((s) => s.slug);
     // Same list, same order — only the numbers changed. A rail that re-sorted
     // itself would make the reader re-find every tag on arrival.
     expect(seneca).toEqual(all);
@@ -83,7 +88,7 @@ describe('listSubjects — the author narrows it', () => {
   it('matches nothing for an unknown author, rather than silently ignoring it', async () => {
     // `listQuotes` returns an empty feed for a slug no row carries; the rail has
     // to agree, or a typo shows a full taxonomy over no results.
-    const rail = await listSubjects(db(), 'quote', { author: 'nobody' });
+    const rail = railOf(await listSubjects(db(), 'quote', { author: 'nobody' }));
     expect(rail).toHaveLength(3);
     expect(rail.every((s) => s.count === 0 && s.disabled)).toBe(true);
   });
@@ -128,7 +133,49 @@ describe('listSubjects — the filters AND together', () => {
   });
 
   it('empties the rail when the term and the author disagree', async () => {
-    const rail = await listSubjects(db(LINKS, [{ id: 'q3' }]), 'quote', { author: 'seneca', q: 'mortal' });
+    const rail = railOf(await listSubjects(db(LINKS, [{ id: 'q3' }]), 'quote', { author: 'seneca', q: 'mortal' }));
     expect(rail.every((s) => s.count === 0 && s.disabled)).toBe(true);
+  });
+});
+
+describe('listSubjects — a failed read is not an empty taxonomy', () => {
+  it('reports failure when the rail read fails, instead of an inert rail', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const r = await listSubjects(
+        fakeDb({ fragment_subjects: { data: null, error: { message: 'JWT expired', code: 'PGRST301' } } }),
+        'quote',
+      );
+      expect(r).toEqual({ subjects: [], failed: true });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports failure when the SEARCH read fails, which is the dangerous one', async () => {
+    // ⚠ THE ONE WORTH THE TEST. A failed search read leaves `matchIds` null,
+    // which this function reads as "no term, so everything matches" — so the
+    // rail would render corpus-wide counts under a search box with a term in
+    // it. Not empty. WRONG, and confidently so.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const r = await listSubjects(
+        fakeDb({
+          fragment_subjects: { data: LINKS },
+          fragments: { data: null, error: { message: 'timeout', code: '57014' } },
+        }),
+        'quote',
+        { q: 'mortal' },
+      );
+      expect(r.failed).toBe(true);
+      expect(r.subjects).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports no failure on an ordinary empty taxonomy', async () => {
+    const r = await listSubjects(fakeDb({ fragment_subjects: { data: [] } }), 'quote');
+    expect(r).toEqual({ subjects: [], failed: false });
   });
 });

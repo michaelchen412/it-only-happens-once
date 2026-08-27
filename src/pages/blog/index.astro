@@ -118,7 +118,8 @@ const page = isPartial ? Math.max(1, Number.parseInt(params.get('page') ?? '1', 
 // Unconditional again since music left (ADR 0040): both remaining views have the
 // rail, so there is no longer a view on this page for which these three queries
 // would be spent on a control that is not drawn.
-const subjects = await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null, author: authorSlug });
+const rail = await listSubjects(supabase, type, { selected: selectedSubjects, q: q || null, author: authorSlug });
+const subjects = rail.subjects;
 const nameBySlug = new Map(subjects.map((s) => [s.slug, s.name]));
 // slug → GLOBAL count, so the feed's per-card subjects sort busiest-first (they
 // carry no count of their own) in an order that never shifts as you filter.
@@ -237,7 +238,25 @@ const tabs = [
 // (X-Requested-With) and appends the items; the manual link is the no-JS fallback.
 const nextUrl = feed && feed.page < feed.pageCount ? buildHref({ page: feed.page + 1 }) : null;
 
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+/*
+  ⚠ NOT WHEN A READ BEHIND THIS PAGE FAILED (2026-08-27). The Index degrades to
+  "nothing here yet" — right for the one reader who arrives mid-outage, and
+  ruinous at the edge, where `stale-while-revalidate` would serve an emptied
+  blog for a day after a few seconds of trouble. That is the amplifier that
+  turned one 401 into an empty front door; `/` and the other public rooms
+  already branch, and this is the last of them.
+
+  ⚠ THE RAIL COUNTS, NOT ONLY THE FEED. `listSubjects` reports its own failure
+  because its worst case is not an empty rail: a failed SEARCH read leaves the
+  term unapplied and renders corpus-wide counts under a search box, which its
+  own header calls worse than having no facet at all. Wrong numbers are not
+  cacheable either.
+*/
+const degraded = !!feed?.failed || rail.failed;
+Astro.response.headers.set(
+  'Cache-Control',
+  degraded ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=86400',
+);
 // The rendered page depends on X-Requested-With (partial page fetches honour
 // ?page; browser navigations always start at page 1), so cache it per-variant.
 Astro.response.headers.set('Vary', 'X-Requested-With');
