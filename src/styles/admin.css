@@ -2312,8 +2312,23 @@ html.scroll-locked .sky-return {
   inset-inline: 0;
   top: 0;
   z-index: 60; /* over the sticky mobile header (z-20) and the drawer (z-40) */
-  height: 2px;
-  background: var(--color-primary);
+  /* ⚠ 1px OF TEXT INK, NOT 2px OF ACCENT (2026-08-27, judged on /lab/nav-bar).
+     A 2px accent strip pinned to the viewport's top edge is the SaaS signature
+     — and design.md §3 bans that register on sight: *"the stance is editorial,
+     never marketing."* It also spent `--color-primary`, the site's one loud
+     ink, on chrome that fires at every click, which turns an editorial accent
+     into a system colour. At 1px in the text's own muted ink the same object
+     reads as a RULE — a typographic thing this site already uses — rather than
+     as a meter. Same information, no product voice.
+
+     ⚠ THE OBSERVATORY GETS IT TOO, and that is a decision rather than an
+     oversight. design.md §4 does put the workshop on the machinery side, where
+     system chrome is welcome — but nothing about machinery register REQUIRES an
+     accent, quieter is not worse at a workbench, and splitting this would buy a
+     two-line visual difference at the cost of the one thing the block above is
+     built on: both chromes drawing the same object, argued once. */
+  height: 1px;
+  background: var(--text-muted);
   transform: scaleX(0);
   transform-origin: left;
   /* Not `display: none` — an element that has to be created or unhidden cannot
@@ -2330,6 +2345,18 @@ html.scroll-locked .sky-return {
    you") and then asymptotic at 92%, which is the honest shape of "still going".
    The document being replaced is what ends it; `stop()` is only for the
    navigations that never happen (a `download`, a declined 302).
+
+   ⚠ THE ALTERNATIVE THAT LOST WAS NOT A LOOK — it was withholding the bar for
+   the first 250ms so that a fast navigation showed nothing at all, which would
+   have cured the flicker-at-every-click that makes this read as product chrome.
+   Michael, 2026-08-27: *"if we have to wait 250ms we are running into the same
+   problem that was the root problem, i.e. no immediate response after
+   clicking."* Right, and more so than it first appears: the pressed-link ink
+   that would have covered the gap is `data-nav-row` ONLY, so sky rows and blog
+   cards — content links, deliberately unmarked — have no other answer. Half the
+   original 2026-08-19 complaint was "opening constellations", the site's
+   biggest document, reached by exactly such a link. A 250ms delay would have
+   restored total silence on the one click that started all of this.
 
    The alternative was a spinner, and it lost on WHERE it can live: a spinner
    needs a spot on the page, and the one thing every admin room disagrees about

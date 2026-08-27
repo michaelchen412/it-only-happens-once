@@ -26,9 +26,11 @@
 //
 // ⚠ IT SHARES THE BAR WITH THE OBSERVATORY AND NOT THE SCRIPT, which looks
 // backwards and is the right split. `#nav-progress`'s CSS lives in `admin.css`,
-// which `app.css` imports — so both chromes already draw the identical 2px
+// which `app.css` imports — so both chromes already draw the identical 1px
 // creep, and the argument for its shape (front-loaded, asymptotic at 92%, never
-// completes) is written there once. What cannot be shared is the DRIVING:
+// completes on its own) is written there once, along with why it is a hairline
+// of text ink rather than the accent strip it was until 2026-08-27. What cannot
+// be shared is the DRIVING:
 //
 //   · The Observatory has no router, so `nav-progress.ts` has to infer a
 //     navigation from a click and then decide, in nine lines of `navigates()`,

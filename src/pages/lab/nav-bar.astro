@@ -39,12 +39,18 @@ if (import.meta.env.PROD) return Astro.redirect('/', 302);
 
 const params = Astro.url.searchParams;
 
-/* The two inks under test, plus the one that ships. Applied as INLINE STYLES on
-   the bar rather than through a stylesheet — see the script for why that is the
-   choice that lets a variant walk out of the bench with you. */
+/* ⚠ DECIDED 2026-08-27: MUTED. The bench stays because the comparison is the
+   argument — a hairline of text ink reads as a rule, the accent strip read as a
+   meter — and because the losing options are the only way to see that quickly
+   again. `ships` is now the muted one; `accent` is kept for a last look at what
+   it replaced, the way `chrome.astro` keeps `?v=current`.
+
+   Applied as INLINE STYLES on the bar rather than through a stylesheet — see
+   the script for why that is the choice that lets a variant walk out of the
+   bench with you. */
 const INKS = [
-  ['ships', 'as it ships — 2px, accent'],
-  ['muted', 'muted — 1px, text ink'],
+  ['ships', 'as it ships — 1px, muted text ink'],
+  ['accent', 'the one it replaced — 2px, accent'],
   ['faint', 'fainter — 1px, quieter still'],
 ] as const;
 
@@ -61,8 +67,9 @@ const WAITS = [
 
 const ink = INKS.find(([v]) => v === params.get('ink'))?.[0] ?? 'ships';
 const wait = WAITS.find(([v]) => v === params.get('wait'))?.[0] ?? '150';
-const deferred = params.get('defer') === 'on';
 const slow = params.get('slow') === 'on';
+/* `?defer=on` is deliberately NOT read here — it has no control to pre-check
+   any more, and the script reads it straight off `location.search`. */
 ---
 
 <SiteLayout title="Bench — the progress bar" active="home">
@@ -147,12 +154,14 @@ const slow = params.get('slow') === 'on';
         }
       </fieldset>
 
+      {
+        /* ⚠ NO CONTROL FOR THE DELAY ANY MORE — it is decided, and it lost. The
+          script still honours `?defer=on` for a look at the proposal that was
+          rejected; the reasoning is at the top of this file and in `admin.css`.
+          Same shape as `chrome.astro`'s `?v=current` hatch. */
+      }
       <fieldset class="nb-panel__set">
-        <legend class="nb-panel__legend">when it appears</legend>
-        <label class="nb-panel__row">
-          <input type="checkbox" name="defer" checked={deferred} />
-          only if it is slow <span class="nb-panel__hint">(wait 250ms first)</span>
-        </label>
+        <legend class="nb-panel__legend">to see it move</legend>
         <label class="nb-panel__row">
           <input type="checkbox" name="slow" checked={slow} />
           slow motion <span class="nb-panel__hint">(4×, to see the ending)</span>
@@ -257,8 +266,8 @@ const slow = params.get('slow') === 'on';
      `route-progress.ts` may never touch `height` or `background` — it clears
      only the three properties it sets. */
   const INK: Record<string, { height: string; background: string }> = {
-    ships: { height: '2px', background: 'var(--color-primary)' },
-    muted: { height: '1px', background: 'var(--text-muted)' },
+    ships: { height: '1px', background: 'var(--text-muted)' },
+    accent: { height: '2px', background: 'var(--color-primary)' },
     faint: { height: '1px', background: 'var(--text-faint)' },
   };
 
@@ -267,8 +276,11 @@ const slow = params.get('slow') === 'on';
     const data = new FormData(panel);
     const ink = String(data.get('ink') ?? 'ships');
     const wait = String(data.get('wait') ?? '150');
-    const deferred = data.get('defer') !== null;
     const slow = data.get('slow') !== null;
+    // The rejected proposal has no control left, so it is read straight off the
+    // URL and written back untouched — the panel must not reset a hatch it
+    // cannot see.
+    const deferred = new URLSearchParams(location.search).get('defer') === 'on';
 
     const bar = document.getElementById('nav-progress');
     if (bar) Object.assign(bar.style, INK[ink] ?? INK.ships);
@@ -307,7 +319,7 @@ const slow = params.get('slow') === 'on';
   async function runOne(): Promise<boolean> {
     const data = new FormData(panel!);
     const wait = Number(data.get('wait') ?? 150);
-    const deferred = data.get('defer') !== null;
+    const deferred = new URLSearchParams(location.search).get('defer') === 'on';
     const delay = deferred ? 250 : 0;
 
     if (delay >= wait) {
