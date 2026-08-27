@@ -134,6 +134,24 @@ async function openFromMidSky(page: Page): Promise<Picked> {
   await page.locator(`[data-sky-slot="${picked!.slug}"]`).click();
   await page.waitForURL(`/${picked!.slug}`);
   await expect(page.locator('.suite-item').first()).toBeVisible();
+  /*
+    ⚠ WAIT FOR THE JS, NOT THE MARKUP — and this file needed it more than most,
+    because six of its seven ways home are `<a href>` and one is not. `via
+    Escape` was a standing red on `anon-mobile` and flaky on `anon` for exactly
+    this: the suite's markup is server-rendered and visible before
+    `constellation-suite.ts` has run, and the keypress that lands in that window
+    is not queued anywhere — it is simply lost, so the test then waits out its
+    full 30s for a navigation that will never start. Measured 2026-08-27:
+    `.suite-item` visible at 954ms, the module's keydown listener registered at
+    975ms. Pressed 600ms later, the same key goes home every time.
+
+    The gap is a dev-server one to this size (unbundled modules, cold compile)
+    and a human cannot press a key 21ms after a paint — so this is a spec that
+    was outrunning the page, not a defect readers can reach. `#suite[data-wired]`
+    is the suite saying it is listening; `dead-network.spec.ts` writes the same
+    race up against the Fragment Manager.
+  */
+  await expect(page.locator('#suite[data-wired]')).toBeAttached();
   await fontsIn(page); // the suite's own faces — see above, this is the one that matters
   return picked!;
 }

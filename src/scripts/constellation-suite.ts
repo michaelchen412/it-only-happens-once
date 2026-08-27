@@ -265,6 +265,22 @@ function init() {
     updateLight();
   });
   ro.observe(document.body);
+  /*
+    ⚠ THE SUITE SAYS WHEN IT IS LISTENING, AND ESCAPE IS WHY (2026-08-27). Six
+    of the seven ways out of a suite are `<a href>` and work with no script at
+    all; Escape is the one that does not exist until this module has run. The
+    markup is server-rendered and paints first, so between the suite appearing
+    and this line there is a window in which the key does nothing — and a
+    keypress that lands there is not queued, it is GONE. Measured under `astro
+    dev`: `.suite-item` visible at 954ms, this module's listener registered at
+    975ms.
+
+    A reader cannot press a key 21ms after a page paints, so this is not a bug
+    they can reach — but a spec can, and `sky-return.anon.spec.ts` did, which is
+    why it had a standing red on the one way home that is not a link. The same
+    `[data-wired]` handshake the Fragment Manager uses, for the same reason.
+  */
+  suiteEl.setAttribute('data-wired', '');
   (document as any).fonts?.ready?.then(() => {
     drawLine();
     updateLight();
