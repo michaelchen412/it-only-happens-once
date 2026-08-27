@@ -38,12 +38,17 @@ import { noted } from '../lib/read-log';
 export const GET: APIRoute = async ({ url, locals }) => {
   const supabase = locals.supabase;
 
-  const [constellations, { data: fragments }] = await Promise.all([
+  const [constellations, { data: fragments, error: fragmentsError }] = await Promise.all([
     // Reused rather than re-queried, and that is the point: this helper already
     // encodes "the public truth" — published only, and empty constellations
     // filtered out because one with no published placements is not in the sky
     // yet. A second query here would be a second definition of the same word.
-    listConstellations(supabase),
+    //
+    // ⚠ IT TAKES NO CLIENT ANY MORE (2026-08-27). It reads on the session-free
+    // one by default, which is a stronger version of the guard the block below
+    // reasons about: this route's document can no longer vary by who asked for
+    // it, rather than merely being filtered until it doesn't.
+    listConstellations(),
     supabase
       .from('fragments')
       .select('slug, updated_at')
@@ -78,9 +83,19 @@ export const GET: APIRoute = async ({ url, locals }) => {
     { path: '/blog' },
     { path: '/listening' },
     { path: '/about' },
-    ...constellations.map((c) => ({ path: `/${c.slug}` })),
+    ...(constellations ?? []).map((c) => ({ path: `/${c.slug}` })),
     ...(fragments ?? []).map((f) => ({ path: `/blog/${f.slug}`, lastmod: f.updated_at })),
   ];
+
+  /*
+    ⚠ A TRUNCATED SITEMAP IS NOT WORTH AN HOUR AT THE EDGE (2026-08-27). Either
+    read failing leaves valid XML with URLs missing from it — the degradation
+    this route wants, and the one its `noted()` line exists to make visible —
+    but caching that document is how a few seconds of Supabase trouble becomes
+    an hour of telling crawlers the writing is gone. `/` learned the same lesson
+    from the same incident, with a shorter window and higher stakes.
+  */
+  const complete = constellations !== null && !fragmentsError;
 
   return new Response(buildSitemap(url.origin, entries), {
     headers: {
@@ -89,7 +104,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
       // share precisely because of the `status` filter above: every caller now
       // gets a byte-identical document, so there is no per-session variant for
       // the CDN to hand to the wrong person.
-      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      'Cache-Control': complete ? 'public, s-maxage=3600, stale-while-revalidate=86400' : 'private, no-store',
     },
   });
 };

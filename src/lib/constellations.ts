@@ -3,7 +3,7 @@
 // all reads go through the anon SSR client and rely on the public RLS policies
 // (published, non-deleted fragments only). "Elevation" is simply having a row
 // in fragment_constellations — there is no flag.
-import type { createSupabaseServerClient } from './supabase';
+import { publicSupabase, type createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, QuoteItem, SubjectRef } from './blog';
 import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
@@ -67,32 +67,57 @@ export interface Constellation {
   neighbourhoods: Map<string, QuotePage>;
 }
 
-/** Every constellation, in authored order, weighted by published placements. */
-export async function listConstellations(supabase: DB): Promise<ConstellationRef[]> {
-  const [{ data: cs }, { data: links }] = await Promise.all([
-    // The overview always shows the PUBLIC truth — even to the admin, whose
-    // session could otherwise see drafts (draft preview lives on /{slug}).
-    supabase
-      .from('constellations')
-      .select('name, slug, description, sort, color')
-      .eq('status', 'published')
-      .order('sort')
-      .then(noted('sky: constellations')),
-    supabase
-      .from('fragment_constellations')
-      .select('constellations!inner(slug), fragments!inner(status, deleted_at)')
-      .eq('fragments.status', 'published')
-      .is('fragments.deleted_at', null)
-      .then(noted('sky: placements')),
-  ]);
+/**
+ * Every constellation in the sky, in authored order, weighted by its published
+ * placements — or `null` if the read failed.
+ *
+ * ⚠ ONE QUERY, NOT TWO, AND A HALF-FAILURE IS WHY (2026-08-27). This was a
+ * `Promise.all` of the constellations and their placements, and it converted a
+ * failure of the SECOND read into a false answer from the whole function: with
+ * `links` null, `counts` stayed empty, every constellation scored zero, and
+ * `.filter(count > 0)` then deleted all eleven of them. The first query had
+ * succeeded. The front door said "The sky is being composed."
+ *
+ * That is what one 401 did on 2026-08-27. The fix is not to handle the case
+ * better but to stop having it: `!inner` makes the placements a join rather
+ * than a second round trip, so there is no state in which one half of this
+ * answer is true and the other half is a lie. It also does the filtering that
+ * used to be done afterwards — a constellation with no published placement is
+ * dropped by the join, which is exactly what `.filter(count > 0)` meant.
+ * Verified against live PostgREST before the swap: same eleven constellations,
+ * same per-constellation counts as the two-query form, to the row.
+ *
+ * ⚠ AND `null` IS NOT `[]`. They were the same value before, which is the
+ * second half of the same bug: a sky that failed to load and a sky with nothing
+ * in it rendered identically, and the CDN was as willing to cache one as the
+ * other. `[]` means the database has nothing to show; `null` means we do not
+ * know. `/` branches its cache header on the difference.
+ *
+ * ⚠ THE DEFAULT ARGUMENT IS THE PUBLIC TRUTH, MADE STRUCTURAL. This function
+ * has always documented that the overview shows the same sky to everyone,
+ * admin included, and enforced it with `status = 'published'`. Running on a
+ * session-bound client was still what let a signed-in viewer's expiring token
+ * fail the read — see `publicSupabase`. No caller passes `db`; it is here so
+ * the unit test can hand in a fake.
+ */
+export async function listConstellations(db: DB = publicSupabase()): Promise<ConstellationRef[] | null> {
+  const { data, error } = await db
+    .from('constellations')
+    .select('name, slug, description, sort, color, fragment_constellations!inner(fragments!inner(status, deleted_at))')
+    .eq('status', 'published')
+    // ⚠ The dotted paths reach through the embed, and `!inner` above is what
+    // makes them filter rather than null out the nested rows — the same care
+    // `getConstellation` spells out at length, for the same reason: under the
+    // anon key RLS already hides these, so a filter that silently did nothing
+    // would still look right here and would inflate the count for anyone whose
+    // session could see more.
+    .eq('fragment_constellations.fragments.status', 'published')
+    .is('fragment_constellations.fragments.deleted_at', null)
+    .order('sort')
+    .then(noted('sky: constellations'));
 
-  const counts = new Map<string, number>();
-  for (const l of links ?? []) {
-    const slug = (l.constellations as unknown as { slug: string }).slug;
-    counts.set(slug, (counts.get(slug) ?? 0) + 1);
-  }
-
-  return (cs ?? []).map((c) => ({ ...c, count: counts.get(c.slug) ?? 0 })).filter((c) => c.count > 0); // an empty constellation isn't in the sky yet
+  if (error) return null;
+  return (data ?? []).map(({ fragment_constellations: placements, ...c }) => ({ ...c, count: placements.length }));
 }
 
 /** One constellation with its composed suite, in authored position order. */

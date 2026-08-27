@@ -37,3 +37,43 @@ export function createSupabaseServerClient(context: { request: Request; cookies:
     },
   });
 }
+
+/**
+ * The session-free client, for reads whose answer is the same for everybody.
+ *
+ * ⚠ IT EXISTS BECAUSE A SIGNED-IN VIEWER'S OWN TOKEN CAN FAIL A PUBLIC READ
+ * (2026-08-27). The front door showed Michael "The sky is being composed." with
+ * eleven constellations sitting in the database. `/` ran its two reads on the
+ * request-bound client above — which carries HIS access token — and the two
+ * straddled a refresh: one went out with the rotated token and came back 200,
+ * the other with the revoked one and came back 401. Supabase's edge logs
+ * recorded the rotation and both requests in the same second, and it was the
+ * only non-2xx the project returned all day.
+ *
+ * A query that wants the public truth has no use for an identity, and an
+ * identity it does not use is one that can only cost it. `listConstellations`
+ * had said so in a comment — *"the overview always shows the PUBLIC truth, even
+ * to the admin"* — since it was written; this is that sentence made structural,
+ * so the guarantee no longer depends on every future caller reading it.
+ *
+ * ⚠ NO COOKIES IN, NO COOKIES OUT — that is the entire mechanism, and it works
+ * because of what `createServerClient` already does: it sets
+ * `skipAutoInitialize`, so the session is loaded lazily from the cookie storage
+ * adapter on the first `getSession`/`getUser`/`getClaims`, and it sets
+ * `autoRefreshToken: false`. An empty jar therefore means there is never a
+ * session to attach, to expire, or to rotate. Requests carry the anon key and
+ * nothing else, and the public RLS policies are the only thing deciding.
+ *
+ * ⚠ SHARED, AND DELIBERATELY. It holds no per-request state, so minting one per
+ * request would allocate on the hottest public route to buy nothing. The price
+ * of sharing is that **`.auth` is off limits on it**: it has no session, and no
+ * response to write refreshed cookies back to. Anything that needs to know who
+ * is asking wants `createSupabaseServerClient` instead.
+ */
+let sharedPublicClient: ReturnType<typeof createSupabaseServerClient> | null = null;
+
+export function publicSupabase(): ReturnType<typeof createSupabaseServerClient> {
+  return (sharedPublicClient ??= createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: { getAll: () => [], setAll: () => {} },
+  }));
+}

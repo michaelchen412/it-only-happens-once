@@ -18,8 +18,13 @@ import { listConstellations } from '../lib/constellations';
 import { renderMarkdown } from '../lib/markdown';
 import StarBloom from '../components/StarBloom.astro';
 
-const supabase = Astro.locals.supabase;
-const refs = await listConstellations(supabase);
+/* No `Astro.locals.supabase` here, and that is the point — see `publicSupabase`.
+   The sky is the same for everyone, so this render has no use for who is
+   asking, and carrying a session was what let one viewer's expiring token
+   empty the front door. `null` back means the read FAILED; `[]` means the
+   database really has nothing. */
+const sky = await listConstellations();
+const refs = sky ?? [];
 
 /*
   The front door is CDN-cached like the blog is (24 · Piece 3). It was the one
@@ -28,12 +33,25 @@ const refs = await listConstellations(supabase);
   change more often, were all cached. Same 60s / SWR-a-day pair, so the four
   public rooms now answer the same way.
 
-  ⚠ UNCONDITIONAL HERE, AND BRANCHED ON `/[slug]` — that asymmetry is deliberate
-  and is explained at the branch. Briefly: `listConstellations` shows the PUBLIC
-  truth to every viewer including the admin (its own comment says so), so this
-  page cannot contain a draft. A constellation permalink can, and does.
+  ⚠ IT BRANCHES ON THE READ HAVING WORKED (2026-08-27), and until it did, this
+  header was the amplifier on an outage rather than a bystander to one. A failed
+  read renders "The sky is being composed." — the right thing to show a reader,
+  and a catastrophic thing to hand the CDN: `s-maxage=60` pins that empty page
+  at the edge for a minute, and `stale-while-revalidate=86400` then lets it be
+  served for a DAY while the revalidation happens behind it. One transient 401
+  becomes an empty sky for every stranger who arrives. The failed render is
+  worth nothing to anybody else, so it is not offered.
+
+  ⚠ IT DOES NOT BRANCH ON DRAFTS, THE WAY `/[slug]` DOES — that asymmetry is
+  deliberate and is explained at the branch. Briefly: `listConstellations` shows
+  the PUBLIC truth to every viewer including the admin — now by construction,
+  not only by filter — so this page cannot contain a draft. A constellation
+  permalink can, and does.
 */
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+Astro.response.headers.set(
+  'Cache-Control',
+  sky ? 'public, s-maxage=60, stale-while-revalidate=86400' : 'private, no-store',
+);
 
 // weight → type scale: distinct counts, heaviest first, share tiers on ties
 const TIERS = [
