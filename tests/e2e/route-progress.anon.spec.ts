@@ -107,3 +107,74 @@ test('a content link moves nothing in the chrome', async ({ page }) => {
   });
   expect(marked, 'a constellation row must not be a chrome link').toBe(false);
 });
+
+/*
+  The ENDING (2026-08-27). Until this date the bar had none: `<ClientRouter />`
+  swaps the whole document, `#nav-progress` was swapped out with it, and the
+  creep was demolished at whatever width the swap caught it — about 14% on an
+  edge-cached page. `stop()` then removed `is-active` from a brand-new element
+  that had never carried it, which is why the code looked like it was ending the
+  bar and nothing on screen ever did.
+
+  ⚠ THE FIRST TEST GUARDS A FAILURE THAT IS COMPLETELY SILENT. `transition:persist`
+  keys elements across documents, and the key Astro generates for you is
+  POSITIONAL — this div sits after a different number of transition-scoped
+  elements on every page, so bare `transition:persist` emitted
+  `astro-vvmeq654-23` on `/` and `-1` on `/blog`. Mismatched keys are simply not
+  persisted, with no warning anywhere. Worse than useless: `/about` and
+  `/listening` happened to agree, so it would have worked between exactly those
+  two and nowhere else. If the name is ever dropped, this is what says so.
+*/
+test('the bar is persisted under a NAMED key, not a positional one', async ({ page }) => {
+  const keyOn = async (url: string) => {
+    await page.goto(url);
+    return page.locator(BAR).getAttribute('data-astro-transition-persist');
+  };
+  // The literal matters as much as the equality: an auto key would also be
+  // equal to itself, and would still be positional.
+  expect(await keyOn('/')).toBe('nav-progress');
+  expect(await keyOn('/blog')).toBe('nav-progress');
+  expect(await keyOn('/about')).toBe('nav-progress');
+});
+
+test('the bar completes when the page lands, instead of being demolished mid-creep', async ({ page }) => {
+  await page.goto('/');
+
+  // ⚠ ON `document`, WHICH SURVIVES THE SWAP — the router replaces the contents
+  // of the page, not the document object, so a listener installed here is still
+  // watching after the navigation. Recording animation NAMES rather than
+  // sampling widths keeps this deterministic: the ending is 200ms long, and a
+  // spec that tried to catch it mid-flight would be a race by construction.
+  await page.evaluate(() => {
+    const w = window as unknown as { __anims: string[] };
+    w.__anims = [];
+    document.getElementById('nav-progress')!.dataset.probe = 'original';
+    document.addEventListener('animationstart', (e) => {
+      if ((e.target as HTMLElement)?.id === 'nav-progress') w.__anims.push((e as AnimationEvent).animationName);
+    });
+  });
+
+  await openChrome(page);
+  await page.locator('header a[data-nav-row][href="/blog"]').click();
+  await expect(page).toHaveURL(/\/blog$/);
+
+  // The same element, still here. This is the assertion the whole change rests
+  // on: without it there is no live bar in the new document to finish.
+  await expect(page.locator(BAR)).toHaveAttribute('data-probe', 'original');
+
+  // The creep ran, and then the completion ran. `nav-progress-finish` ends at
+  // `scaleX(1)`, so its presence IS the claim that the bar reached full width.
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __anims: string[] }).__anims))
+    .toEqual(['nav-progress-creep', 'nav-progress-finish']);
+
+  // ⚠ EXACTLY ONE CREEP. Adopting a node into a new document restarts its CSS
+  // animations, so leaving the creep running across the swap made it begin
+  // again from zero — the bar rewound a seventh of the screen in the frame the
+  // page arrived, and the ending then swept up from nothing. A second
+  // `nav-progress-creep` in that list is that regression.
+
+  // And it tidies up after itself, so the next navigation starts from flat.
+  await expect(page.locator(BAR)).not.toHaveClass(/is-done/);
+  await expect(page.locator(BAR)).not.toHaveClass(/is-active/);
+});

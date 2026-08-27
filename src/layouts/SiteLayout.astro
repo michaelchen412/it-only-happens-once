@@ -148,9 +148,45 @@ const nav = [
 
         Rendered here always and merely flat, never created on demand: an
         element that has to be inserted cannot paint on the frame the click
-        happened, which is the one frame it exists for. */
+        happened, which is the one frame it exists for.
+
+        ⚠ `transition:persist` IS WHAT GIVES THE BAR AN ENDING (2026-08-27), and
+        without it there was no ending to write. The router swaps the whole
+        document, so this div was DESTROYED at the swap and rebuilt flat — the
+        bar did not finish, it was demolished mid-creep along with the page that
+        drew it, and `route-progress.ts`'s `stop()` then dutifully removed
+        `is-active` from a brand-new element that had never had it. Measured on
+        2026-08-27 by tagging the element before a click: after the swap the tag
+        was gone and the class list was empty.
+
+        Which is why it read as abandoned. On an edge-cached navigation the
+        creep is around 14% when the swap lands (measured: `scaleX(0.1415)` at
+        ~200ms), so a reader saw a stub cross a seventh of the screen and
+        vanish. Persisting the element carries the running creep across the swap
+        into the new document, where `astro:page-label`'s handler can finish it
+        properly — see `nav-progress-finish` in `admin.css`.
+
+        ⚠ THE NAME IS NOT DECORATION — BARE `transition:persist` DOES NOT WORK
+        HERE, AND FAILS SILENTLY. Astro matches a persisted element across two
+        documents by the key in `data-astro-transition-persist`, and the key it
+        generates for you is POSITIONAL: it counts transition-scoped elements as
+        it renders. This div sits after a different number of them on every
+        page, so the same element in the same layout was emitted as
+        `astro-vvmeq654-23` on `/`, `-1` on `/blog` and `-3` on a constellation
+        (measured 2026-08-27). Keys that do not match are not persisted, and
+        nothing anywhere says so — the bar simply went on being demolished. The
+        cruel part is that `/about` and `/listening` both came out `-1`, so it
+        would have worked between exactly those two and nowhere else. Naming it
+        pins the key to the element instead of to its position.
+
+        ⚠ SAFE TO PERSIST BECAUSE IT HAS NO CONTENT AND NO CONTEXT. It is an
+        empty `aria-hidden` div whose entire state is one class, so there is
+        nothing in it that could belong to the page being left. The Observatory's
+        copy takes no such directive and needs none: it has no router, so every
+        navigation really does replace the document, and there is no live page
+        left to finish anything in. */
     }
-    <div id="nav-progress" aria-hidden="true"></div>
+    <div id="nav-progress" aria-hidden="true" transition:persist="nav-progress"></div>
     {
       /* Top bar — the site's primary navigation.
 

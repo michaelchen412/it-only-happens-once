@@ -2355,6 +2355,67 @@ html.scroll-locked .sky-return {
   animation: nav-progress-creep 10s cubic-bezier(0.15, 0.75, 0.35, 1) forwards;
 }
 
+/* ⚠ THE ENDING — PUBLIC-ONLY BY NATURE RATHER THAN BY A GUARD (2026-08-27).
+   Everything above was written for the Observatory, where a navigation replaces
+   the document: there is no live page left to animate an ending in, so the
+   creep simply goes away with the page that drew it, and that is the only
+   ending available. The public site looked identical and was not — `<ClientRouter />`
+   swapped the document out from under this element mid-creep, so the bar was
+   DEMOLISHED rather than finished. Measured 2026-08-27: at the moment an
+   edge-cached swap lands the creep is at `scaleX(0.1415)`. A seventh of the
+   screen, then nothing. That reads as gave-up, not as arrived — which is
+   exactly how it was reported.
+
+   `transition:persist` on the div (SiteLayout) carries the running creep across
+   the swap; this is what happens once it is there. The snap to full width is
+   the whole point: an indeterminate bar can only ever say *"still going"*, so
+   the ONE determinate thing it knows — that the page is here — has to be the
+   thing it says at the end, or the creep's honest 92% asymptote is the last
+   word and it sounds like failure.
+
+   ⚠ AN ANIMATION, NOT A TRANSITION, AND NOT BY TASTE. The creep is an animation
+   and animations beat transitions on the same property, so a transition-based
+   ending would have had to fight `nav-progress-creep` for `transform` and lose.
+   Replacing one animation with another has no such contest — and it lets the
+   ending start from wherever the creep actually got to, via
+   `--nav-progress-at`, which the script measures off the live element in the
+   frame before it swaps the classes. A fixed start value would jump.
+
+   ⚠ IT PLAYS ONLY WHEN THE PAGE REALLY ARRIVED. `route-progress.ts` clears the
+   bar without this class for its other endings — the 10s safety timeout, a
+   bfcache restore — because snapping to full width for a navigation that never
+   landed would be the bar telling a confident lie about the single thing it
+   exists to report.
+
+   Under `prefers-reduced-motion` the global rule in app.css collapses the
+   duration to 0.01ms, so the bar completes and clears on the spot: the ending
+   without the movement, the same bargain the creep already makes above. */
+@keyframes nav-progress-finish {
+  0% {
+    transform: scaleX(var(--nav-progress-at, 0.2));
+    opacity: 1;
+  }
+  /* Full width well before the fade starts, so the completion is legible as a
+     completion rather than as a bar dissolving on its way somewhere. */
+  40% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+/* 200ms total, and it is ornament on a page that has ALREADY painted — so this
+   is the one duration here that must not be generous. Long enough to be seen
+   completing, short enough that it is gone before it can read as the new page
+   still doing something. */
+#nav-progress.is-done {
+  opacity: 0;
+  animation: nav-progress-finish 200ms ease-out forwards;
+}
+
 /* ⚠ UNDER `prefers-reduced-motion` THIS DEGRADES CORRECTLY BY ACCIDENT, and the
    accident is worth writing down so nobody "fixes" it. The global rule in
    app.css zeroes every animation duration with `!important`, so the creep lands

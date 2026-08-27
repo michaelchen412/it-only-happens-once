@@ -51,28 +51,161 @@
 
 const BAR = 'nav-progress';
 
-/** Give up if the navigation never lands — see `stop()`'s callers. */
+/** Give up if the navigation never lands — see `clear()`. */
 const SAFETY_MS = 10_000;
 
 let timer = 0;
 
-function stop() {
+/**
+ * How wide the creep had got when the swap took the old page away, or -1 for
+ * "no navigation is in flight".
+ *
+ * ⚠ IT IS CAUGHT AT `astro:before-swap` RATHER THAN READ AT THE END, AND THE
+ * REASON IS NOT OBVIOUS (measured 2026-08-27). Persisting the element means
+ * Astro ADOPTS it into the new document, and adopting a node restarts its CSS
+ * animations — so the creep silently begins again from zero at the swap. Read
+ * the width a moment later, at `astro:page-load`, and it measures ~0: the bar
+ * rewinds a seventh of the screen and then sweeps from nothing, which is a
+ * worse ending than the one being replaced. `before-swap` is the last moment
+ * the old page's creep is still the one on screen.
+ */
+let caught = -1;
+
+const bar = () => document.getElementById(BAR);
+
+/** How far the creep actually got, 0–1, read off the live animation. */
+function creepAt(el: HTMLElement): number {
+  // `matrix(a, b, c, d, tx, ty)` — `a` is the horizontal scale, which is the
+  // only thing the creep animates. `none` before the first navigation.
+  const t = getComputedStyle(el).transform;
+  const a = t && t !== 'none' ? parseFloat(t.slice(t.indexOf('(') + 1)) : 0;
+  return Number.isFinite(a) ? Math.min(1, Math.max(0, a)) : 0;
+}
+
+/** Shared teardown: the safety timer, and the link that was claiming to be pending. */
+function reset() {
   if (timer) {
     clearTimeout(timer);
     timer = 0;
   }
-  document.getElementById(BAR)?.classList.remove('is-active');
   document.querySelector('[data-nav-pending]')?.removeAttribute('data-nav-pending');
 }
 
+/**
+ * End the bar with nothing to show for it — for the navigations that never
+ * happened.
+ *
+ * ⚠ THE SPLIT FROM `finish()` IS THE HONEST HALF OF THIS FILE. A bar that
+ * snapped to full width whenever it went away would be claiming the page
+ * arrived, which is precisely the one fact it exists to report and the one it
+ * would then be wrong about. A cancelled preparation, a fetch that fell back to
+ * a document load, a bfcache restore: none of those is an arrival, so none of
+ * them gets the gesture that means one.
+ */
+function clear() {
+  reset();
+  caught = -1;
+  const el = bar();
+  if (!el) return;
+  el.classList.remove('is-active', 'is-done');
+  el.style.removeProperty('--nav-progress-at');
+  el.style.removeProperty('transform');
+  el.style.removeProperty('opacity');
+}
+
+/**
+ * The new page is on screen: snap to full width and fade.
+ *
+ * ⚠ THIS IS NEW WORK RATHER THAN A TIDY-UP, AND FOR MOST OF THIS FILE'S LIFE IT
+ * WAS IMPOSSIBLE (2026-08-27). The bar had no ending because it had no element
+ * to end: `<ClientRouter />` replaced the whole document, this div with it, and
+ * the old `stop()` removed `is-active` from a fresh one that had never carried
+ * it. What a reader saw was the creep being demolished at whatever width the
+ * swap caught it — around 14% on an edge-cached page. `transition:persist` in
+ * SiteLayout is what carries the running bar across the swap so there is
+ * something here to finish.
+ *
+ * By here the width has already been caught and the bar pinned to it by
+ * `astro:before-swap`, so this only has to hand over to the finish animation:
+ * dropping the inline hold and adding the class in the same block means the
+ * browser computes style once and the ending starts from exactly where the
+ * creep stopped. The live measure is a fallback for a swap that never
+ * announced itself.
+ */
+function finish() {
+  reset();
+  const el = bar();
+  if (!el) return;
+
+  // Not mid-navigation — `astro:page-load` also fires on a cold load, and on a
+  // navigation this file deliberately never started (a Reader hash move).
+  const at = caught >= 0 ? caught : el.classList.contains('is-active') ? creepAt(el) : -1;
+  if (at < 0) return;
+  caught = -1;
+
+  el.style.setProperty('--nav-progress-at', String(at));
+  el.style.removeProperty('transform');
+  el.style.removeProperty('opacity');
+  el.classList.remove('is-active');
+  el.classList.add('is-done');
+}
+
+/*
+  Hold the creep where it is while the documents change hands.
+
+  ⚠ THE INLINE STYLES ARE THE HOLD, AND THEY EXIST BECAUSE OF THE ADOPTION
+  RESTART DESCRIBED AT `caught`. Taking `is-active` off stops the creep from
+  starting over in the new document; pinning `transform` and `opacity` by hand
+  is what keeps the bar visible at the width it had reached in the meantime,
+  since without the class the element's own rule says `scaleX(0)` and
+  `opacity: 0`. `finish()` drops both a few milliseconds later.
+*/
+document.addEventListener('astro:before-swap', () => {
+  const el = bar();
+  if (!el?.classList.contains('is-active')) return;
+  caught = creepAt(el);
+  el.style.transform = `scaleX(${caught})`;
+  el.style.opacity = '1';
+  el.classList.remove('is-active');
+});
+
+/*
+  Tidy-up after the ending: take `is-done` back off, so the next navigation
+  starts from the same flat bar as the first one did.
+
+  ⚠ ON `document`, AND KEYED ON THE ANIMATION NAME. Both halves avoid a trap.
+  Bound to the element instead, this would depend on `#nav-progress` existing at
+  module-evaluation time and on it surviving every swap afterwards — two
+  assumptions that are true today and are not this listener's business.
+  Attaching one per `finish()` would leak a closure per navigation.
+
+  ⚠ AND IT MUST NOT LISTEN FOR `animationcancel`, which looks like the obvious
+  companion and would be a real bug: removing `is-active` at the START of a
+  finish cancels the creep, so a cancel handler would strip `is-done` off the
+  ending in the same frame it was added. Only the finish's own completion tidies
+  up; `start()` handles the case where a new press interrupts one.
+*/
+document.addEventListener('animationend', (e) => {
+  if ((e as AnimationEvent).animationName !== 'nav-progress-finish') return;
+  const el = e.target as HTMLElement;
+  el.classList.remove('is-done');
+  el.style.removeProperty('--nav-progress-at');
+});
+
 function start(source: Element | undefined) {
-  const bar = document.getElementById(BAR);
-  if (!bar) return;
+  const el = bar();
+  if (!el) return;
 
   // Restart the creep from zero on a second press (impatience is a real input).
-  bar.classList.remove('is-active');
-  void bar.offsetWidth; // reflow, so the animation actually re-runs
-  bar.classList.add('is-active');
+  // `is-done` comes off here too: a press landing inside the 200ms ending must
+  // take the bar back to a creep rather than leave the two animations arguing.
+  caught = -1;
+  el.classList.remove('is-active', 'is-done');
+  el.style.removeProperty('--nav-progress-at');
+  el.style.removeProperty('transform');
+  el.style.removeProperty('opacity');
+  void el.offsetWidth; // reflow, so the animation actually re-runs
+  el.classList.add('is-active');
 
   // THE BAR ANSWERS BEFORE THE PAGE DOES. The link you pressed takes the active
   // ink on the frame you press it, rather than a second later when the new
@@ -97,7 +230,7 @@ function start(source: Element | undefined) {
   // A navigation that never completes: a cancelled `astro:before-preparation`,
   // a fetch that fails and falls back to a full page load, a 302 the browser
   // declines. `astro:page-load` is the normal end and arrives long before this.
-  timer = window.setTimeout(stop, SAFETY_MS);
+  timer = window.setTimeout(clear, SAFETY_MS);
 }
 
 document.addEventListener('astro:before-preparation', (e) => start(e.sourceElement));
@@ -108,19 +241,20 @@ document.addEventListener('astro:before-preparation', (e) => start(e.sourceEleme
 // all still lie between there and anything the reader can see. Ending the bar
 // at the fetch would put the gap back at the end instead of the beginning,
 // which is where it is least noticeable but still exactly as long. This event
-// means the new page is on screen.
-document.addEventListener('astro:page-load', stop);
+// means the new page is on screen — which is why it is the one caller that gets
+// `finish()` rather than `clear()`.
+document.addEventListener('astro:page-load', finish);
 
 // The document is going away — or coming back from bfcache, where a bar frozen
 // mid-creep would be restored along with everything else. Public HTML is
 // CDN-cached rather than `no-store`, so unlike the Observatory this restore
 // really can happen.
-window.addEventListener('pagehide', stop);
-window.addEventListener('pageshow', stop);
+window.addEventListener('pagehide', clear);
+window.addEventListener('pageshow', clear);
 
 // ⚠ THIS LINE IS LOAD-BEARING AND LOOKS LIKE DEAD CODE. TypeScript treats a
 // file with no top-level import or export as a global SCRIPT, not a module — so
-// `BAR`, `SAFETY_MS`, `timer`, `start` and `stop` would all be declared in the
+// `BAR`, `SAFETY_MS`, `timer`, `start` and `clear` would all be declared in the
 // global scope. `nav-progress.ts` next door is such a file and names four of
 // the same five, which `astro check` reports as eight redeclaration errors
 // across both files the moment this one exists. Nothing at runtime cares (Vite
