@@ -1,0 +1,350 @@
+---
+/*
+  /lab/nav-bar — is the progress bar too SaaS, and what are the alternatives?
+
+  Michael, 2026-08-27, on the bar that had just been given an ending: *"do you
+  feel like the progress bar reads as too saas like?"* design.md §3 answers most
+  of that before the bench opens — *"the stance is editorial, never marketing…
+  not a SaaS landing page"* — and the bar breaks it three ways at once:
+
+    · it spends `--color-primary`, the site's one loud ink, on chrome that
+      fires at every click, which makes the accent a SYSTEM colour;
+    · it lives full-bleed against the viewport's top edge, which is the
+      browser-chrome position, not a position this site's typography uses;
+    · it is a METER, and a meter's whole proposition is measurable duration —
+      the opposite register to "it only happens once".
+
+  ⚠ AND THE OBVIOUS FIX IS CLOSED BY THE SAME SECTION. The instinct is to make
+  the indicator more *his* — the ✦, say — and §3's reserved-glyph rule forbids
+  exactly that: the signature marks belong to the Sky, and "outside the Sky the
+  wordmark is plain text; ornament is earned by structure, not sprinkled on."
+  So the moves available here are subtractive, which is on-brand anyway.
+
+  ⚠ WHAT THIS BENCH IS FOR IS THE SECOND LEVER, WHICH IS NOT A LOOK AT ALL.
+  The bar currently runs on EVERY navigation, and most of them finish in about
+  200ms — so what a reader actually meets is a flicker at every click. That tic
+  is doing at least as much of the SaaS work as the colour is, and no static
+  mock can show it. Hence a bench that runs the real thing at real durations
+  rather than a page of swatches.
+
+  ⚠ IT DRIVES THE REAL SCRIPT, NOT A COPY OF IT. `route-progress.ts` is wired
+  to `astro:before-preparation` → `astro:before-swap` → `astro:page-load`, so
+  the button below dispatches those three events with the gaps a navigation
+  would have put between them. Nothing here re-implements the sequence, which
+  is the only way the thing being judged is the thing that ships.
+*/
+import SiteLayout from '../../layouts/SiteLayout.astro';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+const params = Astro.url.searchParams;
+
+/* The two inks under test, plus the one that ships. Applied as INLINE STYLES on
+   the bar rather than through a stylesheet — see the script for why that is the
+   choice that lets a variant walk out of the bench with you. */
+const INKS = [
+  ['ships', 'as it ships — 2px, accent'],
+  ['muted', 'muted — 1px, text ink'],
+  ['faint', 'fainter — 1px, quieter still'],
+] as const;
+
+/* Real numbers, measured against production on 2026-08-19 and re-measured
+   2026-08-27: an edge-cached room lands in about 200ms, the biggest
+   constellation nearer 400ms, and a cold function on a slow phone is where the
+   second and third get interesting. */
+const WAITS = [
+  ['150', '150ms — an edge hit'],
+  ['400', '400ms — a big constellation'],
+  ['1200', '1.2s — a cold function'],
+  ['3000', '3s — genuinely slow'],
+] as const;
+
+const ink = INKS.find(([v]) => v === params.get('ink'))?.[0] ?? 'ships';
+const wait = WAITS.find(([v]) => v === params.get('wait'))?.[0] ?? '150';
+const deferred = params.get('defer') === 'on';
+const slow = params.get('slow') === 'on';
+---
+
+<SiteLayout title="Bench — the progress bar" active="home">
+  <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-14">
+    <h1 class="font-serif text-3xl">The bar, at the top of this page</h1>
+
+    <p class="text-muted mt-4 font-serif leading-relaxed">
+      Press <em>run a navigation</em> and watch the top edge. Nothing on this page moves — the button dispatches the three
+      events a real navigation dispatches, so the bar you are judging is the bar that ships.
+    </p>
+
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <button type="button" data-nb-run class="btn btn-primary btn-sm font-sans normal-case"> Run a navigation </button>
+      <button type="button" data-nb-run-thrice class="btn btn-ghost btn-sm font-sans normal-case">
+        Three in a row
+      </button>
+      <span class="text-whisper font-sans text-sm" data-nb-status aria-live="polite"></span>
+    </div>
+
+    <p class="text-whisper mt-3 font-sans text-sm">
+      <strong class="font-medium">Three in a row</strong> is the one that answers the question. A single bar always looks
+      reasonable; the tic only shows up when you click the way a reader clicks.
+    </p>
+
+    <hr class="border-base-300 my-10" />
+
+    <h2 class="font-serif text-xl">Then judge it in the wild</h2>
+    <p class="text-muted mt-3 font-serif leading-relaxed">
+      These are real navigations, so the wait is whatever the dev server actually takes.
+    </p>
+    <ul class="text-muted mt-4 flex flex-wrap gap-x-6 gap-y-2 font-sans text-sm">
+      <li><a class="text-primary hover:underline" href="/blog">/blog</a></li>
+      <li><a class="text-primary hover:underline" href="/about">/about</a></li>
+      <li><a class="text-primary hover:underline" href="/listening">/listening</a></li>
+      <li><a class="text-primary hover:underline" href="/">the sky</a></li>
+    </ul>
+    <p class="text-whisper mt-4 font-sans text-sm">
+      ⚠ The <strong class="font-medium">ink follows you out of here</strong> — it rides on the bar element itself, which is
+      persisted across navigations. The <strong class="font-medium">timing and slow-motion do not</strong>: they are
+      this page's stylesheet and this page's script, and both end at the door. Come back to change them.
+    </p>
+
+    <hr class="border-base-300 my-10" />
+
+    <h2 class="font-serif text-xl">What is not on this bench</h2>
+    <p class="text-muted mt-3 font-serif leading-relaxed">
+      Dropping the bar entirely. The pressed link already takes its ink on the frame you press it — that half is
+      independent of everything here, and you can judge it by watching the nav word rather than the top edge on any run
+      above. If the word is enough on its own, the answer is no bar at all.
+    </p>
+  </div>
+
+  {
+    /* Bottom-left: the top-right corner belongs to the theme popover and the
+      bottom-right to the ✦ / back-to-top, and this panel must not sit under the
+      one edge the whole bench is about. */
+  }
+  <details class="nb-panel" open>
+    <summary class="nb-panel__summary">bench</summary>
+    <form class="nb-panel__form" data-nb-panel aria-label="Bench controls">
+      <fieldset class="nb-panel__set">
+        <legend class="nb-panel__legend">the ink</legend>
+        {
+          INKS.map(([value, label]) => (
+            <label class="nb-panel__row">
+              <input type="radio" name="ink" value={value} checked={value === ink} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="nb-panel__set">
+        <legend class="nb-panel__legend">how long the page takes</legend>
+        {
+          WAITS.map(([value, label]) => (
+            <label class="nb-panel__row">
+              <input type="radio" name="wait" value={value} checked={value === wait} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="nb-panel__set">
+        <legend class="nb-panel__legend">when it appears</legend>
+        <label class="nb-panel__row">
+          <input type="checkbox" name="defer" checked={deferred} />
+          only if it is slow <span class="nb-panel__hint">(wait 250ms first)</span>
+        </label>
+        <label class="nb-panel__row">
+          <input type="checkbox" name="slow" checked={slow} />
+          slow motion <span class="nb-panel__hint">(4×, to see the ending)</span>
+        </label>
+      </fieldset>
+    </form>
+  </details>
+</SiteLayout>
+
+{
+  /* is:global because every selector reaches into SiteLayout's DOM, which
+  Astro's scoping cannot see from a page. Safe by construction: this file is the
+  only page that loads this stylesheet, and the one rule that touches the bar is
+  gated behind an attribute only this page's script sets. */
+}
+<style is:global>
+  /* ⚠ SLOW MOTION IS A STYLESHEET AND THE INK IS NOT, and the split is not
+     arbitrary. Durations belong here because they are only ever judged on this
+     page; the ink is set inline on the element so it survives the swap and can
+     be judged on a real navigation, which is the harder and more honest test.
+     4× rather than 10×: the creep is already a ten-second curve, and the point
+     is to read the 200ms ENDING, which at 4× is 800ms — slow enough to watch,
+     fast enough to still feel like a gesture rather than a wipe. */
+  :root[data-nb-slow] #nav-progress.is-active {
+    animation-duration: 40s;
+  }
+  :root[data-nb-slow] #nav-progress.is-done {
+    animation-duration: 800ms;
+  }
+
+  .nb-panel {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 50;
+    width: min(19rem, calc(100vw - 2rem));
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+  .nb-panel__summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.95rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    color: var(--text-whisper);
+    user-select: none;
+  }
+  .nb-panel__summary::-webkit-details-marker {
+    display: none;
+  }
+  .nb-panel__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem 0.95rem 0.85rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+  .nb-panel__set {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 0;
+    padding: 0;
+  }
+  .nb-panel__legend {
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    color: var(--text-whisper);
+  }
+  .nb-panel__row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    line-height: 1.5;
+  }
+  .nb-panel__hint {
+    color: color-mix(in oklab, var(--color-base-content) 38%, transparent);
+  }
+</style>
+
+<script>
+  /* The bench's own wiring. Nothing here reaches into `route-progress.ts`; it
+     only speaks to it through the events Astro's router speaks to it with. */
+  const panel = document.querySelector<HTMLFormElement>('[data-nb-panel]');
+  const status = document.querySelector<HTMLElement>('[data-nb-status]');
+  const root = document.documentElement;
+
+  /* ⚠ INLINE, ON THE ELEMENT, AND THAT IS THE WHOLE TRICK. `#nav-progress` now
+     carries `transition:persist`, so it is the one node on the site that
+     survives a navigation intact — which means a style set on it here is still
+     set on it after you walk out of the bench. A stylesheet could not do that:
+     this page's `<style>` is replaced along with this page. It is also why
+     `route-progress.ts` may never touch `height` or `background` — it clears
+     only the three properties it sets. */
+  const INK: Record<string, { height: string; background: string }> = {
+    ships: { height: '2px', background: 'var(--color-primary)' },
+    muted: { height: '1px', background: 'var(--text-muted)' },
+    faint: { height: '1px', background: 'var(--text-faint)' },
+  };
+
+  function apply() {
+    if (!panel) return;
+    const data = new FormData(panel);
+    const ink = String(data.get('ink') ?? 'ships');
+    const wait = String(data.get('wait') ?? '150');
+    const deferred = data.get('defer') !== null;
+    const slow = data.get('slow') !== null;
+
+    const bar = document.getElementById('nav-progress');
+    if (bar) Object.assign(bar.style, INK[ink] ?? INK.ships);
+
+    if (slow) root.dataset.nbSlow = 'on';
+    else delete root.dataset.nbSlow;
+
+    const p = new URLSearchParams();
+    p.set('ink', ink);
+    p.set('wait', wait);
+    if (deferred) p.set('defer', 'on');
+    if (slow) p.set('slow', 'on');
+    history.replaceState(null, '', `${location.pathname}?${p}`);
+  }
+
+  panel?.addEventListener('change', apply);
+  apply();
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * One navigation, as the router would run it.
+   *
+   * ⚠ THE THREE EVENTS ARE THE POINT. `route-progress.ts` starts the creep on
+   * `astro:before-preparation`, catches its width on `astro:before-swap` and
+   * finishes on `astro:page-load` — so dispatching those, with a realistic gap
+   * between the last two, exercises the shipped code path rather than a mock of
+   * it. The 60ms is the swap-plus-transition window measured on 2026-08-27.
+   *
+   * ⚠ AND `defer` IS MODELLED HERE RATHER THAN IN THE SCRIPT, deliberately: the
+   * proposal is "don't start the bar until the wait is real", and the honest
+   * way to try that before writing it is to withhold the START event. A
+   * navigation shorter than the threshold then never dispatches one at all,
+   * which is exactly what the proposal claims — most clicks would show nothing.
+   */
+  async function runOne(): Promise<boolean> {
+    const data = new FormData(panel!);
+    const wait = Number(data.get('wait') ?? 150);
+    const deferred = data.get('defer') !== null;
+    const delay = deferred ? 250 : 0;
+
+    if (delay >= wait) {
+      await sleep(wait);
+      return false; // the page beat the bar to it — nothing was ever shown
+    }
+    await sleep(delay);
+    document.dispatchEvent(new Event('astro:before-preparation'));
+    await sleep(wait - delay);
+    document.dispatchEvent(new Event('astro:before-swap'));
+    await sleep(60);
+    document.dispatchEvent(new Event('astro:page-load'));
+    return true;
+  }
+
+  function say(text: string) {
+    if (status) status.textContent = text;
+  }
+
+  document.querySelector('[data-nb-run]')?.addEventListener('click', async () => {
+    say('…');
+    const shown = await runOne();
+    say(shown ? 'the bar ran' : 'the page beat it — no bar at all');
+  });
+
+  /* ⚠ THREE IN A ROW IS THE ONE THAT ANSWERS THE QUESTION, and the 700ms gap is
+     chosen rather than round: it is about how fast somebody actually moves
+     through a site they know, and the whole complaint about SaaS chrome is
+     about repetition. One bar reads as considered; three in eight seconds is
+     where you find out whether it reads as a tic. */
+  document.querySelector('[data-nb-run-thrice]')?.addEventListener('click', async () => {
+    let shown = 0;
+    for (let i = 0; i < 3; i++) {
+      say(`${i + 1} of 3…`);
+      if (await runOne()) shown++;
+      await sleep(700);
+    }
+    say(shown === 0 ? 'three navigations, no bar at all' : `the bar ran ${shown} of 3`);
+  });
+</script>
