@@ -10,6 +10,8 @@
  */
 import type { DB } from '../actions/_shared';
 import type { MusicSet } from './music-sets';
+import { noted } from './read-log';
+import { publicSupabase } from './supabase';
 
 /** A set as the workshop sees it — drafts included. */
 export interface SetRow {
@@ -41,7 +43,19 @@ export interface SetRow {
  * feeds `MusicSets.astro`, so the component cannot tell a fixture from a row —
  * which is the only reason driving it on `/lab/sets` proved anything.
  */
-export async function listSets(supabase: DB): Promise<MusicSet[]> {
+export async function listSets(db: DB = publicSupabase()): Promise<MusicSet[] | null> {
+  /*
+    ⚠ `null` MEANS THE READ FAILED, `[]` MEANS THE ROOM IS EMPTY (2026-08-27).
+    They were one value until the sky taught the difference: `/listening` shows
+    "Nothing here yet." for both, and handed that page to the CDN for a minute
+    with a day of `stale-while-revalidate` behind it. And it did so silently —
+    this was one of the two public reads with no `noted()` on it at all, so a
+    failure here left no line anywhere.
+
+    ⚠ AND IT READS SESSION-FREE BY DEFAULT, which is the `status` filter below
+    made structural rather than merely explicit — see `publicSupabase`. The one
+    caller passes nothing; the parameter is for a test's fake.
+  */
   /*
     ⚠ `.eq('status', 'published')` IS EXPLICIT AND MUST STAY. RLS already hides
     drafts from anonymous readers — but not from Michael, who is the one person
@@ -49,7 +63,7 @@ export async function listSets(supabase: DB): Promise<MusicSet[]> {
     shown a draft on a public URL and not notice. The music room's query carried
     the same line for the same reason.
   */
-  const { data } = await supabase
+  const { data, error } = await db
     .from('sets')
     // ⚠ ONE STRING LITERAL, NEVER A CONCATENATION. supabase-js infers the row
     // type from the select TEXT, so `'a, b' + 'c'` widens to `string` and every
@@ -61,8 +75,10 @@ export async function listSets(supabase: DB): Promise<MusicSet[]> {
     )
     .eq('status', 'published')
     .order('sort')
-    .order('created_at');
+    .order('created_at')
+    .then(noted('listening: sets'));
 
+  if (error) return null;
   return (data ?? []).map((s) => {
     /*
       ⚠ THE QUOTE IS DROPPED UNLESS IT IS ITSELF PUBLISHED AND UNDELETED, and

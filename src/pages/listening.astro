@@ -56,8 +56,11 @@ import MusicSets from '../components/MusicSets.astro';
 import { resolveSet } from '../lib/music-sets';
 import { listSets } from '../lib/sets';
 
-const supabase = Astro.locals.supabase;
-const sets = await listSets(supabase);
+// No `Astro.locals.supabase` — the room is the same for everyone, so the read
+// has no use for who is asking (see `publicSupabase`). `null` back means the
+// read FAILED; `[]` means the room is genuinely empty.
+const listed = await listSets();
+const sets = listed ?? [];
 // `?set=<slug>` — ONE set open, never a combination. A stale link falls back to
 // the first rather than to an empty pane; see `resolveSet`.
 const selectedSet = resolveSet(Astro.url.searchParams.get('set'), sets);
@@ -65,7 +68,15 @@ const selectedSet = resolveSet(Astro.url.searchParams.get('set'), sets);
 // The same 60s / SWR-a-day pair the other four public rooms answer with. No
 // `Vary` here, unlike `/blog`: nothing on this page fetches a partial, so there
 // is no second variant for the edge to hold.
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+//
+// ⚠ EXCEPT WHEN THE READ FAILED (2026-08-27). "Nothing here yet." is the right
+// thing to show one reader and the wrong thing to leave at the edge, where
+// `stale-while-revalidate` would keep serving an emptied room for a day after a
+// few seconds of trouble. Same branch as `/` and `/sitemap.xml`.
+Astro.response.headers.set(
+  'Cache-Control',
+  listed ? 'public, s-maxage=60, stale-while-revalidate=86400' : 'private, no-store',
+);
 ---
 
 <SiteLayout

@@ -40,9 +40,24 @@ import Label from '../components/Label.astro';
 import ContactForm from '../components/ContactForm.astro';
 import { renderMarkdown } from '../lib/markdown';
 import { embedForUrl } from '../lib/media';
+import { noted } from '../lib/read-log';
+import { publicSupabase } from '../lib/supabase';
 
-const supabase = Astro.locals.supabase;
-const { data: page } = await supabase.from('pages').select('content, updated_at').eq('slug', 'about').single();
+/* No `Astro.locals.supabase` — there is one `about` row and everybody gets it,
+   so the read has no use for who is asking (see `publicSupabase`).
+
+   ⚠ `maybeSingle`, NOT `single` (2026-08-27), and the swap is what makes the
+   cache branch below possible at all. `single()` raises an error for NO ROW as
+   well as for a failed read, so the two are indistinguishable at this line —
+   and this page renders "This page is being composed." for both. `maybeSingle`
+   resolves a miss as `data: null, error: null`, which is the distinction
+   `lib/read-log.ts` was built around: only failures speak. */
+const { data: page, error } = await publicSupabase()
+  .from('pages')
+  .select('content, updated_at')
+  .eq('slug', 'about')
+  .maybeSingle()
+  .then(noted('about: page'));
 
 const c = (page?.content ?? {}) as {
   me?: {
@@ -85,7 +100,14 @@ const embed = siteName.spotify_url ? embedForUrl(siteName.spotify_url) : null;
 const hasMe = !!(meBodyHtml || portraitUrl);
 const hasSite = !!(siteBodyHtml || blurbHtml || embed);
 
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+/* ⚠ NOT WHEN THE READ FAILED (2026-08-27). A failed read renders the empty
+   state — right for the reader, and the wrong thing to hand the CDN, which
+   would pin "This page is being composed." at the edge for a minute and then
+   serve it for a day behind the revalidation. Same branch as `/`. */
+Astro.response.headers.set(
+  'Cache-Control',
+  error ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=86400',
+);
 ---
 
 <SiteLayout title="About" active="about" description="Who Michael Chen is, and how to say hello.">

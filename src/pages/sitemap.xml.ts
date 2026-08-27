@@ -34,9 +34,13 @@ import type { APIRoute } from 'astro';
 import { buildSitemap, type SitemapEntry } from '../lib/sitemap';
 import { listConstellations } from '../lib/constellations';
 import { noted } from '../lib/read-log';
+import { publicSupabase } from '../lib/supabase';
 
-export const GET: APIRoute = async ({ url, locals }) => {
-  const supabase = locals.supabase;
+export const GET: APIRoute = async ({ url }) => {
+  // Session-free, so this document cannot vary by who asked for it — see
+  // `publicSupabase`, and the block at the `status` filter below for what the
+  // route used to have to reason about instead.
+  const supabase = publicSupabase();
 
   const [constellations, { data: fragments, error: fragmentsError }] = await Promise.all([
     // Reused rather than re-queried, and that is the point: this helper already
@@ -66,6 +70,12 @@ export const GET: APIRoute = async ({ url, locals }) => {
         own words — *"the overview always shows the PUBLIC truth, even to the
         admin, whose session could otherwise see drafts."* One rule, stated
         twice, because the failure is silent both times.
+
+        ⚠ AND IT NO LONGER RUNS UNDER THE CALLER'S SESSION AT ALL (2026-08-27).
+        Both reads on this route are session-free now, so the sentence above
+        describes a hazard that has been closed rather than one being held
+        back by a filter. The filter stays: it is one line, it is the thing a
+        reader checks first, and plan 34 · §4 was still wrong.
       */
       .eq('status', 'published')
       .is('deleted_at', null)

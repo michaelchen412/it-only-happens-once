@@ -39,6 +39,7 @@ import type { APIRoute } from 'astro';
 import rss from '@astrojs/rss';
 import { excerpt } from '../lib/markdown';
 import { noted } from '../lib/read-log';
+import { publicSupabase } from '../lib/supabase';
 
 /**
  * ⚠ Twenty, not everything. A feed is a recent-items protocol, not an archive —
@@ -68,12 +69,14 @@ const FEED_SIZE = 20;
 const EDGE_TTL = 600;
 
 export const GET: APIRoute = async (context) => {
-  const { data } = await context.locals.supabase
+  const { data, error } = await publicSupabase()
     .from('fragments')
     .select('slug, title, excerpt, body, occurred_at')
     .eq('type', 'writing')
-    // Explicit, for the reason `sitemap.xml.ts` states at length: this route
-    // runs under the caller's session, and Michael's can read drafts.
+    // Explicit, and belt to braces since 2026-08-27: this used to run under the
+    // CALLER's session, whose drafts the filter was here to exclude. It reads
+    // session-free now, so the document cannot vary by viewer rather than
+    // merely being filtered until it doesn't — see `publicSupabase`.
     .eq('status', 'published')
     .is('deleted_at', null)
     /*
@@ -144,6 +147,19 @@ export const GET: APIRoute = async (context) => {
     entry correct, and the one that would have to be re-checked if a field ever
     started varying by viewer.
   */
-  res.headers.set('Cache-Control', `public, s-maxage=${EDGE_TTL}, stale-while-revalidate=86400`);
+  /*
+    ⚠ AND NOT WHEN THE READ FAILED (2026-08-27) — which is the case the comment
+    at that query has described since plan 43 without anything acting on it:
+    *"a failed read here is an EMPTY feed served with a 200 and a 600s edge
+    cache — a reader's app would say 'no posts'."* Logging it made the failure
+    visible; this is what stops the edge from repeating it to every subscriber
+    who polls for the next ten minutes, and for the day of
+    `stale-while-revalidate` after that. An empty feed is not a feed anyone
+    should be able to cache.
+  */
+  res.headers.set(
+    'Cache-Control',
+    error ? 'private, no-store' : `public, s-maxage=${EDGE_TTL}, stale-while-revalidate=86400`,
+  );
   return res;
 };
