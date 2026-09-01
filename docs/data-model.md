@@ -228,6 +228,36 @@ create table fragment_subjects (
   primary key (fragment_id, subject_id)
 );
 
+-- SHELVES (added 2026-09-01, ADR 0042): where a jotting lives when it is never
+-- going to be a piece. The pile's four other exits all REMOVE the note; a shelf
+-- keeps it, which is what lets `status = 'note'` mean "inbox" again.
+--
+-- ⚠ ENTIRELY PRIVATE, and the ONE deliberate divergence from the
+-- `subjects`/`feelings` mirror it otherwise copies: no anon SELECT on either
+-- table, plus a privilege-layer revoke. The things a shelf describes are by
+-- definition the ones that never publish.
+--
+-- ⚠ NOT A SUBJECT. A subject is what a piece is ABOUT and is public; a shelf is
+-- what a jotting is FOR. See ADR 0042 for the leak path that settled it.
+create table shelves (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  slug       text not null unique,  -- frozen once created; lands in `?shelf=`
+  sort       integer not null,      -- authored order, not alphabetical
+  created_at timestamptz not null default now()
+);
+create unique index shelves_name_ci on shelves (lower(name));
+
+-- At most `MAX_SHELVES` (2) rows per fragment — enforced in `shelves.set`, not
+-- in the schema, because the cap is a product decision rather than an integrity
+-- one. ⚠ These rows survive a status flip, so `fragments.bulk` DELETES them when
+-- a note is promoted; nothing here will do it for you.
+create table fragment_shelves (
+  fragment_id uuid not null references fragments(id) on delete cascade,
+  shelf_id    uuid not null references shelves(id)   on delete cascade,
+  primary key (fragment_id, shelf_id)
+);
+
 -- SETS (added 2026-08-15, plan 40 / ADR 0035): a curated listen — one Spotify
 -- playlist somebody can SAVE, one quote, one description. Not a fragment: a
 -- fragment is text with subjects, placeable in a constellation, readable at a
@@ -520,7 +550,9 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 | Constellation | `constellations` row |
 | Composed suite / adjacency | `fragment_constellations.position` |
 | Placement / elevation | existence of a `fragment_constellations` row |
-| Subject (tag) | `subjects` + `fragment_subjects` |
+| Subject (tag) | `subjects` + `fragment_subjects` — public, and what a piece is *about* |
+| Shelf (where a jotting lives) | `shelves` + `fragment_shelves` — private, and what a jotting is *for* ([ADR 0042](adr/0042-a-shelf-is-where-a-jotting-lives.md)) |
+| The notes inbox | absence of a `fragment_shelves` row on a `status = 'note'` fragment |
 | Author / Work (provenance) | `authors` / `works` + `fragments.author_id` / `work_id` — the **Who** and the **From**; the shown line is derived from them into `attribution` (§4) |
 | Emergent links between constellations | shared membership (no table) |
 | The morning check-in | `daily_checkins`, keyed by local `log_date` (§6b) |

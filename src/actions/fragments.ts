@@ -923,6 +923,31 @@ export const fragments = {
         const { error } = await sb.from('fragments').update({ status: input.op }).in('id', ids);
         if (error) throw fail(error.message);
       }
+
+      /*
+        ⚠ A ROW LEAVING THE NOTE TIER LEAVES ITS SHELVES BEHIND (2026-09-01).
+
+        This is the hazard the shelves migration was written around, and moving
+        off `subjects` did not fix it — it only stopped it being public.
+        **Make a piece** is a tier move on the SAME ROW, so `fragment_shelves`
+        links survive it exactly the way `fragment_subjects` links do. Without
+        this, a promoted essay would keep `Applications` for ever: invisible in
+        the manager (which has no shelf column, chip or filter), invisible on
+        the page, and visible only in an export.
+
+        ⚠ IT RUNS FOR `publish` AND `draft` AND NOT FOR `note`, which is the
+        whole distinction — 'note' is the move INTO the pile, where a shelf is
+        the point. `trash`/`restore` do not touch `status` at all, so a
+        discarded jotting keeps its drawer and comes back to it.
+
+        ⚠ AND IT IS UNCONDITIONAL RATHER THAN GUARDED ON "was it a note?". The
+        delete is a no-op for a row that never had a shelf, and asking first
+        would cost a round trip to learn something the delete already knows.
+      */
+      if (input.op === 'draft' || input.op === 'publish') {
+        const { error } = await sb.from('fragment_shelves').delete().in('fragment_id', ids);
+        if (error) throw fail(error.message);
+      }
       return { ok: true, count: ids.length };
     },
   }),

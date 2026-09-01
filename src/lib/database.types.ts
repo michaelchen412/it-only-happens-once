@@ -453,6 +453,36 @@ export type Database = {
           },
         ]
       }
+      fragment_shelves: {
+        Row: {
+          fragment_id: string
+          shelf_id: string
+        }
+        Insert: {
+          fragment_id: string
+          shelf_id: string
+        }
+        Update: {
+          fragment_id?: string
+          shelf_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fragment_shelves_fragment_id_fkey"
+            columns: ["fragment_id"]
+            isOneToOne: false
+            referencedRelation: "fragments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fragment_shelves_shelf_id_fkey"
+            columns: ["shelf_id"]
+            isOneToOne: false
+            referencedRelation: "shelves"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fragment_subjects: {
         Row: {
           fragment_id: string
@@ -986,6 +1016,30 @@ export type Database = {
           home_timezone?: string
           id?: boolean
           updated_at?: string
+        }
+        Relationships: []
+      }
+      shelves: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          sort: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          sort: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          sort?: number
         }
         Relationships: []
       }

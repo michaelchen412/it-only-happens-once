@@ -47,6 +47,8 @@ import { elapsedSince } from '../lib/hq/dates';
 import { stripMarkdown } from '../lib/markdown-plain';
 import { wireAltDialog } from './alt-dialog';
 import { anchorPopover } from './pop-anchor';
+import { MIN_SEARCH } from '../lib/search-highlight';
+import { MAX_SHELVES } from '../lib/shelves';
 import { mountRichEditor } from './rich-editor';
 import { uploadImage } from './upload';
 import { closeWithExit, openDialog } from './dialog-close';
@@ -672,6 +674,206 @@ if (undoBar) {
     fileAs(card, row.dataset.as!);
   });
 
+  /* ── the search field ─────────────────────────────────────────────────────
+     A `<form method="get">`, so Enter works with no script at all — the debounce
+     below is a convenience on top of a control that already functions.
+
+     ⚠ THE SAME `MIN_SEARCH` COMPARISON THE OTHER TWO CONSUMERS MAKE
+     (docs/search.md §3: one constant, and now six enforcement sites). Below it
+     the term never reaches the URL, so typing or clearing a single letter costs
+     no navigation and no stray `?q=a` lands in history. */
+  const qField = document.querySelector<HTMLInputElement>('[data-notes-q]');
+  const qForm = qField?.closest('form');
+  if (qField && qForm) {
+    const effective = (raw: string) => (raw.trim().length >= MIN_SEARCH ? raw.trim() : '');
+    let last = effective(qField.value);
+    let timer = 0;
+    qField.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const next = effective(qField.value);
+        if (next === last) return; // nothing the server would answer differently
+        last = next;
+        // ⚠ SUBMIT THE FORM rather than building a URL: the shelf rides along in
+        // a hidden field, so the pressed-shelf half of the escape rule is kept
+        // by the markup instead of being re-derived here and drifting from it.
+        qField.value = next || qField.value.trim();
+        qForm.submit();
+      }, 260);
+    });
+    // A navigation destroys focus, and a field you must re-click after every
+    // keystroke-batch cannot be typed in. Caret to the end, not to 0.
+    if (qField.value) {
+      qField.focus();
+      qField.setSelectionRange(qField.value.length, qField.value.length);
+    }
+  }
+
+  /* ── shelves: the fifth destination, and the only one that KEEPS the note ──
+     Bench /lab/shelves, decided 2026-09-01. Everything above this line moves a
+     thought OUT of the pile; a shelf is how it stays in without still counting
+     as un-triaged. Unshelved is the inbox. */
+
+  /** A shelf as the chooser and the chips both carry it: id writes, name shows,
+      slug answers "is this the shelf the room is currently filtered to". */
+  type ShelfPick = { id: string; name: string; slug: string };
+
+  const newForm = chooser?.querySelector<HTMLFormElement>('[data-shelf-new-form]');
+  const newField = newForm?.querySelector<HTMLInputElement>('input');
+
+  /** What a card says it is on. ⚠ THE DOM IS THE STATE, as everywhere in HQ. */
+  const shelfIdsOf = (card: HTMLElement) =>
+    [...card.querySelectorAll<HTMLElement>('[data-shelf-id]')].map((c) => c.dataset.shelfId!);
+
+  /**
+   * Redraw a card's chips. Server-rendered on load and re-rendered here after a
+   * write — the one place both spellings meet, which is why the markup is this
+   * short and lives beside the `<span data-shelf-id>` it mirrors.
+   */
+  function drawShelves(card: HTMLElement, refs: ShelfPick[]) {
+    const slot = card.querySelector<HTMLElement>('[data-shelves]');
+    if (!slot) return;
+    slot.textContent = '';
+    for (const r of refs) {
+      const chip = document.createElement('span');
+      chip.className = 'dump__shelf';
+      chip.dataset.shelfId = r.id;
+      chip.dataset.shelfSlug = r.slug;
+      chip.textContent = r.name;
+      slot.append(chip);
+    }
+  }
+
+  /** The badge numbers above the pile, nudged rather than re-queried. */
+  function bumpBadge(shelfId: string | 'inbox', delta: number) {
+    const sel = shelfId === 'inbox' ? '[data-shelf-badge="inbox"]' : `[data-shelf-badge="${shelfId}"]`;
+    const el = document.querySelector<HTMLElement>(sel);
+    if (el) el.textContent = String(Math.max(0, Number(el.textContent ?? 0) + delta));
+  }
+
+  /**
+   * Write a note's shelves and reflect it.
+   *
+   * ⚠ THE CARD ONLY LEAVES IF IT NO LONGER BELONGS IN THE VIEW YOU ARE IN, and
+   * that is the whole of what makes filing feel like triage in the inbox and
+   * like an edit everywhere else. In the inbox, shelving a note is the note
+   * going away — so it gets `showUndo`, the same strip a delete gets, because
+   * it is exactly as reversible. On a shelf, or mid-search, nothing vanishes
+   * and a strip would be an apology for something that did not happen.
+   */
+  async function setShelves(card: HTMLElement, next: ShelfPick[]) {
+    const id = card.dataset.note!;
+    const before = shelfIdsOf(card);
+    try {
+      const { error } = await actions.shelves.set({ noteId: id, shelfIds: next.map((s) => s.id) });
+      if (error) throw new Error(error.message);
+    } catch {
+      say(card, 'could not file it');
+      return;
+    }
+
+    const nextIds = next.map((s) => s.id);
+    for (const was of before) if (!nextIds.includes(was)) bumpBadge(was, -1);
+    for (const now of nextIds) if (!before.includes(now)) bumpBadge(now, +1);
+    if (before.length && !nextIds.length) bumpBadge('inbox', +1);
+    if (!before.length && nextIds.length) bumpBadge('inbox', -1);
+
+    drawShelves(card, next);
+
+    // `?shelf=` / `?q=` decide what this room is currently showing. The inbox is
+    // the only view a filing can push a note out of; a pressed shelf loses it
+    // only when it is taken off THAT shelf.
+    const view = new URLSearchParams(location.search);
+    const pressed = (view.get('shelf') ?? '').trim();
+    const inInbox = !pressed && (view.get('q') ?? '').trim().length < MIN_SEARCH;
+    const leaves = inInbox ? nextIds.length > 0 : pressed ? !next.some((s) => s.slug === pressed) : false;
+
+    if (!leaves) return;
+    const label = next.length ? next.map((s) => s.name).join(' · ') : 'the inbox';
+    showUndo(next.length ? `Filed under ${label}` : 'Back in the inbox', card, async () => {
+      await actions.shelves.set({ noteId: id, shelfIds: before });
+    });
+  }
+
+  chooser?.addEventListener('click', async (e) => {
+    const card = choosing;
+    if (!card) return;
+
+    const newRow = (e.target as Element).closest<HTMLElement>('[data-shelf-new]');
+    if (newRow && newForm && newField) {
+      newForm.hidden = false;
+      newField.value = '';
+      newField.focus();
+      return;
+    }
+
+    const row = (e.target as Element).closest<HTMLElement>('[data-shelf]');
+    if (!row) return;
+    const id = row.dataset.shelf!;
+    const name = row.dataset.shelfName ?? '';
+    const slug = row.dataset.shelfSlug ?? '';
+    const on = shelfIdsOf(card);
+
+    /* ⚠ TWO IS THE CAP AND A THIRD PICK REPLACES THE OLDER, rather than being
+       refused. `MAX_SHELVES` is the decided shape (a note may sit on two), and
+       a menu that simply stops responding teaches nothing — the swap shows you
+       what the cap is by doing it. The server enforces the same number, which
+       is what makes this an affordance rather than the rule. */
+    const next = on.includes(id)
+      ? on.filter((x) => x !== id)
+      : on.length >= MAX_SHELVES
+        ? [...on.slice(1), id]
+        : [...on, id];
+
+    chooser.hidePopover();
+    await setShelves(
+      card,
+      next.map((sid) => {
+        const el = chooser.querySelector<HTMLElement>(`[data-shelf="${sid}"]`);
+        return {
+          id: sid,
+          name: sid === id ? name : (el?.dataset.shelfName ?? ''),
+          slug: sid === id ? slug : (el?.dataset.shelfSlug ?? ''),
+        };
+      }),
+    );
+  });
+
+  /* A shelf named where you went looking for it (`pair-browser`'s create bar).
+     The new drawer is created AND the note filed onto it in one motion — the
+     row you just typed is obviously where you meant this note to go. */
+  newForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const card = choosing;
+    const name = newField?.value.trim();
+    if (!card || !name) return;
+    newForm.hidden = true;
+    chooser?.hidePopover();
+
+    const { data, error } = await actions.shelves.create({ name });
+    if (error || !data) {
+      say(card, error?.message ?? 'could not make that shelf');
+      return;
+    }
+    // The menu has to learn the word too, or the next card's chooser will not
+    // offer it until a reload.
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'pop__row';
+    row.dataset.shelf = data.id;
+    row.dataset.shelfName = data.name;
+    row.dataset.shelfSlug = data.slug;
+    row.textContent = data.name;
+    newForm.before(row);
+
+    const on = shelfIdsOf(card).map((sid) => {
+      const el = chooser?.querySelector<HTMLElement>(`[data-shelf="${sid}"]`);
+      return { id: sid, name: el?.dataset.shelfName ?? '', slug: el?.dataset.shelfSlug ?? '' };
+    });
+    const next = on.length >= MAX_SHELVES ? [...on.slice(1), data] : [...on, data];
+    await setShelves(card, next);
+  });
+
   /**
    * A dump filed into a sheet's destination. The sheet has already written the
    * row; what is left is the half only the pile can do.
@@ -869,6 +1071,14 @@ if (undoBar) {
       // The menu is one element for the whole pile, so it has to be told which
       // card it belongs to before it opens — that is what positions it, too.
       choosing = card;
+      /* The menu says where the note LIVES before it offers to move it — and
+         the create bar closes, so a half-typed name never greets the next
+         card. */
+      const on = shelfIdsOf(card);
+      chooser?.querySelectorAll<HTMLElement>('[data-shelf]').forEach((r) => {
+        r.classList.toggle('is-on', on.includes(r.dataset.shelf!));
+      });
+      if (newForm) newForm.hidden = true;
       chooser?.showPopover();
       return;
     }

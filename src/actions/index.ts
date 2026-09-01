@@ -18,6 +18,7 @@ import { versions } from './versions';
 import { subjects, authors, works } from './vocabulary';
 import { constellations } from './constellations';
 import { sets } from './sets';
+import { shelves } from './shelves';
 import { pages, contact } from './site';
 import { checkin } from './checkin';
 import { people } from './people';
@@ -32,6 +33,7 @@ import { push } from './push';
 
 export const server = {
   fragments,
+  shelves,
   versions,
   songs,
   subjects,

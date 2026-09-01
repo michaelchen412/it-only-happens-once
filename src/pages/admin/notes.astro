@@ -39,24 +39,95 @@ import LogSheet from '../../components/admin/LogSheet.astro';
 import NoteSheet from '../../components/admin/NoteSheet.astro';
 import PageHeader from '../../components/admin/PageHeader.astro';
 import TaskSheet from '../../components/admin/TaskSheet.astro';
+import Highlighted from '../../components/admin/Highlighted.astro';
 import { elapsedSince } from '../../lib/hq/dates';
 import { renderMarkdown } from '../../lib/markdown';
+import { MIN_SEARCH, excerpts, toPlain } from '../../lib/search-highlight';
+import { MAX_SHELVES, listShelves, shelfCounts, shelvesByFragment } from '../../lib/shelves';
 
 const supabase = Astro.locals.supabase;
+
+/*
+  THE ROOM'S TWO CONTROLS (bench: /lab/shelves + /lab/search, decided
+  2026-09-01). Until then this page had neither, and its own header said why:
+  *"if it is ever genuinely 100 deep the answer is a search field, which is the
+  moment to add one and not before."* What changed is not the depth — it is that
+  the pile grew a way of being DELIBERATELY kept, so it is no longer only a
+  queue and can no longer be read by scrolling it.
+
+  ⚠ THE INBOX IS THE DEFAULT VIEW AND UNSHELVED IS WHAT IT MEANS. Every one of
+  the pile's other four exits REMOVES the note; a shelf keeps it, which is the
+  fifth. So a shelved thought is out of the way without being gone, and the
+  pile is a queue you can empty again.
+*/
+const params = Astro.url.searchParams;
+const q = (params.get('q') ?? '').trim();
+// One constant, four enforcement sites — docs/search.md §3. Below it the term
+// is ignored entirely rather than narrowed on.
+const searching = q.length >= MIN_SEARCH;
+
+const shelfVocab = await listShelves(supabase);
+const activeShelf = shelfVocab.find((sh) => sh.slug === (params.get('shelf') ?? '').trim()) ?? null;
+const { byShelf, inbox: inboxCount } = await shelfCounts(supabase);
+
+/*
+  ⚠ A LIVE TERM ESCAPES THE INBOX DEFAULT AND RESPECTS A PRESSED SHELF.
+
+  Found on the bench before anyone looked at it: under a naive inbox, searching
+  a word that only appears in SHELVED notes returned nothing at all — so the
+  pile's one way of finding an old thought could only ever see the notes nobody
+  had dealt with yet, which is the exact opposite of what the search is for.
+
+  The asymmetry is the whole rule. Nobody CHOSE the inbox — it is where the room
+  puts you — so a search that obeyed it would be obeying a decision the reader
+  never made. Pressing a shelf IS a choice, and searching inside it is a
+  reasonable thing to want.
+*/
+const escaped = !activeShelf && searching;
+
+/*
+  Membership → an id list, the same shape `fragment-query.ts` uses for `?in=`
+  (a slug, or "belongs to nothing"). Two queries rather than an embedded join
+  because the exclusion case has no join to embed: "on no shelf at all" is a
+  fact about rows that are ABSENT from the link table.
+*/
+let onlyIds: string[] | null = null;
+let excludeIds: string[] | null = null;
+if (activeShelf) {
+  const { data } = await supabase.from('fragment_shelves').select('fragment_id').eq('shelf_id', activeShelf.id);
+  onlyIds = (data ?? []).map((l) => l.fragment_id);
+} else if (!escaped) {
+  const { data } = await supabase.from('fragment_shelves').select('fragment_id');
+  excludeIds = [...new Set((data ?? []).map((l) => l.fragment_id))];
+}
 
 // Newest first, by when it was last TOUCHED rather than created: editing a
 // thought is thinking about it again, and it belongs back at the top.
 //
-// The cap is a backstop, not paging. The pile is meant to be triaged, so a
-// healthy one is short; if it is ever genuinely 100 deep the answer is a search
-// field, which is the moment to add one and not before.
-const { data: rows } = await supabase
+// The cap is a backstop, not paging — and it is a likelier ceiling now that a
+// shelf lets the pile keep things. `truncated` below says so out loud rather
+// than serving 100 of an unknown number, which is the fault `fragment-query.ts`
+// names at its own two ceilings.
+const LIST_CEILING = 100;
+let listQuery = supabase
   .from('fragments')
   .select('id, body, slug, updated_at')
   .eq('status', 'note')
-  .is('deleted_at', null)
-  .order('updated_at', { ascending: false })
-  .limit(100);
+  .is('deleted_at', null);
+// ⚠ `body` ONLY, and that is the whole column list a jotting has. The manager
+// searches four (title, body, attribution, excerpt); a dump has no title by
+// construction, which is the reason this room exists at all.
+if (searching) listQuery = listQuery.ilike('body', `%${q.replace(/[(),]/g, ' ')}%`);
+if (onlyIds) listQuery = listQuery.in('id', onlyIds.length ? onlyIds : ['00000000-0000-0000-0000-000000000000']);
+if (excludeIds?.length) listQuery = listQuery.not('id', 'in', `(${excludeIds.join(',')})`);
+const { data: rows } = await listQuery.order('updated_at', { ascending: false }).limit(LIST_CEILING);
+const truncated = (rows ?? []).length >= LIST_CEILING;
+
+const shelvesFor = await shelvesByFragment(
+  supabase,
+  (rows ?? []).map((n) => n.id),
+  shelfVocab,
+);
 
 const notes = (rows ?? []).map((n) => ({
   id: n.id,
@@ -83,6 +154,20 @@ const notes = (rows ?? []).map((n) => ({
   // whether the `more` control is offered, and it counts wrapped-looking length
   // as well as newlines so one long paragraph earns it too.
   long: (n.body ?? '').split('\n').length > 10 || (n.body ?? '').length > 700,
+  shelves: shelvesFor[n.id] ?? [],
+  /*
+    ⚠ WINDOWED EXCERPTS, NOT MARKS IN THE CARD — decided on /lab/search, and it
+    was decided by a number rather than by taste. Marking in place is nearly
+    free (`renderMarkdown` already takes a `highlight` option) and it loses:
+    `.dump__text--clamped` caps a long card at 16rem, so measured at 30 notes,
+    **24 of 36 matches were marked and invisible**. Excerpts show every hit in
+    its own window of context and are bounded by `maxHits` besides.
+
+    The cost, accepted: a searching card stops being the note and becomes a
+    result — no rendered Markdown, no clamp. That reads as the mode change it
+    is, which is the other half of why this won.
+  */
+  ex: searching ? excerpts(toPlain(n.body ?? ''), q) : null,
 }));
 
 // Where a dump can be filed. Drafts first — a draft is what you are actively
@@ -140,6 +225,79 @@ const roster = rosterData ?? [];
     <PageHeader title="Notes" />
 
     {
+      /* ⚠ THE BAR IS ABSENT UNTIL THERE IS SOMETHING TO NARROW. `FilterField`'s
+        rule, and this room's own: a box over four jottings is furniture, and
+        the pile's whole promise is that it is short. It appears when the
+        vocabulary exists AND the pile is past a glance — or whenever a filter
+        is already live, so the control that got you here can always be cleared.
+
+        ⚠ ONE STRIP, SEARCH FIRST. Search is the wider net and the shelves
+        narrow it; the reverse order reads as though the shelves scope the box,
+        which is exactly the thing that is NOT true — see `escaped` above. */
+    }
+    {
+      (notes.length > 4 || inboxCount > 4 || searching || activeShelf) && (
+        <div class="notes-bar">
+          <form method="get" class="notes-bar__row" data-notes-filter>
+            {/* The shelf rides along so a term typed inside a shelf stays inside
+              it — the pressed-shelf half of the escape rule, in one hidden
+              field rather than in the script. */}
+            {activeShelf && <input type="hidden" name="shelf" value={activeShelf.slug} />}
+            <label class="search search--w">
+              <Icon name="ph:magnifying-glass" class="shrink-0 opacity-45" />
+              <input
+                type="search"
+                name="q"
+                value={q}
+                placeholder="Search the pile…"
+                aria-label="Search the pile"
+                data-notes-q
+              />
+            </label>
+          </form>
+
+          {shelfVocab.length > 0 && (
+            <div class="seg notes-bar__seg" role="radiogroup" aria-label="Filter by shelf">
+              <a
+                role="radio"
+                aria-checked={!activeShelf}
+                class:list={['type-badge', !activeShelf && 'is-active']}
+                href={searching ? `/admin/notes?q=${encodeURIComponent(q)}` : '/admin/notes'}
+              >
+                Inbox{' '}
+                <span class="type-badge__n" data-shelf-badge="inbox">
+                  {inboxCount}
+                </span>
+              </a>
+              {shelfVocab.map((sh) => (
+                <a
+                  role="radio"
+                  aria-checked={activeShelf?.id === sh.id}
+                  class:list={['type-badge', activeShelf?.id === sh.id && 'is-active']}
+                  href={`/admin/notes?shelf=${sh.slug}${searching ? `&q=${encodeURIComponent(q)}` : ''}`}
+                >
+                  {sh.name}{' '}
+                  <span class="type-badge__n" data-shelf-badge={sh.id}>
+                    {byShelf[sh.id] ?? 0}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+
+          {escaped && (
+            <p class="notes-bar__note">Searching the whole pile — the inbox filter stands down while a term is live.</p>
+          )}
+          {truncated && (
+            <p class="notes-bar__note">
+              Showing the first {notes.length}. There are more than this — narrow it with a shelf or a term.
+            </p>
+          )}
+        </div>
+      )
+    }
+
+    {
       notes.length === 0 ? (
         /* A room with nothing in it says one plain sentence and offers the way
            in — never an empty skeleton of the cards that would be here
@@ -156,7 +314,20 @@ const roster = rosterData ?? [];
            than to this room, and the hint already says so. A second door would
            duplicate a live control rather than supply a missing one — which is
            exactly why that component takes a slot instead of a prop. */
-        <EmptyState title="Nothing here yet." hint="The ✚ in the corner is the way in — from any room." />
+        searching ? (
+          <EmptyState title={`Nothing matches “${q}”.`} hint="Only the words in a jotting are searched." />
+        ) : activeShelf ? (
+          <EmptyState title="Nothing on this shelf." hint="Notes get here from the → on a card." />
+        ) : inboxCount === 0 && shelfVocab.some((sh) => (byShelf[sh.id] ?? 0) > 0) ? (
+          /* ⚠ THE ONE EMPTY STATE THAT IS AN ACHIEVEMENT rather than an
+            absence, and it must not read like the others. The pile is empty
+            because everything in it has been dealt with — which is the whole
+            claim shelves were built on, and the room should say so once it is
+            true. */
+          <EmptyState title="Inbox empty." hint="Everything in the pile is filed. The shelves are above." />
+        ) : (
+          <EmptyState title="Nothing here yet." hint="The ✚ in the corner is the way in — from any room." />
+        )
       ) : (
         <ul id="notes-pile" class="space-y-3">
           {notes.map((n) => (
@@ -164,15 +335,37 @@ const roster = rosterData ?? [];
               {/* The words as they mean, not as they are spelled. Line breaks
                   survive (`breaks: true` above), so a dump's shape is still
                   part of what it says — bold is now bold as well. */}
-              <div
-                class:list={['dump__text', 'reading', 'jot-prose', n.long && 'dump__text--clamped']}
-                data-text
-                set:html={n.html}
-              />
-              {n.long && (
-                <button type="button" class="dump__more" data-more>
-                  more
-                </button>
+              {n.ex ? (
+                /* A RESULT, NOT THE NOTE — see `ex` above for why this won.
+                    No clamp and no `more`: there is nothing being withheld here,
+                    only the windows around each hit. */
+                <div class="dump__text notes-ex" data-text>
+                  {n.ex.windows.map((w) => (
+                    <p class="notes-ex__win">
+                      {w.lead && '… '}
+                      <Highlighted segs={w.segs} />
+                      {w.trail && ' …'}
+                    </p>
+                  ))}
+                  {n.ex.more > 0 && (
+                    <p class="notes-ex__more">
+                      +{n.ex.more} more match{n.ex.more === 1 ? '' : 'es'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div
+                    class:list={['dump__text', 'reading', 'jot-prose', n.long && 'dump__text--clamped']}
+                    data-text
+                    set:html={n.html}
+                  />
+                  {n.long && (
+                    <button type="button" class="dump__more" data-more>
+                      more
+                    </button>
+                  )}
+                </>
               )}
               {/* ⚠ THE CARD'S MARKDOWN, AND IT NEVER SHOWS. The editor is ONE
                   element shared by the whole pile (below), so a card cannot
@@ -217,6 +410,19 @@ const roster = rosterData ?? [];
                   depending on a length you cannot see is a rule you can only
                   learn by being surprised by it. So the pencil means one thing
                   everywhere, and the card is never anything but words. */}
+                {/* ⚠ IN THE FOOT, NOT OVER THE WORDS. This room's founding rule
+                    is that a card is its text — *"no title, no slug, no type
+                    mark"* — so where a thought LIVES is metadata sitting with
+                    the timestamp, never a header pushing the thought down the
+                    card. Rendered server-side and re-rendered by the script
+                    after a file, which is the one place both spellings meet. */}
+                <span class="dump__shelves" data-shelves>
+                  {n.shelves.map((sh) => (
+                    <span class="dump__shelf" data-shelf-id={sh.id} data-shelf-slug={sh.slug}>
+                      {sh.name}
+                    </span>
+                  ))}
+                </span>
                 <button type="button" class="dump__act" data-edit title="Open" aria-label="Open">
                   <Icon name="ph:pencil-simple" />
                 </button>
@@ -253,7 +459,7 @@ const roster = rosterData ?? [];
       than an essay seed, so the task is first — the same rule the interaction
       kinds follow (`KINDS` in lib/hq/interactions.ts). */
   }
-  <div class="pop pop--wide" popover id="dump-file" data-pop="file">
+  <div class="pop pop--wide pop--tall" popover id="dump-file" data-pop="file">
     {
       /* ⚠ ONE ROW, NOT TWO — and it does not say "task", because it does not
         always make one. Michael, 2026-08-04: *"I don't want the cognitive
@@ -301,6 +507,52 @@ const roster = rosterData ?? [];
     <button type="button" class="pop__row" data-as="append">
       <Icon name="ph:article" /> Add to a piece…
     </button>
+
+    {
+      /* ⚠ THE FIFTH DESTINATION, AND THE ONLY ONE THAT KEEPS THE NOTE. The four
+        above all consume it — that is what made a deliberately-kept jotting
+        indistinguishable from an un-triaged one, and why the pile could only
+        grow. Filing is triage; this is where it happens.
+
+        ⚠ BELOW THE FOUR, DESPITE BEING THE COMMONEST. This menu is ordered by
+        frequency everywhere else, and this is the one place that rule loses on
+        purpose: a shelf is where a thought goes when it is NOT going anywhere,
+        so putting it first would offer the way out of deciding before the
+        decisions. The separator is doing real work.
+
+        ⚠ AND THE ROWS TOGGLE — `MAX_SHELVES` of them, ticked when on. The
+        chooser is the only surface that can take a note OFF a shelf, which is
+        why these are checkable rows rather than one-shot destinations like the
+        four above. */
+    }
+    {shelfVocab.length > 0 && <p class="pop__head">Or keep it — {MAX_SHELVES} shelves at most</p>}
+    {
+      shelfVocab.map((sh) => (
+        <button type="button" class="pop__row" data-shelf={sh.id} data-shelf-name={sh.name} data-shelf-slug={sh.slug}>
+          <Icon name="ph:stack" /> {sh.name}
+          <Icon name="ph:check" class="pop__tick" />
+        </button>
+      ))
+    }
+    <button type="button" class="pop__row pop__row--quiet" data-shelf-new>
+      <Icon name="ph:plus" /> New shelf…
+    </button>
+    {
+      /* ⚠ A FIELD INSIDE THE MENU, NOT A DIALOG. `pair-browser`'s create bar is
+        the precedent — you type the name where you looked for it and the offer
+        to create appears in place. A modal over a popover would be two layers
+        deep to name three words, and there is no `prompt()` anywhere in this
+        codebase to fall back on.
+
+        ⚠ AND NO RENAME OR DELETE HERE — `shelves.create` is the only vocabulary
+        write this menu may reach. Renaming has to leave the frozen slug alone,
+        and deleting cascades through `fragment_shelves` and would silently
+        unfile every note on that shelf. Both belong beside the subjects
+        vocabulary, not behind a row you can hit by accident. */
+    }
+    <form class="pop__new" data-shelf-new-form hidden>
+      <input type="text" name="name" maxlength="40" placeholder="Name the shelf" aria-label="Name the new shelf" />
+    </form>
   </div>
 
   {

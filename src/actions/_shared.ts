@@ -212,7 +212,7 @@ export function requireAdmin(ctx: { locals: App.Locals }): void {
  * a subject and a fragment may both be `forgiveness` and neither is wrong.
  */
 export type SluggedTable =
-  'fragments' | 'subjects' | 'authors' | 'works' | 'people' | 'goals' | 'constellations' | 'sets';
+  'fragments' | 'subjects' | 'authors' | 'works' | 'people' | 'goals' | 'constellations' | 'sets' | 'shelves';
 
 /**
  * A slug nobody else in `table` is using (data-model.md §6).

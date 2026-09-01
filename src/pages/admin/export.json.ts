@@ -47,6 +47,11 @@ export const TABLES = [
   'authors',
   'works',
   'constellations',
+  // The private vocabulary (2026-09-01). ⚠ ABOVE `fragments` because
+  // `fragment_shelves` carries into it, and — like `fragment_private_notes`
+  // below — it is admin-only in RLS and revoked from `anon`, which is exactly
+  // why it has to be here: a shelf name Michael invented exists nowhere else.
+  'shelves',
   'pages',
   // Before `fragments`, which carries `paired_song_id` into it — this list is
   // in foreign-key order so an importer walking it top to bottom never trips a
@@ -55,6 +60,9 @@ export const TABLES = [
   'songs',
   'fragments',
   'fragment_subjects',
+  // Where a jotting lives. Not re-derivable and not visible to any reader — the
+  // same argument `fragment_private_notes` makes below.
+  'fragment_shelves',
   'fragment_constellations',
   'fragment_versions',
   // ⚠ PRIVATE, AND THE ONLY THING IN THE CORPUS'S HALF THAT IS (ADR 0031).

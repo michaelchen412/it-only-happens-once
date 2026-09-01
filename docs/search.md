@@ -11,12 +11,15 @@ Search is a **literal, case-insensitive substring match** — the same match the
 1. **Filter** — the server narrows the list to rows containing the term.
 2. **Highlight** — matches are wrapped in `<mark class="hl">` in the title and attribution, and for `writing` fragments the body is shown as **windowed excerpts** around each match (option #2: *all* matches shown, each in its own context window).
 
-**Two consumers, one engine.** They differ only in which columns they may search, and that difference is the RLS boundary rather than a design choice:
+**Three consumers, one engine.** They differ only in which columns they may search, and that difference is the RLS boundary rather than a design choice:
 
 | | Where | Columns searched |
 |---|---|---|
 | **The Fragment Manager** | [`fragment-query.ts`](../src/lib/fragment-query.ts) (server) + [`fragment-panel.ts`](../src/scripts/fragment-panel.ts) (client) | `title`, `body`, `attribution` **and `excerpt`** — the admin sees every field it stores |
 | **The public blog** | [`blog.ts`](../src/lib/blog.ts) (server) + [`blog-feed.ts`](../src/scripts/blog-feed.ts) (client) | writing: `title` + `body`; quotes: `body` + `attribution`. No `excerpt`: a card blurb is a *rendering*, and a hit in one the reader never sees reads as a false positive |
+| **The notes pile** *(2026-09-01)* | [`notes.astro`](../src/pages/admin/notes.astro) (server) + [`notes.ts`](../src/scripts/notes.ts) (client) | **`body`, and that is the whole of what a jotting has.** No title by construction — *"I see untitled, untitled, untitled"* is the sentence the room exists because of — so the narrowest consumer of the three is the one where the column list needed no decision at all |
+
+⚠ **The pile's search interacts with a filter, which neither of the others does** — see §7.
 
 ⚠ **The public half shipped on 2026-08-05 and this file described it as future work until 2026-08-09** — §6 below still opened *"when building public search"* after it had been built. The two live consumers are the reason the checklist there is now a contract rather than a plan.
 
@@ -72,16 +75,44 @@ Verified with a unit test: a body containing 100 matches renders exactly 8 highl
 - **No stemming / fuzzy / synonyms** — literal substring only. Predictable and escaping-free.
 - **No Postgres FTS / `tsvector`** — `ilike` is sufficient at this scale and keeps the same match semantics on client and server. Revisit if the public corpus (500+ posts) makes `ilike` scans slow.
 
-## 6. The contract a third consumer inherits
+## 6. The contract a new consumer inherits
 
-The engine (`search-highlight.ts`) and `Highlighted.astro` are **presentation-agnostic**, and the public blog took them as-is rather than forking — which is the only reason a term typed into the workshop and the same term typed into `/blog` mean the same thing. Every line below is a rule the second consumer already keeps, so it reads as a checklist and is really a description:
+The engine (`search-highlight.ts`) and `Highlighted.astro` are **presentation-agnostic**, and neither the public blog nor the notes pile forked them — which is the only reason a term typed into the workshop, into `/blog` and into the pile all mean the same thing. Every line below is a rule the second and third consumers already keep, so it reads as a checklist and is really a description:
 
 - [x] **Reuse `search-highlight.ts` unchanged** — the matching logic is not forked, and there is no second `ranges()` anywhere.
 - [x] **Keep the segments-as-data boundary** (§2). Neither surface builds `<mark>` by string replace; both render `Seg[]` through the component.
 - [x] **Respect `MIN_SEARCH` on server *and* client debounce** (§3) — four enforcement sites, one constant.
-- [x] **Always `excerpts()` (bounded) for long bodies**, never `highlight()` on a full essay.
+- [x] **Always `excerpts()` (bounded) for long bodies**, never `highlight()` on a full essay. ⚠ The pile proved *why* with a number rather than an argument — see §7.
 - [x] **Run `toPlain()` before excerpting Markdown** so `#`, `*` and link syntax don't leak into snippets.
 - [x] **Keep the density unit test** (100 matches → 8 shown) as the regression guard — the failure mode is invisible until the data is dense.
 - [ ] **Postgres FTS** stays deferred (§5). If the corpus grows enough to make `ilike` scans slow, keep highlighting literal anyway, or client and server stop agreeing about what "matched".
 
 ⚠ **The one thing a new consumer must decide for itself is which columns it may search**, because that is a privacy question and not a search question — see the table in §1. The public feed searches fewer columns than the manager, and it is not an oversight.
+
+---
+
+## 7. What the notes pile added (2026-09-01)
+
+The third consumer inherited the contract unchanged. Two questions it faced that the first two never had:
+
+### 7a. Marking in place loses to excerpts, and it was measured
+
+`renderMarkdown` has taken a `highlight` option since 2026-08-05 — it marks at the *token* level, so offsets come from raw text and each segment is escaped on its own. That makes "mark the card in place" nearly free for any surface that already renders Markdown, and the pile's card does. It still lost.
+
+`.dump__text--clamped` caps a long card at 16rem with a mask fade. Measured on [`/lab/search`](../src/pages/lab/search.astro) at 30 notes searching a common word: **24 of 36 matches were marked and invisible.** Excerpts scored 0 hidden, as did marking with the clamp lifted.
+
+> The general rule, which is §4's lesson from the other end: **a bounded rendering surface makes highlighting a lie unless the bound is lifted or the rendering is replaced.** Check the container before choosing `highlight()` over `excerpts()`; the failure is silent and looks like a search that missed.
+
+The accepted cost is that a searching card stops being the note and becomes a result — no rendered Markdown, no clamp. That reads as the mode change it is, which is the other half of why it won.
+
+### 7b. A search must escape a filter it did not choose
+
+The pile is the only consumer with a **default filter**: unshelved notes (the inbox). Built naively, searching a word that appears only in shelved notes returned nothing — the room's one way of finding an old thought could only see the notes nobody had dealt with yet.
+
+The rule, in `notes.astro` as `escaped`:
+
+> **A live term escapes the inbox *default* and respects a *pressed* shelf.**
+
+The asymmetry is the whole of it. Nobody chose the inbox — it is where the room puts you — so obeying it means obeying a decision the reader never made. Pressing a shelf *is* a choice. The strip says which mode it is in whenever a term is live, because a search whose scope silently changed is worse than one that never widened.
+
+⚠ **This generalises to any future consumer with a default view.** The manager's `?view=list` is the same shape and has never been tested against it: search there is scoped to the working list, and whether a term should reach the trash is an open question, not a settled one.
