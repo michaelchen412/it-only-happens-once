@@ -1,0 +1,761 @@
+---
+/*
+  /lab/search — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  THE QUESTION, Michael 2026-08-28: *"as my notes corpus grows, it will merit a
+  search bar to search through the notes and see where the text hits are
+  similar. If you look in our fragment browser, if we search up something, it
+  will show us all coinciding parts of text that have what I'm searching up."*
+
+  ⚠ THE ROOM HAS ALREADY RULED ON THE TIMING, WHICH IS WHY THE PILE SIZE IS A
+  CONTROL AND NOT A CONSTANT. notes.astro's own header says it:
+
+    *"The cap is a backstop, not paging. The pile is meant to be triaged, so a
+     healthy one is short; if it is ever genuinely 100 deep the answer is a
+     search field, which is the moment to add one and not before."*
+
+  There are **8 live notes today** (9,376 characters, measured 2026-08-28). So
+  the honest bench cannot be the pile as it stands — at 8 the box is furniture
+  whatever it renders, and at 100 it is the room's only way in. Drive `how many`
+  before judging anything else; it is this bench's *three in a row*.
+
+  ⚠ THE FIELD IS ALREADY BUILT, TWICE, AND NEITHER COPY CAN SEE A JOTTING.
+  `docs/search.md` §6 is a checklist headed *"The contract a third consumer
+  inherits"* — the Fragment Manager is the first, the public blog the second, and
+  this room would be the third. But the manager excludes notes BY CONSTRUCTION
+  (`neq('status','note')` in `fragment-query.ts`'s `scoped`), on purpose. So
+  *"did I already jot this down?"* has no answer anywhere in the building at any
+  pile size, and that — not pile depth — may be the real complaint.
+
+  ── THE THREE RENDERINGS ────────────────────────────────────────────────────
+
+  All three FILTER identically. They differ only in what they do about *where*.
+
+    · `mark`    — the card as it ships, with matches marked in place.
+    · `excerpt` — the Fragment Manager's answer: windowed snippets around every
+                  match. This is literally the thing the question points at.
+    · `filter`  — narrow the pile and say nothing. The cheapest honest option,
+                  on the bench so the other two have to beat it rather than win
+                  by being the only ones built.
+
+  ⚠ `mark` IS NEARLY FREE AND THAT IS THE SURPRISE. The card already calls
+  `renderMarkdown(body, { breaks: true })`, and that function has taken a
+  `highlight` option since 2026-08-05 — it marks at the TOKEN level, so offsets
+  come from raw text and each segment is escaped on its own (markdown.ts). It is
+  one option on a call that is already there. `excerpt` costs more and throws the
+  rendering away; judge whether it buys anything back.
+
+  ⚠⚠ AND `mark` HAS A DEFECT THE OTHER TWO DO NOT, WHICH IS WHY THIS BENCH
+  MEASURES. `.dump__text--clamped` caps a long card at 16rem with a mask fade.
+  A note with nine matches can be marked nine times and show you two. The bar at
+  the top counts the hits **hidden behind the clamp**, live, from the rendered
+  DOM — so the failure is a number rather than an impression. `un-clamp while
+  searching` is the one-line fix on the bench beside it.
+
+  ── WHAT IS REAL HERE, AND WHAT IS NOT ──────────────────────────────────────
+
+  14 §11a's rule: prototype the thing in question, not just the pixels.
+
+    REAL · the engine. `hasMatch`, `excerpts`, `toPlain`, `MIN_SEARCH` from
+           `search-highlight.ts`, and `Highlighted.astro` to render the segments.
+           Nothing here re-implements `ranges()` — §6's first checkbox.
+    REAL · the marking. `renderMarkdown(…, { highlight })`, the shipped path,
+           the same `<mark class="hl">` the manager emits and admin.css styles.
+    REAL · the match semantics. Literal, case-insensitive substring — the same
+           match `ilike '%term%'` performs, which is the only reason a hit can
+           be highlighted at all (§5, and the last unchecked box in §6).
+    REAL · the round trip's SHAPE. `?q=` is read on the server and the pile is
+           filtered there, because that is where it would ship — the manager and
+           the blog both do a server GET.
+    REAL · the CSS. `.dump`, `.dump__text`, the 16rem clamp, `.search`, `.hl`
+           are hq.css's and admin.css's, not retyped.
+    REAL · the numbers. Matches, notes, and hits-behind-the-clamp are MEASURED
+           from the DOM on every render, not claimed.
+    NOT  · the debounce-and-swap. The manager fetches a partial and replaces the
+           table (`fragment-panel.ts`); this navigates. Same server, same query,
+           coarser — and what is in question is the RENDERING, not the fetch.
+    NOT  · the database. The pile below is a written sample, because the real one
+           is 8 notes deep and cannot show the case that decides this.
+    NOT  · `ilike` itself. The filter is `hasMatch` in JS. It agrees with the SQL
+           by construction — that agreement IS §5's argument — but a term that
+           only matches Markdown SYNTAX (`**`) would filter in and excerpt to
+           nothing. The shipped manager has the identical property.
+
+  ⚠ THE SAMPLE DECIDES THE WINNER, so it is built for this question rather than
+  borrowed from /lab/notes, whose pile was tuned for editor stretch. Here the
+  terms RECUR at different densities and at different DEPTHS: `shape` is dense
+  and buried, `attention` is spread thin across five notes, `dentist` hits once,
+  and three notes hit nothing at all so you can see what filtering removes. Try
+  the probes in the row under the box — `the` is the density trap from §4, and
+  `a` is below `MIN_SEARCH` and must do nothing whatsoever.
+*/
+import Base from '../../layouts/Base.astro';
+import BackToTop from '../../components/BackToTop.astro';
+import Highlighted from '../../components/admin/Highlighted.astro';
+import { renderMarkdown } from '../../lib/markdown';
+import { MIN_SEARCH, excerpts, hasMatch, toPlain } from '../../lib/search-highlight';
+import { FILTER_THRESHOLD } from '../../lib/filtering';
+// The Observatory's primitives, exactly as an admin page gets them: `hq.css`
+// from AdminLayout, `admin.css` inlined by `app.css` (which `Base` brings).
+import '../../styles/hq.css';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+const params = Astro.url.searchParams;
+
+/**
+ * The three renderings. `cost` is what shipping it would take, stated so the
+ * cheap answer cannot win by looking expensive or vice versa.
+ */
+const VARIANTS = [
+  ['mark', 'Marked in place', 'The card as it ships, matches marked. One option on a call already there.', '~15 lines'],
+  [
+    'excerpt',
+    'Excerpt windows',
+    "The Fragment Manager's rendering: every match in its own window of context.",
+    '~40 lines + the card stops being the card',
+  ],
+  ['filter', 'Filter only', 'Narrow the pile, say nothing about where. The floor the other two must beat.', '~8 lines'],
+] as const;
+
+/** The lever that actually answers "does it earn itself". 8 is today, measured. */
+const SIZES = [
+  ['8', '8 — today, measured'],
+  ['30', '30 — a pile gone untriaged'],
+  ['100', "100 — the room's own threshold"],
+] as const;
+
+/** Probes chosen to hit the interesting cases, not to flatter the feature. */
+const PROBES = [
+  ['shape', 'dense, and buried deep in one long note'],
+  ['attention', 'thin, spread across five notes'],
+  ['observatory', 'a handful, near the top of their notes'],
+  ['dentist', 'exactly one hit, in the shortest note'],
+  ['the', '§4’s density trap — hundreds of hits'],
+  ['a', `below MIN_SEARCH (${MIN_SEARCH}) — must do nothing at all`],
+] as const;
+
+const variant = VARIANTS.find(([v]) => v === params.get('v'))?.[0] ?? 'mark';
+const size = Number(SIZES.find(([v]) => v === params.get('n'))?.[0] ?? '8');
+/* Default ON, because on is what ships. The proposition is turning it off. */
+const keepClamp = params.get('clamp') !== 'off';
+const gate = params.get('gate') === 'on';
+
+const q = (params.get('q') ?? '').trim();
+// The one gate that must hold on the server AND the client, reading the one
+// constant — docs/search.md §3, four enforcement sites and no fifth opinion.
+const searching = q.length >= MIN_SEARCH;
+
+/**
+ * The pile. Markdown, because a dump genuinely is Markdown since 2026-08-06 —
+ * and the long one carries headings, a list and bold so `toPlain` has something
+ * to strip and `mark` has block children to survive.
+ */
+const SEED = [
+  {
+    id: 'a',
+    ago: '11 minutes ago',
+    body: 'Ask the dentist about the night guard when they call back — and whether the old one can be re-fitted rather than remade.',
+  },
+  {
+    id: 'b',
+    ago: '2 hours ago',
+    body: 'A room that shows the words is a different promise from a room that shows the titles.\n\nKeep that sentence.',
+  },
+  {
+    id: 'c',
+    ago: 'yesterday',
+    body: `The thing I keep circling: every tool I have ever liked was one that let me put something down without first deciding what it was. The ones I abandoned all asked a question at the door — which notebook, which project, which tag — and the question is never expensive on its own. It is expensive because it arrives at the exact moment the thought is least willing to sit still, and takes the whole of my attention to answer.
+
+So the test for anything I build here is not how good it is once you are inside it. It is what it costs to get in.`,
+  },
+  {
+    id: 'd',
+    ago: 'two days ago',
+    body: `Reminder to book the car in before the end of the month. Not urgent, will become urgent.`,
+  },
+  {
+    id: 'e',
+    ago: 'three days ago',
+    body: `### What the check-in is actually for
+
+Not a mood tracker. A mood tracker asks you to rate a day, and a rating is a summary — by the time you can give one honestly the day has already been flattened into a number you will not recognise in a month.
+
+The check-in asks smaller questions and keeps the answers as words. The failure mode to watch is the form growing a field every time I notice something it did not capture. That is how a check-in becomes a chore, a chore gets skipped, and a skipped day is worth less than a shallow one.
+
+What it is really measuring is the shape I was in, not the amount of attention I spent.`,
+  },
+  {
+    id: 'f',
+    ago: 'four days ago',
+    body: `## Reading dump — attention, and why the observatory metaphor keeps holding
+
+Long one. Getting it down before it evaporates.
+
+### The claim I want to steal
+
+The book's argument is that attention is not a resource you spend but a **shape** you hold. You do not run out of it the way you run out of money; you lose the shape and then everything you look at afterwards is looked at with the wrong instrument. That is a much better account of what a bad day feels like than "I was tired." I was not tired. I was holding the wrong shape and every input got processed by it.
+
+If that is right then the useful question at the end of a day is not *how much did I get done* but *what shape was I in, and what put me there*. Which is more or less what the check-in already asks, by accident. Worth making deliberate.
+
+### Where it argues with itself
+
+Two chapters later there is a long section on interruption that quietly reverts to the resource model — interruptions are described as costing you attention, with a recovery time, which is exactly the accounting the first half rejected. I do not think this is a contradiction so much as an admission that the resource model is easier to write policy with. You can say "protect two hours" and be understood. "Protect the shape" is true and unactionable.
+
+Most of the useful frameworks I have adopted are the *less* true one that could be acted on, plus a private awareness of the truer one that could not.
+
+### The bit about instruments
+
+There is a lovely passage about an observatory — that the point of a telescope is not that it makes things bigger but that it makes a *specific* kind of seeing repeatable. Anyone can point at the sky and be impressed. The instrument is what lets you come back next week and know whether what you saw has moved.
+
+That is the whole argument for writing things down. A jotting is not a record of a thought. It is the second observation that makes the first one mean something, and you cannot make it without an instrument you trust enough to use badly.
+
+**Which is the actual test for this room**: can I use it badly. Not can I use it carefully.
+
+### Things to look up
+
+- the source for the "shape not resource" framing — the endnote points at a paper I have not read
+- whether the interruption numbers are the old open-office studies, which were bad
+- who first used the observatory analogy; it feels borrowed and uncredited
+
+### What I take from it
+
+1. The end-of-day question should be about shape, not output.
+2. An instrument earns its place by being usable carelessly.
+3. Coming back to a thing is the observation; the first look is only a claim.
+4. Be suspicious of any framework whose final chapter is a resolution.
+
+Enough. Most of this is one idea in four costumes, and the one idea is the observatory one — hold the shape, trust the instrument, come back.`,
+  },
+  {
+    id: 'g',
+    ago: 'a week ago',
+    body: 'Chase the invoice. Second time.',
+  },
+  {
+    id: 'h',
+    ago: 'two weeks ago',
+    body: `An observatory is a promise about coming back, which is why the metaphor survives contact with the actual site. Every room in it should be judged on whether it rewards a second visit — not on how it looks the first time.
+
+The pile fails this today. I go in, I read the same eight things, and nothing helps me find the one I half-remember.`,
+  },
+] as const;
+
+/**
+ * Padding. The seed recycles rather than generating filler prose, so hit
+ * DENSITY at 100 stays the density of real notes — which is the property the
+ * §4 trap is about. Copies are marked in the foot so nothing here can be
+ * mistaken for eight real ones.
+ */
+const pile = Array.from({ length: size }, (_, i) => {
+  const seed = SEED[i % SEED.length];
+  return { key: `${seed.id}-${i}`, ago: seed.ago, body: seed.body, copy: i >= SEED.length };
+});
+
+/* The gate the room would actually ship behind: FilterField renders the field
+   always and hides it below the threshold, so a pile that grows mid-session
+   does not have to wait for a redeploy to become searchable. At 8 notes this is
+   the room's ruling, rendered — you cannot type, which is the argument. */
+const gated = gate && pile.length <= FILTER_THRESHOLD;
+const live = searching && !gated;
+
+const useExcerpt = variant === 'excerpt' && live;
+
+const shown = pile
+  // ⚠ `hasMatch` ON THE RAW BODY, because `ilike` runs against the raw column.
+  // Filtering on `toPlain` output instead would quietly disagree with the DB.
+  .filter((n) => !live || hasMatch(n.body, q))
+  .map((n) => {
+    // The room's own test, copied deliberately: `notes.astro` decides `long`
+    // exactly this way, and a bench that measured a different card would be
+    // measuring a card that does not exist.
+    const long = n.body.split('\n').length > 10 || n.body.length > 700;
+    return {
+      ...n,
+      long,
+      /* clamp=on → as it ships, always. clamp=off → the proposition: the clamp
+         is lifted ONLY while searching, so the room is unchanged at rest. */
+      clamped: long && (keepClamp || !live),
+      html: useExcerpt
+        ? ''
+        : renderMarkdown(n.body, { breaks: true, highlight: variant === 'mark' && live ? q : undefined }),
+      ex: useExcerpt ? excerpts(toPlain(n.body), q) : null,
+    };
+  });
+---
+
+<Base title="Search — the notes bench">
+  <div class="sb">
+    <header class="sb__head">
+      <h1>A search bar for the pile — three renderings</h1>
+      <p>
+        All three narrow the pile identically. What is in question is what they say about <em>where</em> the hit is — and
+        whether, at the size your pile actually is, any of them earns the room it takes.
+      </p>
+    </header>
+
+    {
+      /* ⚠ THE BOX IS IN THE ROOM, NOT IN THE BENCH PANEL. It is the thing being
+        judged; behind a `bench` disclosure it would be judged as a control
+        panel instead of as the first thing you meet above the pile. */
+    }
+    <div class="sb__bar">
+      {
+        gated ? (
+          <p class="sb__gate">
+            <strong>No field here.</strong> {pile.length} notes is at or below <code>FILTER_THRESHOLD</code> (
+            {FILTER_THRESHOLD}), so <code>FilterField</code>'s rule hides it. This is notes.astro's own ruling rendered
+            — <em>“the moment to add one and not before”</em>. Turn the gate off, or raise the pile, to type.
+          </p>
+        ) : (
+          <label class="search search--w">
+            <span class="sb__mag" aria-hidden="true">
+              ⌕
+            </span>
+            <input type="search" data-sb-q value={q} placeholder="Search the pile…" aria-label="Search the pile" />
+          </label>
+        )
+      }
+
+      <p class="sb__probes">
+        {
+          PROBES.map(([term, why]) => (
+            <button type="button" class="sb__probe" data-sb-probe={term} title={why}>
+              {term}
+            </button>
+          ))
+        }
+        <button type="button" class="sb__probe sb__probe--clear" data-sb-probe="">clear</button>
+      </p>
+
+      {
+        /* MEASURED, NOT CLAIMED — the /lab/notes rule. The counts are written by
+          this page's script from the rendered DOM after paint, because the one
+          that decides `mark` (hits swallowed by the 16rem clamp) is a fact about
+          layout and cannot be known on the server. */
+      }
+      <p class="sb__stat" data-sb-stat aria-live="polite"></p>
+    </div>
+
+    {
+      shown.length === 0 ? (
+        <p class="sb__none">Nothing matches “{q}”.</p>
+      ) : (
+        <ul class="sb__pile">
+          {shown.map((n) => (
+            <li class="dump" data-copy={n.copy ? '' : null}>
+              {/* ⚠ ONE SOURCE, THREE RENDERS — the /lab/chrome rule. A variant
+                  is which branch runs here, never a prettier copy of the card. */}
+              {n.ex ? (
+                <div class="dump__text sb__ex" data-text>
+                  {n.ex.windows.map((w) => (
+                    <p class="sb__win">
+                      {w.lead && '… '}
+                      <Highlighted segs={w.segs} />
+                      {w.trail && ' …'}
+                    </p>
+                  ))}
+                  {n.ex.more > 0 && (
+                    <p class="sb__more">
+                      +{n.ex.more} more match{n.ex.more === 1 ? '' : 'es'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div
+                  class:list={['dump__text', 'reading', 'jot-prose', n.clamped && 'dump__text--clamped']}
+                  data-text
+                  set:html={n.html}
+                />
+              )}
+
+              <div class="dump__foot">
+                <span class="dump__when">
+                  <span class="sb__clock" aria-hidden="true">
+                    ◔
+                  </span>
+                  <span class="dump__stamp">{n.ago}</span>
+                </span>
+                {n.copy && <span class="sb__copy">copy</span>}
+                {/* The three controls the room has. Inert here: nothing on this
+                    bench writes, and the foot exists only so the card is judged
+                    at its real height. */}
+                <span class="dump__act" aria-hidden="true">
+                  ✎
+                </span>
+                <span class="dump__act" aria-hidden="true">
+                  →
+                </span>
+                <span class="dump__act" aria-hidden="true">
+                  🗑
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <hr class="sb__rule" />
+
+    <h2 class="sb__h2">What is not on this bench</h2>
+    <p class="sb__note">
+      <strong>Fuzzy and semantic.</strong> This is literal substring, so <code>attention</code> will never find
+      <code>attentive</code> and never find <code>focus</code>. Fuzzy needs <code>pg_trgm</code>; semantic needs
+      <code>pgvector</code> and embeddings. Neither extension is installed, both are migrations against production, and
+      <code>docs/search.md</code> §5 defers them by name. The cost that is easy to miss: highlighting is only honest
+      <em>because</em> matching is literal — the moment the server matches by meaning, nothing can mark where the hit was,
+      and “show me the coinciding text” is the thing being asked for.
+    </p>
+    <p class="sb__note">
+      <strong>Searching the pile from anywhere else.</strong> The Fragment Manager excludes notes on purpose, so a jotting
+      is unreachable from every other room no matter what this bench decides. If the real question is
+      <em>“did I already write this down?”</em>, a box that only lives here answers half of it.
+    </p>
+  </div>
+
+  <details class="sb-panel" open>
+    <summary class="sb-panel__summary">bench</summary>
+    <form class="sb-panel__form" data-sb-panel aria-label="Bench controls">
+      <fieldset class="sb-panel__set">
+        <legend class="sb-panel__legend">the rendering</legend>
+        {
+          VARIANTS.map(([value, label, claim, cost]) => (
+            <label class="sb-panel__row" title={`${claim} — ${cost}`}>
+              <input type="radio" name="v" value={value} checked={value === variant} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="sb-panel__set">
+        <legend class="sb-panel__legend">how many notes</legend>
+        {
+          SIZES.map(([value, label]) => (
+            <label class="sb-panel__row">
+              <input type="radio" name="n" value={value} checked={Number(value) === size} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="sb-panel__set">
+        <legend class="sb-panel__legend">the two propositions</legend>
+        <label class="sb-panel__row">
+          <input type="checkbox" name="unclamp" checked={!keepClamp} />
+          un-clamp while searching
+        </label>
+        <label class="sb-panel__row">
+          <input type="checkbox" name="gate" checked={gate} />
+          hide the field below {FILTER_THRESHOLD}
+        </label>
+      </fieldset>
+    </form>
+  </details>
+
+  {
+    /* ⚠ THE REAL ROOM ALREADY HAS THIS — `AdminLayout` mounts one for every
+      admin page (*"the manager and library run long"*), so `/admin/notes` has
+      had it all along. It is here because a BENCH is not an admin page: this
+      file uses `Base` directly, so at 100 notes it was the one surface in the
+      building that ran long without a way back. Same component, same 600px
+      threshold; nothing about it is a proposition. */
+  }
+  <BackToTop />
+</Base>
+
+<style>
+  .sb {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 6rem;
+  }
+  .sb__head h1 {
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    line-height: 1.25;
+  }
+  .sb__head p,
+  .sb__note {
+    color: var(--text-muted);
+    font-family: var(--font-serif);
+    line-height: 1.65;
+    margin-top: 0.75rem;
+  }
+  .sb__bar {
+    margin: 2rem 0 1.5rem;
+  }
+  .sb__mag {
+    opacity: 0.45;
+    flex-shrink: 0;
+  }
+  .sb__gate {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    border: 1px dashed var(--color-base-300);
+    border-radius: var(--radius-box);
+    padding: 0.7rem 0.9rem;
+  }
+  .sb__probes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+  .sb__probe {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+  }
+  .sb__probe:hover {
+    background: var(--color-base-200);
+  }
+  .sb__probe--clear {
+    border-style: dashed;
+  }
+  .sb__stat {
+    margin-top: 0.7rem;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--text-whisper);
+    min-height: 1.2em;
+  }
+  /* The one number this bench exists to produce. */
+  .sb__stat strong {
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+  .sb__pile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .sb__none {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+  }
+  /* Excerpt windows: the Fragment Manager's own metrics — sans, small, faint,
+     one window per line. Deliberately NOT the card's reading type, because the
+     whole proposition is that a result stops being the note and becomes a hit. */
+  .sb__ex {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+  .sb__win + .sb__win {
+    margin-top: 0.2rem;
+  }
+  .sb__more {
+    color: var(--text-whisper);
+    margin-top: 0.3rem;
+  }
+  .sb__clock {
+    opacity: 0.5;
+  }
+  .sb__copy {
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--text-whisper);
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+  }
+  .dump__act {
+    cursor: default;
+  }
+  .sb__rule {
+    border: 0;
+    border-top: 1px solid var(--color-base-300);
+    margin: 3rem 0 1.5rem;
+  }
+  .sb__h2 {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+  }
+
+  /* Bottom-left, like /lab/nav-bar: the top-right belongs to the theme popover
+     and the bottom-right to back-to-top. */
+  .sb-panel {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 50;
+    width: min(19rem, calc(100vw - 2rem));
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+  .sb-panel__summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.95rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    color: var(--text-whisper);
+    user-select: none;
+  }
+  .sb-panel__summary::-webkit-details-marker {
+    display: none;
+  }
+  .sb-panel__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem 0.95rem 0.85rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+  .sb-panel__set {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 0;
+    padding: 0;
+  }
+  .sb-panel__legend {
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    color: var(--text-whisper);
+  }
+  .sb-panel__row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    line-height: 1.5;
+  }
+</style>
+
+<script>
+  /* The bench's own wiring. `Base` does not opt into view transitions, so every
+     change here is a real document load and this module runs fresh each time —
+     no `astro:page-load` listener, deliberately (see Base.astro's Props). */
+  import { MIN_SEARCH } from '../../lib/search-highlight';
+
+  const panel = document.querySelector<HTMLFormElement>('[data-sb-panel]');
+  const box = document.querySelector<HTMLInputElement>('[data-sb-q]');
+  const stat = document.querySelector<HTMLElement>('[data-sb-stat]');
+
+  /** Rewrite the URL and reload. One place, so no control invents its own params. */
+  function go(mutate: (p: URLSearchParams) => void) {
+    const p = new URLSearchParams(location.search);
+    mutate(p);
+    location.assign(`${location.pathname}?${p}`);
+  }
+
+  panel?.addEventListener('change', () => {
+    const data = new FormData(panel);
+    go((p) => {
+      p.set('v', String(data.get('v') ?? 'mark'));
+      p.set('n', String(data.get('n') ?? '8'));
+      // The checkbox is the PROPOSITION ("un-clamp"), the param is the STATE
+      // ("clamp"), so the panel reads as a change to the room rather than as a
+      // setting whose default is off.
+      if (data.get('unclamp') !== null) p.set('clamp', 'off');
+      else p.delete('clamp');
+      if (data.get('gate') !== null) p.set('gate', 'on');
+      else p.delete('gate');
+    });
+  });
+
+  /* ⚠ THE SAME `MIN_SEARCH` COMPARISON THE SHIPPED CLIENTS MAKE (§3): below it
+     the term is dropped from the URL entirely, so a stray short `q` never lands
+     in the address bar — and typing or clearing a single letter costs nothing. */
+  const effective = (raw: string) => (raw.trim().length >= MIN_SEARCH ? raw.trim() : '');
+  let last = effective(box?.value ?? '');
+  let timer = 0;
+
+  box?.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const next = effective(box.value);
+      if (next === last) return; // nothing the server would do differently
+      last = next;
+      go((p) => (next ? p.set('q', next) : p.delete('q')));
+    }, 260);
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-sb-probe]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const term = b.dataset.sbProbe ?? '';
+      go((p) => (effective(term) ? p.set('q', term) : p.delete('q')));
+    });
+  });
+
+  /* A navigation destroys focus, and a search box you have to re-click after
+     every keystroke-batch cannot be judged at all. Caret to the end, not to 0. */
+  if (box?.value) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+
+  /**
+   * The measurement, and the reason this is a bench rather than a mockup.
+   *
+   * ⚠ HITS BEHIND THE CLAMP CANNOT BE COUNTED ON THE SERVER. `.dump__text--clamped`
+   * is `max-height: 16rem` plus a mask that fades over the final 2.5rem, so
+   * whether a given `<mark>` is readable is a fact about layout. A hit that
+   * STARTS inside the fade is already gone, which is why the test is against
+   * `bottom - 40` and not against `bottom`.
+   */
+  function measure() {
+    let marks = 0;
+    let buried = 0;
+    let notesWithBuried = 0;
+
+    document.querySelectorAll<HTMLElement>('[data-text]').forEach((el) => {
+      const found = el.querySelectorAll<HTMLElement>('mark.hl');
+      marks += found.length;
+      if (!el.classList.contains('dump__text--clamped')) return;
+      const fold = el.getBoundingClientRect().bottom - 40; // the mask's 2.5rem
+      let here = 0;
+      found.forEach((m) => {
+        if (m.getBoundingClientRect().top > fold) here++;
+      });
+      if (here) {
+        buried += here;
+        notesWithBuried++;
+      }
+    });
+
+    const notes = document.querySelectorAll('.dump').length;
+    if (!stat) return;
+
+    const windows = document.querySelectorAll('.sb__win').length;
+    const parts = [`${notes} note${notes === 1 ? '' : 's'} shown`];
+    if (windows) parts.push(`${windows} excerpt window${windows === 1 ? '' : 's'}`);
+    if (marks) parts.push(`${marks} match${marks === 1 ? '' : 'es'} marked`);
+    if (!windows && !marks) parts.push('nothing marked');
+
+    stat.innerHTML = '';
+    stat.append(parts.join(' · '));
+    if (buried) {
+      stat.append(' · ');
+      const b = document.createElement('strong');
+      b.textContent = `${buried} hidden behind the clamp, in ${notesWithBuried} note${notesWithBuried === 1 ? '' : 's'}`;
+      stat.append(b);
+    }
+  }
+
+  // After fonts land: the clamp is a height in rem, so measuring before the
+  // serif swaps counts marks against a box that is about to move.
+  if (document.fonts?.ready) document.fonts.ready.then(measure);
+  else measure();
+  addEventListener('resize', measure);
+</script>

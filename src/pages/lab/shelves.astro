@@ -1,0 +1,1289 @@
+---
+/*
+  /lab/shelves — a LOCAL-ONLY bench, dev-gated below, linked from nowhere.
+
+  THE QUESTION, Michael 2026-09-01: *"I want to be able to categorize things or
+  put stuff into certain buckets, and I need to see that visually"* — for the
+  jottings that will never publish: job application writing, notes to himself,
+  philosophy.
+
+  ⚠ WHAT THIS BENCH IS REALLY TESTING IS A CLAIM, NOT A LOOK, and the claim is
+  mine rather than his. Chips on a card are easy and nobody needs a bench to
+  believe in them. What needs testing is the sentence underneath:
+
+    **Filing to a shelf IS triage. Unshelved is the inbox; shelved is kept, on
+    purpose.**
+
+  The pile has four exits today — the Agenda, a log entry, a quote, a piece —
+  and every one of them REMOVES the note. There is no way to say *"I am keeping
+  this and it is not going anywhere."* So a note kept deliberately looks exactly
+  like a note not yet dealt with, the pile only ever grows, and that growth is
+  what made a search field feel necessary in the first place (/lab/search).
+
+  If the claim is right, `inbox` below reads as a queue you can empty and the
+  other three read as decoration. If it is wrong, this bench should say so —
+  see the three refutation cases at the bottom of this comment.
+
+  ⚠ THE ROOMS DO NOT MERGE, AND THAT IS ALREADY LAW. ADR 0040: *"a section of
+  this site earns a route when it stops sharing the machinery of the room it
+  sits in… the branches are the bill for not saying so."* `?view=notes` WAS the
+  consolidated fragment browser and was deleted on 2026-08-03. A shelf must
+  therefore stay a FILTER ON THE PILE and never grow chrome of its own — a
+  shelved note is still edited, deleted and converted by the same three
+  controls. The moment a shelf wants its own toolbar it has become a room, and
+  this bench has failed rather than succeeded.
+
+  ⚠ AND THE VOCABULARY IS NOT `subjects`. Those are 22 curated PUBLIC themes
+  (`death`, `faith`, `free will`, `stoicism`…) rendered on `PostCard` and
+  `PostArticle` for readers, with 0 links on notes today. Worse than untidy:
+  **make a piece** is a tier move on the SAME ROW (`fragments.ts`, op `draft`),
+  so `fragment_subjects` links survive the conversion — shelve a jotting under
+  `job applications`, promote it, publish it, and that word renders under the
+  essay. A shelf is a PURPOSE and a subject is a TOPIC; one list holding both
+  axes is how a vocabulary rots.
+
+  ⚠⚠ DECIDED 2026-09-01, ON THE BENCH: **inbox + shelves · a note may sit on
+  two · search escapes the inbox.** All three defaults below now ship that way,
+  and the losing propositions are KEPT rather than deleted — the /lab/nav-bar
+  rule, because the comparison is the argument and `flat` is the only way to see
+  quickly again what hiding the shelved notes actually bought.
+
+  ⚠ THE THREE RULINGS ARE INTERNALLY CONSISTENT, WHICH IS NOT LUCK. `grouped`
+  was the one proposition multi-valued shelves could not have honestly — a note
+  in two drawers can only be sectioned under one heading, and the alternative is
+  printing the same thought twice and letting the reader work out it is one
+  note. `inbox` has no headings, so the clash never arises: a note on two
+  shelves is simply not in the inbox, and answers to both filters.
+
+  ⚠ AND THE MULTI RULING BUYS THE EXPENSIVE SCHEMA, stated plainly because it is
+  a ten-to-one difference and it was chosen with the cheap one on screen. Not
+  `alter table fragments add column shelf text` — a `shelves` table and a
+  `fragment_shelves` link table, i.e. the `subjects` machinery again on a
+  private axis. The migration is written and NOT APPLIED; see
+  `supabase/migrations/…_a_jotting_lives_on_a_shelf.sql`.
+
+  ── WHAT IS REAL HERE, AND WHAT IS NOT ──────────────────────────────────────
+
+    REAL · the search. `excerpts`/`toPlain`/`hasMatch`/`MIN_SEARCH`, the
+           rendering /lab/search settled on 2026-09-01, so the two features are
+           judged TOGETHER — whether a shelf filter and a search box in the same
+           strip fight each other is a question neither bench can ask alone.
+    REAL · the chrome. `.seg` + `.type-badge` + `.type-badge__n` is the
+           manager's own segmented-control-with-counts, and `.dump*` is the
+           pile's own card. Michael's ask was to *"align the UI/UX patterns where
+           applicable"*; this is what that looks like — the same control, not a
+           second one that resembles it.
+    REAL · the counts. Inbox depth, shelved depth, homeless notes and
+           double-shelved notes are MEASURED from the rendered DOM.
+    REAL · the filing, since 2026-09-01. The → opens the room's own `.pop`
+           chooser, anchored by the room's own `pop-anchor.ts`; picking a shelf
+           moves the note, the chip changes, the counts move, and under `inbox`
+           the card LEAVES with the room's undo strip. The first version of this
+           bench assigned every shelf in advance and left the cards inert, which
+           could show what a filed pile looks like and not what filing feels
+           like — and only the second of those decides anything.
+    NOT  · the schema. **NO MIGRATION IS APPLIED BY THIS FILE** and none should
+           be until the shape is decided — see `THE BILL` below. A filing lives
+           in `localStorage`, keyed by card, and `put the sample back` clears it.
+           It has to persist: every control in the bench panel navigates, so
+           without it, changing proposition would silently undo the filing you
+           did in order to judge that proposition.
+    NOT  · the four existing exits. They are unchanged under every proposition,
+           which is the argument for adding a fifth rather than reworking them.
+
+  ── THE BILL, so the cheap answer cannot win by looking expensive ───────────
+
+    single-valued  `alter table fragments add column shelf text` + an index.
+                   One column, no join, one chip per card, trivially filtered.
+    multi-valued   a `shelves` table + a `fragment_shelves` link table, i.e.
+                   the `subjects` machinery again, for a private axis.
+
+  Drive `a note may sit on two` to see what multi actually buys. My reading is
+  that it buys ambiguity: a shelf answers WHERE DOES THIS LIVE, and a thing
+  lives in one drawer. But note `h` in the sample is deliberately plausible on
+  two, so the case against is on the bench rather than argued away.
+
+  ⚠ WHAT THIS BENCH FOUND BEFORE ANYBODY LOOKED AT IT (2026-09-01). Under
+  `inbox`, searching `shape` returned **nothing** — both notes holding the word
+  are shelved under `philosophy`, and the inbox had already hidden them. So the
+  claim, built naively, BREAKS SEARCH: the pile's one way of finding an old
+  thought would only ever see the notes nobody had dealt with yet, which is the
+  exact opposite of what /lab/search was for.
+
+  The fix is a rule rather than a toggle, and `search escapes the inbox` is on
+  by default so it can be judged as the shipped behaviour:
+
+    **A live term escapes the INBOX DEFAULT and respects a PRESSED SHELF.**
+
+  The asymmetry is the point. Nobody chose the inbox — it is where the room puts
+  you — so a search that obeyed it would be obeying a decision the reader never
+  made. Pressing `Philosophy` IS a choice, and a search inside it is a
+  reasonable thing to want. Turn the lever off to see the broken version; the
+  strip says which mode it is in whenever a term is live.
+
+  ── THE THREE WAYS THIS CLAIM CAN LOSE, all built into the sample ───────────
+
+    1. HOMELESS NOTES. If most jottings fit no shelf, the inbox never empties
+       and shelving is a chore that changed nothing. Notes `d` and `k` are
+       genuinely unfileable; watch the `homeless` count as the pile grows.
+    2. DRIFT. Note `h` reads as `philosophy` AND `notes to self`. If the eye
+       cannot place a note in one drawer, single-valued is wrong and the bill
+       doubles.
+    3. THE SHELF THAT SHOULD HAVE BEEN AN EXIT. Notes `a` and `g` are errands.
+       Shelving them under `notes to self` would be filing instead of DOING —
+       a shelf that quietly becomes a place to put things you are avoiding is
+       worse than no shelf, because the inbox looks clean and the work is still
+       there. If `inbox` tempts you to shelve those two, that is a finding.
+*/
+import Base from '../../layouts/Base.astro';
+import BackToTop from '../../components/BackToTop.astro';
+import Highlighted from '../../components/admin/Highlighted.astro';
+import { renderMarkdown } from '../../lib/markdown';
+import { MIN_SEARCH, excerpts, hasMatch, toPlain } from '../../lib/search-highlight';
+import '../../styles/hq.css';
+
+if (import.meta.env.PROD) return Astro.redirect('/', 302);
+
+const params = Astro.url.searchParams;
+
+/**
+ * The four propositions. `none` is a CONTROL, not a candidate — without it the
+ * other three are judged against a memory of the pile rather than against it.
+ */
+const VARIANTS = [
+  ['none', 'No shelves', 'The pile as it ships, plus the search that was decided. What a shelf has to beat.'],
+  ['flat', 'Chips only', 'A shelf shows on the card and filters the list. One pile; shelving is annotation.'],
+  ['inbox', 'Inbox + shelves', 'The claim: unshelved IS the pile. Shelving files a note OUT of the inbox.'],
+  ['grouped', 'Grouped', 'One list, sectioned by shelf, inbox first. Everything visible, nothing hidden.'],
+] as const;
+
+const SIZES = [
+  ['11', '11 — the sample'],
+  ['33', '33 — a pile gone untriaged'],
+  ['99', '99 — the room’s own threshold'],
+] as const;
+
+/**
+ * The vocabulary. PURPOSES, not topics — `philosophy` is the one that looks
+ * like a subject and is not: as a shelf it means *this is reading I keep*,
+ * where the subject `stoicism` means *this essay is about stoicism*. If that
+ * distinction will not hold in the hand, the whole axis is wrong and note `h`
+ * is where it breaks first.
+ */
+const SHELVES = [
+  ['applications', 'Applications'],
+  ['self', 'Notes to self'],
+  ['philosophy', 'Philosophy'],
+] as const;
+
+const variant = VARIANTS.find(([v]) => v === params.get('v'))?.[0] ?? 'inbox';
+const size = Number(SIZES.find(([v]) => v === params.get('n'))?.[0] ?? '11');
+/* Decided 2026-09-01 — a note may sit on two. The param spells the LOSER, so a
+   clean URL is the shipped behaviour and `?multi=off` is visibly the opt-out. */
+const multi = params.get('multi') !== 'off';
+const shelf = params.get('shelf') ?? '';
+/* Default ON — see the header. A search that only sees the inbox is broken, so
+   the shipped behaviour is the default and the defect is the thing you opt into. */
+const escapes = params.get('escape') !== 'off';
+const q = (params.get('q') ?? '').trim();
+const searching = q.length >= MIN_SEARCH;
+
+const shelved = variant !== 'none';
+
+/**
+ * The pile. `shelf` is the primary drawer, `also` the second one `multi`
+ * reveals. A note with neither is HOMELESS — deliberately several, because a
+ * sample where everything files neatly would prove nothing.
+ */
+const SEED = [
+  {
+    id: 'a',
+    ago: '11 minutes ago',
+    shelf: null,
+    also: null,
+    body: 'Ask the dentist about the night guard when they call back — and whether the old one can be re-fitted rather than remade.',
+  },
+  {
+    id: 'b',
+    ago: '40 minutes ago',
+    shelf: 'applications',
+    also: null,
+    body: `Cover letter, third paragraph — stop opening with "I have always been passionate about". Start with the thing I actually did and let it carry the claim.
+
+Draft: *In the last year I rebuilt a publishing system twice, and threw away the first one on purpose.*`,
+  },
+  {
+    id: 'c',
+    ago: '2 hours ago',
+    shelf: 'self',
+    also: null,
+    body: 'A room that shows the words is a different promise from a room that shows the titles.\n\nKeep that sentence.',
+  },
+  {
+    id: 'd',
+    ago: '5 hours ago',
+    shelf: null,
+    also: null,
+    body: 'The blue of the tiles outside the library at four in the afternoon. No idea what this is for.',
+  },
+  {
+    id: 'e',
+    ago: 'yesterday',
+    shelf: 'applications',
+    also: null,
+    body: `Questions to ask them, not the other way round:
+
+- what did the last person in this role find hardest
+- what gets decided without a meeting
+- when was the last time someone changed your mind about the roadmap
+
+If they cannot answer the third one, that is the answer.`,
+  },
+  {
+    id: 'f',
+    ago: 'yesterday',
+    shelf: 'philosophy',
+    also: null,
+    body: `The thing I keep circling: every tool I have ever liked was one that let me put something down without first deciding what it was. The ones I abandoned all asked a question at the door — which notebook, which project, which tag — and the question is never expensive on its own. It is expensive because it arrives at the exact moment the thought is least willing to sit still, and takes the whole of my attention to answer.
+
+So the test for anything I build here is not how good it is once you are inside it. It is what it costs to get in.`,
+  },
+  {
+    id: 'g',
+    ago: 'two days ago',
+    shelf: null,
+    also: null,
+    body: 'Reminder to book the car in before the end of the month. Not urgent, will become urgent.',
+  },
+  {
+    /* ⚠ THE DRIFT CASE. Reading he keeps (philosophy) that is also plainly a
+       note to himself. If the eye cannot put this in one drawer, single-valued
+       loses and the bill doubles — so it sits in the middle of the pile rather
+       than at the end, where it would be easy to skip. */
+    id: 'h',
+    ago: 'three days ago',
+    shelf: 'philosophy',
+    also: 'self',
+    body: `### What the check-in is actually for
+
+Not a mood tracker. A mood tracker asks you to rate a day, and a rating is a summary — by the time you can give one honestly the day has already been flattened into a number you will not recognise in a month.
+
+The check-in asks smaller questions and keeps the answers as words. The failure mode to watch is the form growing a field every time I notice something it did not capture. That is how a check-in becomes a chore, a chore gets skipped, and a skipped day is worth less than a shallow one.
+
+What it is really measuring is the shape I was in, not the amount of attention I spent. Which is a note to myself as much as it is an argument.`,
+  },
+  {
+    id: 'i',
+    ago: 'four days ago',
+    shelf: 'philosophy',
+    also: null,
+    body: `## Reading dump — attention, and why the observatory metaphor keeps holding
+
+Long one. Getting it down before it evaporates.
+
+### The claim I want to steal
+
+The book's argument is that attention is not a resource you spend but a **shape** you hold. You do not run out of it the way you run out of money; you lose the shape and then everything you look at afterwards is looked at with the wrong instrument. That is a much better account of what a bad day feels like than "I was tired." I was not tired. I was holding the wrong shape and every input got processed by it.
+
+### Where it argues with itself
+
+Two chapters later there is a long section on interruption that quietly reverts to the resource model — interruptions are described as costing you attention, with a recovery time, which is exactly the accounting the first half rejected. The resource model is simply easier to write policy with. You can say "protect two hours" and be understood. "Protect the shape" is true and unactionable.
+
+### The bit about instruments
+
+There is a lovely passage about an observatory — that the point of a telescope is not that it makes things bigger but that it makes a *specific* kind of seeing repeatable. Anyone can point at the sky and be impressed. The instrument is what lets you come back next week and know whether what you saw has moved.
+
+That is the whole argument for writing things down. A jotting is not a record of a thought. It is the second observation that makes the first one mean something, and you cannot make it without an instrument you trust enough to use badly.
+
+**Which is the actual test for this room**: can I use it badly. Not can I use it carefully.
+
+### What I take from it
+
+1. The end-of-day question should be about shape, not output.
+2. An instrument earns its place by being usable carelessly.
+3. Coming back to a thing is the observation; the first look is only a claim.
+4. Be suspicious of any framework whose final chapter is a resolution.`,
+  },
+  {
+    id: 'j',
+    ago: 'a week ago',
+    shelf: 'applications',
+    also: null,
+    body: 'Chase the recruiter. Second time. If nothing by Friday, assume no and stop refreshing.',
+  },
+  {
+    id: 'k',
+    ago: 'two weeks ago',
+    shelf: null,
+    also: null,
+    body: `An observatory is a promise about coming back, which is why the metaphor survives contact with the actual site. Every room in it should be judged on whether it rewards a second visit — not on how it looks the first time.`,
+  },
+] as const;
+
+const pile = Array.from({ length: size }, (_, i) => {
+  const seed = SEED[i % SEED.length];
+  return {
+    key: `${seed.id}-${i}`,
+    ago: seed.ago,
+    body: seed.body,
+    shelf: seed.shelf as string | null,
+    also: (multi ? seed.also : null) as string | null,
+    copy: i >= SEED.length,
+  };
+});
+
+/** Counts for the segment row — over the WHOLE pile, never the filtered slice,
+    so pressing a shelf can never change the numbers beside the other shelves. */
+const shelfCount = (slug: string) => pile.filter((n) => n.shelf === slug || n.also === slug).length;
+const inboxCount = pile.filter((n) => !n.shelf && !n.also).length;
+/* ⚠ THIS IS THE FIRST PAINT OF THE INBOX BADGE AND NOTHING MORE. The corpus
+   counts moved to `draw()` when filing went live — the reader's own filing is
+   in `localStorage`, which the server cannot see, so a number computed here
+   would be right exactly until the first press. The client owns the shelves,
+   so the client owns every count of them. */
+
+const searched = pile.filter((n) => !searching || hasMatch(n.body, q));
+
+/**
+ * What the list holds under each proposition — the ONE place the four differ,
+ * so no variant can be a prettier copy of another (the /lab/chrome rule).
+ *
+ * ⚠ `inbox` IS THE ONLY ONE THAT HIDES ANYTHING, which is the whole claim. With
+ * no shelf pressed it shows the unshelved notes and nothing else: the pile is
+ * the queue again. `flat` and `grouped` both keep every note on screen, which
+ * is safer and — if the claim is right — is exactly why they will feel like
+ * they changed nothing.
+ */
+/* ⚠ THE INBOX STANDS DOWN FOR A LIVE TERM. `escaped` is true only when the
+   default is what would have hidden the hits — a pressed shelf is a choice and
+   is never overridden, which is why `shelf` is tested first. */
+const escaped = variant === 'inbox' && !shelf && searching && escapes;
+
+const render = (n: (typeof pile)[number]) => {
+  const long = n.body.split('\n').length > 10 || n.body.length > 700;
+  return {
+    ...n,
+    long,
+    clamped: long && !searching,
+    html: searching ? '' : renderMarkdown(n.body, { breaks: true }),
+    ex: searching ? excerpts(toPlain(n.body), q) : null,
+  };
+};
+
+/**
+ * ⚠ THE SERVER RENDERS EVERY MATCH AND HIDES NONE OF THEM BY SHELF — added
+ * 2026-09-01, when filing became real, and it is a seam rather than a
+ * simplification.
+ *
+ *   the SERVER owns SEARCH   — it needs `hasMatch`, `toPlain` and `excerpts`,
+ *                              and it is where the query would run when shipped.
+ *   the CLIENT owns the SHELF — because filing has to be instant. A file that
+ *                              cost a round trip would make the bench feel
+ *                              expensive in a way the real action (an optimistic
+ *                              write with an undo strip, like delete already is)
+ *                              would not, and it would answer *"does filing feel
+ *                              cheap"* with the bench's own latency.
+ *
+ * Two different questions, one owner each, so neither rule is written twice.
+ * The cost is that the pile is hidden until the first client render — see
+ * `[data-sh-pending]` in the stylesheet, and ADR 0038 (a private admin surface
+ * may require JavaScript).
+ */
+const rows = searched.map(render);
+
+/**
+ * `grouped` renders its sections ALWAYS, empty ones included, because the client
+ * moves cards between them as they are filed and cannot append to a section the
+ * server decided not to print. Emptiness is hidden at render time instead.
+ *
+ * ⚠ A CARD IS PLACED BY ITS PRIMARY SHELF ONLY, and with `multi` on that is a
+ * real limitation rather than a shortcut: a note in two drawers can only be
+ * sectioned under one of them. Which is itself an argument on the open
+ * question — `grouped` and multi-valued shelves cannot both be had honestly,
+ * because the alternative is printing the same thought twice under two headings
+ * and letting the reader work out it is one note.
+ */
+const groups =
+  variant === 'grouped' && !shelf
+    ? [{ slug: '', label: 'Inbox' }, ...SHELVES.map(([slug, label]) => ({ slug, label }))]
+    : [{ slug: '', label: '' }];
+
+const groupOf = (n: (typeof rows)[number]) => (variant === 'grouped' && !shelf ? (n.shelf ?? '') : '');
+---
+
+<Base title="Shelves — the notes bench">
+  {
+    /* The view state the client needs to decide visibility, handed down rather
+      than re-parsed from `location.search` — one owner for what mode we are in.
+      `data-sh-pending` hides the pile until the first render (see the note by
+      `rows`); the script clears it. */
+  }
+  <div
+    class="sh"
+    data-sh-root
+    data-variant={variant}
+    data-shelf={shelf}
+    data-escaped={escaped ? '1' : ''}
+    data-multi={multi ? '1' : ''}
+    data-searching={searching ? '1' : ''}
+    data-sh-pending
+  >
+    <header class="sh__head">
+      <h1>Buckets for the pile — four propositions</h1>
+      <p>
+        The easy half is a chip on a card. The half worth benching is whether <em>filing is triage</em> — whether unshelved
+        can be the inbox, so the pile becomes a queue you can empty instead of a list that only grows.
+      </p>
+    </header>
+
+    <div class="sh__bar">
+      {
+        /* ⚠ ONE STRIP, BOTH CONTROLS, and that adjacency is deliberate rather
+          than tidy: /lab/search settled the search rendering alone, and the
+          question neither bench can ask by itself is whether a shelf filter and
+          a search box in the same strip fight each other. Search is the wider
+          net; the shelves narrow it. If pressing a shelf while a term is live
+          reads as ambiguous, that is a finding this layout is here to surface. */
+      }
+      <label class="search search--w">
+        <span class="sh__mag" aria-hidden="true">⌕</span>
+        <input type="search" data-sh-q value={q} placeholder="Search the pile…" aria-label="Search the pile" />
+      </label>
+
+      {
+        shelved && (
+          <div class="seg sh__seg" role="radiogroup" aria-label="Filter by shelf">
+            {/* The manager's own segmented control, not a lookalike. With four
+                options a combobox (`SubjectFilter`) would be the wrong import —
+                that exists for 22 subjects, and FILTER_THRESHOLD's reasoning
+                says a box over a handful is furniture. */}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!shelf}
+              class:list={['type-badge', !shelf && 'is-active']}
+              data-sh-shelf=""
+            >
+              {variant === 'inbox' ? 'Inbox' : 'All'}{' '}
+              <span class="type-badge__n">{variant === 'inbox' ? inboxCount : pile.length}</span>
+            </button>
+            {SHELVES.map(([slug, label]) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={shelf === slug}
+                class:list={['type-badge', shelf === slug && 'is-active']}
+                data-sh-shelf={slug}
+              >
+                {label} <span class="type-badge__n">{shelfCount(slug)}</span>
+              </button>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        escaped && (
+          <p class="sh__escaped">Searching the whole pile — the inbox filter stands down while a term is live.</p>
+        )
+      }
+
+      <p class="sh__stat" data-sh-stat aria-live="polite"></p>
+    </div>
+
+    {
+      rows.length === 0 ? (
+        <p class="sh__none">Nothing matches “{q}”.</p>
+      ) : (
+        groups.map((g) => (
+          <section class="sh__group" data-section={g.slug}>
+            {g.label && (
+              <h2 class="sh__grouphead">
+                {g.label} <span class="sh__groupn" data-groupn />
+              </h2>
+            )}
+            <ul class="sh__pile" data-group={g.slug}>
+              {rows
+                .filter((n) => groupOf(n) === g.slug)
+                .map((n) => (
+                  <li class="dump" data-key={n.key} data-seed={n.shelf ?? ''} data-seed-also={n.also ?? ''}>
+                    {n.ex ? (
+                      <div class="dump__text sh__ex" data-text>
+                        {n.ex.windows.map((w) => (
+                          <p class="sh__win">
+                            {w.lead && '… '}
+                            <Highlighted segs={w.segs} />
+                            {w.trail && ' …'}
+                          </p>
+                        ))}
+                        {n.ex.more > 0 && (
+                          <p class="sh__more">
+                            +{n.ex.more} more match{n.ex.more === 1 ? '' : 'es'}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        class:list={['dump__text', 'reading', 'jot-prose', n.clamped && 'dump__text--clamped']}
+                        data-text
+                        set:html={n.html}
+                      />
+                    )}
+
+                    <div class="dump__foot">
+                      <span class="dump__when">
+                        <span class="sh__clock" aria-hidden="true">
+                          ◔
+                        </span>
+                        <span class="dump__stamp">{n.ago}</span>
+                      </span>
+
+                      {/* ⚠ THE CHIP IS IN THE FOOT, NOT OVER THE WORDS. The room's
+                          founding rule is that a card is its text — *"no title, no
+                          slug, no type mark"* — so a shelf has to be metadata
+                          sitting with the timestamp, not a header that pushes the
+                          thought down the card.
+
+                          ⚠ AND IT IS WRITTEN BY THE CLIENT, not printed here. The
+                          chip has to change the instant a note is filed, so the
+                          markup that draws it lives in one place and that place is
+                          the one that can redraw it. */}
+                      <span class="sh__chips" data-chips />
+                      {n.copy && <span class="sh__copy">copy</span>}
+
+                      {/* THREE CONTROLS, UNCHANGED (14 · Piece 2). Filing is the
+                          FIFTH DESTINATION inside the → chooser, not a fourth
+                          glyph out here — the chooser already holds the other
+                          four, and a shelf is one more answer to the one question
+                          it asks. ✎ and 🗑 stay inert; → is live. */}
+                      <span class="dump__act" aria-hidden="true">
+                        ✎
+                      </span>
+                      <button
+                        type="button"
+                        class="dump__act"
+                        data-file
+                        popovertarget="sh-file"
+                        title="Turn it into…"
+                        aria-label="Turn it into"
+                      >
+                        →
+                      </button>
+                      <span class="dump__act" aria-hidden="true">
+                        🗑
+                      </span>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </section>
+        ))
+      )
+    }
+
+    <p class="sh__none" data-sh-empty hidden></p>
+
+    <hr class="sh__rule" />
+    <h2 class="sh__h2">What this bench cannot tell you</h2>
+    <p class="sh__note">
+      <strong>Whether you will file at the door.</strong> You can file here, and that is the half worth having — but you are
+      filing while <em>looking at the pile</em>, which is the easy case. In the room a thought arrives at the ✚,
+      mid-sentence, and the question is whether filing is cheap enough to do <em>then</em>. If it is not, everything
+      lands unshelved and the inbox is where it stays, whatever this page looks like. That is a
+      <a class="sh__link" href="/lab/capture">/lab/capture</a> question, and it is the one that decides whether any of this
+      pays.
+    </p>
+    <p class="sh__note">
+      <strong>Whether a shelf survives being wrong.</strong> Everything here was filed by you, just now, with the whole sample
+      in front of you. Nothing tests what a drawer feels like six weeks later, when you have forgotten which one you chose
+      and the search box is how you find it anyway — which, if it happens, is the finding that the shelves were never the
+      feature and the search always was.
+    </p>
+    <p class="sh__note">
+      <strong>Whether the vocabulary survives.</strong> Three shelves is a bench, and multi-valued shelves make eleven likelier
+      rather than less likely — a drawer you can put a note in <em>as well</em> is easier to add than one you must choose
+      <em>instead</em>. The question is what happens at eleven, when a shelf stops being a drawer and becomes a tag — at
+      which point this is the subject taxonomy again, on a private axis, and the argument for it being cheap has gone.
+    </p>
+  </div>
+
+  {
+    /* THE CHOOSER — one for the whole pile, anchored against whichever card's →
+      opened it, exactly as the room does it (`scripts/pop-anchor.ts`).
+
+      ⚠ A TOP-LAYER POPOVER, and it has to be (notes.astro, trap 7): a menu
+      anchored inside a card would be clipped or covered. `popover="auto"` also
+      hands Escape, light-dismiss and one-open-at-a-time to the browser.
+
+      ⚠ THE FOUR REAL EXITS ARE PRINTED AND DISABLED, which is the only way the
+      question gets asked properly. What is being judged is not whether a shelf
+      menu works — it is whether **on a shelf** reads as a peer of **make a
+      piece**, or as a way of not deciding. You cannot see that in a menu that
+      contains only the new thing. */
+  }
+  <div class="pop pop--wide sh-pop" popover id="sh-file" data-sh-pop>
+    <p class="sh-pop__head">Put it on a shelf</p>
+    {
+      SHELVES.map(([slug, label]) => (
+        <button type="button" class="pop__row" data-pick={slug}>
+          {label}
+          <span class="pop__tick" aria-hidden="true">
+            ✓
+          </span>
+        </button>
+      ))
+    }
+    <button type="button" class="pop__row sh-pop__off" data-pick="">Take it off the shelf</button>
+
+    <p class="sh-pop__head sh-pop__head--dim">…or send it somewhere, as today</p>
+    <button type="button" class="pop__row" disabled>Add to the Agenda…</button>
+    <button type="button" class="pop__row" disabled>Log an entry…</button>
+    <button type="button" class="pop__row" disabled>Make a quote…</button>
+    <button type="button" class="pop__row" disabled>Make a piece</button>
+  </div>
+
+  {
+    /* The room's own undo strip, and it appears only when filing makes the card
+      LEAVE — under `inbox`, which is the whole claim. In `flat` and `grouped`
+      nothing vanishes, so a strip there would be an apology for something that
+      did not happen. */
+  }
+  <div id="sh-undo" class="undo-bar" role="status" aria-live="polite">
+    <span data-undo-text></span>
+    <button type="button" class="btn btn-xs font-sans" data-undo-do>Undo</button>
+  </div>
+
+  <details class="sh-panel" open>
+    <summary class="sh-panel__summary">bench</summary>
+    <form class="sh-panel__form" data-sh-panel aria-label="Bench controls">
+      <fieldset class="sh-panel__set">
+        <legend class="sh-panel__legend">the proposition</legend>
+        {
+          VARIANTS.map(([value, label, claim]) => (
+            <label class="sh-panel__row" title={claim}>
+              <input type="radio" name="v" value={value} checked={value === variant} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="sh-panel__set">
+        <legend class="sh-panel__legend">how many notes</legend>
+        {
+          SIZES.map(([value, label]) => (
+            <label class="sh-panel__row">
+              <input type="radio" name="n" value={value} checked={Number(value) === size} />
+              {label}
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="sh-panel__set">
+        <legend class="sh-panel__legend">decided — the losers</legend>
+        <label class="sh-panel__row">
+          <input type="checkbox" name="multi" checked={multi} />
+          a note may sit on two
+        </label>
+        <label class="sh-panel__row">
+          <input type="checkbox" name="escape" checked={escapes} />
+          search escapes the inbox
+        </label>
+      </fieldset>
+
+      {
+        /* ⚠ FILING PERSISTS ACROSS THE BENCH'S OWN RELOADS (`localStorage`),
+          because every control in this panel navigates — without it, changing
+          proposition would silently undo the filing you did to judge it. Which
+          also means the sample can drift a long way from the one the header
+          describes, so the way back is a control rather than a paragraph. */
+      }
+      <fieldset class="sh-panel__set">
+        <legend class="sh-panel__legend">your filing</legend>
+        <p class="sh-panel__note" data-sh-filed></p>
+        <button type="button" class="sh-panel__reset" data-sh-reset>put the sample back</button>
+      </fieldset>
+    </form>
+  </details>
+
+  <BackToTop />
+</Base>
+
+<style>
+  .sh {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 6rem;
+  }
+  .sh__head h1 {
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    line-height: 1.25;
+  }
+  .sh__head p,
+  .sh__note {
+    color: var(--text-muted);
+    font-family: var(--font-serif);
+    line-height: 1.65;
+    margin-top: 0.75rem;
+  }
+  .sh__bar {
+    margin: 2rem 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .sh__mag {
+    opacity: 0.45;
+    flex-shrink: 0;
+  }
+  .sh__seg {
+    flex-wrap: wrap;
+  }
+  /* ⚠ `.type-badge` CAPITALISES, and it is right to: it was built for the
+     manager's type segments, whose words come out of a Postgres enum in
+     lowercase (`writing`, `quote`). A shelf label is an authored phrase, so the
+     same rule turns "Notes to self" into "Notes To Self". Overridden here
+     rather than in admin.css — the enum's need is real and still the default. */
+  .sh__seg .type-badge {
+    text-transform: none;
+  }
+  /* The pile is the client's to show — see the note beside `rows`. Hidden, not
+     `display:none`, so the page does not reflow when it appears. */
+  .sh[data-sh-pending] .sh__group,
+  .sh[data-sh-pending] .sh__stat {
+    visibility: hidden;
+  }
+  .sh__chips {
+    display: contents;
+  }
+  .sh-pop {
+    /* `.pop__row.is-on` mixes against `--cn`, the constellation colour a sky
+       menu sets. Nothing sets it here, so the shelf rows would land on an
+       invalid `color-mix` and show no selected state at all. */
+    --cn: var(--color-primary);
+  }
+  .sh-pop__head {
+    font-family: var(--font-serif);
+    font-size: 0.78rem;
+    letter-spacing: 0.07em;
+    font-variant: all-small-caps;
+    color: var(--text-whisper);
+    padding: 0.35rem 0.5rem 0.15rem;
+  }
+  .sh-pop__head--dim {
+    border-top: 1px solid var(--color-base-300);
+    margin-top: 0.35rem;
+    padding-top: 0.5rem;
+  }
+  .sh-pop__off {
+    color: var(--text-muted);
+  }
+  .pop__row[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .sh-panel__note {
+    color: var(--text-whisper);
+    line-height: 1.5;
+  }
+  .sh-panel__reset {
+    align-self: flex-start;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    padding: 0.1rem 0.6rem;
+    cursor: pointer;
+    background: none;
+  }
+  .sh-panel__reset:hover {
+    background: var(--color-base-200);
+  }
+  .sh__link {
+    color: var(--color-primary);
+  }
+  .sh__link:hover {
+    text-decoration: underline;
+  }
+  .sh__escaped {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .sh__stat {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--text-whisper);
+    min-height: 1.2em;
+  }
+  /* The two numbers that can refute the claim get the loud ink. */
+  .sh__stat strong {
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+  .sh__group + .sh__group {
+    margin-top: 2rem;
+  }
+  .sh__grouphead {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+  }
+  .sh__groupn {
+    color: var(--text-whisper);
+  }
+  .sh__pile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .sh__none {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+  }
+  .sh__ex {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+  .sh__win + .sh__win {
+    margin-top: 0.2rem;
+  }
+  .sh__more {
+    color: var(--text-whisper);
+    margin-top: 0.3rem;
+  }
+  .sh__clock {
+    opacity: 0.5;
+  }
+  /* The chip borrows the timestamp's weight, not the accent's: a shelf is where
+     a thought lives, which is a quieter fact than what the thought says. */
+  .sh__chip {
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    background: var(--color-base-200);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+  }
+  .sh__chip--none {
+    background: none;
+    border: 1px dashed var(--color-base-300);
+    color: var(--text-whisper);
+  }
+  .sh__copy {
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--text-whisper);
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+  }
+  .dump__act {
+    cursor: default;
+  }
+  .sh__rule {
+    border: 0;
+    border-top: 1px solid var(--color-base-300);
+    margin: 3rem 0 1.5rem;
+  }
+  .sh__h2 {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+  }
+
+  .sh-panel {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 50;
+    width: min(19rem, calc(100vw - 2rem));
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+  .sh-panel__summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.95rem;
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    color: var(--text-whisper);
+    user-select: none;
+  }
+  .sh-panel__summary::-webkit-details-marker {
+    display: none;
+  }
+  .sh-panel__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem 0.95rem 0.85rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+  .sh-panel__set {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 0;
+    padding: 0;
+  }
+  .sh-panel__legend {
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    color: var(--text-whisper);
+  }
+  .sh-panel__row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    line-height: 1.5;
+  }
+</style>
+
+<script>
+  /* `Base` does not opt into view transitions, so every change is a real
+     document load and this module runs fresh each time — no `astro:page-load`. */
+  import { MIN_SEARCH } from '../../lib/search-highlight';
+  // The room's own popover placement, not a second copy of it.
+  import { anchorPopover } from '../../scripts/pop-anchor';
+
+  const panel = document.querySelector<HTMLFormElement>('[data-sh-panel]');
+  const box = document.querySelector<HTMLInputElement>('[data-sh-q]');
+  const stat = document.querySelector<HTMLElement>('[data-sh-stat]');
+
+  function go(mutate: (p: URLSearchParams) => void) {
+    const p = new URLSearchParams(location.search);
+    mutate(p);
+    location.assign(`${location.pathname}?${p}`);
+  }
+
+  panel?.addEventListener('change', () => {
+    const data = new FormData(panel);
+    go((p) => {
+      p.set('v', String(data.get('v') ?? 'inbox'));
+      p.set('n', String(data.get('n') ?? '11'));
+      if (data.get('multi') !== null) p.delete('multi');
+      else p.set('multi', 'off');
+      // The param spells the DEFECT, the checkbox spells the behaviour — so the
+      // clean URL is the correct one and `?escape=off` is visibly an opt-in.
+      if (data.get('escape') !== null) p.delete('escape');
+      else p.set('escape', 'off');
+      // ⚠ THE SHELF IS DROPPED ON EVERY PANEL CHANGE, deliberately. `flat` and
+      // `grouped` show a shelf that `none` has no control for, so carrying the
+      // selection into the control variant would filter the pile by something
+      // the reader can no longer see or clear.
+      p.delete('shelf');
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-sh-shelf]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const slug = b.dataset.shShelf ?? '';
+      go((p) => (slug ? p.set('shelf', slug) : p.delete('shelf')));
+    });
+  });
+
+  /* The same `MIN_SEARCH` comparison the shipped clients make (docs/search.md
+     §3): below it the term never reaches the URL. */
+  const effective = (raw: string) => (raw.trim().length >= MIN_SEARCH ? raw.trim() : '');
+  let last = effective(box?.value ?? '');
+  let timer = 0;
+
+  box?.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const next = effective(box.value);
+      if (next === last) return;
+      last = next;
+      go((p) => (next ? p.set('q', next) : p.delete('q')));
+    }, 260);
+  });
+
+  if (box?.value) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+
+  /* ══ FILING ══════════════════════════════════════════════════════════════
+     The half /lab/shelves was missing until 2026-09-01: the shelves were
+     assigned by me in advance and every card was inert, so the page could show
+     you what a filed pile LOOKS like and not what filing FEELS like — which is
+     the only half that decides anything.
+
+     ⚠ NOTHING IS WRITTEN TO THE DATABASE, and there is nothing it could be
+     written to: no migration has been applied and none should be until the
+     shape is settled. An override lives in `localStorage`, keyed by the card,
+     and `put the sample back` clears it. */
+  const STORE = 'lab.shelves.v1';
+  const root = document.querySelector<HTMLElement>('[data-sh-root]')!;
+  const variant = root.dataset.variant ?? 'inbox';
+  const pressed = root.dataset.shelf ?? '';
+  const escapedView = root.dataset.escaped === '1';
+  const isMulti = root.dataset.multi === '1';
+
+  type Store = Record<string, string[]>;
+  const load = (): Store => {
+    try {
+      return JSON.parse(localStorage.getItem(STORE) ?? '{}') as Store;
+    } catch {
+      return {}; // a corrupt value is not worth a broken bench
+    }
+  };
+  let store = load();
+  const save = () => localStorage.setItem(STORE, JSON.stringify(store));
+
+  const cards = [...document.querySelectorAll<HTMLElement>('.dump')];
+  const LABEL = new Map<string, string>(
+    [...document.querySelectorAll<HTMLElement>('[data-pick]')]
+      .filter((b) => b.dataset.pick)
+      .map((b) => [b.dataset.pick!, (b.childNodes[0]?.textContent ?? '').trim()]),
+  );
+
+  /** A card's shelves: the reader's filing if there is any, else the sample's. */
+  function shelvesOf(card: HTMLElement): string[] {
+    const own = store[card.dataset.key!];
+    if (own) return own;
+    return [card.dataset.seed, card.dataset.seedAlso].filter((v): v is string => !!v);
+  }
+
+  /** The one visibility rule — the client's copy is the ONLY copy (see `rows`). */
+  function isVisible(list: string[]): boolean {
+    if (variant === 'none') return true;
+    if (pressed) return list.includes(pressed);
+    if (variant === 'inbox' && !escapedView) return list.length === 0;
+    return true;
+  }
+
+  function draw() {
+    let onScreen = 0;
+    let homeless = 0;
+    let onTwo = 0;
+
+    for (const card of cards) {
+      const list = shelvesOf(card);
+      if (!list.length) homeless++;
+      if (list.length > 1) onTwo++;
+
+      // the chip(s)
+      const slot = card.querySelector<HTMLElement>('[data-chips]')!;
+      slot.textContent = '';
+      if (variant === 'none') {
+        // nothing — the control proposition has no shelves at all
+      } else if (list.length) {
+        for (const sl of list) {
+          const chip = document.createElement('span');
+          chip.className = 'sh__chip';
+          chip.dataset.chip = '';
+          chip.textContent = LABEL.get(sl) ?? sl;
+          slot.append(chip);
+        }
+      } else {
+        const chip = document.createElement('span');
+        chip.className = 'sh__chip sh__chip--none';
+        chip.dataset.homeless = '';
+        chip.textContent = 'unshelved';
+        slot.append(chip);
+      }
+
+      const show = isVisible(list);
+      card.hidden = !show;
+      if (show) onScreen++;
+
+      // `grouped` re-sections a card the moment it is filed. Primary shelf only
+      // — see the note on `groups` for why that is a finding and not a bug.
+      if (variant === 'grouped' && !pressed) {
+        const want = document.querySelector<HTMLElement>(`[data-group="${list[0] ?? ''}"]`);
+        if (want && card.parentElement !== want) want.append(card);
+      }
+    }
+
+    // the segment counts, over the WHOLE pile — pressing a shelf must never
+    // change the number beside another one.
+    for (const btn of document.querySelectorAll<HTMLElement>('[data-sh-shelf]')) {
+      const slug = btn.dataset.shShelf ?? '';
+      const n = btn.querySelector('.type-badge__n');
+      if (!n) continue;
+      n.textContent = String(
+        slug ? cards.filter((c) => shelvesOf(c).includes(slug)).length : variant === 'inbox' ? homeless : cards.length,
+      );
+    }
+
+    // group headings hide when their section empties
+    for (const sec of document.querySelectorAll<HTMLElement>('.sh__group')) {
+      const live = [...sec.querySelectorAll<HTMLElement>('.dump')].filter((c) => !c.hidden).length;
+      sec.hidden = live === 0;
+      const n = sec.querySelector<HTMLElement>('[data-groupn]');
+      if (n) n.textContent = String(live);
+    }
+
+    const empty = document.querySelector<HTMLElement>('[data-sh-empty]');
+    if (empty) {
+      empty.hidden = onScreen > 0 || !cards.length;
+      empty.textContent = pressed ? 'Nothing on this shelf.' : 'Inbox empty — everything here is filed.';
+    }
+
+    const filed = Object.keys(store).length;
+    const note = document.querySelector<HTMLElement>('[data-sh-filed]');
+    if (note)
+      note.textContent = filed
+        ? `${filed} note${filed === 1 ? '' : 's'} refiled by you`
+        : 'none yet — the sample as written';
+
+    measure(onScreen, homeless, onTwo);
+    root.removeAttribute('data-sh-pending');
+  }
+
+  /* ── the chooser ──────────────────────────────────────────────────────── */
+  const pop = document.querySelector<HTMLElement>('[data-sh-pop]');
+  let target: HTMLElement | null = null;
+
+  for (const btn of document.querySelectorAll<HTMLElement>('[data-file]')) {
+    btn.addEventListener('click', () => {
+      target = btn.closest<HTMLElement>('.dump');
+      if (!pop || !target) return;
+      // Tick what it is already on, so the menu says where the note lives
+      // before it offers to move it.
+      const on = shelvesOf(target);
+      for (const row of pop.querySelectorAll<HTMLElement>('[data-pick]')) {
+        row.classList.toggle('is-on', !!row.dataset.pick && on.includes(row.dataset.pick));
+      }
+      pop.querySelector<HTMLElement>('.sh-pop__off')!.hidden = on.length === 0;
+    });
+  }
+  if (pop) anchorPopover(pop, () => target?.querySelector<HTMLElement>('[data-file]'));
+
+  for (const row of document.querySelectorAll<HTMLElement>('[data-pick]')) {
+    row.addEventListener('click', () => {
+      if (!target) return;
+      const card = target;
+      const slug = row.dataset.pick ?? '';
+      const before = shelvesOf(card);
+
+      let next: string[];
+      if (!slug) next = [];
+      else if (!isMulti) next = [slug];
+      else if (before.includes(slug)) next = before.filter((x) => x !== slug);
+      // ⚠ TWO IS THE CAP, not an arbitrary one: the open question is whether a
+      // note needs a SECOND drawer, and a third would be answering a question
+      // nobody asked. A pick past the cap replaces the older of the two.
+      else next = before.length >= 2 ? [before[1], slug] : [...before, slug];
+
+      store[card.dataset.key!] = next;
+      save();
+
+      const wasVisible = !card.hidden;
+      const nowVisible = isVisible(next);
+      if (wasVisible && !nowVisible) {
+        // It leaves. Say what happened and offer the way back — the room's own
+        // strip, because filing out of the inbox is exactly as reversible as a
+        // delete and should cost the same to undo.
+        card.classList.add('dump--going');
+        const where = next.length ? (LABEL.get(next[0]) ?? next[0]) : 'the inbox';
+        showUndo(next.length ? `Filed under ${where}.` : 'Back in the inbox.', card, before);
+        window.setTimeout(() => {
+          card.classList.remove('dump--going');
+          draw();
+        }, 220);
+      } else {
+        draw();
+      }
+      pop?.hidePopover();
+    });
+  }
+
+  /* ── the undo strip ───────────────────────────────────────────────────── */
+  const undoBar = document.getElementById('sh-undo');
+  const undoText = undoBar?.querySelector<HTMLElement>('[data-undo-text]');
+  const undoBtn = undoBar?.querySelector<HTMLButtonElement>('[data-undo-do]');
+  let undoTimer = 0;
+  let pending: { card: HTMLElement; before: string[] } | null = null;
+
+  function showUndo(text: string, card: HTMLElement, before: string[]) {
+    if (!undoBar || !undoText) return;
+    window.clearTimeout(undoTimer);
+    pending = { card, before };
+    undoText.textContent = text;
+    undoBar.classList.add('is-visible');
+    undoTimer = window.setTimeout(() => undoBar.classList.remove('is-visible'), 8000);
+  }
+
+  undoBtn?.addEventListener('click', () => {
+    if (!pending) return;
+    const { card, before } = pending;
+    // Back to whatever it was — including "no override at all", so undoing the
+    // first filing of a note leaves the sample genuinely untouched.
+    const seed = [card.dataset.seed, card.dataset.seedAlso].filter(Boolean);
+    if (before.join() === seed.join()) delete store[card.dataset.key!];
+    else store[card.dataset.key!] = before;
+    save();
+    pending = null;
+    undoBar?.classList.remove('is-visible');
+    draw();
+  });
+
+  document.querySelector<HTMLElement>('[data-sh-reset]')?.addEventListener('click', () => {
+    store = {};
+    localStorage.removeItem(STORE);
+    draw();
+  });
+
+  /**
+   * The measurement. Two of these numbers are the ones that can REFUTE the
+   * claim, so they are rendered in the accent and the others are not:
+   *
+   *   homeless — notes on no shelf. If this stays high as the pile grows, the
+   *              inbox never empties and shelving changed nothing (failure 1).
+   *   on two   — notes needing a second drawer. If this is more than a rounding
+   *              error, single-valued is the wrong bill (failure 2).
+   */
+  function measure(shown: number, homeless: number, onTwo: number) {
+    if (!stat) return;
+    /* ⚠ COUNTED OVER THE WHOLE PILE BY `draw()`, never off the rendered cards.
+       This was a real bug for one revision: read from the DOM, "needing two
+       drawers" measured 0 under `inbox`, because the double-shelved note is
+       hidden there BY DEFINITION — so the number quietly flattered the cheap
+       schema it exists to challenge. It was a server value until filing became
+       live; now the client owns the shelves, so the client owns the count. */
+    const parts = [`${shown} card${shown === 1 ? '' : 's'} on screen`];
+    // Windows ARE a render fact, so this one is still counted from the DOM —
+    // and only the visible cards' windows, which is what "on screen" means.
+    const windows = [...document.querySelectorAll<HTMLElement>('.dump')]
+      .filter((c) => !c.hidden)
+      .reduce((sum, c) => sum + c.querySelectorAll('.sh__win').length, 0);
+    if (windows) parts.push(`${windows} excerpt window${windows === 1 ? '' : 's'}`);
+
+    stat.innerHTML = '';
+    stat.append(parts.join(' · '));
+    if (homeless) {
+      stat.append(' · ');
+      const b = document.createElement('strong');
+      b.textContent = `${homeless} unshelved in the pile`;
+      stat.append(b);
+    }
+    if (onTwo) {
+      stat.append(' · ');
+      const b = document.createElement('strong');
+      b.textContent = `${onTwo} needing two drawers`;
+      stat.append(b);
+    }
+  }
+
+  draw();
+</script>
