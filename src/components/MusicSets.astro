@@ -466,12 +466,36 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
      point — ADR 0022: *"hover is not a weaker signal on touch, it is an absent
      one."* On a phone this lands on the sentence nearest the reading line; on a
      pointer device, under the cursor. One rule serves both because the script
-     already decided which input to consult. `.is-open` joins it because the set
-     you took should read as attended to for as long as it is open. */
+     already decided which input to consult. */
   .set-line.is-focus,
-  .set-line:focus-visible,
-  .set-line.is-open {
+  .set-line:focus-visible {
     color: var(--color-primary);
+  }
+
+  /* ⚠ AND `.is-open` IS THE SAME TREATMENT ABOVE `md` ONLY, which is a fix
+     rather than a flourish. Measured 2026-09-02 under the TOUCH model, on a cold
+     `/listening`: **two stars were lit at once and one of them never moved.**
+     `resolveSet` falls back to the first set when the URL names none, so that
+     row was `.is-open` — permanently glowing, for a set nobody chose — while the
+     proximity mark travelled down the list beside it.
+
+     That defeats the one guarantee `focusTracker` makes in its own words —
+     *"marks exactly one of `els`, never two, which is the point"* — and it is
+     ADR 0022's own failure mode restated: on touch the only dynamic thing on
+     the page was teaching *"everything here glows"* rather than *"this one
+     opens."*
+
+     ⚠ THE ASYMMETRY IS HONEST RATHER THAN CONVENIENT, and it is the same
+     input-conditional reasoning ADR 0022 legitimised. Above `md` the pane sits
+     beside the index and is ALWAYS showing a set, so marking which one is true.
+     Below `md` the index is only ever seen with the sheet SHUT, and with the
+     sheet shut nothing is open — so marking one is a claim about state that is
+     not the case. Same markup, two truths, because the two layouts genuinely
+     differ about what "open" means. */
+  @media (min-width: 768px) {
+    .set-line.is-open {
+      color: var(--color-primary);
+    }
   }
 
   /* ── the mark ──────────────────────────────────────────────────────────────
@@ -514,14 +538,21 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
     transition: filter 0.4s ease;
   }
   .set-line.is-focus .set-star,
-  .set-line:focus-visible .set-star,
-  .set-line.is-open .set-star {
+  .set-line:focus-visible .set-star {
     opacity: 1;
   }
   .set-line.is-focus :global(.star-mark),
-  .set-line:focus-visible :global(.star-mark),
-  .set-line.is-open :global(.star-mark) {
+  .set-line:focus-visible :global(.star-mark) {
     filter: drop-shadow(0 0 9px color-mix(in oklab, var(--color-primary) 70%, transparent));
+  }
+  /* The open set's mark, above `md` only — see the note on its colour. */
+  @media (min-width: 768px) {
+    .set-line.is-open .set-star {
+      opacity: 1;
+    }
+    .set-line.is-open :global(.star-mark) {
+      filter: drop-shadow(0 0 9px color-mix(in oklab, var(--color-primary) 70%, transparent));
+    }
   }
 
   /* ⚠ NO `star-breathe`, AND THE OMISSION IS DELIBERATE. The Sky's stars breathe

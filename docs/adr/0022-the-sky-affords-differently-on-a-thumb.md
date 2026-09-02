@@ -68,7 +68,10 @@ openable stanzas have a word for it to warm, warming every stanza is no longer
 a claim about what opens.
 
 It lives in `app.css` ("The overview's stars" / "The Sky"), `index.astro`,
-`ConstellationSuite.astro`, and `scripts/focus-mode.ts`.
+`ConstellationSuite.astro`, and `scripts/focus-mode.ts` — and, since 2026-09-02,
+in `MusicSets.astro` and `scripts/music-sets.ts`, which is why the title's "the
+Sky" now understates the scope. Kept as written: the decision was about the Sky
+and the widening belongs in Consequences, not in a retitled record.
 
 ## Consequences
 
@@ -76,6 +79,23 @@ It lives in `app.css` ("The overview's stars" / "The Sky"), `index.astro`,
   device**, which is a new class of thing to get wrong. The guard is that the
   split is expressed once, in `focusTracker`, rather than as `@media (hover)`
   scattered through `app.css`.
+- **And it is no longer the only one** *(added 2026-09-02)*. `/listening`'s set
+  index adopted `focusTracker` when its own affordance question was ruled on —
+  the sentences rested at 57% alpha with no hue, which is the disabled
+  convention, and their only affordance was a `:hover` rule. **That is this
+  ADR's finding arriving a second time, on a room built a fortnight after it
+  was written**, which says the record was not reaching the person adding the
+  next index. The guard held where it mattered: the split is still expressed
+  once, and the second adopter imported `focusTracker` rather than growing its
+  own `@media (hover)`.
+  ⚠ **It also found a failure mode this ADR did not anticipate.** A surface with
+  a PERSISTENT selection has one more state than an overview row does, and
+  giving "selected" the same treatment as "attended to" put **two marks alight
+  at once**, one of them permanently — which breaks `focusTracker`'s only
+  promise, *"exactly one of `els`, never two"*, without touching `focusTracker`
+  at all. It is resolved there by letting the persistent mark exist above `md`
+  only; see `MusicSets.astro`. Any third adopter carrying a selection has to
+  answer the same question.
 - ⚠ **Testing it requires switching the input model, not the viewport.** A
   chromium run at 390px — which is what `playwright.config.ts`'s `mobile`
   project is — still fires hover. Nothing in the e2e suite can currently see
