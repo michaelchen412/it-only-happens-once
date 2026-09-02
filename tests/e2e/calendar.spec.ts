@@ -78,21 +78,52 @@ test.describe('the month grid', () => {
     await expect(page.locator('.month__grid .ev--task .ev__lock')).toHaveCount(0);
   });
 
-  test('⚠ the legend never keys a source with nothing in it', async ({ page }) => {
+  test('⚠ the legend keys every source on the grid, and a one-source month gets none', async ({ page }) => {
     await calendar(page);
-    const text = await visibleText(page);
-    // Until the Google mirror lands there is nothing mirrored, so nothing says
-    // there is (10-hq.md §10b).
-    expect(text).not.toContain('Mirrored');
-    // And a one-source month gets no key at all: a legend over one thing is
-    // the repeated label §5 cut, wearing a different hat.
-    const kinds = await page
+
+    /*
+      ⚠ THIS USED TO ASSERT `not.toContain('Mirrored')` AND THAT WAS A FACT WITH
+      AN EXPIRY DATE, not an invariant. Its comment said *"until the Google
+      mirror lands there is nothing mirrored"* — and the mirror landed. On
+      2026-09-02 `external_events` holds 20 rows, one of them a meeting on
+      2026-08-31, which falls in the leading row of the September grid because a
+      month here is always 42 days. So the legend correctly keyed a source that
+      was correctly on screen, and the spec failed for being out of date.
+
+      A spec that runs against the LIVE project cannot pin what the data
+      contains — that is the standing hazard of this whole file, and this is the
+      one place it was written in. What it can pin is the RELATION between the
+      grid and the key.
+
+      ⚠ AND THE STRICT HALF LIVES IN A UNIT TEST, deliberately. `legendFor` is
+      pure, so `hq-calendar.test.ts` pins "never keys a source with nothing in
+      it" against constructed items, far harder than a browser could and with no
+      dependence on what is in the database this week. This file checks the
+      thing a unit test cannot: that the answer REACHES THE PAGE. Same division
+      the holidays block below states in its own words.
+    */
+    const shown = await page
       .locator('.month__grid .ev')
-      .evaluateAll(
-        (els) =>
-          [...new Set(els.map((e) => [...e.classList].find((c) => c.startsWith('ev--') && c !== 'ev--ro')))].length,
-      );
-    if (kinds <= 1) await expect(page.locator('.legend')).toHaveCount(0);
+      .evaluateAll((els) => [
+        ...new Set(
+          els
+            .map((e) => [...e.classList].find((c) => c.startsWith('ev--') && c !== 'ev--ro')?.slice(4))
+            .filter((k): k is string => !!k),
+        ),
+      ]);
+    const keyed = await page
+      .locator('.legend .lg__m')
+      .evaluateAll((els) => els.map((e) => [...e.classList].find((c) => c.startsWith('lg__m--'))?.slice(7)));
+
+    // Everything you can SEE is explained. The converse — a key with nothing
+    // behind it — is not checkable here and does not need to be: a cell shows at
+    // most `CELL_ROWS` before the rest become "+N more", so a kind may be real
+    // and legitimately unrendered.
+    for (const kind of shown) expect(keyed, `the grid shows ${kind}, so the legend must key it`).toContain(kind);
+
+    // A one-source month gets no key at all: a legend over one thing is the
+    // repeated label §5 cut, wearing a different hat.
+    if (shown.length <= 1) await expect(page.locator('.legend')).toHaveCount(0);
   });
 });
 
