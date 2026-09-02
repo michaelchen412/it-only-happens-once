@@ -9,6 +9,14 @@
 // ⚠ EVERY SENTENCE IS A REAL LINK AND THAT IS THE NO-JS FLOOR. `?set=<slug>` is
 // server-rendered; this only removes the round trip. Same contract the room's
 // words already honour.
+//
+// ⚠ AND SINCE 2026-09-01 IT ALSO CARRIES THE MOBILE ARRANGEMENTS, which are a
+// live bench question — see `MusicSets.astro`'s `MOBILE_MODES` for what is being
+// asked and the measurements behind it. Two of the four candidates need a tap
+// behaviour that CSS cannot express; the rest of this file is unchanged and the
+// desktop layout is not in question.
+import { lockScroll, unlockScroll } from './scroll-lock';
+import { focusTracker, isTouch, nearest, type FocusTracker } from './focus-mode';
 
 interface EmbedController {
   loadEntity?: (uriOrUrl: string, preferVideo?: boolean, startAt?: number) => void;
@@ -22,7 +30,21 @@ interface IFrameAPI {
     cb: (c: EmbedController) => void,
   ) => void;
 }
-type SetQuoteRow = { text: string; author: string; work?: string | null };
+type SetQuoteRow = {
+  text: string;
+  author: string;
+  work?: string | null;
+  /**
+   * The two font sizes in rem, computed on the server from this quote's length.
+   *
+   * ⚠ THE ANSWER TRAVELS, NOT THE CURVE. A quote's size is a function of how
+   * long it is (`lib/quote-scale.ts`), and this pane is the one surface on the
+   * site that replaces a quote without a navigation — so either the ramp ships
+   * to the browser or its answers do. Two numbers per set is smaller than the
+   * function and cannot drift from what the server rendered.
+   */
+  size: { sm: number; lg: number } | null;
+};
 type SetRow = { title: string; desc: string; url: string; quote: SetQuoteRow | null };
 type SpotifyWindow = Window & { SpotifyIframeApi?: IFrameAPI; onSpotifyIframeApiReady?: (a: IFrameAPI) => void };
 
@@ -63,9 +85,61 @@ let active: {
   base: string;
   render: (slug: string) => void;
   currentSlug: () => string;
+  /** What a tap does beyond the swap, below `md`. See `syncSheet`. */
+  afterTap: () => void;
+  /** The history position moved. Re-derive the sheet from the URL. */
+  onLeave: () => void;
+  /** Is the sheet currently over the page — the only state that owns Escape. */
+  sheetOpen: () => boolean;
+  /** Every "I want out" gesture collapses here. See `wireMusicSets`. */
+  closeIntent: () => void;
 } | null = null;
 
 let delegatesBound = false;
+
+/**
+ * The room element currently holding a scroll lock, so it can be released by
+ * IDENTITY when its pane is swapped away.
+ *
+ * ⚠ THIS EXISTS BECAUSE `<html>` SURVIVES A VIEW TRANSITION — `scroll-lock.ts`
+ * says so in its own words, and an unreleased hold would follow the reader to
+ * the next page and strand them on a document that will not scroll, with no
+ * sheet anywhere to close. Argument-less `unlockScroll()` is the documented
+ * escape hatch for exactly that, and it is too broad here: it drops EVERY
+ * owner, so a set pane leaving the DOM would also unfreeze the page behind an
+ * open Reader. Holding the element is what makes the release precise.
+ */
+let sheetOwner: Element | null = null;
+
+/**
+ * Which index sentence the reader is ATTENDING TO — ADR 0022's model, adopted
+ * here on 2026-09-01 for the affordance bench.
+ *
+ * ⚠ THIS IS THE HALF OF THE QUESTION THAT CSS CANNOT ANSWER. A `:hover` rule
+ * covers a cursor and reaches a thumb never — *"hover is not a weaker signal on
+ * touch, it is an absent one"* — so on a phone the sentence nearest the reading
+ * line is lit instead, and the pointer is not consulted at all. `focusTracker`
+ * owns that decision; this file only supplies the elements and the line.
+ *
+ * ⚠ AND IT LIVES AT MODULE SCOPE BECAUSE THE PANE IS REPLACED. `wireMusicSets`
+ * runs on every arrival, and a tracker built against a dead DOM keeps a mode
+ * subscription alive forever — `focus-mode.ts` says so in its own words. One
+ * tracker, destroyed before the next is built.
+ */
+let indexTracker: FocusTracker | null = null;
+let indexRows: HTMLElement[] = [];
+let indexRaf = 0;
+
+/* A fixed fraction rather than a scroll-derived line, matching the constellation
+   overview: this index is a short list read by glancing, not a long page read
+   top to bottom, so reading progress says nothing worth acting on. */
+const READING_LINE = () => window.innerHeight * 0.45;
+
+function trackIndexFocus(): void {
+  if (!indexTracker || !isTouch()) return; // proximity is never consulted with a cursor
+  cancelAnimationFrame(indexRaf);
+  indexRaf = requestAnimationFrame(() => indexTracker?.setProximate(nearest(indexRows, READING_LINE())));
+}
 
 /** Has the third-party script tag been appended to THIS document yet. */
 let apiRequested = false;
@@ -115,6 +189,16 @@ export function wireMusicSets(): void {
     // No pane on this page. Drop the old one so the delegated listeners below
     // stop answering for a DOM that is gone.
     active = null;
+    // And let go of the page, if a sheet was over it when the reader navigated.
+    if (sheetOwner) {
+      unlockScroll(sheetOwner);
+      sheetOwner = null;
+    }
+    // A tracker outlives its DOM otherwise, holding a mode subscription for a
+    // list of anchors that no longer exist.
+    indexTracker?.destroy();
+    indexTracker = null;
+    indexRows = [];
     return;
   }
   if (detail.dataset.setsWired) return;
@@ -131,8 +215,128 @@ export function wireMusicSets(): void {
   const height = detail.dataset.height || '600';
   const desc = document.getElementById('set-desc');
   const quoteEl = document.getElementById('set-quote');
+  const titleEl = detail.querySelector<HTMLElement>('[data-set-title]');
   const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-set]')];
   let current = detail.dataset.open || Object.keys(data)[0];
+
+  // ── the sheet, below `md` ─────────────────────────────────────────────────
+  //
+  // Ruled 2026-09-01 on `/lab/sets`; `MusicSets.astro`'s header carries the
+  // question, the measurements and the three deleted rivals. What lives here is
+  // only what CSS cannot do — CSS cannot know that a tap means "open".
+  //
+  // ⚠ THE BREAKPOINT IS ASKED AT TAP TIME, NOT AT WIRE TIME. `wireMusicSets`
+  // runs once per pane and a phone can be rotated, so a `matchMedia` result
+  // captured up here would be a stale answer to a question whose whole job is
+  // to be current. It is one cheap synchronous read on an interaction.
+  const room = detail.closest<HTMLElement>('.sets-room');
+  const isNarrow = () => window.matchMedia('(max-width: 767px)').matches;
+
+  /* The index's affordance tracker. Rebuilt against this pane's links, and the
+     old one destroyed first — see `indexTracker`. The `setProximate` call is
+     NOT behind the `isTouch` guard in `trackIndexFocus`, because a phone that
+     lands and never scrolls has to be answered on the first pass. */
+  indexTracker?.destroy();
+  indexRows = links;
+  indexTracker = links.length ? focusTracker(links) : null;
+  indexTracker?.setProximate(isTouch() ? nearest(indexRows, READING_LINE()) : null);
+
+  /**
+   * ⚠ THE SHEET IS A CLASS ON THE ROOM AND NOTHING ELSE, because the pane must
+   * not move. `MusicSets.astro`'s CSS lifts it out of flow with `position:
+   * fixed`; the node stays exactly where the server put it, so the embed inside
+   * it is never re-parented and never reloads. That is the same constraint that
+   * killed `accordion` on the first bench, honoured a different way.
+   *
+   * ⚠ AND THE SCROLL LOCK IS THE SITE'S OWN, not a local `overflow: hidden`.
+   * `scroll-lock.ts` counts owners, which is what stops this from fighting the
+   * Reader if a quote's sheet is ever openable from inside a set.
+   */
+  /**
+   * ⚠ THE LOCK IS RE-ASSERTED RATHER THAN TAKEN ONCE, AND THAT IS NOT BELT AND
+   * BRACES — it is the fix for a bug measured on 2026-09-01, on the one path
+   * that reaches it: back out of an open sheet, then go FORWARD again.
+   *
+   * What happens, in order: `popstate` fires and this opens the sheet and locks
+   * the page; THEN the ClientRouter runs its view transition, which **replaces
+   * the room element and wipes `<html>`'s entire class list** — `scroll-locked`
+   * with it. `astro:page-load` re-wires against the fresh pane and calls this
+   * again, but `scroll-lock.ts` still counts the OLD room as an owner, so its
+   * `wasEmpty` check is false and it never re-adds the class it just lost. The
+   * sheet comes back open over a page that scrolls behind it.
+   *
+   * Both halves are handled here rather than in `scroll-lock.ts`, which is
+   * correct as written: owning-by-element is exactly right, and it cannot be
+   * expected to know that somebody else erased its class. What it needs from a
+   * caller that survives a DOM swap is to be told which owner is stale.
+   */
+  const openSheet = () => {
+    if (!room) return;
+    const already = room.classList.contains('is-open');
+    // A previous pane's room, still holding the lock after the router replaced
+    // it. Released by identity — never `unlockScroll()` bare, which would drop
+    // an open Reader's hold too.
+    if (sheetOwner && sheetOwner !== room) unlockScroll(sheetOwner);
+    room.classList.add('is-open');
+    unlockScroll(room);
+    lockScroll(room);
+    sheetOwner = room;
+    // A sheet opens at its top — but only on a real open. Re-asserting the lock
+    // on an already-open sheet must not throw the reader back to the first line.
+    if (!already) detail.scrollTop = 0;
+  };
+  const closeSheet = () => {
+    if (!room || !room.classList.contains('is-open')) return;
+    room.classList.remove('is-open');
+    unlockScroll(room);
+    if (sheetOwner === room) sheetOwner = null;
+  };
+
+  /**
+   * ⚠ ONE INVARIANT GOVERNS THE WHOLE SHEET: **below `md`, it is open exactly
+   * when the URL names a set.** Everything else follows from that and nothing
+   * needs its own rule — a tap pushes `?set=` and opens; the phone's back
+   * gesture pops it away and closes; a shared `?set=` link arrives open; the
+   * close control rewrites the URL and shuts. Four gestures, one fact.
+   *
+   * ⚠ AND THE CLOSE CONTROL DOES NOT CALL `history.back()`, which is where the
+   * first version of this went wrong. Routing dismissal through the history
+   * stack means dismissal can FAIL — and it did, measured: `history.back()`
+   * invoked from a keydown handler produced no `popstate` and no URL change at
+   * all, while the identical call from a click did. Reproduced with an unrelated
+   * key and an empty handler, so it is the platform rather than this file, and
+   * it may well be headless-only. It does not matter which: a sheet that stays
+   * shut only if a history API cooperates is a sheet that can trap someone, and
+   * ADR 0032's whole finding is that *"a modal that will not close does not read
+   * as protected; it reads as stuck."*
+   *
+   * So the control closes the sheet ITSELF and rewrites the URL to match.
+   * `replaceState` rather than `back()` also fixes the case that made the first
+   * version need a flag: `/listening?set=<slug>` is a URL somebody can be SENT,
+   * where there is no pushed entry to pop and "back" means "leave this site
+   * entirely" — the one thing a close control must never do.
+   */
+  const syncSheet = () => {
+    if (!isNarrow()) return;
+    const named = new URLSearchParams(location.search).get('set');
+    if (named && data[named]) openSheet();
+    else closeSheet();
+  };
+
+  /*
+    ⚠ A DEEP LINK OPENS THE SHEET ON ARRIVAL, and the room is pointless without
+    it: `?set=<slug>` is the link the share control produces, and on a phone it
+    would otherwise land on the index with the set it names hidden behind it —
+    eight sentences and no reason the link was sent.
+
+    ⚠ THE PARAM MUST BE PRESENT, not merely resolvable, which is why `syncSheet`
+    reads the URL rather than asking the pane what is open. `resolveSet` falls
+    back to the first set, so a bare `/listening` always renders with something
+    open — and treating that as a deep link would mean the room opens as a sheet
+    over an index nobody has touched, every single time. Only an explicit `?set=`
+    is an instruction.
+  */
+  syncSheet();
 
   // ── showing and hiding ────────────────────────────────────────────────────
   //
@@ -253,6 +457,12 @@ export function wireMusicSets(): void {
     // from parts means no path exists here that could ever inject markup — the
     // same reasoning `renderMarkdown` exists for, applied by not needing it.
     if (desc) desc.innerHTML = row.desc;
+    // `textContent`, for the same reason the quote below uses it: a title is one
+    // plain string and building it from parts means no path here can inject
+    // markup. Written unconditionally even though only `lead` and `sheet` show
+    // it — a hidden element holding the wrong set's title is a bug waiting for
+    // whichever arrangement wins.
+    if (titleEl) titleEl.textContent = row.title;
     writeQuote(quoteEl, row.quote);
 
     conceal();
@@ -275,6 +485,18 @@ export function wireMusicSets(): void {
     const text = fig.querySelector<HTMLElement>('[data-quote-text]');
     const author = fig.querySelector<HTMLElement>('[data-quote-author]');
     let work = fig.querySelector<HTMLElement>('[data-quote-work]');
+    /*
+      ⚠ THE SIZE IS SET ON THE `<blockquote>`, NOT ON THE `<p>` THAT HOLDS THE
+      WORDS, because that is where the server puts it and `.quote-ramp` is on
+      the same element. Setting it a level down would give the pane two sources
+      of truth for one number and the swap would silently disagree with the
+      first paint.
+    */
+    const block = fig.querySelector<HTMLElement>('blockquote');
+    if (block && q.size) {
+      block.style.setProperty('--qs', `${q.size.sm}rem`);
+      block.style.setProperty('--ql', `${q.size.lg}rem`);
+    }
     if (text) text.textContent = q.text;
     if (author) author.textContent = q.author;
     if (q.work) {
@@ -298,9 +520,13 @@ export function wireMusicSets(): void {
   const render = (slug: string) => {
     links.forEach((a) => {
       const on = a.dataset.set === slug;
-      a.classList.toggle('text-primary', on);
-      a.classList.toggle('text-whisper', !on);
-      a.classList.toggle('hover:text-base-content/75', !on);
+      // ⚠ ONE CLASS, NOT THREE UTILITIES (2026-09-01). This used to toggle
+      // `text-primary` / `text-whisper` / `hover:text-base-content/75` by hand,
+      // which meant the index's colour was stated in two places — here and in
+      // the component's class list — and any treatment the affordance bench
+      // proposed would have had to be restated here too, or the first swap
+      // would undo it. `.is-open` is the state; the stylesheet owns the ink.
+      a.classList.toggle('is-open', on);
       if (on) a.setAttribute('aria-current', 'true');
       else a.removeAttribute('aria-current');
     });
@@ -348,9 +574,67 @@ export function wireMusicSets(): void {
    * `Reader.astro` hit this first and `music-room.ts` documents the same fix in
    * the same words. Third time; it is a property of the site, not a surprise.
    */
+  /*
+    ⚠ THE CLOSE CONTROL BINDS TO THE PANE AND NOT TO THE DOCUMENT, unlike the
+    two listeners below, and the asymmetry is not an oversight: those exist
+    because they act on anchors the router also wants, and because they must
+    survive a pane being replaced. This button IS part of the pane, so it dies
+    with it and needs no delegation.
+
+    ⚠ AND IT GOES THROUGH `closeIntent` RATHER THAN CLOSING DIRECTLY, which is
+    `Reader.astro`'s rule in the same words: *"every close intent collapses to"*
+    one path. This control, Escape and the phone's back gesture are three
+    gestures meaning the same thing, and ADR 0032's finding was that hand-wiring
+    them per surface is exactly how they drift apart.
+  */
+  detail.querySelector('[data-set-close]')?.addEventListener('click', () => active?.closeIntent());
+
+  /**
+   * ⚠ CAPTURE PHASE AND `stopPropagation`, AND WITHOUT THEM THIS FILE IS
+   * DECORATION. The site mounts `<ClientRouter />`, whose document-level click
+   * listener claims any `<a href>` and navigates — and every sentence here is a
+   * real anchor, because that is the no-JS floor. A bubble-phase
+   * `preventDefault()` arrives after the router has already started the
+   * transition, so the page swaps out from under the embed and the in-place
+   * swap this whole file exists for never happens.
+   *
+   * `Reader.astro` hit this first and `music-room.ts` documents the same fix in
+   * the same words. Third time; it is a property of the site, not a surprise.
+   */
   // Hand this mount to the document-level listeners, which were bound once and
   // outlive every pane they drive.
-  active = { data, base, render, currentSlug: () => current };
+  active = {
+    data,
+    base,
+    render,
+    currentSlug: () => current,
+    /*
+      What a tap does BEYOND swapping the pane. Above `md` it does nothing, and
+      correctly: there the pane is already beside the index and has never needed
+      help being seen. The whole mobile question lives in this one branch.
+    */
+    afterTap: () => syncSheet(),
+    /*
+      ⚠ BACK MUST DISMISS THE SHEET, and the `popstate` handler could not do it
+      before: it re-rendered only when the URL named a DIFFERENT set, so backing
+      out to a URL with no `?set=` at all matched nothing and fell through
+      silently. Harmless while the pane was always visible; it is the difference
+      between a sheet you can leave and one you cannot.
+
+      It is `syncSheet` rather than a bare close because back is not the only way
+      to arrive here — FORWARD lands on a URL that names a set again, and the
+      invariant says that is an open sheet.
+    */
+    onLeave: () => syncSheet(),
+    sheetOpen: () => !!room?.classList.contains('is-open'),
+    /* The URL is the state, so closing means rewriting it. See `syncSheet`. */
+    closeIntent: () => {
+      const url = new URL(location.href);
+      url.searchParams.delete('set');
+      history.replaceState(null, '', url);
+      closeSheet();
+    },
+  };
   bindDelegates();
 
   conceal();
@@ -371,6 +655,12 @@ export function wireMusicSets(): void {
 function bindDelegates(): void {
   if (delegatesBound) return;
   delegatesBound = true;
+
+  /* Proximity, for the index's affordance on a device that cannot point. Bound
+     once per document like everything else here; `trackIndexFocus` returns
+     immediately where there is no pane or where a cursor exists. */
+  addEventListener('scroll', trackIndexFocus, { passive: true });
+  addEventListener('resize', trackIndexFocus);
 
   /**
    * ⚠ CAPTURE PHASE AND `stopPropagation`, AND WITHOUT THEM THIS FILE IS
@@ -402,10 +692,33 @@ function bindDelegates(): void {
       if (!active.data[slug]) return;
       e.preventDefault();
       e.stopPropagation();
-      if (slug === active.currentSlug()) return;
-      const base = active.base;
-      history.pushState({ set: slug }, '', `${base}${base.includes('?') ? '&' : '?'}set=${encodeURIComponent(slug)}`);
-      active.render(slug);
+
+      /*
+        ⚠ THREE QUESTIONS THAT USED TO BE ONE, and collapsing them was a bug the
+        sheet made visible. The old guard was `if (slug === currentSlug) return`
+        — one test standing in for "is there anything to do at all" — which was
+        right while the pane was always on screen and the only possible response
+        was a re-render.
+
+        With a sheet there are two more responses, and they do not agree with
+        each other:
+
+          · PUSH — should the address bar start naming this set? Yes whenever it
+            does not already, INCLUDING when the pane is already showing it.
+            Dismiss-then-tap-the-same-set is the most ordinary gesture there is,
+            and under the old guard it reopened a sheet the URL denied was open,
+            with a back button that skipped straight off the page.
+          · RENDER — should the pane's contents change? Only on a real change.
+            Rewriting the same words would flash the embed for nothing.
+          · RESPOND — should anything happen visibly? Always. "Already selected"
+            was never a reason to swallow a tap.
+      */
+      if (new URLSearchParams(location.search).get('set') !== slug) {
+        const base = active.base;
+        history.pushState({ set: slug }, '', `${base}${base.includes('?') ? '&' : '?'}set=${encodeURIComponent(slug)}`);
+      }
+      if (slug !== active.currentSlug()) active.render(slug);
+      active.afterTap();
     },
     true,
   );
@@ -415,6 +728,30 @@ function bindDelegates(): void {
     if (!active) return;
     const slug = new URLSearchParams(location.search).get('set') ?? '';
     if (active.data[slug] && slug !== active.currentSlug()) active.render(slug);
+    // ⚠ UNCONDITIONALLY, not only when the set is gone. The URL is the sheet's
+    // state, so every move through history has to be re-derived — back to a
+    // bare `/listening` closes it, forward to a `?set=` opens it again, and a
+    // move between two sets leaves it open while the pane swaps underneath.
+    active.onLeave();
+  });
+
+  /*
+    ⚠ ESCAPE, BECAUSE A SHEET THAT TRAPS YOU IS THE ONE THING ADR 0032 REFUSES.
+    A `<dialog>` would give this for free and the room cannot have one — moving
+    the pane into the top layer means moving the node, and that reloads the
+    embed. So the key is bound by hand, which is the price of the constraint.
+  */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !active) return;
+    /*
+      ⚠ GATED ON THE SHEET BEING OPEN, not on there being a pane. Without this
+      the room would swallow Escape on every `/listening?set=<slug>` at every
+      width — a key that did nothing visible on desktop and quietly walked the
+      reader back through their history. Escape belongs to whatever is on top,
+      and when no sheet is open that is not this.
+    */
+    if (!active.sheetOpen()) return;
+    active.closeIntent();
   });
 }
 

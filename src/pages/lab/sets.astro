@@ -24,11 +24,26 @@
   no `sets` table (plan 40 §4, phase 0) — and this is the only place the real
   component can be driven over real playlists until there is.
 
-  THE ONE QUESTION STILL LIVE: **the embed height.** 352 is Spotify's convention
-  and not a ceiling; the player fills whatever it is given. 600 leaves ~250px of
-  dead space under a three-track playlist and 480 does not, so the right number
-  depends on how long the sets get — curation, not code. The switch stays until
-  that settles.
+  ⚠ AND A SECOND QUESTION RAN HERE ON 2026-09-01: **what does this room do below
+  `md`?** The first bench asked "which arrangement" and answered it for a screen
+  wide enough to hold two columns; nobody ever asked what the winner collapses to
+  on a phone, and the answer turned out to be "it stacks", which is not a design
+  so much as the absence of one. Michael: *"on mobile I don't like how on the
+  listening page we just stack the list of playlists on top of the viewing
+  section… just stacking it is not a good UI/UX solution."*
+
+  ANSWERED: **`sheet`** — the index is the page and a set opens over it. Its three
+  rivals (`stack`, the control; `lead`; `scroll`) are deleted from the component
+  rather than kept behind a switch, same rule as the first round. The ruling, the
+  measurements and the accepted cost are in `components/MusicSets.astro`'s header;
+  `git log` has the rivals.
+
+  ⚠ AND THE HEIGHT SETTLED WITH IT, AT **480**, which is what `/listening` was
+  already passing — so the switch below now confirms a default rather than
+  proposing one. Michael, ruling on both at once: *"480 embed height for mobile
+  is ideal as well."* It stays switchable because the number that suits a sheet
+  is not necessarily the number that suits a 20rem column beside an index, and
+  nobody has looked at that question with sets this long.
 
   WHAT TO JUDGE:
     1. Switch sets twice. The FIRST switch and every one after it should be a
@@ -43,11 +58,14 @@
     3. *The point of a journey is not to return* — a quote and NO description.
        If it reads as complete, a borrowed line can stand instead of Michael's
        own and the description stops being mandatory.
-    4. The index as typography. It leans (`INDEX_INDENTS`, borrowed from
-       ConstellationSuite's stanzas) and the open one goes `--color-primary`
-       while the rest recede — the room's own grammar, kept on purpose so that
-       what Michael liked about looking at the room survives the mechanism being
-       deleted under it.
+    4. The index as typography. ⚠ REWRITTEN 2026-09-02 and this note with it: the
+       lean is gone and the sentences no longer recede. Every one now rests at a
+       trace of `--color-primary` with a faded star in the gutter, and comes to
+       full hue with the star lit on whichever the reader is attending to. What
+       Michael liked about looking at the room survives; what it recorded — a
+       selection grammar inherited from the deleted room — did not, because it
+       was saying "you are here" where it needed to say "you can go here". The
+       argument is in `components/MusicSets.astro`'s header.
     5. Press Save inside a player while signed in to Spotify. That is the entire
        product — everything else here is in service of somebody doing that once
        and never coming back.
@@ -188,8 +206,8 @@ const height = HEIGHTS.includes(rawHeight) ? rawHeight : 600;
 const selected = resolveSet(Astro.url.searchParams.get('set'), SETS);
 
 /* The bench mounts the component at its own path WITH its own query string, so
-   a sentence's link keeps the layout and height you are testing. Same reason
-   `musicHref` takes a base. */
+   a sentence's link keeps the height you are testing. Same reason `musicHref`
+   takes a base. */
 const base = `/lab/sets?h=${height}`;
 const benchHref = (p: Record<string, string>) => {
   const q = new URLSearchParams(Astro.url.search);

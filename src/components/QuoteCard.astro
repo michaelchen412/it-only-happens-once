@@ -26,7 +26,8 @@ import Reveal from './Reveal.astro';
 import FragmentStrip from './FragmentStrip.astro';
 import Highlighted from './admin/Highlighted.astro';
 import { MIN_SEARCH } from '../lib/search-highlight';
-import { renderMarkdown } from '../lib/markdown';
+import { renderMarkdown, toPlainText } from '../lib/markdown';
+import { quoteStyle } from '../lib/quote-scale';
 import type { QuoteItem } from '../lib/blog';
 
 interface Props {
@@ -54,6 +55,18 @@ const bodyHtml = renderMarkdown(item.body, { breaks: true, highlight: searching 
 // own page offered the door. One rule, both surfaces (plan 32 · §5).
 const hasDoor = Boolean(item.author && item.authorSiblings > 0);
 const authorHref = item.author ? `/blog?view=quotes&author=${item.author.slug}` : null;
+
+// ⚠ THE FEED RAMPS NOW, AND IT NEVER DID (2026-09-01, `/lab/quotes`). This card
+// was flat 1.35rem from a 30-character aphorism to an 843-character passage, so
+// the long ones dominated the feed by sheer area — twenty-five cards down a page
+// and one of them is a wall. Only the quote page had a ramp, which made this the
+// one surface where the SAME quote looked deliberate in one place and unweighted
+// in another.
+//
+// ⚠ THE TOP OF THE RANGE IS UNCHANGED at 1.35rem, so a short quote in the feed
+// looks exactly as it always has. Everything this changes is a long one coming
+// down, which is what equalises the cards.
+const size = quoteStyle(toPlainText(item.body).length, 'feed');
 ---
 
 <style>
@@ -118,7 +131,7 @@ const authorHref = item.author ? `/blog?view=quotes&author=${item.author.slug}` 
   */
   }
   <a href={`/blog/${item.slug}`} data-read={item.slug} class="quote-line block">
-    <blockquote class="quote-body font-serif text-[1.35rem] leading-[1.5] font-light" set:html={bodyHtml} />
+    <blockquote class="quote-body quote-ramp font-serif leading-[1.5] font-light" style={size} set:html={bodyHtml} />
   </a>
   {
     item.attribution && (

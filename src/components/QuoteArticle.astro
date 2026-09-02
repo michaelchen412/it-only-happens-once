@@ -52,6 +52,7 @@
 import Reveal from './Reveal.astro';
 import FragmentStrip from './FragmentStrip.astro';
 import { renderMarkdown, toPlainText } from '../lib/markdown';
+import { quoteStyle } from '../lib/quote-scale';
 // Aliased: the type and this component share a name, and the shadow silently
 // widened `page` to `any` — every callback below lost its parameter types.
 import type { QuotePage as QuotePageData } from '../lib/quote-page';
@@ -89,19 +90,20 @@ const constellations = inConstellation
 const bodyHtml = renderMarkdown(quote.body, { breaks: true });
 
 // The type ramps DOWN as the line grows. A six-word aphorism at essay size looks
-// lost; a stanza at display size overruns the screen. Three steps, chosen
-// against the real corpus (30 → 843 characters, mean 189).
+// lost; a stanza at display size overruns the screen.
+//
+// ⚠ THE THREE STEPS THAT LIVED HERE ARE GONE (2026-09-01, `/lab/quotes`). They
+// were this surface's private ladder, and both halves of that were the problem:
+// the cliffs were visible — 2.6rem to 2.0rem at a single character, and a
+// 297-character passage set at 32px, which is what Michael reported as
+// *"ostentatious"* — and being private meant the feed, the suite and /listening
+// never got a ramp at all. `lib/quote-scale.ts` now owns the curve; this file
+// keeps only its own register, which is the half that was always right.
 //
 // Measured on the WORDS, not the source: `**` and an escaped `\*` are two
 // characters each that a reader never sees, and the ramp is about how much line
 // there is to look at.
-const len = toPlainText(quote.body).length;
-const size =
-  len < 90
-    ? 'text-[2rem] sm:text-[2.6rem]'
-    : len < 320
-      ? 'text-[1.6rem] sm:text-[2rem]'
-      : 'text-[1.35rem] sm:text-[1.6rem]';
+const size = quoteStyle(toPlainText(quote.body).length, 'permalink');
 
 // ⚠ The attribution is a control whenever there is ANYTHING behind it, which is
 // the change from the feed's rule. QuoteReveal renders nothing without a
@@ -128,7 +130,8 @@ const authorHref = author ? `/blog?view=quotes&author=${author.slug}` : null;
 <div class="quote-article">
   <figure>
     <blockquote
-      class:list={['quote-body text-base-content font-serif leading-[1.42] font-light', size]}
+      class="quote-body quote-ramp text-base-content font-serif leading-[1.42] font-light"
+      style={size}
       set:html={bodyHtml}
     />
 

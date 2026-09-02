@@ -935,6 +935,31 @@
   .quote-body p {
     margin-block: 0;
   }
+
+  /* ⚠ THE TYPE RAMP, WORN BESIDE `.quote-body` RATHER THAN BY IT. A quote's
+     SIZE is a function of its length (`lib/quote-scale.ts`); its block rhythm
+     is not, and the two must stay separable — `MusicSets` sets a quote and does
+     not wear `.quote-body` at all, because its epigraph is plain text rather
+     than rendered Markdown.
+
+     The two numbers are computed server-side and arrive as inline custom
+     properties; only the breakpoint lives here. See `quoteStyle` for why the
+     arithmetic cannot move into a `calc()` on this side.
+
+     ⚠ ALL FOUR PUBLIC SURFACES WEAR IT — the permalink and Reader
+     (`QuoteArticle`), the feed (`QuoteCard`), a suite stanza (`SuiteStanza`) and
+     /listening's epigraph (`MusicSets`). Before 2026-09-01 only the first ramped
+     at all, in three hardcoded steps of its own; the other three were flat from
+     the corpus's shortest line to its longest. Each still sets its own RANGE —
+     see `REGISTERS` — and shares only the shape of the fall. */
+  .quote-ramp {
+    font-size: var(--qs);
+  }
+  @media (min-width: 40rem) {
+    .quote-ramp {
+      font-size: var(--ql);
+    }
+  }
   /* A blank line in the source was ONE blank line on screen under `pre-line`.
      `1lh` is that same line, exactly, at whatever size the surface set — which
      an `em` value cannot be, since the three ramps disagree. The `em` above it

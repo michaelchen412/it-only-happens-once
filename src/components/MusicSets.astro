@@ -41,9 +41,93 @@
   `MusicRoom` made when it put a song's feelings below the player rather than
   above. The vocabulary retires with the room (plan 40).
 */
+import StarMark from './StarMark.astro';
 import { embedForUrl } from '../lib/media';
-import { renderMarkdown } from '../lib/markdown';
-import { indentFor, setHref, type MusicSet } from '../lib/music-sets';
+import { renderMarkdown, toPlainText } from '../lib/markdown';
+import { quoteSize } from '../lib/quote-scale';
+import { setHref, type MusicSet } from '../lib/music-sets';
+
+/*
+  ⚠ BELOW `md` THE INDEX IS THE PAGE AND A SET OPENS OVER IT — ruled 2026-09-01
+  on `/lab/sets`, and the side-by-side layout above `md` is untouched. Michael:
+  *"on mobile I don't like how on the listening page we just stack the list of
+  playlists on top of the viewing section. I think this makes sense in the
+  desktop viewer, where we can view it side by side, but just stacking it is not
+  a good UI/UX solution."*
+
+  WHAT STACKING ACTUALLY COST, measured on a 390×844 phone: the index of eight
+  titles is **471px tall and starts at y=92**, so it IS the first screen; the
+  detail pane started at y=611 and the player at **y=783**, below the fold before
+  browser chrome takes another hundred pixels. Two failures, and the second is
+  the worse one:
+
+    1. A stranger arriving cold saw eight sentences and no evidence the page had
+       playlists on it at all — and this room prints no heading, by deliberation,
+       because on desktop the player beside the index is the explanation. Below
+       `md` there was no player beside anything.
+    2. Tapping a title ran the in-place swap ENTIRELY OFF-SCREEN. `aria-live` had
+       been announcing it to screen readers the whole time, which is the tell:
+       the pane knew it had changed and only sighted readers were not told.
+
+  ⚠ THE SHEET IS `position: fixed`, NOT A `<dialog>`, AND THAT IS THE ROOM'S
+  OLDEST CONSTRAINT RATHER THAN A PREFERENCE. Moving the pane into the top layer
+  means moving the NODE, and re-parenting an iframe reloads it — the same fact
+  that killed `accordion` and `stacked` on the first bench. So the pane stays
+  exactly where the server put it and only its box changes. The site owns a
+  perfectly good sheet in `Reader.astro` and this one cannot use it.
+
+  ⚠ AND DISMISSING IT DOES NOT STOP THE MUSIC. The pane is still in the DOM, so a
+  playing embed keeps playing behind the index with no visible control. That is a
+  KNOWN AND ACCEPTED cost, judged on the bench before the ruling rather than
+  discovered after it: the alternative is a persistent mini-bar, and a room whose
+  entire product is *"press Save inside a player once and never come back"* should
+  not grow a playback UI to manage a session it does not want you to have. ADR
+  0032's question — what does dismissing cost — is answered "nothing you typed",
+  which is the whole of what that record governs.
+
+  ⚠ THREE RIVALS ARE DELETED RATHER THAN KEPT AS OPTIONS: `stack` (the control,
+  what shipped), `lead` (the open set first, index beneath), `scroll` (today's
+  order, tap glides the pane into view). A bench is legitimate while its question
+  is live; `git log -- src/components/MusicSets.astro` has all three.
+*/
+
+/*
+  ⚠ AN INDEX SENTENCE SAYS IT IS A DOOR WITH HUE AND A STAR — ruled 2026-09-02 on
+  `/lab/afford-sets`. Michael: *"can we style the listening sets so its more
+  obvious theyre clickable? similar to constellations?"* and then, on the mark:
+  *"just a star to the left of each one thats kind of faded and then glows when
+  hovered or active."*
+
+  WHAT WAS WRONG, measured rather than felt. A constellation name rested at
+  `oklab(0.859 0.017 0.048)` — a TRACE OF ITS OWN HUE, at full opacity. A set
+  rested at `oklab(0.91 0.004 0.018 / 0.57)`: no hue at all, and 57% alpha (69%
+  on paper). Faded text is the universal convention for DISABLED, so the seven
+  sets a reader could open were styled like dead items while the one already open
+  wore the only colour on the page. **The grammar was backwards — hue marked the
+  place you were rather than the places you could go.**
+
+  ⚠ AND THE ONLY AFFORDANCE WAS A `:hover` RULE, which is the whole finding of
+  ADR 0022 — *"hover is not a weaker signal on touch, it is an absent one"* —
+  written after Michael reported exactly this about the Sky a month earlier.
+  `QuoteCard` learned it (it rests at `color-mix(base-content 96%, primary)` and
+  cites `.sky-name` by name); this component was written a week later and adopted
+  neither the trace nor `focusTracker`. It was the last public index on the site
+  affording by hover alone, and since the sheet shipped this index IS the whole
+  first screen below `md` rather than a column beside a player.
+
+  ⚠ THE SETS INDEX HAS ONE MORE STATE THAN THE SKY DOES, which is why this is an
+  adaptation rather than a port. An overview row is a door or it is focused — two
+  states. A set is a door, the door you are about to take, or **the door you
+  took**. Today focus and open share one treatment (full hue, lit star), which is
+  deliberate but not obviously right: it means a hovered set and the open set look
+  identical. `open` had four rivals on the bench for freeing hue — `rule`,
+  `flush`, `weight`, `none` — and none was chosen. `git log` has them if the
+  collision starts to read as ambiguity.
+
+  ⚠ AND `flush` CANNOT BE REVIVED AS IT WAS. It marked the open set by removing
+  its indent, and the lean it spent is gone (see `lib/music-sets.ts`) — it also
+  could not mark three of the eight sets, whose indents were already zero.
+*/
 
 interface Props {
   sets: MusicSet[];
@@ -55,9 +139,16 @@ interface Props {
    * fills whatever it is given with more track rows. Michael, 2026-08-14: *"it
    * only shows 2 songs at a time in what little space it has"*.
    *
-   * Still open at 480 vs 600 — the bench keeps the switch. 600 leaves ~250px of
-   * dead space under a three-track playlist, so the right number depends on how
-   * long the sets get, which is curation rather than code.
+   * ⚠ 480 IS RULED FOR THE SHEET (2026-09-01) — Michael, deciding it alongside
+   * the arrangement: *"480 embed height for mobile is ideal as well."* It was
+   * already the default here, so nothing changed; what changed is that it is now
+   * a decision rather than a placeholder. 600 leaves ~250px of dead space under
+   * a three-track playlist and 480 does not.
+   *
+   * The parameter stays, and `/lab/sets` keeps its switch, because the number
+   * that suits a full-screen sheet is not necessarily the number that suits a
+   * 20rem column beside an index — and that half has not been looked at with
+   * sets this long.
    */
   height?: number;
   base?: string;
@@ -68,15 +159,47 @@ const open = sets.find((s) => s.slug === selected) ?? sets[0];
 const openEmbed = open ? embedForUrl(open.url) : null;
 const descOf = (s: MusicSet) => (s.description.trim() ? renderMarkdown(s.description) : '');
 
-/* Selected goes `--color-primary`, the rest recede — the room's own grammar for
-   a chosen word (`.feel-word.is-on`). Deliberately inherited: the room's
-   mechanism is being deleted, but the way it felt to look at should survive it. */
-const INDEX_ITEM = 'font-display block text-xl leading-snug font-light transition-colors duration-300 sm:text-2xl';
+/* ⚠ COMPUTED PER SET, NOT PER RENDER, because this pane swaps its quote in the
+   browser without a navigation — so the size cannot be a property of the OPEN
+   set, it has to travel with every set in the payload at the foot of this file.
+   `music-sets.ts` applies the two numbers on the swap and never learns the
+   curve, which is what `quoteStyle`'s note means about the one client that
+   rewrites a quote.
+
+   ⚠ MEASURED ON `toPlainText`, matching the other three surfaces, even though
+   this one prints the body as plain text rather than rendering it. The ramp is
+   about how much line there is to LOOK at, and a `**` is two characters nobody
+   sees. (That this surface prints the mark at all is a separate latent bug —
+   `fragments.body` is Markdown by contract and the other three honour it.) */
+const quoteSizeOf = (s: MusicSet) => (s.quote ? quoteSize(toPlainText(s.quote.text).length, 'listening') : null);
+const openQuoteSize = open ? quoteSizeOf(open) : null;
+
+/* ⚠ THE COLOUR LEFT THIS STRING ON 2026-09-02 and moved into the stylesheet
+   below. It was `isOpen ? 'text-primary' : 'text-whisper hover:text-base-content/75'`
+   — inherited from the deleted room's grammar for a chosen word
+   (`.feel-word.is-on`), which is a SELECTION grammar that was being asked to
+   carry AFFORDANCE as well and could not. See the header.
+
+   ⚠ `.set-line` IS ALSO THE FOCUS ELEMENT, the way `.sky-row` is on the
+   overview — `focusTracker` writes `.is-focus` onto these anchors, so a thumb
+   gets what a cursor gets. Keep the two class names in step with the CSS.
+
+   ⚠ NO `block` AND NO `transition-colors`: the stylesheet makes this a flex
+   baseline row for the star, and transitions colour at the same 0.4s as the
+   mark's glow so the two arrive together. Tailwind's 300ms would desynchronise
+   them by a tenth of a second, which is exactly the *"checklist of effects"*
+   ADR 0022 built its three signals to avoid. */
+const INDEX_ITEM = 'set-line font-display text-xl leading-snug font-light sm:text-2xl';
 
 /* Italic against the description's upright, because both are serif at a similar
    size and without a slant they read as one block of small text. Italic for a
    borrowed voice is also what the constellation epigraph already does. */
-const QUOTE_TEXT = 'font-serif text-xl leading-relaxed italic text-muted sm:text-2xl';
+/* ⚠ THE SIZE LEFT THIS STRING ON 2026-09-01 and moved onto the element as two
+   custom properties (`lib/quote-scale.ts`). It was `text-xl sm:text-2xl` — flat,
+   from the corpus's shortest line to its longest — and this was the fourth of
+   four surfaces that set a quote and the third of them that never ramped.
+   1.25/1.5rem is still the ceiling, so a short epigraph is unchanged. */
+const QUOTE_TEXT = 'quote-ramp font-serif leading-relaxed italic text-muted';
 const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all-small-caps] text-whisper';
 ---
 
@@ -92,23 +215,48 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
       <link rel="preconnect" href="https://open.spotify.com" />
       <link rel="preconnect" href="https://i.scdn.co" crossorigin />
 
+      {/* `.sets-room` is what the sheet's CSS and `music-sets.ts` both hang off —
+          the open state is one class on this element and nothing else moves. */}
       <section
-        class="mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-16"
+        class="sets-room mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-16"
         aria-label="Playlists"
       >
         <nav aria-label="Sets">
           <ul class="flex flex-col gap-7">
-            {sets.map((s, i) => {
+            {sets.map((s) => {
+              /* ⚠ A COLD LOAD STILL MARKS A SET NOBODY CHOSE, and that is
+                 unchanged rather than endorsed. `resolveSet` falls back to the
+                 FIRST set when the URL names none, so a stranger's first screen
+                 has one lit star and one full-hue sentence they never picked —
+                 and below `md` it is a lie about state besides, since the sheet
+                 is shut and nothing is open. Benched as `cold=off` and not
+                 ruled on; it costs much less now that the other seven read as
+                 doors rather than as dead items, which is why it was left. */
               const isOpen = s.slug === open?.slug;
               return (
-                <li style={`padding-left:${indentFor(i)}`}>
+                <li>
                   <a
                     href={setHref(s.slug, base)}
                     data-set={s.slug}
                     aria-current={isOpen ? 'true' : undefined}
-                    class:list={[INDEX_ITEM, isOpen ? 'text-primary' : 'text-whisper hover:text-base-content/75']}
+                    class:list={[INDEX_ITEM, isOpen && 'is-open']}
                   >
-                    {s.title}
+                    {/* ⚠ `StarMark`, NOT `StarBloom`, AND THE DIFFERENCE IS A
+                        CLAIM. The bloom's own header: *"a constellation is drawn
+                        BETWEEN stars, never one star"* — it parts to say
+                        "several things live here". A set is one playlist, so
+                        blooming it would borrow a sentence about constellations
+                        and say it about a Spotify link. A single point is the
+                        honest mark. (If the reading is meant to be "many songs
+                        live here", the bloom is right and this is a one-word
+                        change — worth asking before it ships.) */}
+                    <span class="set-star" aria-hidden="true">
+                      <StarMark />
+                    </span>
+                    {/* Wrapped so the flex row has a text box to wrap INSIDE:
+                        without it a two-line title's second line would return to
+                        the star's left edge instead of hanging under the first. */}
+                    <span>{s.title}</span>
                   </a>
                 </li>
               );
@@ -124,11 +272,46 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
              and a screen reader otherwise gets no signal that anything
              happened. */
           <div id="set-detail" aria-live="polite" data-height={height} data-base={base} data-open={open.slug}>
+            {/* ⚠ THE SHEET'S ONLY CHROME, AND IT IS A BACK ARROW RATHER THAN AN
+                ✕ ON PURPOSE — `Reader.astro` settled that in the same words: the
+                intent is "leave this", not "close a panel", because there is a
+                whole page behind it to go back TO. Same reason it prefers
+                `history.back()`; see the script.
+
+                First in the markup because it is what a thumb should reach
+                first. Renders only below `md`, where a sheet exists to leave. */}
+            <button
+              type="button"
+              class="sets-back text-whisper font-sans text-xs tracking-wide uppercase"
+              data-set-close
+            >
+              ← Back to the sets
+            </button>
+
+            {/* ⚠ THE PANE'S OWN TITLE, AND IT IS NOT THE DOUBLE PRINT THE FIRST
+                BENCH KILLED. That one was Michael's sentence and then Spotify's
+                copy of it six pixels below — two voices saying the same thing at
+                once, which is what killed `stacked`. This is the SAME single
+                print relocated: once the set is a sheet, the index that was
+                serving as this pane's heading is behind it, and an untitled
+                sheet opening on a borrowed quote reads as nobody's.
+
+                Above `md` it does not render at all, because there the index is
+                still overhead and still doing the job. `aria-hidden` because the
+                index entry it repeats is already the accessible name of what is
+                open — see `aria-current` above. */}
+            <p class="sets-lede font-display text-primary mb-7 text-2xl leading-snug font-light" aria-hidden="true">
+              <span data-set-title>{open.title}</span>
+            </p>
+
             {/* Always rendered even when empty — the client writes the next
                 set's quote into it, and a container that appears and disappears
                 is a layout shift on every switch. */}
             <figure id="set-quote" class="prose-measure" hidden={!open.quote}>
-              <blockquote class={QUOTE_TEXT}>
+              <blockquote
+                class={QUOTE_TEXT}
+                style={openQuoteSize ? `--qs:${openQuoteSize.sm}rem;--ql:${openQuoteSize.lg}rem` : undefined}
+              >
                 {/* A quote may carry the line break its author put there. */}
                 <p class="whitespace-pre-line" data-quote-text>
                   {open.quote?.text}
@@ -210,15 +393,29 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
       </section>
 
       {/* Every set's quote and prose, inert, so the client can change panes
-          without a fetch. Cheap — seven short records — and it is what lets a
-          switch cost no navigation. */}
+          without a fetch. Cheap — eight short records — and it is what lets a
+          switch cost no navigation.
+
+          ⚠ THE QUOTE CARRIES ITS OWN TWO SIZES, and that is the whole reason the
+          browser never needs `quote-scale.ts`. A quote's size is a function of
+          its length, and this pane is the one surface on the site that replaces
+          a quote WITHOUT a navigation — so either the curve ships to the client
+          or the answers do. The answers are two numbers per set. */}
       <script
         type="application/json"
         id="set-data"
         is:inline
         set:html={JSON.stringify(
           Object.fromEntries(
-            sets.map((s) => [s.slug, { title: s.title, desc: descOf(s), url: s.url, quote: s.quote ?? null }]),
+            sets.map((s) => [
+              s.slug,
+              {
+                title: s.title,
+                desc: descOf(s),
+                url: s.url,
+                quote: s.quote ? { ...s.quote, size: quoteSizeOf(s) } : null,
+              },
+            ]),
           ),
         )}
       />
@@ -227,6 +424,175 @@ const QUOTE_CITE = 'font-serif text-[0.9rem] tracking-[0.08em] [font-variant:all
 }
 
 <style>
+  /* ── how an index sentence says it is a door ────────────────────────────────
+     Ruled 2026-09-02 on `/lab/afford-sets`. The header carries the diagnosis and
+     the rivals; what survives is a trace of hue at rest, a star in the gutter,
+     and full colour plus a glow on whichever sentence is being attended to.
+
+     ⚠ THE TWO SIGNALS ARRIVE TOGETHER ON PURPOSE, which is ADR 0022's rule in
+     its own words — three signals *"deliberately on the same focus and the same
+     easing so the row reads as one arrival rather than a checklist of effects."*
+     Same 0.4s, same trigger, no delay between them. */
+
+  .set-line {
+    /* A flex baseline row, the way the overview pairs its star with its name.
+       `baseline` rather than `center`: the mark sits on the sentence's baseline
+       instead of floating in the middle of a two-line block. The title is
+       wrapped in its own span so a second line hangs under the first rather than
+       returning to the star's left edge. */
+    display: flex;
+    align-items: baseline;
+    gap: 0.55em;
+    /* ⚠ HUE AT FULL OPACITY, AND THAT IS THE WHOLE FIX. This rested at
+       `--text-whisper` — 57% alpha on dusk, 69% on paper, no hue at all — which
+       is the disabled convention, so the seven sets a reader could open were
+       styled like dead items while the one already open wore the only colour on
+       the page. `.sky-name` does the opposite and says so: a TRACE of the lamp
+       mixed into the prose ink, because *"a stranger who lands and never moves
+       still sees that these are links"*.
+
+       22% of `--color-primary`. The site carries this device at 34% of `--cn`
+       on the Sky and 4% of primary in the feed; 38% here measured
+       `oklab(0.853 0.019 0.051)` against `.sky-name`'s
+       `oklab(0.859 0.017 0.048)` — near enough to be the same signal — and this
+       index sits one step quieter than the front door deliberately. */
+    color: color-mix(in oklab, var(--color-primary) 22%, var(--color-base-content));
+    /* NOT `transition-colors` from the class list: the star transitions too, and
+       both are declared at 0.4s so they arrive as one thing. */
+    transition: color 0.4s ease;
+  }
+
+  /* ⚠ `.is-focus` IS WRITTEN BY `focusTracker`, NOT BY `:hover`, and that is the
+     point — ADR 0022: *"hover is not a weaker signal on touch, it is an absent
+     one."* On a phone this lands on the sentence nearest the reading line; on a
+     pointer device, under the cursor. One rule serves both because the script
+     already decided which input to consult. `.is-open` joins it because the set
+     you took should read as attended to for as long as it is open. */
+  .set-line.is-focus,
+  .set-line:focus-visible,
+  .set-line.is-open {
+    color: var(--color-primary);
+  }
+
+  /* ── the mark ──────────────────────────────────────────────────────────────
+     ⚠ `StarMark`, NOT `StarBloom`, AND THE DIFFERENCE IS A CLAIM — see the note
+     at the call site. A single point, because a set is one playlist. */
+  .set-star {
+    /* `em` off the sentence, so one rule holds at both index sizes — the same
+       reason `StarMark` is em-sized at all. */
+    font-size: 0.62em;
+    flex: none;
+    color: var(--color-primary);
+    /* "Kind of faded" — far enough down that the glow has somewhere to travel,
+       high enough that the column reads as eight marks rather than as dust. */
+    opacity: 0.38;
+    transition:
+      opacity 0.4s ease,
+      color 0.4s ease;
+  }
+
+  /* ⚠ THE GLOW IS ON THE MARK, NOT THE SPAN. `.sky-star`'s reasoning, borrowed
+     rather than its code: *"a filter rasterises its whole subtree and a
+     descendant cannot opt out"*, so anything ever added inside this span would
+     silently be lit too.
+
+     ⚠ AND IT IS DECLARED AT REST WITH A TRANSPARENT COLOUR so only ALPHA moves.
+     Without it the filter interpolates from `none`, which is the identity, and
+     the BLUR RADIUS grows with the colour — a halo popping in a beat late
+     rather than a light coming up. Measured once already, on `.sky-cta__arrow`,
+     where it cost a bug.
+
+     ⚠ `:global()` IS LOAD-BEARING AND ITS ABSENCE FAILS SILENTLY. `.star-mark`
+     is rendered by `StarMark.astro`, so it carries THAT component's scope id;
+     Astro compiles a bare `.set-star .star-mark` into a selector demanding this
+     file's `data-astro-cid-*` on both halves, which the svg will never have. No
+     error, no warning — the rule matches nothing and every mark measures
+     `filter: none`. (`admin.css`'s `.sky-star .star-mark` needs none of this
+     because a plain stylesheet is not scoped at all.) */
+  .set-star :global(.star-mark) {
+    filter: drop-shadow(0 0 7px transparent);
+    transition: filter 0.4s ease;
+  }
+  .set-line.is-focus .set-star,
+  .set-line:focus-visible .set-star,
+  .set-line.is-open .set-star {
+    opacity: 1;
+  }
+  .set-line.is-focus :global(.star-mark),
+  .set-line:focus-visible :global(.star-mark),
+  .set-line.is-open :global(.star-mark) {
+    filter: drop-shadow(0 0 9px color-mix(in oklab, var(--color-primary) 70%, transparent));
+  }
+
+  /* ⚠ NO `star-breathe`, AND THE OMISSION IS DELIBERATE. The Sky's stars breathe
+     on a 9s cycle because eleven spread down a long page read as a sky; eight in
+     a tight column would read as a list that will not sit still, and what was
+     asked for was two states — faded, then glowing — not three. One line to
+     reinstate if the room turns out to want the atmosphere. */
+
+  /* ── the sheet ─────────────────────────────────────────────────────────────
+     ⚠ ALL OF THIS IS BELOW `md`, AND ABOVE IT NOTHING HERE APPLIES. The
+     side-by-side layout was never the question and is not touched: at `md` the
+     pane is a grid column beside the index, exactly as it has been since the
+     first bench. See the component header for the ruling and the measurements.
+
+     The sheet's two pieces of furniture are hidden by default and claimed by the
+     narrow branch, rather than the reverse — so the desktop layout cannot
+     inherit them by accident, and neither can a future width. */
+  .sets-lede,
+  .sets-back {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    /* The index is the page; the set opens over it. `position: fixed` rather
+       than a `<dialog>` — moving the pane into the top layer would mean moving
+       the NODE, and that reloads the embed. So the pane stays a grid child that
+       has been lifted out of flow, and the grid collapses to the index alone,
+       which is exactly what should be behind the sheet.
+
+       ⚠ `visibility` RATHER THAN `display`, so the transform has something to
+       animate and the embed keeps its layout box while closed — a `display:
+       none` iframe is re-laid-out on every open, which is the flicker the first
+       bench spent its whole budget removing. It is also what lets a playing
+       embed go on playing behind the index, which the header records as a known
+       and accepted cost rather than an oversight. */
+    .sets-room > #set-detail {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 1.25rem 1.25rem 3rem;
+      background: var(--color-base-100);
+      transform: translateY(100%);
+      visibility: hidden;
+      transition:
+        transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
+        visibility 320ms;
+    }
+    .sets-room.is-open > #set-detail {
+      transform: none;
+      visibility: visible;
+    }
+    .sets-lede,
+    .sets-back {
+      display: block;
+    }
+    .sets-back {
+      margin-bottom: 1.75rem;
+    }
+
+    /* ⚠ THE SLIDE IS THE ONE THING A REDUCED-MOTION READER MUST NOT GET, and it
+       is a 100vh translate — by far the largest movement this room makes. The
+       sheet still appears and still dismisses; it simply stops travelling. */
+    @media (prefers-reduced-motion: reduce) {
+      .sets-room > #set-detail {
+        transition-duration: 0.01ms;
+      }
+    }
+  }
+
   /* The waiting state. Slow and shallow on purpose — this is a page you read,
      and anything that pulses at UI speed would pull the eye off the sentences
      while the player loads. */

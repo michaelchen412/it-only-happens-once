@@ -28,7 +28,8 @@
 */
 import type { SuiteItem } from '../lib/constellations';
 import QuoteReveal from './QuoteReveal.astro';
-import { renderMarkdown } from '../lib/markdown';
+import { renderMarkdown, toPlainText } from '../lib/markdown';
+import { quoteStyle } from '../lib/quote-scale';
 
 interface Props {
   item: SuiteItem;
@@ -40,6 +41,14 @@ const { item } = Astro.props;
 // is where an unhonoured `\` would have been loudest: a stanza is set at
 // display size with nothing else on the line.
 const quoteHtml = item.kind === 'quote' ? renderMarkdown(item.quote.body, { breaks: true }) : '';
+
+// ⚠ AND IT RAMPS THE SAME WAY THEY DO, AS OF 2026-09-01 (`/lab/quotes`). This was
+// flat 1.35 / 1.6rem, which is the register a SHORT stanza wants — and a suite
+// is exactly where the flat version hurt most, because a stanza is set with
+// nothing else on the line and the file header already says so. A 500-character
+// passage at 1.6rem in the middle of a read stops being a movement and becomes
+// the piece. The ceiling is unchanged; only the long ones move.
+const quoteSizeStyle = item.kind === 'quote' ? quoteStyle(toPlainText(item.quote.body).length, 'suite') : '';
 ---
 
 {
@@ -69,7 +78,8 @@ const quoteHtml = item.kind === 'quote' ? renderMarkdown(item.quote.body, { brea
     <figure>
       <a href={`/blog/${item.quote.slug}`} data-read={item.quote.slug} class="block">
         <blockquote
-          class="quote-body prose-measure text-[1.35rem] leading-[1.5] font-light sm:text-[1.6rem]"
+          class="quote-body quote-ramp prose-measure leading-[1.5] font-light"
+          style={quoteSizeStyle}
           set:html={quoteHtml}
         />
       </a>

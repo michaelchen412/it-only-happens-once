@@ -95,16 +95,17 @@ export function setHref(slug: string, base: string): string {
   return `${base}${base.includes('?') ? '&' : '?'}set=${encodeURIComponent(slug)}`;
 }
 
-/**
- * ⚠ THE INDEX LEANS, and it is borrowed from `ConstellationSuite`'s stanza
- * indents rather than invented. Seven left-aligned sentences read as a list of
- * options; seven that drift read as a page someone wrote. The amplitude is
- * smaller than the suite's (that one indents up to 15%) because these lines are
- * navigation and must still scan as a column — past about 8% the ragged left
- * edge stops looking composed and starts looking broken.
- */
-export const INDEX_INDENTS = ['0%', '6%', '2%', '8%', '0%', '5%', '3%'];
+/*
+  ⚠ THE INDEX NO LONGER LEANS, AND `INDEX_INDENTS`/`indentFor` ARE GONE WITH IT
+  (2026-09-02, `/lab/afford-sets`). The lean was borrowed from
+  `ConstellationSuite`'s stanza indents on the argument that *"seven
+  left-aligned sentences read as a list of options; seven that drift read as a
+  page someone wrote"* — true of a column of bare sentences, and false the
+  moment each one grows a mark. A gutter star's whole job is a straight edge to
+  read down, and an indent per item put the eight marks at six different x
+  positions. Measured before it was cut.
 
-export function indentFor(i: number): string {
-  return INDEX_INDENTS[i % INDEX_INDENTS.length];
-}
+  It was also already failing on its own terms below `md`, where most titles
+  wrap and only the first line is indented, so the column read ragged rather
+  than composed. `git log` has the amplitudes.
+*/

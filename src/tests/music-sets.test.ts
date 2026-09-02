@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indentFor, INDEX_INDENTS, resolveSet, setHref, type MusicSet } from '../lib/music-sets';
+import { resolveSet, setHref, type MusicSet } from '../lib/music-sets';
 
 const SETS: MusicSet[] = [
   { slug: 'first', title: 'First', description: '', url: 'https://open.spotify.com/playlist/aaa' },
@@ -46,21 +46,5 @@ describe('setHref', () => {
 
   it('encodes a slug', () => {
     expect(setHref('a b', '/x')).toBe('/x?set=a%20b');
-  });
-});
-
-describe('indentFor', () => {
-  it('wraps past the end of the pattern', () => {
-    expect(indentFor(0)).toBe(INDEX_INDENTS[0]);
-    expect(indentFor(INDEX_INDENTS.length)).toBe(INDEX_INDENTS[0]);
-    expect(indentFor(INDEX_INDENTS.length + 2)).toBe(INDEX_INDENTS[2]);
-  });
-
-  // Past ~8% a ragged left edge stops reading as composed and starts reading as
-  // broken. This is the guard on that judgement, not on the exact numbers.
-  it('keeps every indent inside the readable band', () => {
-    for (const v of INDEX_INDENTS) {
-      expect(Number(v.replace('%', ''))).toBeLessThanOrEqual(8);
-    }
   });
 });
