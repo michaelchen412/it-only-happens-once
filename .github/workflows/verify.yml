@@ -26,6 +26,24 @@
 # buy something a local run already provides. Same trade as plan 31 §4's refusal
 # of database branching, in a different costume. If that ever changes, it is a
 # decision to write down, not a convenience to reach for.
+#
+# ── ACTION VERSIONS: v4 → v7, 2026-09-08 ─────────────────────────────────────
+#
+# Every run was printing "Node.js 20 is deprecated … being forced to run on
+# Node.js 24". That is a warning about the ACTIONS' OWN runtime, not about this
+# repo's `node-version` below, and the two are unrelated: the checks still run
+# on the 22.12.0 that matches `engines.node`. Forced is the operative word — the
+# runner was already executing v4 on a runtime it was not built against, which
+# is a state to leave rather than to sit in. v5 declares `using: node24`, and v7
+# is where that line currently is.
+#
+# ⚠ v5 AND v6 EACH CARRY A `setup-node` BREAKING CHANGE, AND NEITHER TOUCHES
+# THIS FILE — checked rather than assumed. v5 added automatic caching driven by
+# `packageManager` in package.json; v6 narrowed that automatic caching to npm.
+# Both are about what happens when the cache is left UNSPECIFIED, and all three
+# jobs below pass `cache: npm` explicitly, so the behaviour they change is
+# behaviour this workflow never relied on.
+
 name: verify
 
 on:
@@ -53,8 +71,8 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           # Matches `engines.node` in package.json.
           node-version: '22.12.0'
@@ -95,8 +113,8 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.12.0'
           cache: npm
@@ -154,7 +172,7 @@ jobs:
     # swallowed the `high` that started all this.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # ⚠ FULL HISTORY, because the check below diffs the push's whole
           # commit RANGE, not just its tip. A push of several commits where only
@@ -187,7 +205,7 @@ jobs:
             echo 'run=false' >> "$GITHUB_OUTPUT"
             echo 'Lockfile unchanged — audit skipped. Monday sweeps the tree regardless.' >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.tree.outputs.run == 'true'
         with:
           node-version: '22.12.0'
