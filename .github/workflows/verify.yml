@@ -124,18 +124,37 @@ jobs:
       # (once here, once in the job above); it costs ~22s and keeps the two jobs
       # independently readable, which is worth more than the saving.
       #
-      # ⚠ NO SECRETS, AND THAT WAS CHECKED RATHER THAN ASSUMED. The first draft
-      # of this job passed `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY`,
-      # on the reasoning that `astro build` evaluates every route module and
-      # `lib/supabase.ts` reads both at module scope. It was tested by moving
-      # `.env.local` aside and building with the two unset: **it completes**,
-      # because a bare `import.meta.env.X` is `undefined` at build time and
-      # nothing in a route calls Supabase until a request arrives.
+      # ⚠ THIS JOB NEEDS THE TWO `PUBLIC_SUPABASE_*` VALUES, AND HAS BEEN RED
+      # WITHOUT THEM SINCE 2026-08-18. The paragraph that stood here said the
+      # build "completes with the two unset", and that was true the day it was
+      # written: a bare `import.meta.env.X` is `undefined` at build time and
+      # nothing in a route calls Supabase until a request arrives. Eight days
+      # later `0d681ae` added an `env.schema` to astro.config.mjs whose entire
+      # purpose is that the two keys which can 500 every route FAIL THE BUILD —
+      # which deliberately made that premise false. Every run since has ended
+      # `[EnvInvalidVariables] … PUBLIC_SUPABASE_URL is missing`.
       #
-      # So this job needs no repository secrets at all — which is the same
-      # answer 31 · §4 reached for the e2e suite, arrived at from the other
-      # direction. If a future config change makes the build genuinely need a
-      # key, that is a decision to write down, not an `env:` block to paste.
+      # ⚠ WHAT THAT COST WAS NOT A RED SQUARE, IT WAS THE GATE. dependabot.yml
+      # argues at length that `verify` is NOT the check a dependency bump needs
+      # and that only this job runs `check-server-bundle.mjs`. With this job
+      # red, every Dependabot PR was unmergeable — so no bump landed for four
+      # weeks, and the advisories those bumps would have closed arrived instead
+      # as consecutive red Mondays on the `audit` job, including a CRITICAL
+      # Astro RCE that PR #15 had been carrying the fix for since 2026-09-08.
+      # A broken gate is quieter than a missing one, and costs more.
+      #
+      # ⚠ `.env.example`, NOT AN `env:` BLOCK AND NOT REPOSITORY SECRETS — the
+      # paragraph above asked that this be "a decision to write down, not an
+      # `env:` block to paste", so here is the decision. That file is already
+      # committed, already carries the project URL `image.domains` pins, and
+      # its key is a placeholder long enough to clear the schema's `min: 20`.
+      # Copying it keeps ONE source of truth: a third required variable added
+      # to the schema arrives here for free, where a pasted pair would have to
+      # be remembered. It adds no secret to this repo that is not already in
+      # it, and the service-role placeholder it also carries is inert — nothing
+      # in a build calls Supabase, which is the half of the old paragraph that
+      # is still true and is why this job still needs no repository secrets.
+      - run: cp .env.example .env
       - run: npm run build
 
   audit:
