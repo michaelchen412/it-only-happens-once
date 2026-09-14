@@ -75,6 +75,33 @@ updates:
       - dependency-name: '@tiptap/*'
         update-types: ['version-update:semver-major']
 
+      # ⚠ ASTRO MINORS ARE BLOCKED UPSTREAM, NOT DEFERRED BY PREFERENCE, and
+      # `package.json` says the same thing twice on purpose (`~7.2.9`, not a
+      # caret). Astro 7.3 moved the DEPENDENCY SCAN onto the Rust compiler, and
+      # it mis-reads a backtick inside a `{/* … */}` expression comment as an
+      # unterminated template literal:
+      #
+      #   [PARSE_ERROR] Expected a semicolon … FragmentBrowser.astro
+      #
+      # That construct is this repo's house style for explaining a decision next
+      # to the markup it governs — 278 of them across 75 files — so the workaround
+      # is to delete the documentation, which is the wrong way round.
+      #
+      # ⚠ AND NO CHECK HERE WOULD CATCH IT, which is why it is written down
+      # rather than left to the `build` job. `astro build` SUCCEEDS on 7.3.2;
+      # only the dev server's scan fails, degrading to "Skipping dependency
+      # pre-bundling", after which pages die as `net::ERR_ABORTED` and the e2e
+      # suite reads like an outage. CI never renders a page, so CI stays green
+      # while local development is unusable.
+      #
+      # 7.2.9 is not a compromise on security: the AVIF RCE (GHSA-26w7-cxv4-gfx2,
+      # CVSS 9.8) was patched in 7.2.8, and `~` still takes 7.2.x patches. Verified
+      # 2026-09-14 by installing each version and reading the dev log: 7.3.2 errors,
+      # 7.2.9 does not. UNBLOCK WHEN a 7.3.x parses that comment form — then drop
+      # these lines and restore the caret.
+      - dependency-name: astro
+        update-types: ['version-update:semver-minor']
+
   # The Actions in workflows/verify.yml pin to major tags (`actions/checkout@v4`),
   # which float — so this is genuinely just the major bumps, a few times a year.
   - package-ecosystem: github-actions
