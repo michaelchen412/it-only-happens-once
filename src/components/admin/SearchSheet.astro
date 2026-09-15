@@ -1,0 +1,211 @@
+---
+/*
+  SearchSheet — the Observatory's ⌕: one field over the whole building.
+
+  Michael, 2026-09-08: *"How difficult would it be for us to implement a
+  universal search bar? meaning I can query tasks, notes, essays, quotes, etc.
+  all from one central search?"* — and the thing it finally answers, from the
+  notes room a fortnight earlier: *"did I already write this down?"* had no
+  answer anywhere in the building, because the Fragment Manager excludes jottings
+  by construction and every other room searches only itself.
+
+  ── WHERE IT LIVES, AND WHY IT IS A TRIGGER RATHER THAN A FIELD ─────────────
+
+  ⚠⚠ THE OBSERVATORY HAS NO DESKTOP HEADER, and that fact decided this before
+  any design did. `AdminLayout`'s only top bar is `md:hidden` — *"desktop uses
+  the full height for content"* — so the entire persistent desktop chrome is the
+  15rem sidebar plus the ✚ pinned bottom-right, and *"a field in the header"*,
+  which is what everyone proposes first, is not an available position without
+  inventing a header to put it in.
+
+  ⚠ A FIELD IN THE SIDEBAR WAS BUILT AND MEASURED, AND IT LOST TO ITS OWN WIDTH.
+  The rail is 15rem; an excerpt cannot be read at 15rem, so its results had to
+  break out to a 30rem panel beside the field — two boxes for one gesture. A
+  TRIGGER has no width to be wrong about: the field lives inside the surface,
+  where there is room for it, so the chrome carries the affordance and the sheet
+  carries the work.
+
+  ⚠ AND THE SAME SLOT EXISTS AT BOTH BREAKPOINTS, which is why this is one
+  placement rather than two. `AdminLayout` has exactly two `h-14` header strips:
+  the sidebar's, whose trailing `ml-auto` slot holds `#sb-close` — `md:hidden`,
+  so above 768px it is EMPTY — and the app top bar, whose right edge holds
+  nothing at all. One ⌕ in each is the chrome expressing one idea twice.
+
+  ⚠ IT LEAVES THE BOTTOM-RIGHT TO THE ✚. A second floating button there was the
+  rival and it measured identically, because both open this same sheet; it lost
+  on the corner. The building now reads **✚ adds, ⌕ finds** rather than as two
+  round buttons competing for one thumb — and that is the right way round
+  ergonomically too, since capture is frequent and one-handed while searching is
+  deliberate and rarer.
+
+  ── THE SURFACE ────────────────────────────────────────────────────────────
+
+  A `.drawer-dialog` — the building's own right-hand sheet, full width on a
+  phone. Measured against a centred ⌘K modal and the sidebar panel at 1440×900:
+  **6 of 8 kinds visible without scrolling, against 3 of 8 for both.** The
+  reason is height — a drawer is `100dvh` where a centred modal is capped — and
+  the reason it matters is §7a's, one level up: a result list that returns eight
+  kinds and shows you one has hidden the answer just as surely as a marked hit
+  behind a clamp.
+
+  ⚠ `.drawer-dialog` IS ALSO WHERE THE KEYBOARD HANDLING LIVES. It sizes itself
+  `calc(100dvh - var(--kb, 0px))`, so on a phone the software keyboard does not
+  sit over the foot of the list — `100dvh` alone is the same number with the
+  keyboard up. This is the reason to reuse the class rather than style a dialog
+  here: a hand-rolled copy had none of that, nor the enter/exit animation, nor
+  the reduced-motion handling, and "the sheet doesn't close gracefully" was that
+  and nothing else.
+*/
+import { Icon } from 'astro-icon/components';
+import '../../styles/search-results.css';
+
+interface Props {
+  /**
+   * Which piece to render. The two triggers sit in two different header strips
+   * and the sheet sits at the end of the body, so the layout mounts this three
+   * times rather than once.
+   */
+  part: 'trigger-topbar' | 'trigger-sidebar' | 'sheet';
+}
+const { part } = Astro.props;
+---
+
+{
+  part === 'trigger-topbar' && (
+    /* The app top bar (`md:hidden`), whose right edge holds nothing else.
+       `ml-auto` pushes it there past the wordmark and the room title. */
+    <button
+      type="button"
+      data-search-open
+      class="u-tap rounded-field text-muted hover:bg-base-200 hover:text-base-content ml-auto p-1.5"
+      aria-label="Search everything"
+      aria-haspopup="dialog"
+    >
+      <Icon name="ph:magnifying-glass" class="text-xl" />
+    </button>
+  )
+}
+
+{
+  part === 'trigger-sidebar' && (
+    /*
+      ⚠ `hidden md:inline-grid` — DESKTOP ONLY, and not for layout reasons. On a
+      phone the sidebar is a drawer you had to open to reach this, and the top
+      bar's ⌕ is already one tap away on every room; a second trigger inside the
+      drawer would be a second answer to a question already answered. Above
+      768px `#sb-close` is `md:hidden`, so this takes the slot it vacates.
+    */
+    <button
+      type="button"
+      data-search-open
+      class="u-tap rounded-field text-whisper hover:bg-base-200 hover:text-base-content ml-auto hidden place-items-center p-1 md:inline-grid"
+      aria-label="Search everything"
+      aria-haspopup="dialog"
+      title="Search everything (⌘K)"
+    >
+      <Icon name="ph:magnifying-glass" class="text-lg" />
+    </button>
+  )
+}
+
+{
+  part === 'sheet' && (
+    <dialog id="search-sheet" class="drawer-dialog search-sheet" aria-label="Search everything">
+      <div class="search-sheet__shell">
+        <label class="search-sheet__field">
+          <span class="search-sheet__mag" aria-hidden="true">
+            ⌕
+          </span>
+          {/*
+            ⚠ `autocomplete="off"` AND NO `name`, so the browser never offers a
+            history dropdown over the results this is already producing.
+          */}
+          <input
+            type="search"
+            data-search-input
+            autocomplete="off"
+            placeholder="Search everything…"
+            aria-label="Search everything"
+            aria-controls="search-results"
+          />
+          {/* ⚠ `data-close` is the building's exit hook — `wireSheetDismiss`
+              finds the ✕ by it, so this button needs no listener of its own and
+              cannot drift out of step with Escape and the backdrop. */}
+          <button type="button" data-close class="search-sheet__x" aria-label="Close">
+            <Icon name="ph:x" class="text-lg" />
+          </button>
+        </label>
+        {/* `aria-live` so a screen reader hears the count change as you type,
+            rather than having to go looking for a list that silently swapped. */}
+        <div id="search-results" class="search-sheet__body" data-search-results aria-live="polite" />
+      </div>
+    </dialog>
+  )
+}
+
+<style>
+  /*
+    ⚠ `.drawer-dialog` DOES THE WORK; THIS IS THE WIDTH AND THE INNARDS. The
+    class already pins right, slides 0.28s with `@starting-style` in and
+    `[data-closing]` out, fades its backdrop, zeroes its own motion under
+    `prefers-reduced-motion`, and sizes itself against the software keyboard.
+    Anything restated here would be a copy that stops agreeing with the other
+    twenty sheets the first time one of them changes.
+  */
+  .search-sheet {
+    width: min(32rem, 100vw);
+  }
+  .search-sheet__shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .search-sheet__field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--color-base-300);
+    padding: 0.8rem 1rem;
+    flex-shrink: 0;
+  }
+  .search-sheet__field input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: 0;
+    outline: none;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-base-content);
+  }
+  /*
+    ⚠ TWO ✕ GLYPHS, SIDE BY SIDE, MEANING DIFFERENT THINGS. `type="search"`
+    renders a native clear button in Chromium, and it landed immediately left of
+    this sheet's own ✕ — identical glyphs, one clearing the field and one closing
+    the surface. Escape closes rather than clears here (see scripts/search.ts),
+    so the native one had no job left.
+  */
+  .search-sheet__field input[type='search']::-webkit-search-cancel-button {
+    display: none;
+  }
+  .search-sheet__mag {
+    opacity: 0.45;
+    flex-shrink: 0;
+  }
+  .search-sheet__x {
+    background: none;
+    border: 0;
+    color: var(--text-whisper);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .search-sheet__x:hover {
+    color: var(--color-base-content);
+  }
+  .search-sheet__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.85rem 1rem 2rem;
+  }
+</style>

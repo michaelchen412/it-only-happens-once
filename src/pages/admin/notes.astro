@@ -48,8 +48,8 @@ import { MAX_SHELVES, listShelves, shelfCounts, shelvesByFragment } from '../../
 const supabase = Astro.locals.supabase;
 
 /*
-  THE ROOM'S TWO CONTROLS (bench: /lab/shelves + /lab/search, decided
-  2026-09-01). Until then this page had neither, and its own header said why:
+  THE ROOM'S TWO CONTROLS (benched and decided 2026-09-01; the search half is
+  written up in docs/search.md §7). Until then this page had neither, and its own header said why:
   *"if it is ever genuinely 100 deep the answer is a search field, which is the
   moment to add one and not before."* What changed is not the depth — it is that
   the pile grew a way of being DELIBERATELY kept, so it is no longer only a
@@ -156,8 +156,8 @@ const notes = (rows ?? []).map((n) => ({
   long: (n.body ?? '').split('\n').length > 10 || (n.body ?? '').length > 700,
   shelves: shelvesFor[n.id] ?? [],
   /*
-    ⚠ WINDOWED EXCERPTS, NOT MARKS IN THE CARD — decided on /lab/search, and it
-    was decided by a number rather than by taste. Marking in place is nearly
+    ⚠ WINDOWED EXCERPTS, NOT MARKS IN THE CARD — docs/search.md §7a, and it was
+    decided by a number rather than by taste. Marking in place is nearly
     free (`renderMarkdown` already takes a `highlight` option) and it loses:
     `.dump__text--clamped` caps a long card at 16rem, so measured at 30 notes,
     **24 of 36 matches were marked and invisible**. Excerpts show every hit in

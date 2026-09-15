@@ -18,7 +18,7 @@
   and every one of them REMOVES the note. There is no way to say *"I am keeping
   this and it is not going anywhere."* So a note kept deliberately looks exactly
   like a note not yet dealt with, the pile only ever grows, and that growth is
-  what made a search field feel necessary in the first place (/lab/search).
+  what made a search field feel necessary in the first place (docs/search.md §7).
 
   If the claim is right, `inbox` below reads as a queue you can empty and the
   other three read as decoration. If it is wrong, this bench should say so —
@@ -65,7 +65,7 @@
   ── WHAT IS REAL HERE, AND WHAT IS NOT ──────────────────────────────────────
 
     REAL · the search. `excerpts`/`toPlain`/`hasMatch`/`MIN_SEARCH`, the
-           rendering /lab/search settled on 2026-09-01, so the two features are
+           rendering settled on 2026-09-01 (docs/search.md §7a), so the two features are
            judged TOGETHER — whether a shelf filter and a search box in the same
            strip fight each other is a question neither bench can ask alone.
     REAL · the chrome. `.seg` + `.type-badge` + `.type-badge__n` is the
@@ -108,7 +108,7 @@
   are shelved under `philosophy`, and the inbox had already hidden them. So the
   claim, built naively, BREAKS SEARCH: the pile's one way of finding an old
   thought would only ever see the notes nobody had dealt with yet, which is the
-  exact opposite of what /lab/search was for.
+  exact opposite of what the search field was for.
 
   The fix is a rule rather than a toggle, and `search escapes the inbox` is on
   by default so it can be judged as the shipped behaviour:
@@ -439,7 +439,7 @@ const groupOf = (n: (typeof rows)[number]) => (variant === 'grouped' && !shelf ?
     <div class="sh__bar">
       {
         /* ⚠ ONE STRIP, BOTH CONTROLS, and that adjacency is deliberate rather
-          than tidy: /lab/search settled the search rendering alone, and the
+          than tidy: the search bench settled the rendering alone, and the
           question neither bench can ask by itself is whether a shelf filter and
           a search box in the same strip fight each other. Search is the wider
           net; the shelves narrow it. If pressing a shelf while a term is live

@@ -28,6 +28,7 @@ import NotificationsDialog from '../components/admin/NotificationsDialog.astro';
 import StarMark from '../components/StarMark.astro';
 import BackToTop from '../components/BackToTop.astro';
 import { attentionLabel, titlePrefix } from '../lib/hq/attention';
+import SearchSheet from '../components/admin/SearchSheet.astro';
 
 interface Props {
   title?: string;
@@ -229,6 +230,12 @@ const nav = [
           <span class="text-primary text-lg leading-none"><StarMark /></span>
           <span class="font-display text-lg leading-none">Observatory</span>
         </a>
+        {
+          /* ⌕ — desktop only, in the slot `#sb-close` vacates above 768px. It
+            carries its own `ml-auto`, so on a phone (where both are in the DOM)
+            it still sits left of the close button. */
+        }
+        <SearchSheet part="trigger-sidebar" />
         <button
           id="sb-close"
           class="u-tap rounded-field text-whisper hover:bg-base-200 hover:text-base-content ml-auto p-1 md:hidden"
@@ -369,6 +376,11 @@ const nav = [
         </button>
         <span class="text-primary text-lg leading-none"><StarMark /></span>
         <span class="font-display text-base leading-none">{title}</span>
+        {
+          /* ⌕ — the phone's only search affordance. The sidebar is shut here and
+            there is no keyboard to press ⌘K with, so this one is never hidden. */
+        }
+        <SearchSheet part="trigger-topbar" />
       </header>
 
       {
@@ -430,6 +442,12 @@ const nav = [
   <NotificationsDialog />
   {/* the manager and library run long; the sheets bring their own */}
   <BackToTop />
+  {
+    /* The ⌕'s surface. Mounted here beside the building's other three dialogs
+      for the reason the ✚ is: a search over the whole corpus belongs to the
+      BUILDING rather than to any room (10-hq §10c). */
+  }
+  <SearchSheet part="sheet" />
 
   <script>
     // Every `<time data-local>` on every admin surface, rewritten into the
@@ -461,6 +479,12 @@ const nav = [
     // to. Mounted here because a layout cannot know which room will open a
     // sheet, and a room that had to opt in would be the room that forgot.
     import '../scripts/keyboard-inset';
+
+    // And the ⌕. Mounted here for the same reason as the rest of this list —
+    // searching is a fact about the building, not about the room you happen to
+    // be standing in, and a room that had to opt in would be the room that
+    // forgot.
+    import '../scripts/search';
 
     // ⚠ MOUNTED FROM THE LAYOUT FOR A REASON THE OTHERS DO NOT HAVE. Its
     // `sync()` re-asserts this device's push subscription on every admin load,

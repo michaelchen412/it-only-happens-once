@@ -1,0 +1,46 @@
+---
+/*
+  /admin/search-panel — an Astro PARTIAL (no doctype/head/scripts) serving the
+  universal bar's result list. `scripts/search.ts` fetches it on every debounced
+  keystroke and swaps the innerHTML, the way `fragment-panel.ts` drives
+  `/admin/fragments-panel`.
+
+  ⚠ A PARTIAL AND NOT A NAVIGATION, and that is a behaviour decision rather than
+  a plumbing one. The sheet is a surface you type INTO; reloading the page under
+  it on every keystroke would throw away focus, the caret and the scroll position
+  of whatever room you opened it from — and the room underneath is usually the
+  thing you are searching in order to get back to.
+
+  Auth: middleware gates every `/admin` path, so this partial is admin-only too.
+  It invents no boundary of its own — the twelve queries behind it are governed
+  entirely by RLS, per row (see `lib/search-all.ts`).
+
+  ⚠ IT TAKES ONE PARAM, DELIBERATELY. The container bench drove grouping, row
+  shape, scope and cap from the query string while they were open questions.
+  They are settled now and live in the code that owns each — `SearchResults.astro`
+  and `searchEverything` — and a param that no longer varies is a param inviting
+  a crafted URL to reopen a decision.
+*/
+import SearchResults from '../../components/admin/SearchResults.astro';
+import { MIN_SEARCH } from '../../lib/search-highlight';
+import { searchEverything } from '../../lib/search-all';
+
+export const partial = true;
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+// One of `MIN_SEARCH`'s enforcement sites (docs/search.md §3) — the server gate,
+// reading the one shared constant rather than repeating the comparison.
+const searching = q.length >= MIN_SEARCH;
+
+const { hits } = searching ? await searchEverything(Astro.locals.supabase, q) : { hits: [] };
+---
+
+{
+  !searching ? (
+    <p class="sr__empty">Type at least {MIN_SEARCH} characters.</p>
+  ) : hits.length === 0 ? (
+    <p class="sr__empty">Nothing matches “{q}”.</p>
+  ) : (
+    <SearchResults hits={hits} term={q} />
+  )
+}

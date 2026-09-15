@@ -1,0 +1,130 @@
+---
+/*
+  SearchResults — the universal bar's result list (docs/search.md §8).
+
+  ⚠ IT RENDERS SEGMENTS, NEVER HTML STRINGS. §2 calls this the XSS boundary:
+  `Highlighted.astro` takes `Seg[]` and Astro escapes every text node, so the
+  only real markup inserted is `<mark>`. Do not "optimise" any of this into a
+  `.replace(term, '<mark>…')` string builder.
+
+  ⚠ AND IT ALWAYS EXCERPTS, NEVER MARKS IN PLACE. §7a measured the alternative
+  and it lost by a number: 24 of 36 matches marked and invisible behind the notes
+  pile's clamp. *"A bounded rendering surface makes highlighting a lie unless the
+  bound is lifted or the rendering is replaced."* A result row is the most
+  bounded surface in the building, so the rendering is replaced — and the
+  accepted cost is that a result stops being the thing and becomes a hit.
+
+  ── THE THREE RULES THAT MAKE A CROSS-KIND LIST READABLE ────────────────────
+
+  All three came out of measuring the container bench, and each is a number
+  rather than a preference.
+
+  1. GROUPED BY KIND, NOT RANKED. §5's *"no ranking — results keep the list's
+     normal order"* was free with one table. Across twelve there IS no shared
+     order to keep: ⚠ `updated_at` does not even exist on sets, songs,
+     constellations, works, authors or subjects, so a recency sort would file
+     half the building at the bottom by accident rather than by relevance.
+     Grouping never asks the question, which is how §5 survives.
+
+  2. AT MOST `CAP` PER KIND. ⚠ THIS IS THE ONE THE BENCH FOUND RATHER THAN
+     STARTED WITH. Every container scored **1 of 8 kinds above the fold** —
+     sidebar, palette and sheet, grouped and flat, one window and none — and
+     uniform results mean the variable under test is not the one that matters.
+     `love` returns 36 hits of which 23 are essays, so ONE kind buried the other
+     seven in any box. Capping at 3 took the sheet from 1 of 8 to **6 of 8**. No
+     container can fix a head that long; bounding it where it is produced can.
+
+  3. NO EXCERPT WHEN THE NAME ALREADY CARRIES THE MATCH. A quote, a jotting and
+     a song are named by their own first words (`nameless`), so for them the
+     marked name IS the context — and a window repeating it underneath is a row
+     of noise costing a line of the fold. Essays and tasks have real titles, so
+     they usually still get one.
+*/
+import Highlighted from './Highlighted.astro';
+import { excerpts, hasMatch, highlight, toPlain } from '../../lib/search-highlight';
+import { KINDS, ORDER, moreHref, type Hit } from '../../lib/search-all';
+
+interface Props {
+  hits: Hit[];
+  term: string;
+}
+const { hits, term } = Astro.props;
+
+/**
+ * Rows per kind. ⚠ Three, and the number is measured — see rule 2 above.
+ * Raising it trades kinds-above-the-fold for depth-within-a-kind, and the whole
+ * point of a universal bar is the first of those: depth is what the owning room
+ * is for, and every capped group links straight into it.
+ */
+const CAP = 3;
+
+/*
+  `excerpts(…, maxHits: 1)` rather than a second code path — the count that
+  actually bounds the DOM is the number of HIGHLIGHTS, not of windows (§4), so
+  the bound belongs in the call that produces them.
+
+  Rule 3: `hasMatch` on the NAME decides whether a window is worth a line. It is
+  the engine's own test, so it agrees with what `highlight` just marked.
+*/
+const rendered = hits.map((h) => ({
+  ...h,
+  nameSegs: highlight(h.name, term),
+  ex: !h.body || hasMatch(h.name, term) ? null : excerpts(toPlain(h.body), term, 56, 1),
+}));
+
+const groups = ORDER.map((k) => {
+  const all = rendered.filter((h) => h.kind === k);
+  return { key: k, ...KINDS[k], rows: all.slice(0, CAP), hidden: Math.max(0, all.length - CAP) };
+}).filter((g) => g.rows.length > 0);
+---
+
+{
+  groups.map((g) => (
+    <section class="sr__group">
+      <h3 class="sr__kind">
+        {g.label}
+        {/* The kind's FULL count, not the shown one — the tail below says how
+            many of them are behind the cap. */}
+        <span class="sr__count">{g.rows.length + g.hidden}</span>
+      </h3>
+      <ul class="sr__list">
+        {g.rows.map((h) => (
+          <li>
+            {/* ⚠ THE WHOLE ROW IS THE LINK, not a title with a body beside it.
+                A result is one thing to press, and a nested target inside a row
+                is a second place to aim at the same destination. */}
+            <a class="sr__hit" href={h.href} data-hit data-hit-kind={h.kind}>
+              <p class="sr__name">
+                <Highlighted segs={h.nameSegs} />
+                {h.meta && <span class="sr__meta">{h.meta}</span>}
+              </p>
+              {h.ex && h.ex.windows.length > 0 && (
+                <div class="sr__ex">
+                  {h.ex.windows.map((w) => (
+                    <p class="sr__win">
+                      {w.lead && '… '}
+                      <Highlighted segs={w.segs} />
+                      {w.trail && ' …'}
+                    </p>
+                  ))}
+                  {h.ex.more > 0 && <span class="sr__more">+{h.ex.more} more in this one</span>}
+                </div>
+              )}
+            </a>
+          </li>
+        ))}
+        {/* The capped tail, and it is a LINK — see `moreHref`. A line naming
+            twenty essays you cannot reach is the "no address" defect one level
+            up. It also keeps `excerpts()`'s own contract: a bounded surface
+            says what it bounded. */}
+        {g.hidden > 0 && (
+          <li>
+            <a class="sr__capped" href={moreHref(g.key, term)}>
+              +{g.hidden} more in {g.label.toLowerCase()} →
+            </a>
+          </li>
+        )}
+      </ul>
+    </section>
+  ))
+}

@@ -1,0 +1,128 @@
+/*
+  The universal bar's result list (docs/search.md §8).
+
+  ⚠ PLAIN GLOBAL CSS IN A FILE, NOT A SCOPED BLOCK, AND THAT IS A REAL ASTRO
+  TRAP RATHER THAN A PREFERENCE. `SearchResults.astro` is rendered by
+  `/admin/search-panel`, a PARTIAL that `scripts/search.ts` fetches and swaps
+  into the sheet. A partial has no head, so its extracted stylesheet is linked
+  from nowhere — the swapped-in markup would carry scope attributes whose rules
+  never arrive, and every row would render unstyled. Anything that styles fetched
+  markup has to be global by construction, and `SearchSheet.astro` imports this
+  so the host page carries it.
+
+  It references only the app's own custom properties, which resolve globally at
+  runtime, so it needs nothing from the Tailwind pipeline.
+*/
+
+.sr__group + .sr__group {
+  margin-top: 1rem;
+}
+
+.sr__kind {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  font-variant: all-small-caps;
+  letter-spacing: 0.09em;
+  color: var(--text-whisper);
+  border-bottom: 1px solid var(--color-base-300);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.35rem;
+}
+
+.sr__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* ⚠ The cost badges. `no address` is the bench's second finding and `no
+   updated_at` is the recency-sort argument; both are rendered on the row rather
+   than summarised, so neither can be skimmed past. */
+
+.sr__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sr__hit {
+  display: block;
+  padding: 0.3rem 0.4rem;
+  margin-inline: -0.4rem;
+  border-radius: var(--radius-field);
+  color: inherit;
+}
+/* ⚠ HOVER AND FOCUS ARE THE SAME TREATMENT, deliberately. The sheet is opened
+   by ⌘K as often as by the ⌕, so it is walked with the keyboard at least as
+   often as with a pointer — a row that only lit under a mouse would leave the
+   faster path unlit. `:focus-visible` keeps the ring off a pointer press. */
+.sr__hit:hover,
+.sr__hit:focus-visible {
+  background: var(--color-base-200);
+}
+
+.sr__name {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--color-base-content);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.sr__meta {
+  color: var(--text-whisper);
+  font-size: 0.75rem;
+}
+
+/* The Fragment Manager's own excerpt metrics — sans, small, faint. A result is
+   deliberately not the thing it points at: §7a's accepted cost, where a
+   searching card stops being the note and becomes a hit. */
+.sr__ex {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.sr__win + .sr__win {
+  margin-top: 0.1rem;
+}
+
+/* "+2 more in this one" — matches inside a single row's body, which
+   `excerpts(maxHits: 1)` deliberately did not render. */
+.sr__more {
+  font-size: 0.72rem;
+  color: var(--text-whisper);
+}
+
+.sr__empty {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--text-whisper);
+  line-height: 1.6;
+}
+
+/* The capped tail. Same contract `excerpts()` keeps with `+N more matches`: a
+   bounded surface must say what it bounded, or it is lying about what matched —
+   and here it is a link, because naming rows you cannot reach is the defect one
+   level up. */
+.sr__capped {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--text-whisper);
+  padding: 0.2rem 0.4rem;
+  margin-inline: -0.4rem;
+  border-radius: var(--radius-field);
+}
+.sr__capped:hover,
+.sr__capped:focus-visible {
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+}
