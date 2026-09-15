@@ -16,7 +16,7 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { listConstellations } from '../lib/constellations';
 import { renderMarkdown } from '../lib/markdown';
-import StarBloom from '../components/StarBloom.astro';
+import ConstellationStar from '../components/ConstellationStar.astro';
 
 /* No `Astro.locals.supabase` here, and that is the point — see `publicSupabase`.
    The sky is the same for everyone, so this render has no use for who is
@@ -71,7 +71,6 @@ const tierIndex = (count: number) => Math.min(distinct.indexOf(count), TIERS.len
 const tierOf = (count: number) => TIERS[tierIndex(count)];
 // Each star breathes on its own phase — synchronised pulsing reads as
 // machinery. Derived from the slug so it's stable across renders.
-const phaseOf = (slug: string) => -(([...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 90) / 10).toFixed(1) + 's';
 
 // The stagger — ONE tier per row, chosen explicitly.
 //
@@ -177,13 +176,12 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
                     contain phrasing content. Nothing in `npm run verify`
                     catches that — astro check doesn't validate content models. */}
                 <div class="flex items-baseline gap-3">
-                  <span
-                    class:list={['sky-star', STAR_TIERS[tierIndex(c.count)]]}
-                    style={`--glow: ${GLOW_TIERS[tierIndex(c.count)]}; --phase: ${phaseOf(c.slug)}`}
-                    transition:name={`star-${c.slug}`}
-                  >
-                    <StarBloom />
-                  </span>
+                  <ConstellationStar
+                    slug={c.slug}
+                    glow={GLOW_TIERS[tierIndex(c.count)]}
+                    size={STAR_TIERS[tierIndex(c.count)]}
+                    transitionName={`star-${c.slug}`}
+                  />
                   {/* The name is an h2 so the sky has a document outline. It
                       keeps `transition:name` — a transition:name is an
                       ATTRIBUTE, not an element type, so the morph into the

@@ -81,6 +81,7 @@ const NOT_DIALOGS: Record<string, string> = {
   shell:
     'A ShellHandle in a FragmentBrowser consumer — the same object as `handle`, whose `close()` calls closeWithExit.',
   ui: 'The Sheet from scripts/sheet.ts (plan 41 · §4), whose own `close()` resets the dirty tracker and then calls closeWithExit — same shape as `handle` above.',
+  live: "The current page's handles in scripts/site-search.ts, whose `close()` is a closure over closeWithExit. It exists because the public layout opts into view transitions: the dialog is replaced on every navigation, so the window-level ⌘K listener has to reach the CURRENT one rather than the one it was bound beside.",
 };
 
 /*

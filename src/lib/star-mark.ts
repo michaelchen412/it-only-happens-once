@@ -24,3 +24,25 @@ export function starMarkHtml(className = ''): string {
     `aria-hidden="true" fill="none"><path d="${STAR_PATH}" fill="currentColor"/></svg>`
   );
 }
+
+/**
+ * A constellation's own breathing phase, in seconds, as a negative offset.
+ *
+ * ⚠ SYNCHRONISED PULSING READS AS MACHINERY, which is the whole reason this
+ * exists — `admin.css`'s `.sky-star` note puts it as *"a sky is alive without
+ * asking to be watched"*. Every star runs the same 9s `star-breathe`, so
+ * without a per-star delay a list of them beats like a cursor.
+ *
+ * ⚠ DERIVED FROM THE SLUG, NEVER RANDOM, and that is the load-bearing part: the
+ * value has to be identical on the server and on the client, or the star would
+ * jump on hydration — and identical across SURFACES, so a constellation
+ * breathing in the sky and the same one in a search result are the same star
+ * rather than two things wearing one name.
+ *
+ * Negative, so the animation starts mid-cycle rather than every star fading up
+ * from its dimmest together on first paint.
+ */
+export function starPhase(slug: string): string {
+  const sum = [...slug].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  return `${-((sum % 90) / 10).toFixed(1)}s`;
+}

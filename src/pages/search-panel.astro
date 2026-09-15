@@ -1,0 +1,61 @@
+---
+/*
+  /search-panel — an Astro PARTIAL (no doctype/head/scripts) serving the public
+  ⌕'s result list. `scripts/site-search.ts` fetches it on a debounce and swaps
+  the innerHTML, the way `fragment-panel.ts` drives the Fragment Manager.
+
+  ⚠ IT READS THROUGH `publicSupabase()`, THE SESSION-FREE CLIENT, AND THAT IS
+  NOT AN OPTIMISATION. A query that wants the public truth has no use for an
+  identity, and an identity it does not use can only cost it: on 2026-08-27 a
+  signed-in viewer's own token straddled a refresh mid-request and the homepage
+  rendered "The sky is being composed" over eleven live constellations. It also
+  means Michael, signed in, sees exactly what a stranger sees here — which for a
+  search over a corpus with unpublished halves is the property that matters.
+
+  ⚠ NOT INDEXABLE, AND BY A HEADER RATHER THAN BY `robots.txt`. It serves an
+  HTML fragment with no head and no canonical, so an indexed one would be a
+  headless shard of the site under a URL no reader ever sees.
+
+  `robots.ts` was the obvious place and is the wrong one, for the reason its own
+  test writes down: *"a robots.txt that enumerates private rooms is a directory
+  for anyone who reads it, so the list staying short is the actual
+  requirement."* This path holds nothing private — every row it can return is
+  already published — so listing it would spend that budget to protect nothing.
+  ⚠ And `Disallow` is the weaker tool anyway: it asks a crawler not to FETCH,
+  which does not stop a URL being indexed from a link elsewhere. `noindex` is
+  the one that means what we want, and it needs no public list.
+*/
+import SiteSearchResults from '../components/SiteSearchResults.astro';
+import SiteSearchVerse from '../components/SiteSearchVerse.astro';
+import { MIN_SEARCH } from '../lib/search-highlight';
+import { publicSupabase } from '../lib/supabase';
+import { searchPublic } from '../lib/search-public';
+
+export const partial = true;
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+// One of `MIN_SEARCH`'s enforcement sites (docs/search.md §3) — the server gate,
+// reading the one shared constant rather than repeating the comparison.
+const searching = q.length >= MIN_SEARCH;
+
+const hits = searching ? await searchPublic(publicSupabase(), q) : [];
+---
+
+{
+  !searching ? (
+    <SiteSearchVerse />
+  ) : hits.length === 0 ? (
+    <div class="ss-none">
+      {/* ⚠ THE PLAIN SENTENCE COMES FIRST. A reader who just typed needs to know
+          the search RAN and found nothing — that is information, and an epigraph
+          is not. The verse follows as the second half of its own line rather
+          than as the answer. */}
+      <p class="ss-none__said">Nothing matches “{q}”.</p>
+      <SiteSearchVerse />
+    </div>
+  ) : (
+    <SiteSearchResults hits={hits} term={q} />
+  )
+}

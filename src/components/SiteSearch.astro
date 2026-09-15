@@ -1,0 +1,136 @@
+---
+/*
+  SiteSearch — the public ⌕: one field over everything a reader can reach.
+
+  Writing, quotes, constellations, sets, songs, subjects and voices. ⚠ Not works
+  — `?work=` was never implemented on the public feed, so a works row would have
+  nowhere to send anybody; `search-public.ts` says so at length.
+
+  ── WHERE IT SITS ──────────────────────────────────────────────────────────
+
+  Two triggers, one sheet, and neither placement was free.
+
+  ⚠ DESKTOP: FIRST IN THE `.site-util` GROUP, ahead of Source. Measured before
+  it was chosen — at 768px, the tightest width where the nav is still inline, a
+  glyph here costs +32px where a fifth nav WORD ("Search") cost +73px; and the
+  word would also have claimed that searching is a ROOM, since a nav row lists
+  places and an item that opens an overlay is the one entry in the row that lies
+  about what it is.
+
+  ⚠ THE GROUP HOLDS TWO, AND IT BRIEFLY HELD THREE. Source, ⌕ and the theme
+  toggle together read as a toolbar rather than as the end of a running head —
+  Michael, 2026-09-15: *"not liking the three icons. seems too busy."* Part of it
+  was count and part was WEIGHT: GitHub is a filled brand mark where the other
+  two are hairline strokes, so they never looked like a set. The theme toggle
+  moved to the footer under a rule worth keeping — **a per-visit control belongs
+  in the head; a per-device control belongs in the foot** — and ⌕ went FIRST,
+  because search is the one of the two a reader came for.
+
+  ⚠ PHONE: BESIDE THE HAMBURGER, NOT INSIDE IT. The same ruling the Observatory
+  took, for the same reason — a phone has no ⌘K and the menu is shut, so search
+  behind it is a tap behind a door. At 390px the bar is `wordmark 158 + free 162
+  + burger 30`, so this spends 30 of 162.
+
+  ⚠ NOT BOTTOM-RIGHT, which is what the Observatory does. `SiteLayout`'s
+  `backToTop` prop exists because *"constellation pages bring their own floating
+  control (the sky-return ✦) — one quiet corner control at a time"*. A floating
+  ⌕ would be the third thing fighting for that corner.
+
+  ── THE SURFACE, AND THE ONE THING IT GIVES UP ─────────────────────────────
+
+  A `.drawer-dialog`, the same right-hand sheet the Reader uses — `app.css`
+  imports `admin.css`, so the class and all of its motion (slide in, `[data-
+  closing]` out, backdrop fade, reduced-motion, and the `--kb` software-keyboard
+  inset) are already on every public page.
+
+  ⚠ THE SHEET NEEDS JAVASCRIPT, AND THE TRIGGER IS AN `<a>` BECAUSE OF IT. The
+  public side does not assume JS the way the Observatory does — `/blog`'s rail is
+  a real `<form method="get">` precisely so that search survives without it. So
+  this trigger is a LINK to `/blog`, which the script upgrades into "open the
+  sheet". A reader without JavaScript follows it and lands on the field that
+  already works; a reader with it never leaves the page. Nothing is lost and
+  nothing lies about where it goes.
+*/
+import { Icon } from 'astro-icon/components';
+import SiteSearchVerse from './SiteSearchVerse.astro';
+import '../styles/site-search.css';
+
+interface Props {
+  /**
+   * `util` — the desktop trigger, inside the nav's trailing icon group.
+   * `bar`  — the phone trigger, beside the hamburger.
+   * `sheet` — the surface, mounted once at the end of the body.
+   */
+  part: 'util' | 'bar' | 'sheet';
+}
+const { part } = Astro.props;
+
+/* The no-JS destination, shared by both triggers — see the header. `#blog-filters`
+   is the rail form's own id, so the fallback lands ON the field rather than at
+   the top of a feed. */
+const FALLBACK = '/blog#blog-filters';
+---
+
+{
+  part === 'util' && (
+    <a
+      href={FALLBACK}
+      data-site-search
+      class="site-util rounded-field text-whisper hover:bg-base-200 hover:text-base-content inline-flex items-center gap-2.5 px-2 py-2.5 transition-colors md:justify-center md:gap-0 md:p-1.5"
+      aria-label="Search"
+      aria-haspopup="dialog"
+    >
+      <Icon name="ph:magnifying-glass" class="size-4 shrink-0" />
+      {/* Inside the mobile dropdown this gets a word, exactly as Source and
+          Theme do; above 768px the glyph stands alone. */}
+      <span class="font-serif text-base tracking-[0.09em] [font-variant:all-small-caps] md:hidden">Search</span>
+    </a>
+  )
+}
+
+{
+  part === 'bar' && (
+    /* ⚠ `md:hidden` — the phone's own trigger. Above 768px the util above is
+       visible in the inline nav and this would be a second one. */
+    <a
+      href={FALLBACK}
+      data-site-search
+      class="rounded-field text-faint hover:bg-base-200 hover:text-base-content p-1.5 md:hidden"
+      aria-label="Search"
+      aria-haspopup="dialog"
+    >
+      <Icon name="ph:magnifying-glass" class="text-lg" />
+    </a>
+  )
+}
+
+{
+  part === 'sheet' && (
+    <dialog id="site-search" class="drawer-dialog ss-sheet" aria-label="Search">
+      <div class="ss-shell">
+        <label class="ss-field">
+          <span class="ss-mag" aria-hidden="true">
+            ⌕
+          </span>
+          <input
+            type="search"
+            data-ss-input
+            autocomplete="off"
+            placeholder="Search everything…"
+            aria-label="Search everything"
+            aria-controls="ss-results"
+          />
+          {/* ⚠ `data-close` is the building's exit hook — `wireSheetDismiss`
+              finds the ✕ by it, so this needs no listener of its own and cannot
+              drift out of step with Escape and the backdrop. */}
+          <button type="button" data-close class="ss-x" aria-label="Close">
+            <Icon name="ph:x" class="text-lg" />
+          </button>
+        </label>
+        <div id="ss-results" class="ss-body" data-ss-results aria-live="polite">
+          <SiteSearchVerse />
+        </div>
+      </div>
+    </dialog>
+  )
+}

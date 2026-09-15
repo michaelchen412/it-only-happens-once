@@ -1,0 +1,117 @@
+---
+/*
+  SiteSearchResults — the public ⌕'s result list.
+
+  ⚠ ITS OWN COMPONENT RATHER THAN THE ADMIN'S `SearchResults.astro`, and the
+  reason is register rather than data. The Observatory's list is sans, dense and
+  built to be scanned by someone who already knows what is in it; this one is
+  read by someone who does not, so it is serif and takes the room. The rules
+  below are the admin's, because they were measured; the type is this side's.
+
+  ⚠ SEGMENTS, NEVER HTML STRINGS. `docs/search.md` §2 calls this the XSS
+  boundary: `Highlighted.astro` takes `Seg[]` and Astro escapes every text node,
+  so the only real markup inserted is `<mark>`.
+
+  ── THE THREE RULES, ALL MEASURED ON THE ADMIN SIDE ─────────────────────────
+
+  1. GROUPED BY KIND, NOT RANKED. §5's *"no ranking"* was free with one table;
+     across seven there is no shared order to keep, and half of them have no
+     timestamp to sort by at all.
+  2. AT MOST `CAP` PER KIND. Every container scored 1 of 8 kinds above the fold
+     until this existed — one heavy kind buries the rest in any box. Capping took
+     the admin's sheet from 1 of 8 to 6 of 8.
+  3. NO EXCERPT WHEN THE NAME ALREADY CARRIES THE MATCH. A quote is named by its
+     own first words, so for it the marked name IS the context.
+*/
+import Highlighted from './admin/Highlighted.astro';
+import ConstellationStar from './ConstellationStar.astro';
+import { excerpts, hasMatch, highlight, toPlain } from '../lib/search-highlight';
+import { PUBLIC_KINDS, PUBLIC_ORDER, type PublicHit } from '../lib/search-public';
+
+interface Props {
+  hits: PublicHit[];
+  term: string;
+}
+const { hits, term } = Astro.props;
+
+/** Rows per kind — see rule 2. Depth is what the owning room is for. */
+const CAP = 3;
+
+const rendered = hits.map((h) => ({
+  ...h,
+  nameSegs: highlight(h.name, term),
+  ex: !h.body || hasMatch(h.name, term) ? null : excerpts(toPlain(h.body), term, 64, 1),
+}));
+
+const groups = PUBLIC_ORDER.map((k) => {
+  const all = rendered.filter((h) => h.kind === k);
+  return { key: k, ...PUBLIC_KINDS[k], rows: all.slice(0, CAP), hidden: Math.max(0, all.length - CAP) };
+}).filter((g) => g.rows.length > 0);
+---
+
+{
+  groups.map((g) => (
+    <section class="ss-group">
+      <h3 class="ss-kind">
+        {g.label}
+        {/* The kind's FULL count — the cap is a rendering, not a result. */}
+        <span class="ss-count">{g.rows.length + g.hidden}</span>
+      </h3>
+      <ul class="ss-list">
+        {g.rows.map((h) => (
+          <li>
+            {/* ⚠ THE WHOLE ROW IS THE LINK. A result is one thing to press. */}
+            {/*
+              ⚠ `group` AND `cn-<slot>` BOTH BELONG ON THE ROW, not on the star.
+              The bloom parts on `.group:hover`, so the whole row is the hover
+              target; and `cn-*` sets `--cn`, which the star AND the name read,
+              so one declaration warms everything inside. A constellation here is
+              the same star it is in the sky — same colour, same breathing phase
+              — which is the point of it being a component.
+            */}
+            <a class:list={['ss-hit', h.star && 'group', h.star && `cn-${h.star.slot}`]} href={h.href}>
+              <span class="ss-name">
+                {h.star && <ConstellationStar slug={h.star.slug} size="text-xs" class="ss-star" />}
+                <Highlighted segs={h.nameSegs} />
+              </span>
+              {h.meta && <span class="ss-meta">{h.meta}</span>}
+              {h.ex && h.ex.windows.length > 0 && (
+                <span class="ss-ex">
+                  {h.ex.windows[0].lead && '… '}
+                  <Highlighted segs={h.ex.windows[0].segs} />
+                  {h.ex.windows[0].trail && ' …'}
+                </span>
+              )}
+            </a>
+          </li>
+        ))}
+        {/*
+          ⚠ THE CAPPED TAIL IS A LINK, not a label. A line naming nine more
+          essays with nowhere to press is the same defect as a result with no
+          address, one level up. Writing and quotes hand the term to the feed's
+          own field; the rest hand over their room.
+        */}
+        {g.hidden > 0 && (
+          <li>
+            <a
+              class="ss-more"
+              href={
+                g.key === 'writing'
+                  ? `/blog?q=${encodeURIComponent(term)}`
+                  : g.key === 'quote'
+                    ? `/blog?view=quotes&q=${encodeURIComponent(term)}`
+                    : g.key === 'constellation'
+                      ? '/'
+                      : g.key === 'subject' || g.key === 'author'
+                        ? '/blog'
+                        : '/listening'
+              }
+            >
+              +{g.hidden} more in {g.label.toLowerCase()} →
+            </a>
+          </li>
+        )}
+      </ul>
+    </section>
+  ))
+}

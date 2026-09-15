@@ -38,6 +38,7 @@
 import { Icon } from 'astro-icon/components';
 import Analytics from '@vercel/analytics/astro';
 import Base from './Base.astro';
+import SiteSearch from '../components/SiteSearch.astro';
 import Colophon from '../components/Colophon.astro';
 import BackToTop from '../components/BackToTop.astro';
 
@@ -230,6 +231,13 @@ const nav = [
         It Only Happens Once
       </a>
 
+      {
+        /* ⌕ — the phone's own trigger, beside the hamburger rather than inside it.
+          A phone has no ⌘K and the menu is shut, so search behind it is a tap
+          behind a door. Above 768px this hides and the util below takes over. */
+      }
+      <SiteSearch part="bar" />
+
       {/* Hamburger — mobile only. */}
       <button
         id="menu-toggle"
@@ -339,6 +347,23 @@ const nav = [
           class="border-base-300 mt-1 flex w-full flex-col items-stretch gap-0.5 border-t px-1 pt-2 md:mt-0 md:w-auto md:flex-row md:items-center md:gap-1 md:border-0 md:p-0"
         >
           {
+            /* ⌕ — measured at 768px before it was chosen: a fifth nav WORD cost
+              +73px against this glyph's +32px, and would also have claimed that
+              searching is a ROOM, which a sheet is not.
+
+              ⚠ THIS GROUP HOLDS TWO GLYPHS AND SHOULD KEEP HOLDING TWO. It was
+              briefly three — Source, ⌕ and the theme toggle — and three read as
+              a toolbar rather than as the end of a running head. Michael,
+              2026-09-15: *"not liking the three icons. seems too busy."* Part of
+              that was count and part was WEIGHT: GitHub is a filled brand mark
+              where the other two are hairline strokes, so they never looked like
+              a set. The theme toggle moved to the footer — the rule is written
+              where it landed — and Source stayed, because it was wanted here.
+
+              ⚠ So a third control in this row is a decision, not an addition. */
+          }
+          <SiteSearch part="util" />
+          {
             /* A trigger only; the drawer it opens is mounted once at layout
               level (see the note on <Colophon /> below). It stays in the bar
               even though the footer now carries the same mark, because the two
@@ -377,29 +402,6 @@ const nav = [
           >
             <Icon name="simple-icons:github" class="size-4 shrink-0" />
             <span class="font-serif text-base tracking-[0.09em] [font-variant:all-small-caps] md:hidden">Source</span>
-          </button>
-          {
-            /* ⚠ THE LABEL IS THE NOUN AND NOT THE VERB, and that is the one
-              decision in this control. "Light theme" / "Dark theme" — the state
-              you would switch TO, matching what the icon already shows — reads
-              better and cannot be rendered honestly: the theme is chosen by an
-              inline script in <head> from `localStorage`, so the SERVER does
-              not know which word is true and would ship the wrong one to every
-              reader who has ever pressed this. A CSS swap keyed on
-              `[data-theme]` would fix the flash and break WCAG 2.5.3 instead —
-              "Light theme" is not a substring of any accessible name that is
-              also correct in the other state. So the word is stable, the icon
-              carries the direction, and `aria-pressed` carries the state. */
-          }
-          <button
-            id="theme-toggle"
-            class="site-util theme-toggle rounded-field text-whisper hover:bg-base-200 hover:text-base-content inline-flex items-center gap-2.5 px-2 py-2.5 transition-colors md:justify-center md:gap-0 md:p-1.5"
-            aria-label="Toggle light and dark theme"
-            title="Toggle theme"
-          >
-            <Icon name="ph:sun" class="theme-icon-sun shrink-0 text-base" />
-            <Icon name="ph:moon" class="theme-icon-moon shrink-0 text-base" />
-            <span class="font-serif text-base tracking-[0.09em] [font-variant:all-small-caps] md:hidden">Theme</span>
           </button>
         </div>
       </nav>
@@ -530,6 +532,41 @@ const nav = [
             <Icon name="ph:rss-simple" class="site-foot__icon" />
             RSS
           </a>
+          {
+            /* ⚠ THE THEME TOGGLE LIVES HERE, NOT IN THE BAR (2026-09-15), and the
+              rule that moved it is the reusable part: **a per-visit control
+              belongs in the head; a per-device control belongs in the foot.**
+              Searching is something you do on a visit. Choosing a theme is
+              something you do once — `localStorage` remembers it and
+              `Base.astro` re-asserts it before paint on every navigation — so
+              its discoverability cost is paid once per reader rather than once
+              per visit.
+
+              ⚠ AND IT IS NOT DECORATION, WHICH IS THE CAVEAT THAT COMES WITH IT.
+              `Base.astro` sets `data-theme="dusk"` unconditionally and says why:
+              *"this site was drawn at dusk… dark is the site's own default and
+              light is an opt-in — the toggle."* It deliberately does NOT follow
+              `prefers-color-scheme`, so this button is the ONLY way a
+              light-preferring reader reaches paper. Moving it cost one scroll on
+              a first visit; dropping it would cost them the site.
+
+              ⚠ ONE INSTANCE ONLY. `theme-toggle.ts` reads `#theme-toggle` by id
+              for `aria-pressed` and delegates clicks through
+              `closest('#theme-toggle')`, so a second copy would leave whichever
+              one the id did not land on silently inert.
+
+              The label is the NOUN, not the verb, for the reason this control
+              carried in the bar: the server cannot know which theme is current,
+              so "Light theme" would ship wrong to every reader who has ever
+              pressed it — and a CSS swap would break WCAG 2.5.3 instead. The
+              word is stable, the icon carries the direction, `aria-pressed`
+              carries the state. */
+          }
+          <button id="theme-toggle" type="button" aria-label="Toggle light and dark theme">
+            <Icon name="ph:sun" class="theme-icon-sun site-foot__icon" />
+            <Icon name="ph:moon" class="theme-icon-moon site-foot__icon" />
+            Theme
+          </button>
         </div>
       </div>
     </footer>
@@ -548,6 +585,17 @@ const nav = [
       trigger. */
   }
   <Colophon />
+
+  {
+    /* The ⌕'s surface — one sheet, two triggers (the bar's ⌕ and, on a phone,
+      the one beside the hamburger). ⚠ MOUNTED AT LAYOUT LEVEL FOR THE REASON
+      DIRECTLY ABOVE, which the colophon learned the expensive way: a surface
+      rendered inside the bar's utilities <div> lives inside `#site-menu`, which
+      is `display: none` below `md:` — and an element in a display:none subtree
+      has no box, so the phone's trigger would flip it open and paint nothing.
+      Layout level belongs to neither trigger. */
+  }
+  <SiteSearch part="sheet" />
 
   {backToTop && <BackToTop />}
 
@@ -588,6 +636,12 @@ const nav = [
     // The one thing that answers a nav click here — see the file, and the
     // `#nav-progress` note at the top of this layout.
     import '../scripts/route-progress';
+
+    // The public ⌕ (docs/search.md §9). Mounted here because searching spans
+    // every room rather than belonging to one — and ⚠ because this layout opts
+    // into view transitions, the module re-binds on `astro:page-load` rather
+    // than once on load. See its header.
+    import '../scripts/site-search';
 
     // The theme toggle used to be implemented here too, and this copy was the
     // wrong one: it set `aria-pressed` only inside its own click handler, so the

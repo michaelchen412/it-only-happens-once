@@ -1,0 +1,61 @@
+---
+/*
+  ConstellationStar — a constellation's ✦, in its own colour, breathing.
+
+  ⚠ EXTRACTED 2026-09-15 BECAUSE A THIRD SURFACE WANTED ONE. Michael, on the
+  search results: *"can constellation search results have the same
+  colored/animated star? might be worth making into a consistent component of
+  various sizes wherever we're listing constellations."* He is right, and the
+  duplication was already two call sites deep — the overview built this wrapper
+  by hand and the search sheet was about to build a third copy of a `--glow` and
+  a `--phase` nobody would have kept in step.
+
+  WHAT IT IS: the `.sky-star` wrapper plus `StarBloom`. The wrapper carries the
+  animation and the magnitude; the bloom carries the shape and the parting-on-
+  hover. Both were already reusable at any scale — everything inside is sized in
+  `em` — so this component adds no new styling, only one place to get the three
+  custom properties right.
+
+  ⚠ THE COLOUR IS NOT SET HERE, AND THAT IS DELIBERATE. `.sky-star` reads
+  `var(--cn)`, which a `cn-<slot>` class sets on an ANCESTOR — so the caller puts
+  `cn-${c.color}` on the row, and the star, the name and anything else inside all
+  warm to the same ink from one declaration. Taking a `color` prop here would
+  light the star alone and silently break that.
+
+  ⚠ AND THE CALLER STILL OWNS `group`. `StarBloom` parts on `.group:hover`, so
+  the hover target is whichever ancestor should trigger it — usually the whole
+  row, not the mark.
+*/
+import StarBloom from './StarBloom.astro';
+import { starPhase } from '../lib/star-mark';
+
+interface Props {
+  /** Drives the breathing phase. Same slug ⇒ same star on every surface. */
+  slug: string;
+  /**
+   * Magnitude, 0–1. ⚠ WEIGHT IS BRIGHTNESS, NOT SIZE — `admin.css` states the
+   * rule: *"magnitude is how bright a star looks, not how large it is — so a
+   * heavy constellation burns rather than merely swells."* Drives the glow
+   * radius and the breathing's opacity floor. Default is the CSS default.
+   */
+  glow?: number;
+  /** A type-scale class, since everything inside sizes in `em`. */
+  size?: string;
+  /**
+   * ⚠ OPT-IN, AND LEAVING IT OFF IS THE SAFE DEFAULT. The overview names its
+   * stars so they morph into the suite's, but a `transition:name` must be
+   * UNIQUE IN THE DOCUMENT — and the search sheet lists constellations while
+   * standing on the overview, where those names are already taken. Two elements
+   * sharing one name is an unpredictable morph, not an error you would see.
+   */
+  transitionName?: string;
+  class?: string;
+}
+const { slug, glow, size = 'text-sm', transitionName, class: className = '' } = Astro.props;
+
+const style = [`--phase: ${starPhase(slug)}`, glow === undefined ? '' : `--glow: ${glow}`].filter(Boolean).join('; ');
+---
+
+<span class:list={['sky-star', size, className]} style={style} transition:name={transitionName}>
+  <StarBloom />
+</span>
