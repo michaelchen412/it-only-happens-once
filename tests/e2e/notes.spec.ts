@@ -343,7 +343,27 @@ test.describe('the pile', () => {
     await expect(sheet).toBeVisible();
     const box = page.locator('#ns-editor [contenteditable="true"]');
     await expect(box).toBeFocused();
-    expect((await box.innerText()).trim()).toBe(text.trim()); // the same words, not a fetch
+    /*
+      ⚠ PER-LINE `trimEnd`, AND THE REASON IS A HARD BREAK (measured 2026-09-18).
+      A dump written in the drawer is serialised with Markdown's backslash hard
+      breaks — `…categories. \` — and the two renderers disagree about the space
+      in FRONT of one: `renderMarkdown` strips it, TipTap keeps it. Nothing is
+      visible either way, since a trailing space before a line break renders as
+      nothing at all, and the words are identical.
+
+      A whole-string `.trim()` only reaches the two ends, so the first note whose
+      body happened to carry one turned this green assertion red — and what it
+      was reporting was a space nobody can see. Normalised here rather than in
+      either renderer: this test's claim is "the same words, not a fetch", which
+      is exactly what it now checks.
+    */
+    const sameWords = (s: string) =>
+      s
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .join('\n')
+        .trim();
+    expect(sameWords(await box.innerText())).toBe(sameWords(text)); // the same words, not a fetch
     await expect(card.locator('[data-text]')).toBeVisible(); // ⚠ the card is untouched
     await expect(page).toHaveURL(/\/admin\/notes$/); // still no navigation
 

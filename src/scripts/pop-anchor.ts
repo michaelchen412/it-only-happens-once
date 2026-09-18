@@ -43,12 +43,47 @@ export function anchorPopover(pop: HTMLElement, triggerFor: () => HTMLElement | 
     const trigger = triggerFor();
     if (!trigger) return;
     const t = trigger.getBoundingClientRect();
+    /*
+      ⚠ THE CAP IS CLEARED BEFORE MEASURING, or the second open measures the
+      first open's clamp and the menu ratchets shorter every time it is used.
+    */
+    pop.style.maxHeight = '';
+    pop.style.overflowY = '';
     const { width, height } = pop.getBoundingClientRect();
 
-    // Below by default; above only when below genuinely does not fit.
-    const below = t.bottom + GAP;
-    const fits = below + height <= window.innerHeight - GAP;
-    pop.style.top = `${fits ? below : Math.max(GAP, t.top - GAP - height)}px`;
+    /*
+      ⚠ A MENU TOO TALL FOR EITHER SIDE USED TO DETACH FROM ITS TRIGGER, and it
+      took the notes chooser growing a shelf vocabulary to expose it. The old
+      fallback was `Math.max(GAP, t.top - GAP - height)`: when the menu fits
+      neither below nor above, that `max` wins and pins it to the top of the
+      viewport, metres from the card you pressed. Measured 2026-09-18 with four
+      shelves — a 408px menu against ~338px of room either side of a trigger at
+      y=338 — the chooser rendered at y=6 and `notes.spec.ts` reported it as
+      *"anchored to neither side of its trigger"*.
+
+      That is not a positioning bug so much as a missing answer to "what if it
+      does not fit". The answer is to cap it to the room there is and let it
+      SCROLL, which keeps the menu attached to the thing it belongs to however
+      long its list grows. `.pop--tall` already had a `max-height` and it never
+      did anything, because `.pop` is `overflow: visible`.
+
+      ⚠ INLINE, AND ONLY WHEN IT IS NEEDED. Every popover that fits is left
+      exactly as it was — no cap, no scroller, no new stacking context — so this
+      cannot change the four menus that were never too tall.
+    */
+    const roomBelow = window.innerHeight - t.bottom - GAP * 2;
+    const roomAbove = t.top - GAP * 2;
+    // Below by default; above only when below genuinely does not fit and above
+    // is the roomier side.
+    const useBelow = height <= roomBelow || roomBelow >= roomAbove;
+    const room = Math.max(GAP, useBelow ? roomBelow : roomAbove);
+
+    if (height > room) {
+      pop.style.maxHeight = `${room}px`;
+      pop.style.overflowY = 'auto';
+    }
+    const h = Math.min(height, room);
+    pop.style.top = `${useBelow ? t.bottom + GAP : Math.max(GAP, t.top - GAP - h)}px`;
     // Clamped horizontally, or the people picker runs off the edge at 390px.
     pop.style.left = `${Math.min(Math.max(GAP, t.left), Math.max(GAP, window.innerWidth - width - GAP))}px`;
     pop.style.visibility = '';
