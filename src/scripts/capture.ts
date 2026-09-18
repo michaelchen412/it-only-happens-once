@@ -41,6 +41,7 @@
 // that lands in the first second of a page's life, before idle has fired.
 import { actions } from 'astro:actions';
 import { callAction } from './action-error';
+import { MAX_SHELVES } from '../lib/shelves';
 import { pick, wireRadioGroups } from './radio-group';
 import { closeWithExit, openDialog } from './dialog-close';
 import { onBackdropDismiss } from './backdrop-close';
@@ -85,6 +86,90 @@ async function boot(dialog: HTMLDialogElement) {
   let lock: Promise<unknown> = Promise.resolve(); // serialize: New must not race autosave
   let lastSaved = '';
   let savedAnything = false; // did this visit write? decides whether the pile needs re-reading
+
+  /* ── where this jotting goes (2026-09-18) ────────────────────────────────
+     CaptureDialog.astro carries the design argument; this is the wiring. */
+
+  const shelfZone = dialog.querySelector<HTMLElement>('[data-cap-shelf]');
+  const shelfRow = dialog.querySelector<HTMLElement>('[data-cap-shelf-row]');
+  /** Shelf ids this note should end up on. Survives ＋ New — see `startNew`. */
+  let picked: string[] = [];
+  /** The last list actually written, so a re-save is not a second round trip. */
+  let appliedShelves = '\u0000'; // not `''`, which is a legitimate list ("inbox")
+  let shelvesLoaded = false;
+  /** `shelf id → slug`, because `?shelf=` addresses a view by slug. */
+  const slugOf = new Map<string, string>();
+
+  /**
+   * The vocabulary, fetched once and only if the ✚ is ever opened.
+   *
+   * ⚠ THE PRESSED SHELF IS THE DEFAULT, AND THIS IS THE WHOLE POINT OF THE
+   * FEATURE. `?shelf=<slug>` is how the pile addresses a filtered view, so
+   * reading it here is how the ✚ learns where you are standing WITHOUT the
+   * layout having to tell it — no prop, no `locals`, and correct from a
+   * bookmark. Michael: *"if I have a notes section already open there should be
+   * an option to add a note into here under that category automatically."*
+   */
+  async function loadShelves() {
+    if (shelvesLoaded || !shelfRow) return;
+    shelvesLoaded = true;
+    const { data, error } = await callAction(actions.shelves.list());
+    if (error || !data) {
+      shelvesLoaded = false; // let the next open try again
+      return;
+    }
+    // ⚠ NOTHING AT ALL WHEN THERE IS NO VOCABULARY — 10-hq §10b, the rule the
+    // Log tab's picker and the pile's own chooser row both follow. A label over
+    // an empty strip is a control asking a question with no answers.
+    if (!data.length) return;
+
+    const here = new URLSearchParams(window.location.search).get('shelf')?.trim();
+    shelfRow.textContent = '';
+    for (const sh of data) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'lchip';
+      chip.dataset.shelfId = sh.id;
+      chip.textContent = sh.name;
+      slugOf.set(sh.id, sh.slug);
+      // `aria-pressed`, because these are toggles rather than a radio group:
+      // a note may sit on two (MAX_SHELVES), and neither is "the" choice.
+      chip.setAttribute('aria-pressed', 'false');
+      shelfRow.append(chip);
+      if (here && sh.slug === here) toggleShelf(chip, true);
+    }
+    syncShelfRow();
+  }
+
+  function toggleShelf(chip: HTMLElement, on: boolean) {
+    const id = chip.dataset.shelfId!;
+    chip.classList.toggle('lchip--on', on);
+    chip.setAttribute('aria-pressed', String(on));
+    picked = on ? [...picked.filter((x) => x !== id), id] : picked.filter((x) => x !== id);
+  }
+
+  /** The row is the `jot` tab's, exactly as the picker above is the Log tab's. */
+  function syncShelfRow() {
+    if (shelfZone) shelfZone.hidden = kind !== 'jot' || !shelfRow?.children.length;
+  }
+
+  /**
+   * File the note onto what is picked.
+   *
+   * ⚠ SEPARATE FROM THE TEXT SAVE, AND AFTER IT. There is nothing to file until
+   * `saveWriting` has minted a row, and the 700ms autosave must not carry a
+   * second write on every keystroke — so this runs on the same lock, once, and
+   * only when the list has actually changed.
+   */
+  async function applyShelves() {
+    if (!currentId) return;
+    const want = picked.join(',');
+    if (want === appliedShelves) return;
+    const { error } = await callAction(actions.shelves.set({ noteId: currentId, shelfIds: picked }));
+    // Quiet, like the autosave it rides behind: the words are saved either way,
+    // and the pile is where an unfiled note will be visible.
+    if (!error) appliedShelves = want;
+  }
   let fadeTimer: number | undefined;
 
   /**
@@ -194,7 +279,13 @@ async function boot(dialog: HTMLDialogElement) {
   }
 
   const save = () => {
-    lock = lock.then(persist).catch(() => {});
+    // ⚠ FILING RIDES THE SAME LOCK, AFTER THE TEXT. `applyShelves` needs the id
+    // `persist` mints, and putting it on the lock is what stops a close racing
+    // an in-flight save and filing a note that does not exist yet.
+    lock = lock
+      .then(persist)
+      .then(applyShelves)
+      .catch(() => {});
     return lock;
   };
 
@@ -206,11 +297,41 @@ async function boot(dialog: HTMLDialogElement) {
     baseUpdatedAt = '';
     slug = '';
     lastSaved = '';
+    /*
+      ⚠ `picked` SURVIVES AND `appliedShelves` DOES NOT, and the asymmetry is the
+      motion this shortcut exists for: ⌘/Ctrl+Enter is *emptying your head*,
+      three or four dumps in a row without leaving the box. If you were filing
+      those under `job applications`, the second one belongs there too — so the
+      chips stay lit. What must reset is the record of having WRITTEN them,
+      which belonged to the row just parked.
+    */
+    appliedShelves = '\u0000';
     // emitUpdate: false — TipTap fires `update` on setContent, which would arm
     // the debounce and try to save the blank we just handed over.
     editor.commands.setContent('', { emitUpdate: false });
     editor.commands.focus('end');
   }
+
+  /* A chip toggles, and files immediately if there is already a row to file.
+     Before the first save there is nothing to write to, and `save()` will carry
+     the selection the moment one exists. */
+  shelfRow?.addEventListener('click', (e) => {
+    const chip = (e.target as Element).closest<HTMLElement>('[data-shelf-id]');
+    if (!chip) return;
+    const on = chip.getAttribute('aria-pressed') === 'true';
+    /*
+      ⚠ A THIRD PICK REPLACES THE OLDEST — the pile's chooser rule, and the
+      server enforces the same cap (`MAX_SHELVES`). A control that simply stops
+      responding teaches nothing; the swap shows you what the cap is by doing
+      it. `picked` is append-ordered, so `[0]` is genuinely the oldest.
+    */
+    if (!on && picked.length >= MAX_SHELVES) {
+      const oldest = shelfRow!.querySelector<HTMLElement>(`[data-shelf-id="${picked[0]}"]`);
+      if (oldest) toggleShelf(oldest, false);
+    }
+    toggleShelf(chip, !on);
+    if (currentId) void save();
+  });
 
   newBtn.addEventListener('click', () => void startNew());
   // On the dialog rather than on the box: the shortcut has to work from the
@@ -258,6 +379,9 @@ async function boot(dialog: HTMLDialogElement) {
 
   function open() {
     openDialog(dialog!);
+    // First open only; the pressed shelf is read from the URL in there, which is
+    // why this is not hoisted to boot time — the ✚ can be opened from anywhere.
+    void loadShelves();
     editor.commands.focus('end');
   }
 
@@ -292,7 +416,43 @@ async function boot(dialog: HTMLDialogElement) {
       a second copy of the card's markup kept in step by hand.
     */
     await closeWithExit(dialog!);
-    if (savedAnything && document.getElementById('notes-pile')) window.location.reload();
+    if (savedAnything && document.getElementById('notes-pile')) window.location.assign(landing());
+  }
+
+  /**
+   * Where to re-read the pile — the view the note you just wrote is ACTUALLY in.
+   *
+   * ⚠ A BARE `location.reload()` COULD LAND YOU WHERE THE NOTE IS NOT, and that
+   * is the second half of what Michael reported on 2026-09-18. Standing in
+   * `?shelf=philosophy`, pressing ✚ and typing wrote the note to the inbox —
+   * and then reloaded the shelf view, which does not contain it. The thought
+   * was saved, the room said nothing, and the only honest reading from the
+   * outside is that it went nowhere.
+   *
+   * The chips fix the common case by pre-selecting the shelf you are standing
+   * in. This covers the rest: turn that chip OFF, or write from a shelf that
+   * the note does not end up on, and the room follows the note rather than
+   * leaving you looking at the view it just left.
+   *
+   * ⚠ IT ONLY EVER RELAXES THE SHELF FILTER, never tightens it and never
+   * touches anything else. Sending you to a shelf you did not press would be
+   * the ✚ navigating on your behalf; dropping to the inbox is returning to the
+   * room's own default, which is where an unfiled note lives by definition. A
+   * live `?q=` is left exactly as it was — narrowing it was the reader's
+   * decision, and this function's whole licence is to undo a filter the note
+   * has fallen out of, not to tidy the room.
+   */
+  function landing(): string {
+    const url = new URL(window.location.href);
+    const pressed = url.searchParams.get('shelf')?.trim();
+    if (!pressed) return url.pathname + url.search;
+    // On the shelf the room is filtered to? Then nothing moves, which is the
+    // normal path now that the chip for it starts lit.
+    if (picked.some((id) => slugOf.get(id) === pressed)) return url.pathname + url.search;
+    // Otherwise the note is in the inbox — including when the vocabulary never
+    // loaded, because then nothing could have been filed.
+    url.searchParams.delete('shelf');
+    return url.pathname + (url.search || '');
   }
 
   // ⚠ NOT `fab.addEventListener('click', open)` ANY MORE — the door is wired
@@ -385,6 +545,10 @@ async function boot(dialog: HTMLDialogElement) {
       pick(dialog, 'cap-tab', kind);
       doneBtn.textContent = DONE_LABEL[kind] ?? 'Done';
       if (whoRow) whoRow.hidden = kind !== 'log';
+      // The shelf row belongs to `jot` the way the picker belongs to `log`: the
+      // other three tabs take the thought OUT of the pile, so filing it would
+      // be shelving something that is about to stop existing.
+      syncShelfRow();
       if (kind === 'log') void loadRoster();
 
       /*

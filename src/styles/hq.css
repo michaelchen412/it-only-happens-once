@@ -4014,6 +4014,35 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   max-width: 20rem;
 }
 
+/* Where a jotting goes, in the box (2026-09-18). Reads as a sibling of the
+   Log tab's picker directly above, because it answers the same question for a
+   different tab — see CaptureDialog's own note. */
+.cap-shelf {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.875rem;
+  border-top: 1px solid var(--color-base-300);
+}
+/* ⚠ `display` ON THE CLASS BEATS THE UA'S `[hidden]`, and this row is hidden
+   on every tab but `jot`. Without this it would show on all four. */
+.cap-shelf[hidden] {
+  display: none;
+}
+.cap-shelf__k {
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  letter-spacing: 0.07em;
+  font-variant: all-small-caps;
+  color: var(--text-whisper);
+}
+.cap-shelf__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
 /* Under the box, never over it: the dialog has no title, and a strip of
    controls above the words would be chrome introducing something that needs no
    introduction. */

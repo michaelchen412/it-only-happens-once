@@ -221,6 +221,41 @@ const { hasRoster = false } = Astro.props;
       )
     }
 
+    {
+      /*
+        ⚠ WHERE THIS JOTTING GOES — the fifth destination, brought into the box
+        (2026-09-18). Michael: *"if I have a notes section already open there
+        should be an option to add a note into here under that category
+        automatically (currently only way is through the floating + button which
+        seems to have no connection)."*
+
+        The ✚ belongs to the BUILDING, not to a room — that is this file's
+        founding rule and it is not in question. But "belongs to the building"
+        was being read as "knows nothing about where you are standing", and
+        those are different claims. Standing in a shelf and pressing ✚ wrote the
+        note to the inbox and then reloaded you into a view it was not in, which
+        reads exactly like the thought being lost.
+
+        ⚠ AN APPARENT SELECTOR RATHER THAN A SILENT DEFAULT, ruled by Michael on
+        being asked. The pressed shelf PRE-SELECTS a chip and the chip is on
+        screen, so the room's context is offered rather than imposed — and a jot
+        that belongs somewhere else is one tap from going there, from any room
+        in the building rather than only from the pile.
+
+        ⚠ AND IT IS TIED TO THE `jot` TAB, the same way the Log tab owns the
+        picker above. The other three destinations LEAVE the pile — a task, a
+        quote, a piece — so a shelf on any of them would be filing a thing that
+        is about to stop existing.
+
+        The chips arrive late, like the roster, and for the same reason: the
+        layout mounts this dialog everywhere and knows nothing about shelves.
+      */
+    }
+    <div class="cap-shelf" data-cap-shelf hidden>
+      <span class="cap-shelf__k">Keep it under</span>
+      <div class="cap-shelf__row" role="group" aria-label="Shelves for this note" data-cap-shelf-row></div>
+    </div>
+
     <div class="cap-foot">
       {
         /*

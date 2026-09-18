@@ -23,6 +23,30 @@ import { fail, requireAdmin, uniqueSlug } from './_shared';
 
 export const shelves = {
   /**
+   * The vocabulary, for a surface that did not render it.
+   *
+   * ⚠ THE ONE READ IN THIS FILE, AND IT EXISTS FOR THE ✚. `CaptureDialog` is
+   * mounted by `AdminLayout` on every admin page, so rendering the shelf list
+   * into it would be a query on every page view for a control most of them
+   * never open — the cost plan 45 · §4d refused for the roster, answered the
+   * same way (`people.roster`): the layout knows nothing, and the dialog asks
+   * on first open.
+   *
+   * ⚠ ADMIN-GATED LIKE EVERY OTHER ACTION HERE, even though a shelf name is not
+   * a secret. A shelf is private by definition (ADR 0042: no reader ever sees
+   * one), and `requireAdmin` is the rule this file applies uniformly rather
+   * than a judgement made per-action.
+   */
+  list: defineAction({
+    handler: async (_input, ctx) => {
+      requireAdmin(ctx);
+      const { data, error } = await ctx.locals.supabase.from('shelves').select('id, name, slug').order('sort');
+      if (error) throw fail(error.message);
+      return data;
+    },
+  }),
+
+  /**
    * Put a note on nought, one or two shelves — REPLACING whatever it was on.
    *
    * ⚠ REPLACE, NOT ADD, AND THE CALLER SENDS THE WHOLE LIST. `_shared.ts` has
