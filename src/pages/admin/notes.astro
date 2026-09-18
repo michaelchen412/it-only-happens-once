@@ -43,7 +43,7 @@ import Highlighted from '../../components/admin/Highlighted.astro';
 import { elapsedSince } from '../../lib/hq/dates';
 import { renderMarkdown } from '../../lib/markdown';
 import { MIN_SEARCH, excerpts, toPlain } from '../../lib/search-highlight';
-import { MAX_SHELVES, listShelves, shelfCounts, shelvesByFragment } from '../../lib/shelves';
+import { MAX_SHELVES, idsInView, readShelfIndex } from '../../lib/shelves';
 
 const supabase = Astro.locals.supabase;
 
@@ -66,9 +66,26 @@ const q = (params.get('q') ?? '').trim();
 // is ignored entirely rather than narrowed on.
 const searching = q.length >= MIN_SEARCH;
 
-const shelfVocab = await listShelves(supabase);
+/*
+  ⚠ EVERY FACT THIS ROOM NEEDS, IN ONE ROUND TRIP RATHER THAN SIX (2026-09-18).
+
+  This block used to be six sequential awaits — the vocabulary, the counts, the
+  membership list, the rows, the chips, then the pieces — and each one is a
+  separate trip to Supabase. Measured from this machine at ~53ms a trip, the
+  room spent **~420ms before its first byte**, and paid it again on every shelf
+  press, every search keystroke-batch and every reload after the ✚. Michael:
+  *"a lot of these actions on the notes page seem to take a long time."*
+
+  Nothing here depended on anything else except through the ID LIST, and the id
+  list is derivable in memory from the index — so the only genuine ordering is
+  *facts, then the words for the ids those facts chose*. Two round trips, not
+  eight, and the second is the only one that carries any bulk.
+*/
+const index = await readShelfIndex(supabase);
+const shelfVocab = index.vocab;
+const byShelf = index.byShelf;
+const inboxCount = index.inbox;
 const activeShelf = shelfVocab.find((sh) => sh.slug === (params.get('shelf') ?? '').trim()) ?? null;
-const { byShelf, inbox: inboxCount } = await shelfCounts(supabase);
 
 /*
   ⚠ A LIVE TERM ESCAPES THE INBOX DEFAULT AND RESPECTS A PRESSED SHELF.
@@ -86,29 +103,34 @@ const { byShelf, inbox: inboxCount } = await shelfCounts(supabase);
 const escaped = !activeShelf && searching;
 
 /*
-  Membership → an id list, the same shape `fragment-query.ts` uses for `?in=`
-  (a slug, or "belongs to nothing"). Two queries rather than an embedded join
-  because the exclusion case has no join to embed: "on no shelf at all" is a
-  fact about rows that are ABSENT from the link table.
+  The cap is a backstop, not paging. It is a likelier ceiling now that a shelf
+  lets the pile KEEP things, so the bar below says the real number held back
+  rather than the older "there are more than this" — which is the fault
+  `fragment-query.ts` names at its own two ceilings, and we can now do better
+  because the index already knows how many there are.
 */
-let onlyIds: string[] | null = null;
-let excludeIds: string[] | null = null;
-if (activeShelf) {
-  const { data } = await supabase.from('fragment_shelves').select('fragment_id').eq('shelf_id', activeShelf.id);
-  onlyIds = (data ?? []).map((l) => l.fragment_id);
-} else if (!escaped) {
-  const { data } = await supabase.from('fragment_shelves').select('fragment_id');
-  excludeIds = [...new Set((data ?? []).map((l) => l.fragment_id))];
-}
-
-// Newest first, by when it was last TOUCHED rather than created: editing a
-// thought is thinking about it again, and it belongs back at the top.
-//
-// The cap is a backstop, not paging — and it is a likelier ceiling now that a
-// shelf lets the pile keep things. `truncated` below says so out loud rather
-// than serving 100 of an unknown number, which is the fault `fragment-query.ts`
-// names at its own two ceilings.
 const LIST_CEILING = 100;
+
+/*
+  ⚠ THE `NOT IN (…)` THAT STOOD HERE WAS A CLIFF, and removing it is the second
+  half of this refactor. The inbox was expressed as *every shelved id, excluded*
+  — so the query string grew one UUID per shelved note, unbounded. At a few
+  hundred kept jottings that URL passes PostgREST's limit and the room stops
+  rendering at all: not slow, broken, and only for the person who used shelves
+  most.
+
+  Asking the index instead bounds it by construction. `idsInView` is pure and
+  already ordered newest-touched first, so slicing to the ceiling leaves at most
+  100 ids — ~3.7KB — whatever the pile grows to.
+
+  ⚠ AND THE SLICE IS SKIPPED WHILE SEARCHING, because a term has to reach the
+  whole view rather than its newest hundred. That costs nothing: `escaped` means
+  an unfiltered search needs no id list at all, and a search inside a pressed
+  shelf is bounded by that shelf's membership.
+*/
+const viewIds = escaped ? null : idsInView(index, activeShelf);
+const held = viewIds && !searching ? Math.max(0, viewIds.length - LIST_CEILING) : 0;
+
 let listQuery = supabase
   .from('fragments')
   .select('id, body, slug, updated_at')
@@ -118,16 +140,45 @@ let listQuery = supabase
 // searches four (title, body, attribution, excerpt); a dump has no title by
 // construction, which is the reason this room exists at all.
 if (searching) listQuery = listQuery.ilike('body', `%${q.replace(/[(),]/g, ' ')}%`);
-if (onlyIds) listQuery = listQuery.in('id', onlyIds.length ? onlyIds : ['00000000-0000-0000-0000-000000000000']);
-if (excludeIds?.length) listQuery = listQuery.not('id', 'in', `(${excludeIds.join(',')})`);
-const { data: rows } = await listQuery.order('updated_at', { ascending: false }).limit(LIST_CEILING);
-const truncated = (rows ?? []).length >= LIST_CEILING;
+if (viewIds) {
+  const wanted = searching ? viewIds : viewIds.slice(0, LIST_CEILING);
+  // An empty view is a real answer ("nothing on this shelf"), and `.in([])` is
+  // not — PostgREST drops the filter and would serve the whole pile.
+  listQuery = listQuery.in('id', wanted.length ? wanted : ['00000000-0000-0000-0000-000000000000']);
+}
+/*
+  ⚠ THE SECOND AND LAST ROUND TRIP, AND THREE PASSENGERS RIDE IT. The pieces,
+  the goals and the roster answer questions this room asks of the SHEETS it
+  mounts, not of the pile — so none of them depends on the id list above and
+  none ever needed a trip of its own. Awaited together they are free; awaited in
+  sequence they were three more ~53ms waits in front of the first byte.
+*/
+const [{ data: rows }, { data: pieceRows }, { data: goalData }, { data: rosterData }] = await Promise.all([
+  listQuery.order('updated_at', { ascending: false }).limit(LIST_CEILING),
+  // Where a dump can be filed. Drafts first — a draft is what you are actively
+  // writing, so it is the likely destination — then published, newest first
+  // within each.
+  //
+  // SERVER-RENDERED AND FILTERED IN THE BROWSER, the same call LinkSheet makes
+  // and for the same reason: there are 60 of these, it is already one round
+  // trip, and a keystroke that has to ask the server is slower and no more
+  // correct.
+  supabase
+    .from('fragments')
+    .select('id, title, slug, status, updated_at')
+    .eq('type', 'writing')
+    .neq('status', 'note')
+    .is('deleted_at', null)
+    .order('status', { ascending: true }) // draft < published
+    .order('updated_at', { ascending: false }),
+  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
+  supabase.from('people').select('id, display_name, photo_path').is('archived_at', null).order('display_name'),
+]);
+const truncated = held > 0 || (rows ?? []).length >= LIST_CEILING;
 
-const shelvesFor = await shelvesByFragment(
-  supabase,
-  (rows ?? []).map((n) => n.id),
-  shelfVocab,
-);
+// No query: the index already carries every live note's shelves, in the
+// vocabulary's own order. This was the sixth round trip.
+const shelvesFor = index.byFragment;
 
 const notes = (rows ?? []).map((n) => ({
   id: n.id,
@@ -170,22 +221,6 @@ const notes = (rows ?? []).map((n) => ({
   ex: searching ? excerpts(toPlain(n.body ?? ''), q) : null,
 }));
 
-// Where a dump can be filed. Drafts first — a draft is what you are actively
-// writing, so it is the likely destination — then published, newest first
-// within each.
-//
-// SERVER-RENDERED AND FILTERED IN THE BROWSER, the same call LinkSheet makes
-// and for the same reason: there are 60 of these, it is already one round trip,
-// and a keystroke that has to ask the server is slower and no more correct.
-const { data: pieceRows } = await supabase
-  .from('fragments')
-  .select('id, title, slug, status, updated_at')
-  .eq('type', 'writing')
-  .neq('status', 'note')
-  .is('deleted_at', null)
-  .order('status', { ascending: true }) // draft < published
-  .order('updated_at', { ascending: false });
-
 const pieces = (pieceRows ?? []).map((p) => ({
   id: p.id,
   title: p.title?.trim() || '(untitled)',
@@ -212,10 +247,6 @@ const pieces = (pieceRows ?? []).map((p) => ({
 // consolidation happened; this was the call site it missed (plans/29 · §2).
 const { ymd: todayYmd } = Astro.locals.today;
 
-const [{ data: goalData }, { data: rosterData }] = await Promise.all([
-  supabase.from('goals').select('id, name').eq('status', 'active').order('created_at'),
-  supabase.from('people').select('id, display_name, photo_path').is('archived_at', null).order('display_name'),
-]);
 const goals = goalData ?? [];
 const roster = rosterData ?? [];
 ---
@@ -290,7 +321,15 @@ const roster = rosterData ?? [];
           )}
           {truncated && (
             <p class="notes-bar__note">
-              Showing the first {notes.length}. There are more than this — narrow it with a shelf or a term.
+              {/* ⚠ THE REAL NUMBER WHEN WE HAVE IT. The index counts the whole
+                  view in memory, so "and 34 more" is now sayable where the old
+                  line could only manage "there are more than this" — which told
+                  you a ceiling had been hit without telling you how far past it
+                  you were. Searching is the one case still vague: the term is
+                  matched in the database, so the count of hits beyond the
+                  ceiling is genuinely not known here. */}
+              Showing the first {notes.length}
+              {held > 0 ? `, and ${held} more` : ''}. Narrow it with a shelf or a term.
             </p>
           )}
         </div>

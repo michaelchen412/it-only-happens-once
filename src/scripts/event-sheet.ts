@@ -14,8 +14,7 @@ import { announceFiled, wireJotArrival } from './jot-arrival';
 import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 import { wireFilterFields } from './filter-field';
-// Static, for the reason task-sheet.ts states at its own copy of this import.
-import { mountMiniEditor } from './rich-editor';
+import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
 
 const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
 const form = document.querySelector<HTMLFormElement>('#event-form');
@@ -54,7 +53,12 @@ if (sheet && form) {
    * (agenda.astro) — an event's notes are the door code and the parking, not an
    * essay, so a lone newline is a line break at both ends.
    */
-  const notes = mountMiniEditor({
+  /*
+    ⚠ LAZY — the editor is imported when this sheet is first warmed, not when
+    the page loads (`mini-editor-lazy.ts` carries the measurement). This sheet
+    is mounted by rooms that may never open it, and TipTap is 512 KB.
+  */
+  const notes = lazyMiniEditor({
     editorEl: document.getElementById('event-notes')!,
     toolbarRoot: document.getElementById('event-notes-wrap')!,
     placeholder: 'Optional.',
@@ -70,7 +74,7 @@ if (sheet && form) {
   });
   /** `emitUpdate: false`: v3 emits `update` from `setContent` and would arm the
    *  exit guard on a sheet nobody typed in. */
-  const setNotes = (md: string) => notes.editor.commands.setContent(md, { emitUpdate: false });
+  const setNotes = (md: string) => notes.setContent(md);
 
   interface EventRow {
     id: string;
@@ -312,4 +316,13 @@ if (sheet && form) {
   // The calendar's half of the ✚'s Agenda door — reached either directly, when
   // the reading says this is an event, or from the tasks room's KindBar switch.
   wireJotArrival(sheet, 'hq:event-open');
+
+  /*
+    ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
+    of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
+    ✚. The page paints without TipTap in it; a moment later the editor is there,
+    so a sheet opened in anger finds it already mounted and nothing about the
+    typing feels deferred.
+  */
+  warmOnIdle(notes);
 }

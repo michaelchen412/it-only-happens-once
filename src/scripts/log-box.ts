@@ -18,8 +18,7 @@ import { submitAction } from './action-error';
 import { announceFiled } from './jot-arrival';
 import { confirmDialog } from './confirm-dialog';
 import { wireEntryMeta } from './entry-meta';
-// Static, for the reason task-sheet.ts states at its own copy of this import.
-import { mountMiniEditor } from './rich-editor';
+import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
 
 const zone = document.querySelector<HTMLElement>('[data-timeline]');
 
@@ -39,7 +38,11 @@ if (zone) {
    * falls: the textarea used to display two lines where the row beneath it
    * displayed one, and the editor now agrees with the row.
    */
-  const box = mountMiniEditor({
+  /*
+    ⚠ LAZY — imported when this sheet is first warmed, not when the page loads.
+    `mini-editor-lazy.ts` carries the measurement and the argument.
+  */
+  const box = lazyMiniEditor({
     editorEl: $<HTMLElement>('[data-log-input]')!,
     // The whole zone: the two `.tt-btn`s live down in the foot, not over the
     // box. `mountMiniEditor` takes ELEMENTS precisely so a caller can place its
@@ -85,12 +88,16 @@ if (zone) {
   // made the measurement possible are all deleted rather than ported.
 
   function syncControls() {
-    // ⚠ `getText().trim()`, NOT `editor.isEmpty` — AND THE SPEC SAYS WHY.
+    // ⚠ `isBlank()`, NOT TIPTAP'S `editor.isEmpty` — AND THE SPEC SAYS WHY.
     // "Whitespace alone is not something typed": a paragraph holding four
     // spaces is a real node, so `isEmpty` is FALSE for it and Save would have
     // appeared for a box containing nothing you meant. `.value.trim()` gave
     // this for free on the textarea; the editor has to be asked.
-    const has = box.editor.getText().trim().length > 0;
+    //
+    // ⚠ THE NAME IS THE GUARD. `mini-editor-lazy`'s method is called `isBlank`
+    // precisely so it cannot be mistaken for the property this comment exists
+    // to warn against — it trims, and `editor.isEmpty` does not.
+    const has = !box.isBlank();
     meta.hidden = !has && !editingId;
     saveBtn.hidden = !has && !editingId;
     cancelBtn.hidden = !editingId;
@@ -102,7 +109,7 @@ if (zone) {
     // `emitUpdate: false` — `onChange` calls `syncControls`, which runs on the
     // next line anyway; letting `setContent` fire it too would sync against a
     // half-reset box (`editingId` cleared, meta not yet).
-    box.editor.commands.setContent('', { emitUpdate: false });
+    box.setContent('');
     entryMeta.reset();
     showError(null);
     syncControls();
@@ -118,7 +125,7 @@ if (zone) {
       const row = btn.closest<HTMLElement>('.tl')!;
       reset();
       editingId = row.dataset.entry!;
-      box.editor.commands.setContent(row.dataset.body ?? '', { emitUpdate: false });
+      box.setContent(row.dataset.body ?? '');
       entryMeta.set(
         row.dataset.entryOn!,
         row.dataset.entryKind!,
@@ -127,7 +134,7 @@ if (zone) {
 
       zone.querySelectorAll('.tl').forEach((r) => r.classList.toggle('is-editing', r === row));
       syncControls();
-      box.editor.commands.focus('end');
+      box.focus('end');
     }),
   );
 
@@ -221,8 +228,8 @@ if (zone) {
   const seedBody = zone.dataset.seedBody;
   if (seedBody) {
     delete zone.dataset.seedBody;
-    box.editor.commands.setContent(seedBody);
-    box.editor.commands.focus('end');
+    box.setContent(seedBody);
+    box.focus('end');
     const url = new URL(window.location.href);
     url.searchParams.delete('from');
     history.replaceState(null, '', url.pathname + url.search + url.hash);
@@ -231,4 +238,13 @@ if (zone) {
   // The initial paint. `grow()` used to lead here, sizing an empty textarea to
   // one line; the editor is already the height of its own content.
   syncControls();
+
+  /*
+    ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
+    of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
+    ✚. The page paints without TipTap in it; a moment later the editor is there,
+    so a sheet opened in anger finds it already mounted and nothing about the
+    typing feels deferred.
+  */
+  warmOnIdle(box);
 }

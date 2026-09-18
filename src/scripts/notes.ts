@@ -45,12 +45,17 @@
 import { actions } from 'astro:actions';
 import { elapsedSince } from '../lib/hq/dates';
 import { stripMarkdown } from '../lib/markdown-plain';
-import { wireAltDialog } from './alt-dialog';
 import { anchorPopover } from './pop-anchor';
 import { MIN_SEARCH } from '../lib/search-highlight';
 import { MAX_SHELVES } from '../lib/shelves';
-import { mountRichEditor } from './rich-editor';
-import { uploadImage } from './upload';
+/*
+  ⚠ TYPE-ONLY, AND THE THREE VALUE IMPORTS THAT STOOD HERE ARE GONE — the
+  editor, the alt dialog and the uploader are all reached by `import()` in
+  `warmEditor` below. `import type` is erased at build time, so this line costs
+  no bytes; the three it replaced cost 512 KB raw / 171 KB gzipped, on the
+  critical path of every load of this room.
+*/
+import type { RichEditorHandle } from './rich-editor';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { onBackdropDismiss } from './backdrop-close';
@@ -160,56 +165,107 @@ if (undoBar) {
   const nsWords = document.getElementById('ns-words');
   const pileBtn = document.getElementById('ns-pile') as HTMLButtonElement | null;
 
-  const { editor, getMarkdown } = mountRichEditor({
-    editorEl: document.getElementById('ns-editor')!,
-    toolbarRoot: document.querySelector('.nsheet__tools') as HTMLElement,
-    linkDialog: document.getElementById('dump-link-dialog') as HTMLDialogElement,
-    placeholder: 'Write it down…', // the ✚'s words, for a thought you emptied
-    ariaLabel: 'Edit this note',
-    // ⚠ NOT `jot-prose` ANY MORE. That class carried the CARD's metrics so the
-    // words would not move when an editor arrived in their place — a promise
-    // this room no longer has to keep, because the editor is somewhere else
-    // entirely. The sheet sets its own, at document scale (hq.css).
-    docClass: 'ns-prose',
-    // ⚠ A dump's newlines are its shape, and every one written before this
-    // editor existed is plain text. See rich-editor's `breaks` for the whole
-    // argument; the card renders to match.
-    breaks: true,
-    images: {
-      // `essays/<id>/` rather than `notes/<id>/`, because "make it a piece" is
-      // a status flip on this very row — the picture must not need moving when
-      // the thought graduates. The id is read at upload time from the card the
-      // sheet is open on, which is the only card an upload can come from.
-      upload: async (file) => {
-        const id = editing?.dataset.note;
-        if (!id) throw new Error('No note is open');
-        // `embedUrl` — the dims ride along so the picture keeps its box when
-        // this note graduates to a public piece (plan 43 §5).
-        return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).embedUrl;
+  /*
+    ⚠ THE EDITOR IS MOUNTED ON DEMAND, NOT AT MODULE SCOPE, and `capture.ts`'s
+    header carries the whole measurement this follows. That file made exactly
+    this move on 2026-08-07 and named this room as one of the eight paying for
+    it: *"this module used to `import` TipTap statically, so Today, People,
+    Agenda, **Notes**, Fragments, Constellations, Library and About each
+    fetched, parsed and executed it whether or not anybody opened the box."*
+
+    Plan 46 then gave the pile a sheet with a real editor in it and reached for
+    the static import again — so the room went back to paying 512 KB raw /
+    171 KB gzipped on the critical path of every load, to mount an editor that
+    is invisible until a pencil is pressed. Confirmed in the built graph: the
+    room's entry chunk imported `rich-editor` outright.
+
+    ⚠ AND THE COST IS PAID ON EVERY NAVIGATION, which is what made it feel like
+    the room rather than like the network. The Observatory mounts no
+    `<ClientRouter />` (nav-progress.ts), so pressing a shelf, typing in the
+    search field and closing the ✚ are each a full document load — and each one
+    re-parsed TipTap before the pile could be touched.
+
+    ⚠ WARMED ON IDLE, NOT IMPORTED ON CLICK. Same design as `capture.ts` and
+    for the same reason: `await import()` inside the pencil's handler would put
+    a fetch between the tap and a usable editor. Warming after first paint takes
+    the parse off the critical path while leaving the editor resident by the
+    time a pencil is pressed in anger.
+  */
+  let rich: RichEditorHandle | null = null;
+  let booting: Promise<RichEditorHandle> | null = null;
+
+  function warmEditor(): Promise<RichEditorHandle> {
+    return (booting ??= mountEditor());
+  }
+
+  async function mountEditor(): Promise<RichEditorHandle> {
+    // One await, three modules — they are independent and `rich-editor` is the
+    // long pole; serialising them would be three round trips of parse latency
+    // instead of one. (`upload` drags in the Supabase browser client, which is
+    // another 218 KB and is wanted only when a picture is dropped in.)
+    const [{ mountRichEditor }, { wireAltDialog }, { uploadImage }] = await Promise.all([
+      import('./rich-editor'),
+      import('./alt-dialog'),
+      import('./upload'),
+    ]);
+
+    rich = mountRichEditor({
+      editorEl: document.getElementById('ns-editor')!,
+      toolbarRoot: document.querySelector('.nsheet__tools') as HTMLElement,
+      linkDialog: document.getElementById('dump-link-dialog') as HTMLDialogElement,
+      placeholder: 'Write it down…', // the ✚'s words, for a thought you emptied
+      ariaLabel: 'Edit this note',
+      // ⚠ NOT `jot-prose` ANY MORE. That class carried the CARD's metrics so the
+      // words would not move when an editor arrived in their place — a promise
+      // this room no longer has to keep, because the editor is somewhere else
+      // entirely. The sheet sets its own, at document scale (hq.css).
+      docClass: 'ns-prose',
+      // ⚠ A dump's newlines are its shape, and every one written before this
+      // editor existed is plain text. See rich-editor's `breaks` for the whole
+      // argument; the card renders to match.
+      breaks: true,
+      images: {
+        // `essays/<id>/` rather than `notes/<id>/`, because "make it a piece" is
+        // a status flip on this very row — the picture must not need moving when
+        // the thought graduates. The id is read at upload time from the card the
+        // sheet is open on, which is the only card an upload can come from.
+        upload: async (file) => {
+          const id = editing?.dataset.note;
+          if (!id) throw new Error('No note is open');
+          // `embedUrl` — the dims ride along so the picture keeps its box when
+          // this note graduates to a public piece (plan 43 §5).
+          return (await uploadImage(file, { pathFor: (hash, ext) => `essays/${id}/${hash}.${ext}` })).embedUrl;
+        },
+        askAlt: wireAltDialog(document.getElementById('dump-alt-dialog') as HTMLDialogElement),
+        // ⚠ IT HAS TO REACH THE SHEET'S STAMP, and `say` is what guarantees it:
+        // the card is behind a backdrop while an upload runs, so a notice written
+        // only there would be reported to nobody. Both stamps carry it, and both
+        // go back to the elapsed line when the upload ends.
+        onStatus: (m) => editing && say(editing, m || atRest(editing)),
+        onError: (m) => editing && say(editing, m),
       },
-      askAlt: wireAltDialog(document.getElementById('dump-alt-dialog') as HTMLDialogElement),
-      // ⚠ IT HAS TO REACH THE SHEET'S STAMP, and `say` is what guarantees it:
-      // the card is behind a backdrop while an upload runs, so a notice written
-      // only there would be reported to nobody. Both stamps carry it, and both
-      // go back to the elapsed line when the upload ends.
-      onStatus: (m) => editing && say(editing, m || atRest(editing)),
-      onError: (m) => editing && say(editing, m),
-    },
-    onChange: () => {
-      if (!editing) return;
-      const card = editing;
-      sayWords();
-      window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => void save(card), DEBOUNCE_MS);
-    },
-  });
+      onChange: () => {
+        if (!editing) return;
+        const card = editing;
+        sayWords();
+        window.clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(() => void save(card), DEBOUNCE_MS);
+      },
+    });
+    return rich;
+  }
 
   /**
    * This card's Markdown. From the editor while its note is the open one, from
    * the hidden carrier otherwise — the carrier is what every other card has
    * instead of an editor of its own.
+   *
+   * ⚠ `rich &&` IS NOT BELT AND BRACES — before the first pencil press there is
+   * no editor in this room at all, and the carrier is then the only spelling of
+   * a note's text. That is the case every destination in the → chooser hits:
+   * you can file, delete and convert a note without ever mounting TipTap.
    */
-  const markdownOf = (card: HTMLElement) => (editing === card ? getMarkdown() : boxOf(card).value);
+  const markdownOf = (card: HTMLElement) => (editing === card && rich ? rich.getMarkdown() : boxOf(card).value);
 
   /**
    * ⚠ COUNTED OFF THE EDITOR'S TEXT, NOT ITS MARKDOWN. `getMarkdown()` would
@@ -218,8 +274,8 @@ if (undoBar) {
    * rather than prints.
    */
   function sayWords() {
-    if (!nsWords) return;
-    const t = editor.getText().trim();
+    if (!nsWords || !rich) return;
+    const t = rich.editor.getText().trim();
     const n = t ? t.split(/\s+/).length : 0;
     nsWords.textContent = n === 1 ? '1 word' : `${n} words`;
   }
@@ -359,8 +415,11 @@ if (undoBar) {
    */
   function flush(card: HTMLElement): Promise<unknown> {
     window.clearTimeout(saveTimer);
+    // No editor means no card was ever opened in the sheet, so there is nothing
+    // to hand back — the carrier already holds the only copy of these words.
+    if (!rich) return save(card);
     const box = boxOf(card);
-    box.value = getMarkdown();
+    box.value = rich.getMarkdown();
     /*
       The rendered twin comes from the editor's own document rather than from a
       Markdown round trip: it is the exact thing that was on screen a moment
@@ -370,7 +429,7 @@ if (undoBar) {
       cannot express one. The public renderer still sanitizes (lib/markdown).
     */
     const text = textOf(card);
-    text.innerHTML = editor.getHTML();
+    text.innerHTML = rich.editor.getHTML();
     // An edited thought may have grown past the clamp, or shrunk under it.
     const long = box.value.split('\n').length > 10 || box.value.length > 700;
     text.classList.toggle('dump__text--clamped', long && !text.dataset.expanded);
@@ -379,9 +438,10 @@ if (undoBar) {
     return save(card);
   }
 
-  function load(card: HTMLElement) {
+  /** ⚠ Only ever called with the editor already mounted — see `openSheet`. */
+  function load(card: HTMLElement, r: RichEditorHandle) {
     editing = card;
-    editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
+    r.editor.commands.setContent(boxOf(card).value, { emitUpdate: false });
     /*
       ⚠ THE BASELINE IS WHAT THE EDITOR WOULD WRITE, not what the server sent,
       and the difference is the whole reason this line has a comment.
@@ -395,7 +455,7 @@ if (undoBar) {
       serialization asks the question that actually matters: did the DOCUMENT
       change?
     */
-    card.dataset.saved = getMarkdown();
+    card.dataset.saved = r.getMarkdown();
     if (nsStamp) {
       nsStamp.dateTime = card.dataset.updated ?? '';
       nsStamp.textContent = card.dataset.updated ? elapsedSince(card.dataset.updated) : '';
@@ -412,22 +472,37 @@ if (undoBar) {
       other half, since the previous note may have left it anywhere.
     */
     doc?.scrollTo({ top: 0 });
-    editor.commands.focus('start');
+    r.editor.commands.focus('start');
   }
 
-  function openSheet(card: HTMLElement) {
+  /**
+   * ⚠ ASYNC NOW, BECAUSE THE EDITOR ARRIVES ON DEMAND (see `warmEditor`). The
+   * await is almost always already settled: the idle warm-up below has had
+   * since first paint, and a `pointerdown` on any card starts the boot before
+   * the finger lifts. On the one press that beats both, the drawer opens a few
+   * hundred milliseconds later instead of never — which is the trade
+   * `capture.ts` made for the ✚ and the same one this room now makes.
+   *
+   * ⚠ AND THE DIALOG OPENS AFTER `load`, NOT BEFORE. Opening first would show
+   * an empty drawer for the length of the import, which reads as the room
+   * losing the note.
+   */
+  async function openSheet(card: HTMLElement) {
     if (!sheet || editing === card) return;
-    load(card);
+    const r = await warmEditor();
+    if (editing === card) return; // a second press landed while we were booting
+    load(card, r);
     if (!sheet.open) openDialog(sheet);
   }
 
   /** Note to note without leaving — the rail's whole proposition. */
   async function handOver(card: HTMLElement) {
     if (!editing) return openSheet(card);
+    const r = await warmEditor();
     const outgoing = editing;
     editing = null; // the DOM work below must not be attributed to the new one
     const landed = flush(outgoing);
-    load(card);
+    load(card, r);
     setRail(false);
     await landed;
   }
@@ -1058,12 +1133,12 @@ if (undoBar) {
     if (el.hasAttribute('data-text')) {
       if (target.closest('a')) return; // following a link the dump contains
       if (!window.getSelection()?.isCollapsed) return; // selecting, not opening
-      openSheet(card);
+      void openSheet(card);
       return;
     }
 
     if (el.hasAttribute('data-edit')) {
-      openSheet(card);
+      void openSheet(card);
       return;
     }
 
@@ -1124,4 +1199,25 @@ if (undoBar) {
       minute: '2-digit',
     });
   });
+
+  /* ── warming the editor ─────────────────────────────────────────────────── */
+  /*
+    The other half of `warmEditor`'s bargain: off the critical path, resident
+    before it is wanted. Lifted from `capture.ts`, whose ✚ warms on exactly this
+    pair of signals — and which explains why `requestIdleCallback` needs the
+    fallback (it is still missing on Safari versions Michael actually uses, and
+    a missing warm-up would silently move the whole parse back onto the first
+    pencil press, which is the trade this refuses).
+
+    ⚠ `pointerdown` ON THE PILE, NOT ON EACH PENCIL. One listener on the
+    container catches every card — including cards added after load — and it
+    fires before `click`, so a press already has the import in flight by the
+    time the finger lifts. It is deliberately not narrowed to `[data-edit]`:
+    the words themselves open the sheet too, and a press anywhere on a card is
+    a good enough guess that this reader is about to want an editor.
+  */
+  pile?.addEventListener('pointerdown', () => void warmEditor(), { once: true });
+
+  const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
+  idle(() => void warmEditor());
 }

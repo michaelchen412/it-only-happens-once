@@ -13,8 +13,7 @@
 import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireEntryMeta } from './entry-meta';
-// Static, for the reason task-sheet.ts states at its own copy of this import.
-import { mountMiniEditor } from './rich-editor';
+import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 
@@ -34,7 +33,11 @@ if (root && sheet) {
    * Markdown — so `setContent` renders whatever marks it already carried rather
    * than showing you its asterisks, which is the entire point of the change.
    */
-  const box = mountMiniEditor({
+  /*
+    ⚠ LAZY — imported when this sheet is first warmed, not when the page loads.
+    `mini-editor-lazy.ts` carries the measurement and the argument.
+  */
+  const box = lazyMiniEditor({
     editorEl: $<HTMLElement>('[data-log-body]')!,
     // The sheet root: the `.tt-btn`s are down in the foot, not over the box.
     toolbarRoot: root,
@@ -64,10 +67,11 @@ if (root && sheet) {
    * wiring. The body has to re-run it too — Save depends on both.
    */
   const syncSave = () => {
-    // `getText().trim()` rather than `isEmpty`: a paragraph of spaces is a real
-    // node, so `isEmpty` is false for a box holding nothing you meant. See the
-    // fuller note at the same line in `log-box.ts`.
-    saveBtn.disabled = meta.people().length === 0 || box.editor.getText().trim().length === 0;
+    // `isBlank()` rather than TipTap's `isEmpty`: a paragraph of spaces is a
+    // real node, so `isEmpty` is false for a box holding nothing you meant. The
+    // façade trims; the property does not. Fuller note at the same line in
+    // `log-box.ts`.
+    saveBtn.disabled = meta.people().length === 0 || box.isBlank();
   };
 
   // Kind, date and who are `entry-meta.ts` now — the same wiring the profile's
@@ -95,7 +99,7 @@ if (root && sheet) {
     reset();
     // `emitUpdate: false` — `syncSave` runs explicitly on the next line, and
     // letting `setContent` fire `onChange` too would just run it twice.
-    box.editor.commands.setContent(detail.text, { emitUpdate: false });
+    box.setContent(detail.text);
     syncSave(); // the words arrived after `reset` ran; Save depends on them
     openDialog(sheet!);
     // NOT focusing the box: the words are already there, and the thing
@@ -151,4 +155,13 @@ if (root && sheet) {
     );
     noteId = null;
   });
+
+  /*
+    ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
+    of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
+    ✚. The page paints without TipTap in it; a moment later the editor is there,
+    so a sheet opened in anger finds it already mounted and nothing about the
+    typing feels deferred.
+  */
+  warmOnIdle(box);
 }

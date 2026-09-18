@@ -34,7 +34,7 @@ import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar
 // it buys a parse this page's own capture dialog performs on idle regardless,
 // and costs a pending-content dance for every `setContent` that can now run
 // before the editor exists.
-import { mountMiniEditor } from './rich-editor';
+import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
 
 const sheet = document.querySelector<HTMLDialogElement>('#task-sheet');
 const form = document.querySelector<HTMLFormElement>('#task-form');
@@ -83,7 +83,12 @@ if (sheet && form) {
    * A contenteditable fires no event the dirty tracker can hear, so `onChange`
    * does that job by hand — see `dirtyTracker.touch`.
    */
-  const notes = mountMiniEditor({
+  /*
+    ⚠ LAZY — the editor is imported when this sheet is first warmed, not when
+    the page loads (`mini-editor-lazy.ts` carries the measurement). This sheet
+    is mounted by rooms that may never open it, and TipTap is 512 KB.
+  */
+  const notes = lazyMiniEditor({
     editorEl: document.getElementById('task-notes')!,
     toolbarRoot: document.getElementById('task-notes-wrap')!,
     placeholder: 'Optional.',
@@ -100,7 +105,7 @@ if (sheet && form) {
   /** `emitUpdate: false` everywhere below — TipTap v3 fires `update` from
    *  `setContent`, which would arm the exit guard on a sheet nobody has typed
    *  in. The same note stands in five other files. */
-  const setNotes = (md: string) => notes.editor.commands.setContent(md, { emitUpdate: false });
+  const setNotes = (md: string) => notes.setContent(md);
 
   /** The row's JSON — every column, so the form and the row cannot disagree. */
   interface TaskRow {
@@ -501,6 +506,15 @@ if (sheet && form) {
   // Inert unless the room was arrived at with `?from=` — which is what keeps it
   // out of the way in the notes room, where the pile owns the whole motion.
   wireJotArrival(sheet, 'hq:task-open');
+
+  /*
+    ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
+    of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
+    ✚. The page paints without TipTap in it; a moment later the editor is there,
+    so a sheet opened in anger finds it already mounted and nothing about the
+    typing feels deferred.
+  */
+  warmOnIdle(notes);
 }
 
 // The role promises arrow keys and one tab stop; this is what keeps it
