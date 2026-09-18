@@ -120,6 +120,33 @@ const WAYS = [
           <time id="ns-stamp" data-ago></time>
         </span>
         <span class="nsheet__words" id="ns-words"></span>
+        {
+          /* ── WHERE THIS NOTE LIVES ──────────────────────────────────────────
+            Reported missing 2026-09-18: *"in the main dedicated notes editor
+            sheet, theres no way to categorize stuff."* True — the card's → could
+            file a note and this drawer, the one place you actually sit and read
+            one, could neither say where it lived nor move it.
+
+            ⚠ IN THE HEAD, BESIDE THE STAMP, AND THAT IS THE CARD'S OWN RULE. The
+            pile puts its chips in the foot *"sitting with the timestamp"*,
+            because a card is nothing but its text and metadata may not push the
+            words down. Here the stamp is in the head, so that is where the same
+            fact belongs — and this header already exists, so nothing moves.
+
+            ⚠⚠ NOT A SIXTH ROW IN THE FOOT, which is the obvious place and the
+            wrong one. All five destinations down there CONSUME the note. A shelf
+            is the opposite — it is how a thought stays — and the → chooser
+            already puts shelves below a separator for exactly this reason. Mixed
+            into the exits it would be the one row that does not do what its
+            neighbours do. **The foot is where a note leaves; the head is where it
+            lives.**
+
+            ⚠ AND IT WRITES NOTHING OF ITS OWN, which is this file's standing
+            rule. A press dispatches into `notes.ts`'s `setShelves` — the same
+            function the card's chooser calls, with the same cap and the same
+            undo. */
+        }
+        <span class="nsheet__shelves" id="ns-shelves" role="group" aria-label="Shelves for this note"></span>
         <button type="button" class="nsheet__x" data-ns-close aria-label="Close">✕</button>
       </header>
 

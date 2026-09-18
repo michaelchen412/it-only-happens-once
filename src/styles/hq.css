@@ -4308,6 +4308,61 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 .notes-bar__seg[hidden] {
   display: none;
 }
+
+/* The pencil that opens the shelf manager — a `.type-badge` like the shelves it
+   sits beside, so it reads as part of the strip rather than as a control bolted
+   to the end of it. Quieter than its neighbours: it is about the row, not a
+   filter you can press. */
+.notes-bar__edit {
+  color: var(--text-whisper);
+  padding-inline: 0.45rem;
+}
+.notes-bar__edit:hover {
+  color: var(--color-base-content);
+}
+
+/* One row of the shelf manager: a name you can retype, the count as a door, and
+   the way out. */
+.shelfman {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-block: 0.3rem;
+}
+.shelfman__name {
+  flex: 1;
+  min-width: 0;
+}
+.shelfman__n {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  min-width: 1.5rem;
+  text-align: right;
+}
+.shelfman__n:hover {
+  color: var(--color-base-content);
+  text-decoration: underline;
+}
+.shelfman__new {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  border-top: 1px solid var(--color-base-300);
+  padding: 0.75rem 1.25rem;
+}
+.shelfman__new input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  background: transparent;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  padding: 0.3rem 0.5rem;
+  color: var(--color-base-content);
+}
 .notes-bar__row {
   display: flex;
 }
@@ -4465,6 +4520,24 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
 }
 .nsheet__words {
   font-variant-numeric: tabular-nums;
+}
+
+/* Where the open note lives — the card's foot chips, in the drawer's head,
+   beside the stamp they belong with. `.lchip` is the toggle primitive the ✚'s
+   own shelf row and the timeline both use, so a shelf looks like a shelf
+   wherever you meet one. */
+.nsheet__shelves {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+/* ⚠ SMALLER THAN THE ✚'s, because these sit in a dense header rather than in a
+   box you are typing into. The 30px tap floor `.lchip` sets is kept — this only
+   tightens the horizontal padding. */
+.nsheet__shelves .lchip {
+  font-size: 0.68rem;
+  padding-inline: 0.4rem;
 }
 /* ⚠ `margin-left: auto` IS WHAT PUTS IT IN THE CORNER, and it is the only thing
    in this head that is about the DRAWER rather than about the note — so it is

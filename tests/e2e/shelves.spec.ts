@@ -168,47 +168,120 @@ test.describe('§2 — the shelf strip is not gated on how deep the pile is', ()
   });
 });
 
-test.describe('§3 — the Library grooms the vocabulary', () => {
-  test('⚠ shelves are the fourth vocabulary, with a rename and a delete', async ({ page }) => {
-    await page.goto('/admin/library');
-    await hideDevToolbar(page);
+test.describe('§3 — the vocabulary is groomed in the room that uses it', () => {
+  /*
+    ⚠ THIS MOVED OUT OF THE LIBRARY ON 2026-09-18 and the tests moved with it.
+    Shelves shipped there first, beside subjects, authors and works — Michael:
+    *"its not really intuitive to go into library. ideally we have a way to
+    manage while we are in notes anyway."* A shelf is the only vocabulary in the
+    building scoped to ONE room, so the Library was buying a trip it exists to
+    save. `notes.astro` carries the full argument.
+  */
+  test('⚠ the pencil on the filter strip opens the manager', async ({ page }) => {
+    await gotoPile(page);
+    const pencil = page.locator('[data-shelf-manage]');
+    test.skip((await pencil.count()) === 0, 'no shelves in this database');
+    await expect(pencil).toBeVisible();
 
-    const rows = page.locator('.lib-row[data-entity="shelf"]');
-    const section = page.locator('[data-vocab]').filter({ hasText: 'Shelves' });
-    await expect(section).toHaveCount(1);
-    test.skip((await rows.count()) === 0, 'no shelves in this database to groom');
+    await pencil.click();
+    await expect(page.locator('#shelf-manage')).toBeVisible();
 
-    const row = rows.first();
-    await expect(row.locator('[data-field="name"]')).toHaveCount(1);
-    await expect(row.locator('.lib-save')).toHaveCount(1);
-    await expect(row.locator('.lib-delete')).toHaveCount(1);
-
-    /*
-      ⚠ NO MERGE, AND ITS ABSENCE IS ASSERTED. There is no `merge_shelves`
-      function and there should not be: filing the notes across and deleting the
-      empty shelf reaches the same place with every step visible. A Merge…
-      button here could only ever fail, which is the "disabled control asking a
-      question with no answers" this building refuses (10-hq §10b).
-    */
-    await expect(row.locator('[data-lib-merge]')).toHaveCount(0);
+    const rows = page.locator('#shelf-manage [data-shelf-item]');
+    expect(await rows.count()).toBe(await page.locator('[data-shelf-link]').count());
+    await expect(rows.first().locator('[data-shelf-rename]')).toBeVisible();
+    await expect(rows.first().locator('[data-shelf-remove]')).toBeVisible();
+    // Creating is here too — the chooser files as it creates, this one does not.
+    await expect(page.locator('[data-shelf-create] input')).toBeVisible();
   });
 
-  test('⚠ the slug is shown and cannot be edited — `?shelf=` addresses this view', async ({ page }) => {
+  test('⚠ the Library no longer carries shelves — one home, and it is this one', async ({ page }) => {
     await page.goto('/admin/library');
     await hideDevToolbar(page);
-    const row = page.locator('.lib-row[data-entity="shelf"]').first();
-    test.skip((await row.count()) === 0, 'no shelves in this database to groom');
+    await expect(page.locator('.lib-row[data-entity="shelf"]')).toHaveCount(0);
+    // …and the other three are untouched, so this was a move and not a deletion.
+    await expect(page.locator('.lib-row[data-entity="subject"]').first()).toBeVisible();
+  });
+
+  test('the count on a row is a door to those notes', async ({ page }) => {
+    await gotoPile(page);
+    test.skip((await page.locator('[data-shelf-manage]').count()) === 0, 'no shelves');
+    await page.locator('[data-shelf-manage]').click();
+    const link = page.locator('#shelf-manage [data-shelf-item]').first().locator('.shelfman__n');
+    // The one thing in this dialog you might want to LOOK at before deciding.
+    await expect(link).toHaveAttribute('href', /\/admin\/notes\?shelf=/);
+  });
+});
+
+test.describe('§3b — the drawer says where the open note lives', () => {
+  /*
+    ⚠ REPORTED MISSING 2026-09-18: *"in the main dedicated notes editor sheet,
+    theres no way to categorize stuff."* The card could file a note and the
+    drawer — the one surface you actually sit and read one in — could neither
+    say where it lived nor move it. It was the only shelf surface in the building
+    blank in BOTH directions.
+  */
+  const openDrawer = async (page: Page) => {
+    await gotoPile(page);
+    const card = page.locator('.dump').first();
+    test.skip((await card.count()) === 0, 'the pile is empty');
+    await card.locator('[data-edit]').click();
+    await expect(page.locator('#nsheet')).toBeVisible();
+    await expect(page.locator('#ns-editor .ProseMirror')).toBeVisible({ timeout: 10_000 });
+  };
+
+  test('⚠ every shelf is offered in the head, beside the stamp', async ({ page }) => {
+    await openDrawer(page);
+    const chips = page.locator('#ns-shelves .lchip');
+    test.skip((await page.locator('[data-shelf-link]').count()) === 0, 'no shelves in this database');
+
+    // The vocabulary is read from the chooser, so the two can never disagree.
+    expect(await chips.count()).toBe(await page.locator('#dump-file [data-shelf]').count());
 
     /*
-      A shelf's slug is an IDENTIFIER that happened to be minted from its first
-      name. `shelves.rename` deliberately leaves it alone, because an unknown
-      slug resolves to `activeShelf: null` and renders the inbox as though
-      nothing were wrong — so a re-derived slug would break every bookmark
-      silently. Printing it read-only is what stops the rename control looking
-      like it renames the URL too.
+      ⚠ IN THE HEAD, NOT THE FOOT, and the assertion is structural rather than
+      cosmetic. All five rows in the foot CONSUME the note; a shelf is how a
+      thought stays. Mixed in among them it would be the one control that does
+      not do what its neighbours do.
     */
-    await expect(row.locator('.font-mono')).toContainText('/');
-    await expect(row.locator('input[data-field="slug"]')).toHaveCount(0);
+    await expect(page.locator('.nsheet__head #ns-shelves')).toHaveCount(1);
+    await expect(page.locator('.nsheet__foot #ns-shelves')).toHaveCount(0);
+  });
+
+  test('⚠ a chip files the note, and the card agrees — the card is still the state', async ({ page }) => {
+    await stubActions(page, { 'shelves.set': () => ({ ok: true, count: 1 }) });
+    await openDrawer(page);
+    const chip = page.locator('#ns-shelves .lchip').first();
+    test.skip((await chip.count()) === 0, 'no shelves in this database');
+
+    const name = (await chip.textContent())!.trim();
+    const was = await chip.getAttribute('aria-pressed');
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', was === 'true' ? 'false' : 'true');
+
+    // The drawer writes nothing of its own: it dispatches into the same
+    // `setShelves` the card chooser calls, so the card foot must follow.
+    const foot = page.locator('.dump').first().locator('[data-shelf-id]');
+    if (was !== 'true') await expect(foot.filter({ hasText: name })).toHaveCount(1);
+  });
+
+  test('⚠ filing from the drawer does NOT eject the card from under you', async ({ page }) => {
+    await stubActions(page, { 'shelves.set': () => ({ ok: true, count: 1 }) });
+    await openDrawer(page);
+    const chip = page.locator('#ns-shelves .lchip:not(.lchip--on)').first();
+    test.skip((await chip.count()) === 0, 'nothing left to file this note onto');
+
+    await chip.click();
+    await page.waitForTimeout(400);
+    /*
+      In the pile, filing IS the card going away — that is the feedback, and the
+      undo strip is its way back. In the drawer it is not triage: you are reading
+      the thing, and the pile is the rail beside you. Letting the leave run here
+      would drop the row out of the rail, offer to undo something still on
+      screen, and eventually `remove()` the card the drawer is open on.
+    */
+    await expect(page.locator('.dump').first()).toBeVisible();
+    await expect(page.locator('#notes-undo.is-visible')).toHaveCount(0);
+    await expect(page.locator('#nsheet')).toBeVisible();
   });
 });
 

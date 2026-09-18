@@ -13,28 +13,13 @@ import VocabTable from '../../components/admin/VocabTable.astro';
 import VocabActions from '../../components/admin/VocabActions.astro';
 import MergeDialog from '../../components/admin/MergeDialog.astro';
 import { Icon } from 'astro-icon/components';
-import { MAX_SHELVES, readShelfIndex } from '../../lib/shelves';
 
 const supabase = Astro.locals.supabase;
 
-const [{ data: subjects }, { data: authors }, { data: works }, shelfIndex] = await Promise.all([
+const [{ data: subjects }, { data: authors }, { data: works }] = await Promise.all([
   supabase.from('subjects').select('id, name, definition').order('name'),
   supabase.from('authors').select('id, name, note').order('name'),
   supabase.from('works').select('id, title, author_id, year, kind').order('title'),
-  /*
-    ⚠ THE FOURTH VOCABULARY, ADDED 2026-09-18. Shelves shipped on 2026-09-01
-    with a create-only door — makeable from the pile's → chooser and then
-    unreachable by any grooming tool in the building. Michael: *"I also dont see
-    a place where to even manage the notes categories."* This is that place, and
-    the action file had already named it: *"Both belong beside the subjects
-    vocabulary, not behind a row you can hit by accident."*
-
-    `readShelfIndex` rather than a bare select, because the row needs the
-    membership count and that helper already derives it — over LIVE notes only,
-    which matters here: a soft-deleted jotting must not inflate the number the
-    delete confirm is about to quote.
-  */
-  readShelfIndex(supabase),
   // ⚠ BY `sort`, NOT BY NAME. The other three vocabularies are lists and sort
   // alphabetically; this one is a SPECTRUM, ordered dark → light, and that
   // ordering is a claim about the material (plan 33 §1). Alphabetising it here
@@ -269,70 +254,6 @@ const mergeOptions = {
               </td>
             </tr>
           ))
-        }
-      </VocabTable>
-
-      {/* SHELVES */}
-      <VocabTable
-        title="Shelves"
-        count={shelfIndex.vocab.length}
-        columns={[{ label: 'Name' }, { label: 'Notes', w: 'w-16', right: true }, { label: 'Actions', w: 'w-48' }]}
-      >
-        <Fragment slot="lede">
-          {
-            /* ⚠ THE ONE VOCABULARY ON THIS PAGE THAT NO READER EVER SEES, and
-              saying so is worth a line because the other three are all public
-              in some way. A shelf is what a jotting is FOR; a subject is what a
-              piece is ABOUT (ADR 0042). The two must never merge, and a room
-              that lists them one above the other is exactly where somebody
-              would get the idea. */
-          }
-          <p class="text-muted mb-3 max-w-prose text-sm">
-            Where a jotting lives when it is never going to be a piece — private, and never rendered for a reader. A
-            note sits on at most {MAX_SHELVES}. New ones are made from the <strong>→</strong> on a card in the pile.
-          </p>
-        </Fragment>
-        {
-          shelfIndex.vocab.map((sh) => (
-            <tr
-              class="lib-row border-base-300 border-b align-top last:border-0"
-              data-entity="shelf"
-              data-id={sh.id}
-              data-name={sh.name}
-              data-search={sh.name.toLowerCase()}
-              data-uses={shelfIndex.byShelf[sh.id] ?? 0}
-            >
-              <td class="px-3 py-2">
-                <input data-field="name" value={sh.name} aria-label="Shelf name" class="input input-xs w-44" />
-                {/* ⚠ THE SLUG IS SHOWN AND IS NOT EDITABLE, which is the honest
-                  rendering of `shelves.rename`'s hardest constraint: `?shelf=`
-                  addresses this view, so the slug is an identifier that happens
-                  to have been minted from the first name. Printing it stops the
-                  rename control looking like it renames the URL too. */}
-                <span class="text-whisper mt-1 block font-mono text-xs">/{sh.slug}</span>
-              </td>
-              <td class="text-faint px-3 py-2 text-right">
-                {/* Links to the shelf rather than printing a dead number: this
-                  is the count of a thing you can go and look at, and the pile
-                  is one press away. */}
-                <a class="hover:underline" href={`/admin/notes?shelf=${sh.slug}`}>
-                  {shelfIndex.byShelf[sh.id] ?? 0}
-                </a>
-              </td>
-              <td class="px-3 py-2">
-                <VocabActions entity="shelf" id={sh.id} name={sh.name} mergeable={false} />
-              </td>
-            </tr>
-          ))
-        }
-        {
-          shelfIndex.vocab.length === 0 && (
-            <tr>
-              <td colspan="3" class="text-whisper px-3 py-4 text-sm">
-                No shelves yet. The <strong>→</strong> on a card in the pile is where the first one gets made.
-              </td>
-            </tr>
-          )
         }
       </VocabTable>
     </FilterField>

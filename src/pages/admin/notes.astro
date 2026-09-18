@@ -360,6 +360,39 @@ const showSearch = notes.length > 4 || inboxCount > 4 || searching;
             </a>
           ))
         }
+        {
+          /* ⚠ GROOMING LIVES HERE, NOT IN THE LIBRARY (moved 2026-09-18).
+
+            It shipped in the Library first, beside subjects, authors and works
+            — which `actions/shelves.ts` had named as the right home, and which
+            was wrong for a reason the other three hide. Michael: *"its not
+            really intuitive to go into library. ideally we have a way to manage
+            while we are in notes anyway."*
+
+            He is right, and ADR 0040 already carries the test: **a shelf is the
+            only vocabulary in this building scoped to ONE room.** Subjects,
+            authors and works are cross-cutting — they appear on the manager, the
+            composer, a person page and the public site, so a room of their own
+            is the only place that can hold all of them at once. A shelf is
+            private, notes-only, and no reader ever sees one. Sending somebody to
+            another room to rename a word that exists only in this one spends the
+            trip the Library was built to save.
+
+            ⚠ AND IT IS A PENCIL AT THE END OF THE STRIP, not a row inside the →
+            chooser. Those rows FILE a note; a menu where one row renames the
+            vocabulary and the next moves the thing you are looking at is a menu
+            where a mis-tap changes the wrong noun. Here it sits with the shelves
+            it grooms and a press away from anything that writes to a note. */
+        }
+        <button
+          type="button"
+          class="type-badge notes-bar__edit"
+          data-shelf-manage
+          title="Edit shelves"
+          aria-label="Edit shelves"
+        >
+          <Icon name="ph:pencil-simple" />
+        </button>
       </div>
 
       {
@@ -771,6 +804,74 @@ const showSearch = notes.length > 4 || inboxCount > 4 || searching;
       hand-back to race, no card that can carry the room's only editor into the
       void, and no second set of metrics for a surface at card scale. */
   }
+  {
+    /* ── EDITING THE VOCABULARY, IN THE ROOM THAT USES IT ──────────────────
+      The pencil on the filter strip opens this; the strip's own comment carries
+      why it is here rather than in the Library.
+
+      ⚠ ONE DIALOG, EVERY SHELF — the TaskSheet rule this room already follows
+      twice. The list is short by construction (a vocabulary nobody sees has no
+      reason to grow long), so it renders inline rather than being fetched.
+
+      ⚠ RENAME IS PER ROW AND SAVES ON ITS OWN. The Library commits per row for
+      the same reason and its own note says what that cost once: a hundred live
+      inputs and one Save is how correcting three rows loses two of them. Here
+      the number is small and the rule is the same — the row you edited is the
+      row that gets written. */
+  }
+  <dialog id="shelf-manage" class="modal-dialog w-full max-w-md" aria-labelledby="shelf-manage-title">
+    <div class="flex max-h-[80vh] flex-col overflow-hidden font-sans">
+      <header class="border-base-300 flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3.5">
+        <h2 id="shelf-manage-title" class="font-display text-lg">Shelves</h2>
+        <button type="button" data-close class="text-whisper hover:text-base-content" aria-label="Close">✕</button>
+      </header>
+
+      <ul id="shelf-manage-list" class="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        {
+          shelfVocab.map((sh) => (
+            <li class="shelfman" data-shelf-item={sh.id}>
+              <input
+                class="input input-sm shelfman__name"
+                value={sh.name}
+                maxlength="40"
+                aria-label={`Rename ${sh.name}`}
+                data-shelf-rename
+              />
+              {/* The count is a door, not a number: it is the one thing in this
+                  dialog you might want to go and LOOK at before deciding. */}
+              <a class="shelfman__n" href={`/admin/notes?shelf=${sh.slug}`} title="See these notes">
+                {byShelf[sh.id] ?? 0}
+              </a>
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs text-error normal-case"
+                data-shelf-remove
+                data-shelf-title={sh.name}
+              >
+                Delete
+              </button>
+            </li>
+          ))
+        }
+      </ul>
+
+      {
+        /* ⚠ THE SECOND DOOR TO `shelves.create`, AND IT IS NOT A DUPLICATE. The
+          → chooser makes a shelf AND files the note onto it in one motion —
+          that is a filing gesture that happens to need a new word. This makes a
+          word and files nothing, which is the gesture you want when you are
+          tidying rather than triaging. Same action, two honest reasons. */
+      }
+      <form class="shelfman__new" data-shelf-create>
+        <input type="text" name="name" maxlength="40" placeholder="New shelf" aria-label="Name a new shelf" />
+        <button type="submit" class="btn btn-primary btn-xs normal-case">Add</button>
+      </form>
+
+      <p class="text-error px-5 pb-3 text-sm" data-shelf-manage-error hidden></p>
+      <p class="text-whisper px-5 pb-4 text-sm">Deleting a shelf keeps every note on it — they go back to the inbox.</p>
+    </div>
+  </dialog>
+
   <NoteSheet hasRoster={roster.length > 0} />
   <LinkDialog id="dump-link-dialog" />
   <AltTextDialog id="dump-alt-dialog" />
