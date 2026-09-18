@@ -2,10 +2,18 @@
 // Shelves — the write path for where a jotting lives (docs/admin.md §4).
 // Bench: /lab/shelves · decided 2026-09-01.
 //
-// TWO WRITES AND NO MORE. `set` replaces a note's shelves outright; `create`
-// adds a word to the vocabulary from inside the chooser. Renaming and deleting
-// a shelf are deliberately absent — see `create` for why the door is one-way
-// for now.
+// FOUR WRITES. `set` replaces a note's shelves outright and `create` adds a word
+// to the vocabulary from inside the chooser; `rename` and `remove` groom the
+// vocabulary from the Library.
+//
+// ⚠ THE DOOR WAS ONE-WAY UNTIL 2026-09-18, AND THAT WAS A REAL FAULT RATHER
+// THAN A DEFERRAL. `create` used to close with *"Both are real follow-ups;
+// neither is something the → chooser should be able to do by accident"* — the
+// second half of which is still right and is why these two live in the Library
+// rather than in the menu. But the follow-up was never scheduled, so a shelf,
+// once made, could not be renamed, could not be deleted, and appeared in no
+// room that manages anything. Michael: *"I also dont see a place where to even
+// manage the notes categories."*
 // ============================================================================
 import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
@@ -90,13 +98,12 @@ export const shelves = {
   /**
    * A new drawer, named from inside the chooser.
    *
-   * ⚠ NO RENAME AND NO DELETE HERE, DELIBERATELY. `shelves.slug` is frozen once
-   * created (it lands in `?shelf=`), so a rename is a two-field write that has
-   * to leave the slug alone — the shape `subjects.update` already has, and it
-   * belongs in a vocabulary room beside that one rather than in the pile's
-   * menu. Deleting is worse: `fragment_shelves` cascades, so a mis-tap would
-   * silently unfile every note on that shelf. Both are real follow-ups; neither
-   * is something the → chooser should be able to do by accident.
+   * ⚠ NO RENAME AND NO DELETE FROM THE CHOOSER, DELIBERATELY — they live in the
+   * Library instead (`rename` and `remove` below). `shelves.slug` is frozen once
+   * created because it lands in `?shelf=`, so a rename must leave it alone; and
+   * `fragment_shelves` cascades, so a delete unfiles every note on that shelf.
+   * Neither is something a menu row you can hit by accident should be able to
+   * do, and both want a confirm that can say the number.
    *
    * ⚠ THE NAME IS CASE-INSENSITIVELY UNIQUE IN THE DATABASE (`shelves_name_ci`),
    * because the pile prints the word itself and `Philosophy` twice in the
@@ -122,6 +129,71 @@ export const shelves = {
         throw fail(error.message);
       }
       return data;
+    },
+  }),
+
+  /**
+   * Rename a drawer, from the Library.
+   *
+   * ⚠⚠ THE SLUG IS FROZEN AND MUST STAY FROZEN, which is the one way this
+   * differs from every other vocabulary write in the building. `subjects.update`
+   * re-derives its slug from the new name, and doing the same here would break
+   * three things at once: `?shelf=<slug>` is how the pile addresses a filtered
+   * view, so every bookmark and every link in flight would 404 into an empty
+   * room — silently, because an unknown slug resolves to `activeShelf: null`
+   * and renders the inbox as though nothing were wrong.
+   *
+   * A shelf's slug is therefore an IDENTIFIER that happened to be minted from
+   * its first name, not a rendering of its current one. No reader ever sees it.
+   *
+   * ⚠ THE CI-UNIQUE NAME CONSTRAINT STILL APPLIES (`shelves_name_ci`), for the
+   * reason `create` gives: the pile prints the word itself, and `Philosophy`
+   * twice in the filter row reads as a rendering fault.
+   */
+  rename: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid(), name: z.string().trim().min(1, 'Give the shelf a name.').max(40) }),
+    handler: async ({ id, name }, ctx) => {
+      requireAdmin(ctx);
+      const { error } = await ctx.locals.supabase.from('shelves').update({ name }).eq('id', id);
+      if (error) {
+        if (error.code === '23505') throw fail('There is already a shelf with that name.', 'CONFLICT');
+        throw fail(error.message);
+      }
+      return { ok: true };
+    },
+  }),
+
+  /**
+   * Delete a drawer. The notes on it go back to the inbox.
+   *
+   * ⚠ NOTHING IS LOST, AND THAT IS WHY THIS IS SAFE IN A WAY THE OTHER
+   * VOCABULARIES' DELETES ARE NOT. `fragment_shelves` cascades, so removing a
+   * shelf removes only the MEMBERSHIP rows; every jotting survives untouched and
+   * reappears in the inbox, which is the pile's default view. Compare
+   * `works.remove`, which takes somebody's shelf entry and the note written on
+   * it with it (plans/30 · §6a) — that one destroys authored content and this
+   * one cannot.
+   *
+   * ⚠ IT STILL RETURNS THE COUNT, because "unfiled 23 notes" is a fact worth
+   * being told even when it is reversible by hand. The Library's confirm reads
+   * it before asking, which is the whole reason `library.astro` counts shelf
+   * membership beside the vocabulary.
+   */
+  remove: defineAction({
+    accept: 'form',
+    input: z.object({ id: z.uuid() }),
+    handler: async ({ id }, ctx) => {
+      requireAdmin(ctx);
+      const sb = ctx.locals.supabase;
+      // Counted BEFORE the delete, because the cascade is what takes them away.
+      const { count } = await sb
+        .from('fragment_shelves')
+        .select('fragment_id', { count: 'exact', head: true })
+        .eq('shelf_id', id);
+      const { error } = await sb.from('shelves').delete().eq('id', id);
+      if (error) throw fail(error.message);
+      return { ok: true, unfiled: count ?? 0 };
     },
   }),
 };

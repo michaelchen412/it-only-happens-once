@@ -1,4 +1,4 @@
-// What deleting a subject, author or work actually takes — as a sentence
+// What deleting a subject, author, work or shelf actually takes — as a sentence
 // (docs/plans/30 · §6a).
 //
 // ⚠ THE OLD SENTENCE WAS TRUE AND STILL MISLED. *"Fragments themselves stay —
@@ -20,10 +20,10 @@
 // layer and the wording is reachable from a test.
 
 export interface DeleteCost {
-  entity: 'subject' | 'author' | 'work';
+  entity: 'subject' | 'author' | 'work' | 'shelf';
   /** Shown in quotes so the dialog names the row you actually clicked. */
   name?: string;
-  /** Live fragments tagged with / naming / citing it. */
+  /** Live fragments tagged with / naming / citing it — or, for a shelf, filed on it. */
   uses: number;
   /** `person_works` rows — works only. */
   shelves: number;
@@ -42,7 +42,7 @@ export function deleteWarning(c: DeleteCost): string {
     costs.push(
       c.entity === 'subject'
         ? `${plural(c.uses, 'fragment is', 'fragments are')} tagged with this`
-        : // ⚠ THIS CHAIN ENDS IN `work` AS ITS DEFAULT, so a FOURTH entity added to
+        : // ⚠ THIS CHAIN ENDS IN `work` AS ITS DEFAULT, so a FIFTH entity added to
           // the union above and not added here silently gets "N fragments cite
           // this work" — a confidently wrong sentence, which is the exact fault
           // this module exists to prevent. It has happened once: `feeling` was
@@ -51,7 +51,11 @@ export function deleteWarning(c: DeleteCost): string {
           // same commit that extends the union.
           c.entity === 'author'
           ? `${plural(c.uses, 'fragment names', 'fragments name')} this author`
-          : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
+          : // ⚠ A SHELF COUNTS JOTTINGS, NOT FRAGMENTS, and it is the one
+            // entity here whose delete takes nothing at all — see the tail.
+            c.entity === 'shelf'
+            ? `${plural(c.uses, 'note sits', 'notes sit')} on this shelf`
+            : `${plural(c.uses, 'fragment cites', 'fragments cite')} this work`,
     );
   }
 
@@ -68,10 +72,23 @@ export function deleteWarning(c: DeleteCost): string {
   if (c.entity === 'author' && c.ownNote) costs.push('the note on it will go too');
 
   const subject = c.name?.trim() ? `Delete “${c.name.trim()}”?` : 'Delete this?';
-  // The reassurance has to change when it stops being the whole truth.
-  const tail = c.shelfNotes
-    ? 'The fragments and the shelves’ owners stay; the label, its links and those notes are removed.'
-    : 'Fragments themselves stay — only this label and its links are removed.';
+  /*
+    The reassurance has to change when it stops being the whole truth.
+
+    ⚠ AND A SHELF'S IS DIFFERENT IN KIND, which is why it leads. Deleting a
+    subject or an author removes a label that fragments were WEARING; deleting a
+    shelf removes a container, and `fragment_shelves` cascading means every
+    jotting inside it simply stops being filed. Unshelved is the inbox — the
+    room's founding claim — so the notes do not merely "stay", they reappear
+    somewhere you will see them. Saying only "fragments themselves stay" would
+    be true and would read as a warning about loss where there is none.
+  */
+  const tail =
+    c.entity === 'shelf'
+      ? 'The notes themselves stay — they go back to the inbox.'
+      : c.shelfNotes
+        ? 'The fragments and the shelves’ owners stay; the label, its links and those notes are removed.'
+        : 'Fragments themselves stay — only this label and its links are removed.';
 
   return costs.length ? `${subject} ${costs.join('; ')}. ${tail}` : `${subject} ${tail}`;
 }

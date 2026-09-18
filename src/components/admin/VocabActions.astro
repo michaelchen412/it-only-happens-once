@@ -27,13 +27,26 @@
 */
 interface Props {
   /** Which vocabulary — the key the page's action map is dialled by. */
-  entity: 'subject' | 'author' | 'work';
+  entity: 'subject' | 'author' | 'work' | 'shelf';
   /** This row's id, so the picker can exclude it from its own target list. */
   id: string;
   /** This row's name, so the confirm can say what is being merged AWAY. */
   name: string;
+  /**
+   * Can two of these be merged into one?
+   *
+   * ⚠ ABSENT RATHER THAN DISABLED FOR SHELVES (10-hq §10b, the rule this
+   * building applies everywhere): there is no `shelves.merge` action and no
+   * `merge_shelves` function, so the control could only ever fail. It is also
+   * not an oversight waiting to be filled — merging two vocabularies means
+   * reassigning links and hard-deleting the loser, and for a shelf the same
+   * outcome is reached by filing the notes across and deleting the empty one,
+   * with every step visible and reversible. A shelf holds no data of its own
+   * beyond membership, which is exactly what makes the ceremony unnecessary.
+   */
+  mergeable?: boolean;
 }
-const { entity, id, name } = Astro.props;
+const { entity, id, name, mergeable = true } = Astro.props;
 ---
 
 <div class="flex items-center gap-2">
@@ -43,13 +56,19 @@ const { entity, id, name } = Astro.props;
       class named a `<select>` that no longer exists, and a stale selector that
       still matches something is worse than one that matches nothing. */
   }
-  <button
-    type="button"
-    data-lib-merge
-    data-entity={entity}
-    data-id={id}
-    data-name={name}
-    class="btn btn-ghost btn-xs normal-case">Merge…</button
-  >
+  {
+    mergeable && (
+      <button
+        type="button"
+        data-lib-merge
+        data-entity={entity}
+        data-id={id}
+        data-name={name}
+        class="btn btn-ghost btn-xs normal-case"
+      >
+        Merge…
+      </button>
+    )
+  }
   <button class="lib-delete btn btn-ghost btn-xs text-error normal-case">Delete</button>
 </div>

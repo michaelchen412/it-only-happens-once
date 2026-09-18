@@ -66,6 +66,33 @@ describe('deleteWarning', () => {
     expect(deleteWarning({ ...base, entity: 'work', shelves: 2, shelfNotes: 2 })).toContain('2 with notes');
   });
 
+  /*
+    ⚠ A SHELF FELL THROUGH TO `work` UNTIL 2026-09-18, which is precisely the
+    fault the chain's own comment warns about — it happened to `feeling` once
+    before. Without these, deleting "Philosophy" with three notes on it would
+    have read *"3 fragments cite this work"* and promised that "only this label
+    and its links are removed", when what actually happens is that three
+    jottings go back to the inbox and nothing is lost at all.
+  */
+  it('⚠ a shelf counts notes, not fragments', () => {
+    expect(deleteWarning({ ...base, entity: 'shelf', uses: 1 })).toContain('1 note sits on this shelf');
+    expect(deleteWarning({ ...base, entity: 'shelf', uses: 3 })).toContain('3 notes sit on this shelf');
+    expect(deleteWarning({ ...base, entity: 'shelf', uses: 3 })).not.toContain('cite this work');
+  });
+
+  it('⚠ a shelf promises the inbox, not mere survival', () => {
+    const msg = deleteWarning({ ...base, entity: 'shelf', name: 'Philosophy', uses: 3 });
+    expect(msg).toContain('they go back to the inbox');
+    // The other entities' reassurance is about a LABEL being removed; a shelf's
+    // is about a container opening. Borrowing the wrong one reads as loss.
+    expect(msg).not.toContain('only this label');
+  });
+
+  it('an empty shelf still says what deleting it means', () => {
+    const msg = deleteWarning({ ...base, entity: 'shelf', name: 'Unused', uses: 0 });
+    expect(msg).toBe('Delete “Unused”? The notes themselves stay — they go back to the inbox.');
+  });
+
   it('falls back to “this” rather than printing an empty pair of quotes', () => {
     expect(deleteWarning({ ...base, entity: 'work', name: '  ' })).toMatch(/^Delete this\?/);
     expect(deleteWarning({ ...base, entity: 'work' })).toMatch(/^Delete this\?/);

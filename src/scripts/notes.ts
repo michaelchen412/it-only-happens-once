@@ -914,6 +914,65 @@ if (undoBar) {
     );
   });
 
+  /**
+   * Teach the whole room a shelf that did not exist when the page rendered.
+   *
+   * ⚠ BOTH SPELLINGS, FROM THE PAGE'S OWN `<template>`s, and that is the point.
+   * The code this replaced hand-built a `<button>` with `textContent` — no
+   * `ph:stack` glyph and, load-bearingly, no `.pop__tick` element, which is what
+   * `.pop__row.is-on .pop__tick` reveals. A shelf made in this session could
+   * therefore never show as ticked, and it was invisible in the filter row
+   * because nothing added it there at all.
+   *
+   * Cloning means there is one authored spelling of a shelf row and one of a
+   * filter link, both in `notes.astro` beside the loops that render the
+   * server's copies. A glyph added to either lands in both by construction.
+   */
+  function addShelfToRoom(sh: ShelfPick) {
+    // ── the chooser's row ──
+    const rowTpl = document.querySelector<HTMLTemplateElement>('[data-tpl-chooser-row]');
+    if (rowTpl && newForm) {
+      const row = rowTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+      row.dataset.shelf = sh.id;
+      row.dataset.shelfName = sh.name;
+      row.dataset.shelfSlug = sh.slug;
+      row.querySelector('[data-name]')!.textContent = sh.name;
+      newForm.before(row);
+    }
+
+    // ── the filter strip's link ──
+    const linkTpl = document.querySelector<HTMLTemplateElement>('[data-tpl-shelf-link]');
+    const strip = document.querySelector<HTMLElement>('[data-shelf-row]');
+    if (linkTpl && strip) {
+      const link = linkTpl.content.firstElementChild!.cloneNode(true) as HTMLAnchorElement;
+      link.href = `/admin/notes?shelf=${encodeURIComponent(sh.slug)}`;
+      link.dataset.shelfLink = sh.id;
+      link.querySelector('[data-name]')!.textContent = sh.name;
+      const badge = link.querySelector<HTMLElement>('.type-badge__n')!;
+      // ⚠ SEEDED AT ZERO, NOT AT ONE. The filing that follows this call runs
+      // `bumpBadge`, which needs a hook that already exists to find — that is
+      // the other half of why a brand-new shelf's count used to stay blank.
+      badge.dataset.shelfBadge = sh.id;
+      badge.textContent = '0';
+      strip.append(link);
+      strip.hidden = false;
+      // The strip may be the only reason the bar exists — see `showSearch` in
+      // notes.astro. A room of three jottings renders no search box.
+      const bar = document.querySelector<HTMLElement>('[data-notes-bar]');
+      if (bar) bar.hidden = false;
+    }
+
+    /*
+      ⚠ AND THE CHOOSER'S HEADING, which is rendered only when the vocabulary is
+      non-empty. Making the FIRST shelf otherwise left the new row sitting under
+      nothing, directly against the four destinations that consume a note — the
+      one place in this menu where the separator is doing real work (see the
+      chooser's own comment on why filing sits below the four).
+    */
+    const head = chooser?.querySelector<HTMLElement>('.pop__head');
+    if (head) head.hidden = false;
+  }
+
   /* A shelf named where you went looking for it (`pair-browser`'s create bar).
      The new drawer is created AND the note filed onto it in one motion — the
      row you just typed is obviously where you meant this note to go. */
@@ -930,16 +989,13 @@ if (undoBar) {
       say(card, error?.message ?? 'could not make that shelf');
       return;
     }
-    // The menu has to learn the word too, or the next card's chooser will not
-    // offer it until a reload.
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'pop__row';
-    row.dataset.shelf = data.id;
-    row.dataset.shelfName = data.name;
-    row.dataset.shelfSlug = data.slug;
-    row.textContent = data.name;
-    newForm.before(row);
+    // ⚠ THE WHOLE ROOM HAS TO LEARN THE WORD, NOT JUST THE MENU. This is the
+    // hard-refresh bug Michael reported on 2026-09-18, and the old code here is
+    // the whole of it: it added a row to the CHOOSER and stopped. The filter
+    // strip above the pile never heard about the new shelf, so the thing you
+    // had just made — and just filed a note onto — had no control anywhere on
+    // the page that could reach it.
+    addShelfToRoom(data);
 
     const on = shelfIdsOf(card).map((sid) => {
       const el = chooser?.querySelector<HTMLElement>(`[data-shelf="${sid}"]`);

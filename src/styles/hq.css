@@ -4268,6 +4268,17 @@ body:has(.cap-fab) .back-to-top:not(.back-to-top--in-sheet) {
   gap: 0.6rem;
   margin-bottom: 1.25rem;
 }
+/* ⚠ `display` ON A CLASS BEATS THE UA'S `[hidden]`, WHICH IS EXACTLY THE TRAP
+   `phantom-classes.spec.ts` exists to catch in the other direction. The strip
+   and the shelf row are rendered ALWAYS and hidden when empty, so the chooser's
+   "New shelf…" can reveal them without owning a second copy of their markup
+   (notes.astro) — and an author `display` would have made that `hidden` a
+   no-op, showing an empty bar to every room with no shelves and nothing to
+   search. Both need the attribute honoured explicitly. */
+.notes-bar[hidden],
+.notes-bar__seg[hidden] {
+  display: none;
+}
 .notes-bar__row {
   display: flex;
 }

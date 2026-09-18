@@ -10,6 +10,18 @@ const A: Record<string, any> = {
   subject: actions.subjects,
   author: actions.authors,
   work: actions.works,
+  /*
+    ⚠ `update: rename`, AND THE ALIAS IS THE POINT RATHER THAN A SHORTCUT. Every
+    other vocabulary's `update` re-derives its slug from the new name; a shelf's
+    MUST NOT, because `?shelf=<slug>` is how the pile addresses a filtered view
+    (see `shelves.rename`). Naming the action `rename` keeps that difference
+    legible where it is enforced, and this one line is what lets the row wiring
+    below stay identical for all four.
+
+    No `merge`: there is no `merge_shelves` function and `VocabActions` is
+    passed `mergeable={false}`, so nothing here can reach for one.
+  */
+  shelf: { update: actions.shelves.rename, remove: actions.shelves.remove },
 };
 
 const err = document.getElementById('lib-error') as HTMLParagraphElement;
@@ -132,7 +144,7 @@ document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
       // rather than re-querying, so the number in the dialog is exactly the
       // number in the "Used" column beside the button you pressed.
       message: deleteWarning({
-        entity: row.dataset.entity as 'subject' | 'author' | 'work',
+        entity: row.dataset.entity as 'subject' | 'author' | 'work' | 'shelf',
         name: row.dataset.name,
         uses: Number(row.dataset.uses ?? 0),
         shelves: Number(row.dataset.shelves ?? 0),

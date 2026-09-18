@@ -249,6 +249,17 @@ const { ymd: todayYmd } = Astro.locals.today;
 
 const goals = goalData ?? [];
 const roster = rosterData ?? [];
+
+/*
+  ⚠ THE SEARCH BOX'S OWN RULE, SEPARATED FROM THE SHELVES' (2026-09-18) — the
+  markup below carries the whole argument. In short: a box over four jottings is
+  furniture and can wait for depth; a shelf row is the only door to notes the
+  inbox is hiding, and cannot.
+
+  `inboxCount` as well as `notes.length`, because the room you are standing in
+  may be a shelf with two things on it while the pile behind it is forty deep.
+*/
+const showSearch = notes.length > 4 || inboxCount > 4 || searching;
 ---
 
 <AdminLayout title="Notes" active="notes">
@@ -256,19 +267,39 @@ const roster = rosterData ?? [];
     <PageHeader title="Notes" />
 
     {
-      /* ⚠ THE BAR IS ABSENT UNTIL THERE IS SOMETHING TO NARROW. `FilterField`'s
-        rule, and this room's own: a box over four jottings is furniture, and
-        the pile's whole promise is that it is short. It appears when the
-        vocabulary exists AND the pile is past a glance — or whenever a filter
-        is already live, so the control that got you here can always be cleared.
+      /* ⚠ THE SEARCH BOX IS ABSENT UNTIL THERE IS SOMETHING TO NARROW.
+        `FilterField`'s rule, and this room's own: a box over four jottings is
+        furniture, and the pile's whole promise is that it is short. It appears
+        when the pile is past a glance — or whenever a term is already live, so
+        the control that got you here can always be cleared.
+
+        ⚠⚠ AND THAT RULE USED TO GATE THE SHELVES TOO, WHICH MADE A SHELF
+        UNREACHABLE (found 2026-09-18, reported by Michael as *"I also dont see
+        a place where to even manage the notes categories"*). One condition
+        covered the whole bar, so in a room with four jottings the segment row
+        was absent — and since the inbox HIDES a shelved note, filing one put it
+        somewhere the room offered no way to get to. Not until the pile grew
+        past four. A hard refresh did not help, because the gate was never about
+        staleness.
+
+        The two controls answer to different rules, and now say so. A search box
+        over a short pile is furniture; a shelf row over a short pile is **the
+        only door to the notes that are not on screen.** So: the box waits for
+        depth, the shelves appear the moment a shelf exists.
 
         ⚠ ONE STRIP, SEARCH FIRST. Search is the wider net and the shelves
         narrow it; the reverse order reads as though the shelves scope the box,
         which is exactly the thing that is NOT true — see `escaped` above. */
     }
     {
-      (notes.length > 4 || inboxCount > 4 || searching || activeShelf) && (
-        <div class="notes-bar">
+      /* ⚠ RENDERED ALWAYS AND HIDDEN WHEN EMPTY, rather than omitted. Creating
+        a shelf from the chooser has to be able to REVEAL this strip without
+        rebuilding it in JavaScript — see `scripts/notes.ts`. Hidden, it is
+        `display: none` and inert; the room looks exactly as it did. */
+    }
+    <div class="notes-bar" data-notes-bar hidden={!showSearch && shelfVocab.length === 0}>
+      {
+        showSearch && (
           <form method="get" class="notes-bar__row" data-notes-filter>
             {/* The shelf rides along so a term typed inside a shelf stays inside
               it — the pressed-shelf half of the escape rule, in one hidden
@@ -286,55 +317,72 @@ const roster = rosterData ?? [];
               />
             </label>
           </form>
+        )
+      }
 
-          {shelfVocab.length > 0 && (
-            <div class="seg notes-bar__seg" role="radiogroup" aria-label="Filter by shelf">
-              <a
-                role="radio"
-                aria-checked={!activeShelf}
-                class:list={['type-badge', !activeShelf && 'is-active']}
-                href={searching ? `/admin/notes?q=${encodeURIComponent(q)}` : '/admin/notes'}
-              >
-                Inbox{' '}
-                <span class="type-badge__n" data-shelf-badge="inbox">
-                  {inboxCount}
-                </span>
-              </a>
-              {shelfVocab.map((sh) => (
-                <a
-                  role="radio"
-                  aria-checked={activeShelf?.id === sh.id}
-                  class:list={['type-badge', activeShelf?.id === sh.id && 'is-active']}
-                  href={`/admin/notes?shelf=${sh.slug}${searching ? `&q=${encodeURIComponent(q)}` : ''}`}
-                >
-                  {sh.name}{' '}
-                  <span class="type-badge__n" data-shelf-badge={sh.id}>
-                    {byShelf[sh.id] ?? 0}
-                  </span>
-                </a>
-              ))}
-            </div>
-          )}
+      {
+        /* ⚠ RENDERED ALWAYS, HIDDEN WHILE THE VOCABULARY IS EMPTY — the same
+          reason the strip above is. The first shelf is made from inside the →
+          chooser, and that motion has to be able to show this row without the
+          script owning a second copy of its markup. */
+      }
+      <div
+        class="seg notes-bar__seg"
+        role="radiogroup"
+        aria-label="Filter by shelf"
+        data-shelf-row
+        hidden={shelfVocab.length === 0}
+      >
+        <a
+          role="radio"
+          aria-checked={!activeShelf}
+          class:list={['type-badge', !activeShelf && 'is-active']}
+          href={searching ? `/admin/notes?q=${encodeURIComponent(q)}` : '/admin/notes'}
+        >
+          Inbox{' '}
+          <span class="type-badge__n" data-shelf-badge="inbox">
+            {inboxCount}
+          </span>
+        </a>
+        {
+          shelfVocab.map((sh) => (
+            <a
+              role="radio"
+              aria-checked={activeShelf?.id === sh.id}
+              class:list={['type-badge', activeShelf?.id === sh.id && 'is-active']}
+              href={`/admin/notes?shelf=${sh.slug}${searching ? `&q=${encodeURIComponent(q)}` : ''}`}
+              data-shelf-link={sh.id}
+            >
+              <span data-name>{sh.name}</span>{' '}
+              <span class="type-badge__n" data-shelf-badge={sh.id}>
+                {byShelf[sh.id] ?? 0}
+              </span>
+            </a>
+          ))
+        }
+      </div>
 
-          {escaped && (
-            <p class="notes-bar__note">Searching the whole pile — the inbox filter stands down while a term is live.</p>
-          )}
-          {truncated && (
-            <p class="notes-bar__note">
-              {/* ⚠ THE REAL NUMBER WHEN WE HAVE IT. The index counts the whole
+      {
+        escaped && (
+          <p class="notes-bar__note">Searching the whole pile — the inbox filter stands down while a term is live.</p>
+        )
+      }
+      {
+        truncated && (
+          <p class="notes-bar__note">
+            {/* ⚠ THE REAL NUMBER WHEN WE HAVE IT. The index counts the whole
                   view in memory, so "and 34 more" is now sayable where the old
                   line could only manage "there are more than this" — which told
                   you a ceiling had been hit without telling you how far past it
                   you were. Searching is the one case still vague: the term is
                   matched in the database, so the count of hits beyond the
                   ceiling is genuinely not known here. */}
-              Showing the first {notes.length}
-              {held > 0 ? `, and ${held} more` : ''}. Narrow it with a shelf or a term.
-            </p>
-          )}
-        </div>
-      )
-    }
+            Showing the first {notes.length}
+            {held > 0 ? `, and ${held} more` : ''}. Narrow it with a shelf or a term.
+          </p>
+        )
+      }
+    </div>
 
     {
       notes.length === 0 ? (
@@ -564,11 +612,18 @@ const roster = rosterData ?? [];
         why these are checkable rows rather than one-shot destinations like the
         four above. */
     }
-    {shelfVocab.length > 0 && <p class="pop__head">Or keep it — {MAX_SHELVES} shelves at most</p>}
+    {
+      /* Hidden rather than omitted while the vocabulary is empty, so making the
+        FIRST shelf can reveal the heading along with the row. Without it the new
+        row sat directly against the four destinations that CONSUME a note —
+        and the separator between the two groups is doing real work here, as the
+        comment above says at length. */
+    }
+    <p class="pop__head" hidden={shelfVocab.length === 0}>Or keep it — {MAX_SHELVES} shelves at most</p>
     {
       shelfVocab.map((sh) => (
         <button type="button" class="pop__row" data-shelf={sh.id} data-shelf-name={sh.name} data-shelf-slug={sh.slug}>
-          <Icon name="ph:stack" /> {sh.name}
+          <Icon name="ph:stack" /> <span data-name>{sh.name}</span>
           <Icon name="ph:check" class="pop__tick" />
         </button>
       ))
@@ -593,6 +648,43 @@ const roster = rosterData ?? [];
       <input type="text" name="name" maxlength="40" placeholder="Name the shelf" aria-label="Name the new shelf" />
     </form>
   </div>
+
+  {
+    /* ── THE TWO SPELLINGS OF A SHELF, AS TEMPLATES ─────────────────────────
+
+      ⚠ THESE EXIST BECAUSE THE SCRIPT USED TO BUILD A SHELF BY HAND AND GOT IT
+      WRONG (reported 2026-09-18: *"I have to hard refresh the page when I add a
+      new notes category"*). `notes.ts` created its chooser row with three lines
+      — a class, a data attribute and `textContent` — which left it without the
+      ⌘ glyph every other row has and, worse, without the `.pop__tick` element
+      that `.pop__row.is-on .pop__tick` reveals. So a shelf made in this session
+      could never show as ticked, and nothing was added to the filter row above
+      at all: the shelf you had just made was unreachable until a reload.
+
+      A `<template>` is the idiom this codebase already uses where one shape has
+      to exist both on the server and in the browser — `Reader.astro`, the
+      about-page repeater, `FillPanel`. The markup is authored ONCE, here, next
+      to the loop that renders the server's copies, and cloned below.
+
+      ⚠ THE TEMPLATES AND THE LOOPS MUST STAY IDENTICAL, which is what
+      `notes.spec.ts`'s shelf lifecycle test is for: it makes a shelf and then
+      asserts the row it produced is indistinguishable from a server-rendered
+      one. That is the only thing standing between this file and the exact bug
+      it was written to fix. */
+  }
+  <template data-tpl-chooser-row>
+    <button type="button" class="pop__row">
+      <Icon name="ph:stack" />
+      <span data-name></span>
+      <Icon name="ph:check" class="pop__tick" />
+    </button>
+  </template>
+  <template data-tpl-shelf-link>
+    <a role="radio" aria-checked="false" class="type-badge">
+      <span data-name></span>{' '}
+      <span class="type-badge__n">0</span>
+    </a>
+  </template>
 
   {
     /* ONE PICKER, MANY CARDS — the TaskSheet rule. The room lists dozens of
