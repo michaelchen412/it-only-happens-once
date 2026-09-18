@@ -128,6 +128,11 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0036](0036-a-reload-is-how-the-observatory-tells-the-truth.md) | After a write, an admin surface re-derives by reloading, and patches only where a reload would destroy something the page holds — the database is the only model | Accepted |
 | [0037](0037-a-seeded-write-is-throwaway-gated-and-swept.md) | A spec may create rows in the live project only if all five hold: flagged off by default, `zzz-e2e-throwaway` prefix, `afterEach` sweep, service key under `tests/` only, real control driven through the admin's own session. Extends [0028](0028-the-e2e-suite-is-read-only-against-live.md) | Accepted |
 | [0038](0038-a-private-admin-surface-may-require-javascript.md) | A private single-user admin surface may require JavaScript; progressive enhancement is not on its own a reason to keep a page-scoped form. Scoped to `/admin` — it does not touch the public side | Accepted |
+| [0039](0039-an-instant-and-a-calendar-date-are-different-values.md) | A column holds one kind of value, and the kind decides the treatment — an instant and a calendar date are not interchangeable | Accepted |
+| [0040](0040-a-view-state-is-not-a-room.md) | A section earns a route when it stops sharing the machinery of the room it sits in; a view state is not a room | Accepted |
+| [0041](0041-a-capture-surface-declares-a-destination.md) | A capture surface DECLARES where a thought is going and never becomes that destination's form — the destination room does the collecting | Accepted |
+| [0042](0042-a-shelf-is-where-a-jotting-lives.md) | Filing to a shelf is triage: unshelved is the inbox, shelved is kept. A shelf is what a jotting is FOR and is private; a subject is what a piece is ABOUT and is public — the two never merge | Accepted |
+| [0043](0043-a-script-binds-per-arrival-not-per-document.md) | The Observatory navigates client-side, and an admin script binds its DOM work on every arrival rather than once per document; a `document`/`window` listener inside a boot is scoped so it cannot accumulate | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all

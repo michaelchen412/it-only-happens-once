@@ -15,314 +15,333 @@ import { wireSheet } from './sheet';
 import { mountKindBar, showFrom, timeValue, type FilingDetail } from './kind-bar';
 import { wireFilterFields } from './filter-field';
 import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
+import { onPage } from './page';
 
-const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
-const form = document.querySelector<HTMLFormElement>('#event-form');
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage((page) => {
+  const sheet = document.querySelector<HTMLDialogElement>('#event-sheet');
+  const form = document.querySelector<HTMLFormElement>('#event-form');
 
-if (sheet && form) {
-  /* The tracker, the error line, the three ways out and the native `close`
+  if (sheet && form) {
+    /* The tracker, the error line, the three ways out and the native `close`
      teardown are `wireSheet` now (plan 41 · §4). */
-  const ui = wireSheet(sheet, {
-    noun: 'This event',
-    // ⚠ ABANDONING THE SHEET FORGETS THE DUMP IT WAS OPENED FOR. Without
-    // this, closing on a note and later saving an unrelated row from the
-    // same page would consume a thought nobody filed — a deletion caused by
-    // a save that had nothing to do with it. Reached by Escape and the
-    // backdrop too, which is why it hangs off `close` rather off the ✕.
-    onClose: () => {
-      filingNote = null;
-      setKindBar(null);
-    },
-  });
-  const pageError = document.querySelector<HTMLElement>('[data-event-error]');
-  const heading = document.querySelector<HTMLElement>('#event-sheet-title')!;
-  const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-  const deleteBtn = form.querySelector<HTMLButtonElement>('[data-delete-event]')!;
-  const titleInput = form.querySelector<HTMLInputElement>('input[name="title"]')!;
-  const dateInput = form.querySelector<HTMLInputElement>('[data-starts-on]')!;
-  const startInput = form.querySelector<HTMLInputElement>('[data-starts-at]')!;
-  const endInput = form.querySelector<HTMLInputElement>('[data-ends-at]')!;
-  const locationInput = form.querySelector<HTMLInputElement>('input[name="location"]')!;
-  const allDay = form.querySelector<HTMLElement>('[data-all-day]')!;
-  const whoEl = form.querySelector<HTMLElement>('[data-who]');
-  const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.ep-check'));
+    const ui = wireSheet(sheet, {
+      noun: 'This event',
+      // ⚠ ABANDONING THE SHEET FORGETS THE DUMP IT WAS OPENED FOR. Without
+      // this, closing on a note and later saving an unrelated row from the
+      // same page would consume a thought nobody filed — a deletion caused by
+      // a save that had nothing to do with it. Reached by Escape and the
+      // backdrop too, which is why it hangs off `close` rather off the ✕.
+      onClose: () => {
+        filingNote = null;
+        setKindBar(null);
+      },
+    });
+    const pageError = document.querySelector<HTMLElement>('[data-event-error]');
+    const heading = document.querySelector<HTMLElement>('#event-sheet-title')!;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const deleteBtn = form.querySelector<HTMLButtonElement>('[data-delete-event]')!;
+    const titleInput = form.querySelector<HTMLInputElement>('input[name="title"]')!;
+    const dateInput = form.querySelector<HTMLInputElement>('[data-starts-on]')!;
+    const startInput = form.querySelector<HTMLInputElement>('[data-starts-at]')!;
+    const endInput = form.querySelector<HTMLInputElement>('[data-ends-at]')!;
+    const locationInput = form.querySelector<HTMLInputElement>('input[name="location"]')!;
+    const allDay = form.querySelector<HTMLElement>('[data-all-day]')!;
+    const whoEl = form.querySelector<HTMLElement>('[data-who]');
+    const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.ep-check'));
 
-  /**
-   * Rich since plan 43; the stored value is the same Markdown it always was.
-   * `breaks: true` matches the day panel, which renders it `{ breaks: true }`
-   * (agenda.astro) — an event's notes are the door code and the parking, not an
-   * essay, so a lone newline is a line break at both ends.
-   */
-  /*
+    /**
+     * Rich since plan 43; the stored value is the same Markdown it always was.
+     * `breaks: true` matches the day panel, which renders it `{ breaks: true }`
+     * (agenda.astro) — an event's notes are the door code and the parking, not an
+     * essay, so a lone newline is a line break at both ends.
+     */
+    /*
     ⚠ LAZY — the editor is imported when this sheet is first warmed, not when
     the page loads (`mini-editor-lazy.ts` carries the measurement). This sheet
     is mounted by rooms that may never open it, and TipTap is 512 KB.
   */
-  const notes = lazyMiniEditor({
-    editorEl: document.getElementById('event-notes')!,
-    toolbarRoot: document.getElementById('event-notes-wrap')!,
-    placeholder: 'Optional.',
-    ariaLabel: 'Notes',
-    // A field's register, not an essay's — see `docClass`.
-    docClass: 'f-prose',
-    // `lists: true` (plan 44) — the steps inside one event, which is the content
-    // this field was always holding as run-on prose. Must stay in step with the
-    // `lists` prop on this field's <MiniEditor>: the buttons and the nodes are
-    // two halves of one decision.
-    lists: true,
-    onChange: () => ui.dirty.touch(),
-  });
-  /** `emitUpdate: false`: v3 emits `update` from `setContent` and would arm the
-   *  exit guard on a sheet nobody typed in. */
-  const setNotes = (md: string) => notes.setContent(md);
+    const notes = lazyMiniEditor({
+      editorEl: document.getElementById('event-notes')!,
+      toolbarRoot: document.getElementById('event-notes-wrap')!,
+      placeholder: 'Optional.',
+      ariaLabel: 'Notes',
+      // A field's register, not an essay's — see `docClass`.
+      docClass: 'f-prose',
+      // `lists: true` (plan 44) — the steps inside one event, which is the content
+      // this field was always holding as run-on prose. Must stay in step with the
+      // `lists` prop on this field's <MiniEditor>: the buttons and the nodes are
+      // two halves of one decision.
+      lists: true,
+      onChange: () => ui.dirty.touch(),
+    });
+    /** `emitUpdate: false`: v3 emits `update` from `setContent` and would arm the
+     *  exit guard on a sheet nobody typed in. */
+    const setNotes = (md: string) => notes.setContent(md);
 
-  interface EventRow {
-    id: string;
-    title: string;
-    starts_on: string;
-    starts_at: string | null;
-    ends_at: string | null;
-    location: string | null;
-    notes: string | null;
-    person_ids: string[];
-  }
-
-  let editing: string | null = null;
-
-  /** `all day` beside the empty time — one word, in place, never a sentence. */
-  const syncAllDay = () => {
-    allDay.hidden = !!startInput.value;
-    // An end with no beginning is not a time anybody can act on, so the field
-    // simply is not offered until there is one.
-    endInput.disabled = !startInput.value;
-    if (!startInput.value) endInput.value = '';
-  };
-
-  /** The summary line, so the closed state still tells you who is coming. */
-  const syncWho = () => {
-    if (!whoEl) return;
-    const names = checks()
-      .filter((c) => c.checked)
-      .map((c) => c.dataset.name!);
-    whoEl.textContent = names.length === 0 ? 'nobody' : names.length <= 3 ? names.join(', ') : `${names.length} people`;
-  };
-
-  const reset = () => {
-    editing = null;
-    form.reset();
-    titleInput.value = '';
-    startInput.value = '';
-    endInput.value = '';
-    locationInput.value = '';
-    setNotes('');
-    checks().forEach((c) => (c.checked = false));
-    heading.textContent = 'New event';
-    submitBtn.textContent = 'Add event';
-    deleteBtn.hidden = true;
-    syncAllDay();
-    syncWho();
-  };
-
-  const fill = (row: EventRow) => {
-    reset();
-    editing = row.id;
-    titleInput.value = row.title;
-    dateInput.value = row.starts_on;
-    startInput.value = row.starts_at ? row.starts_at.slice(0, 5) : '';
-    endInput.value = row.ends_at ? row.ends_at.slice(0, 5) : '';
-    locationInput.value = row.location ?? '';
-    setNotes(row.notes ?? '');
-    const on = new Set(row.person_ids);
-    checks().forEach((c) => (c.checked = on.has(c.value)));
-    heading.textContent = 'Edit event';
-    submitBtn.textContent = 'Save';
-    deleteBtn.hidden = false;
-    syncAllDay();
-    syncWho();
-  };
-
-  /**
-   * The brain dump this event is being made out of (14 · Piece 3). Null
-   * everywhere else, which leaves the Agenda room's behaviour — save, then
-   * reload — exactly as 13 · Piece 4 shipped it.
-   */
-  let filingNote: string | null = null;
-
-  /** Says which row this is, and offers the other one. See KindBar.astro. */
-  // ⚠ CLOSE FIRST, THEN ANNOUNCE — see `mountKindBar`'s note. The pile answers
-  // the switch by opening the task sheet, and a second `showModal()` stacks
-  // instead of replacing: without this line "make it a task instead" left this
-  // sheet sitting underneath, still holding the same sentence.
-  //
-  // ⚠ AND "FIRST" IS NOW A PROMISE, NOT A STATEMENT ORDER (2026-08-15). Closing
-  // through `closeWithExit` keeps this sheet genuinely open for the length of
-  // its slide, so announcing on the next line would open the task sheet ON TOP
-  // of one still leaving — exactly the stack this comment was written to
-  // prevent, reintroduced by a change that looks unrelated. The `.then` is the
-  // same ordering, expressed in the only way that still holds.
-  const setKindBar = mountKindBar(form, (detail, to) => {
-    void ui
-      .close()
-      .then(() => document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })));
-  });
-
-  const open = (row?: EventRow, on?: string) => {
-    ui.showError(null);
-    if (row) fill(row);
-    else {
-      reset();
-      // The day you are looking at, not today: pressing New while reading
-      // August means an event in August.
-      dateInput.value = on || (form.dataset.today ?? '');
+    interface EventRow {
+      id: string;
+      title: string;
+      starts_on: string;
+      starts_at: string | null;
+      ends_at: string | null;
+      location: string | null;
+      notes: string | null;
+      person_ids: string[];
     }
-    ui.dirty.reset(); // populating is not editing — see dirtyTracker
-    ui.open();
-    titleInput.focus();
-  };
 
-  document
-    .querySelectorAll<HTMLElement>('[data-open-event-sheet]')
-    .forEach((btn) => btn.addEventListener('click', () => open(undefined, btn.dataset.openEventSheet)));
+    let editing: string | null = null;
 
-  /**
-   * Opened from the notes room, with a dump already read into fields.
-   *
-   * ⚠ WHAT AN EVENT CANNOT HOLD IS DROPPED BEFORE IT GETS HERE: `parse-task.ts`
-   * forces the kind back to `task` whenever a repeat or a lead is present,
-   * because `events` has neither column. So this handler never has to decide
-   * what to do with a recurrence — it cannot receive one.
-   */
-  document.addEventListener('hq:event-open', (e) => {
-    const detail = (e as CustomEvent<FilingDetail>).detail;
-    open();
-    filingNote = detail.noteId;
-    heading.textContent = 'Make an event';
+    /** `all day` beside the empty time — one word, in place, never a sentence. */
+    const syncAllDay = () => {
+      allDay.hidden = !!startInput.value;
+      // An end with no beginning is not a time anybody can act on, so the field
+      // simply is not offered until there is one.
+      endInput.disabled = !startInput.value;
+      if (!startInput.value) endInput.value = '';
+    };
 
-    const p = detail.parsed;
-    const [first, ...rest] = detail.text.split('\n');
-    titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
-    setNotes((p?.notes ?? rest.join('\n')).trim());
-    if (p) {
-      dateInput.value = p.due_on?.value ?? form.dataset.today ?? '';
-      startInput.value = timeValue(p.due_time);
-      showFrom(form, 'due_on', p.due_on);
-      showFrom(form, 'due_time', p.due_time);
+    /** The summary line, so the closed state still tells you who is coming. */
+    const syncWho = () => {
+      if (!whoEl) return;
+      const names = checks()
+        .filter((c) => c.checked)
+        .map((c) => c.dataset.name!);
+      whoEl.textContent =
+        names.length === 0 ? 'nobody' : names.length <= 3 ? names.join(', ') : `${names.length} people`;
+    };
+
+    const reset = () => {
+      editing = null;
+      form.reset();
+      titleInput.value = '';
+      startInput.value = '';
+      endInput.value = '';
+      locationInput.value = '';
+      setNotes('');
+      checks().forEach((c) => (c.checked = false));
+      heading.textContent = 'New event';
+      submitBtn.textContent = 'Add event';
+      deleteBtn.hidden = true;
       syncAllDay();
-    }
-    setKindBar(detail);
-    titleInput.select();
-  });
+      syncWho();
+    };
 
-  // Delegated: the day panel is server-rendered per request, so a listener per
-  // row would need rebinding on every navigation.
-  document.addEventListener('click', (e) => {
-    const trigger = (e.target as Element).closest<HTMLElement>('[data-edit-event]');
-    if (!trigger) return;
-    const raw = trigger.closest<HTMLElement>('[data-event]')?.dataset.event;
-    if (raw) open(JSON.parse(raw) as EventRow);
-  });
+    const fill = (row: EventRow) => {
+      reset();
+      editing = row.id;
+      titleInput.value = row.title;
+      dateInput.value = row.starts_on;
+      startInput.value = row.starts_at ? row.starts_at.slice(0, 5) : '';
+      endInput.value = row.ends_at ? row.ends_at.slice(0, 5) : '';
+      locationInput.value = row.location ?? '';
+      setNotes(row.notes ?? '');
+      const on = new Set(row.person_ids);
+      checks().forEach((c) => (c.checked = on.has(c.value)));
+      heading.textContent = 'Edit event';
+      submitBtn.textContent = 'Save';
+      deleteBtn.hidden = false;
+      syncAllDay();
+      syncWho();
+    };
 
-  startInput.addEventListener('input', syncAllDay);
-  form.addEventListener('change', (e) => {
-    if ((e.target as HTMLElement).classList.contains('ep-check')) syncWho();
-  });
+    /**
+     * The brain dump this event is being made out of (14 · Piece 3). Null
+     * everywhere else, which leaves the Agenda room's behaviour — save, then
+     * reload — exactly as 13 · Piece 4 shipped it.
+     */
+    let filingNote: string | null = null;
 
-  // The filter, when the roster is long enough to need one.
-  // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — these six lines
-  // existed here, in `event-sheet.ts` and in `tag-sheet.ts`, byte for byte, and
-  // all three were missing the no-match line the fourth copy had.
-  wireFilterFields(form);
+    /** Says which row this is, and offers the other one. See KindBar.astro. */
+    // ⚠ CLOSE FIRST, THEN ANNOUNCE — see `mountKindBar`'s note. The pile answers
+    // the switch by opening the task sheet, and a second `showModal()` stacks
+    // instead of replacing: without this line "make it a task instead" left this
+    // sheet sitting underneath, still holding the same sentence.
+    //
+    // ⚠ AND "FIRST" IS NOW A PROMISE, NOT A STATEMENT ORDER (2026-08-15). Closing
+    // through `closeWithExit` keeps this sheet genuinely open for the length of
+    // its slide, so announcing on the next line would open the task sheet ON TOP
+    // of one still leaving — exactly the stack this comment was written to
+    // prevent, reintroduced by a change that looks unrelated. The `.then` is the
+    // same ordering, expressed in the only way that still holds.
+    const setKindBar = mountKindBar(form, (detail, to) => {
+      void ui
+        .close()
+        .then(() => document.dispatchEvent(new CustomEvent('hq:kind-switch', { detail: { ...detail, to } })));
+    });
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    ui.showError(null);
-    // The disable/label/format/restore lifecycle is `submitAction` now
-    // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
-    // CLOSES this sheet rather than replacing the page — and it is reopened for
-    // the next dump, with the same button.
-    const res = await submitAction(
-      () =>
-        actions.events.save({
-          id: editing ?? undefined,
-          title: titleInput.value.trim(),
-          startsOn: dateInput.value,
-          startsAt: startInput.value,
-          endsAt: endInput.value,
-          location: locationInput.value.trim(),
-          notes: notes.getMarkdown().trim(),
-          personIds: checks()
-            .filter((c) => c.checked)
-            .map((c) => c.value),
-        }),
-      { button: submitBtn, busy: 'Saving…', onError: ui.showError, reusable: true },
-    );
-    if (!res.ok) return;
+    const open = (row?: EventRow, on?: string) => {
+      ui.showError(null);
+      if (row) fill(row);
+      else {
+        reset();
+        // The day you are looking at, not today: pressing New while reading
+        // August means an event in August.
+        dateInput.value = on || (form.dataset.today ?? '');
+      }
+      ui.dirty.reset(); // populating is not editing — see dirtyTracker
+      ui.open();
+      titleInput.focus();
+    };
 
-    // ⚠ TWO ENDINGS, as the task sheet has. In the Agenda room: reload, since
-    // which CELL a row lands in, the legend and the day panel are all
-    // functions of the row that changed. In the notes room: don't — a reload
-    // would throw away the pile's undo strip at the moment it has something
-    // to offer, and nothing on that page is derived from this event.
-    if (filingNote) {
-      const noteId = filingNote;
-      filingNote = null;
-      void ui.close();
-      // Cancelable, for the reason written out in `jot-arrival.ts`: the pile
-      // claims it in the notes room, and nothing does when the jot arrived
-      // from the ✚ — in which case this consumes it.
-      void announceFiled({
-        noteId,
-        what: 'an event',
-        href: '/admin/agenda',
-        undo: { kind: 'event', id: res.data?.id },
+    document
+      .querySelectorAll<HTMLElement>('[data-open-event-sheet]')
+      .forEach((btn) => btn.addEventListener('click', () => open(undefined, btn.dataset.openEventSheet)));
+
+    /**
+     * Opened from the notes room, with a dump already read into fields.
+     *
+     * ⚠ WHAT AN EVENT CANNOT HOLD IS DROPPED BEFORE IT GETS HERE: `parse-task.ts`
+     * forces the kind back to `task` whenever a repeat or a lead is present,
+     * because `events` has neither column. So this handler never has to decide
+     * what to do with a recurrence — it cannot receive one.
+     */
+    page.on(document, 'hq:event-open', (e) => {
+      const detail = (e as CustomEvent<FilingDetail>).detail;
+      open();
+      filingNote = detail.noteId;
+      heading.textContent = 'Make an event';
+
+      const p = detail.parsed;
+      const [first, ...rest] = detail.text.split('\n');
+      titleInput.value = (p?.title ?? first.trim()).slice(0, 200);
+      setNotes((p?.notes ?? rest.join('\n')).trim());
+      if (p) {
+        dateInput.value = p.due_on?.value ?? form.dataset.today ?? '';
+        startInput.value = timeValue(p.due_time);
+        showFrom(form, 'due_on', p.due_on);
+        showFrom(form, 'due_time', p.due_time);
+        syncAllDay();
+      }
+      setKindBar(detail);
+      titleInput.select();
+    });
+
+    // Delegated: the day panel is server-rendered per request, so a listener per
+    // row would need rebinding on every navigation.
+    page.on(document, 'click', (e) => {
+      const trigger = (e.target as Element).closest<HTMLElement>('[data-edit-event]');
+      if (!trigger) return;
+      const raw = trigger.closest<HTMLElement>('[data-event]')?.dataset.event;
+      if (raw) open(JSON.parse(raw) as EventRow);
+    });
+
+    startInput.addEventListener('input', syncAllDay);
+    form.addEventListener('change', (e) => {
+      if ((e.target as HTMLElement).classList.contains('ep-check')) syncWho();
+    });
+
+    // The filter, when the roster is long enough to need one.
+    // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — these six lines
+    // existed here, in `event-sheet.ts` and in `tag-sheet.ts`, byte for byte, and
+    // all three were missing the no-match line the fourth copy had.
+    wireFilterFields(form);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      ui.showError(null);
+      // The disable/label/format/restore lifecycle is `submitAction` now
+      // (docs/plans/25 · §2). `reusable`, because the notes-room ending below
+      // CLOSES this sheet rather than replacing the page — and it is reopened for
+      // the next dump, with the same button.
+      const res = await submitAction(
+        () =>
+          actions.events.save({
+            id: editing ?? undefined,
+            title: titleInput.value.trim(),
+            startsOn: dateInput.value,
+            startsAt: startInput.value,
+            endsAt: endInput.value,
+            location: locationInput.value.trim(),
+            notes: notes.getMarkdown().trim(),
+            personIds: checks()
+              .filter((c) => c.checked)
+              .map((c) => c.value),
+          }),
+        { button: submitBtn, busy: 'Saving…', onError: ui.showError, reusable: true },
+      );
+      if (!res.ok) return;
+
+      // ⚠ TWO ENDINGS, as the task sheet has. In the Agenda room: reload, since
+      // which CELL a row lands in, the legend and the day panel are all
+      // functions of the row that changed. In the notes room: don't — a reload
+      // would throw away the pile's undo strip at the moment it has something
+      // to offer, and nothing on that page is derived from this event.
+      if (filingNote) {
+        const noteId = filingNote;
+        filingNote = null;
+        void ui.close();
+        // Cancelable, for the reason written out in `jot-arrival.ts`: the pile
+        // claims it in the notes room, and nothing does when the jot arrived
+        // from the ✚ — in which case this consumes it.
+        void announceFiled({
+          noteId,
+          what: 'an event',
+          href: '/admin/agenda',
+          undo: { kind: 'event', id: res.data?.id },
+        });
+        return;
+      }
+      location.reload();
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      if (!editing) return;
+      const { confirmDialog } = await import('./confirm-dialog');
+      const ok = await confirmDialog({
+        title: 'Delete this event?',
+        // What survives first, then that nothing does — the footer-Delete rule in
+        // `sheet.ts` (plan 42 · §4.A.1). `events.remove` is a hard delete with no
+        // trash tier, and it argues why at the action.
+        message: 'Its person tags go with it. This cannot be undone.',
+        confirmLabel: 'Delete',
+        danger: true,
       });
-      return;
-    }
-    location.reload();
-  });
-
-  deleteBtn.addEventListener('click', async () => {
-    if (!editing) return;
-    const { confirmDialog } = await import('./confirm-dialog');
-    const ok = await confirmDialog({
-      title: 'Delete this event?',
-      // What survives first, then that nothing does — the footer-Delete rule in
-      // `sheet.ts` (plan 42 · §4.A.1). `events.remove` is a hard delete with no
-      // trash tier, and it argues why at the action.
-      message: 'Its person tags go with it. This cannot be undone.',
-      confirmLabel: 'Delete',
-      danger: true,
+      if (!ok) return;
+      const id = editing; // captured: `editing` is a `let`, so the guard above
+      // does not narrow it inside the callback below.
+      const res = await submitAction(() => actions.events.remove({ id }), {
+        button: deleteBtn,
+        // The sheet is about to close on success, so a failure has to be visible
+        // where the eye already is — and echoed on the page behind it, in case
+        // the sheet goes anyway.
+        onError: (m) => {
+          ui.showError(m);
+          if (pageError) {
+            pageError.textContent = 'Couldn’t delete that event.';
+            pageError.hidden = false;
+          }
+        },
+      });
+      if (!res.ok) return;
+      location.reload();
     });
-    if (!ok) return;
-    const id = editing; // captured: `editing` is a `let`, so the guard above
-    // does not narrow it inside the callback below.
-    const res = await submitAction(() => actions.events.remove({ id }), {
-      button: deleteBtn,
-      // The sheet is about to close on success, so a failure has to be visible
-      // where the eye already is — and echoed on the page behind it, in case
-      // the sheet goes anyway.
-      onError: (m) => {
-        ui.showError(m);
-        if (pageError) {
-          pageError.textContent = 'Couldn’t delete that event.';
-          pageError.hidden = false;
-        }
-      },
-    });
-    if (!res.ok) return;
-    location.reload();
-  });
 
-  // The calendar's half of the ✚'s Agenda door — reached either directly, when
-  // the reading says this is an event, or from the tasks room's KindBar switch.
-  wireJotArrival(sheet, 'hq:event-open');
+    // The calendar's half of the ✚'s Agenda door — reached either directly, when
+    // the reading says this is an event, or from the tasks room's KindBar switch.
+    wireJotArrival(sheet, 'hq:event-open');
 
-  /*
+    /*
     ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
     of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
     ✚. The page paints without TipTap in it; a moment later the editor is there,
     so a sheet opened in anger finds it already mounted and nothing about the
     typing feels deferred.
   */
-  warmOnIdle(notes);
-}
+    warmOnIdle(notes);
+
+    /*
+      ⚠ THE PREVIOUS ARRIVAL'S EDITOR IS TORN DOWN. `onPage` re-runs this boot on
+      every client-side arrival, so without this a second visit leaves the first
+      instance alive and unreachable — see `LazyMiniEditor.destroy`.
+    */
+    page.cleanup(() => notes.destroy());
+  }
+});

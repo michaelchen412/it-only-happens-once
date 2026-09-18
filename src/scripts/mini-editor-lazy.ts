@@ -69,6 +69,17 @@ export interface LazyMiniEditor {
    * Returns once the editor is live, for the rare caller that wants to know.
    */
   warm(): Promise<RichEditorHandle>;
+  /**
+   * Tear the editor down, if one was ever built.
+   *
+   * ⚠ ARRIVED WITH `<ClientRouter />` (plan 24 · §9) AND IS NOT OPTIONAL. Under
+   * the router `onPage` re-runs each sheet's boot on every arrival, so a second
+   * visit mounts a second editor into the new element while the first goes on
+   * holding its plugins, its input hooks and a detached document. ProseMirror
+   * stays reachable through its own listeners, so it is never collected — walk
+   * in and out ten times and ten editors are alive.
+   */
+  destroy(): void;
 }
 
 export function lazyMiniEditor(opts: MiniEditorOptions): LazyMiniEditor {
@@ -118,6 +129,13 @@ export function lazyMiniEditor(opts: MiniEditorOptions): LazyMiniEditor {
     },
     warm() {
       return (booting ??= mount());
+    },
+    destroy() {
+      live?.editor.destroy();
+      live = null;
+      booting = null;
+      // `pending` is deliberately kept: it is the document, not the editor, and
+      // a boot that sets content before warming must still find it afterwards.
     },
   };
 }

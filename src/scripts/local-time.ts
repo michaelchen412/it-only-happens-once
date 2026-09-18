@@ -23,6 +23,8 @@
 //
 // `data-local="time"` still adds the date when the instant is not today, since
 // a bare clock time on a stamp from last week is actively misleading.
+import { onPage } from './page';
+
 const TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
 const DATE: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
 
@@ -52,4 +54,12 @@ export function renderLocalTimes(root: ParentNode = document): void {
   });
 }
 
-renderLocalTimes();
+/*
+  ⚠ ON EVERY ARRIVAL, NOT ONCE — `<ClientRouter />` swaps the body, and the
+  stamps in the new one carry the server's spelling until this runs over them. A
+  module that ran only on the first document would leave every room you WALKED
+  into showing an un-localised time, which is the one thing the project's
+  "no UTC on screen" rule says may never happen. It would also be invisible to
+  the room you loaded directly, so it would read as intermittent.
+*/
+onPage(() => renderLocalTimes());

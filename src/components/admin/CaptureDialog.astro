@@ -68,7 +68,38 @@ const { hasRoster = false } = Astro.props;
     it. BackToTop sits at the same corner but only appears once you have
     scrolled, and it offsets itself when this is present — see app.css. */
 }
+{
+  /*
+    ⚠⚠ `transition:persist` — AND IT IS THE WHOLE REASON THIS FILE NEEDED NO
+    MIGRATION when `<ClientRouter />` landed (plan 24 · §9).
+
+    Under the router the body is swapped and no module re-runs, so anything
+    bound to a page element goes dead. The usual answer is `onPage` from
+    `scripts/page.ts`: re-find the elements and re-bind on every arrival. That
+    is the wrong answer HERE, for one specific reason — the box has TipTap
+    mounted inside it. Re-booting on every navigation would re-mount a 512 KB
+    editor each time you crossed the building, which is the exact cost
+    `mini-editor-lazy.ts` was written to remove.
+
+    Persisting says the truer thing anyway. This file's first line is *"one
+    door, every room"*: the ✚ is not a thing each room has a copy of, it is one
+    control that the rooms move past. So the element itself travels across the
+    swap, its listeners travel with it, and the mounted editor is never rebuilt.
+
+    ⚠ AND A HALF-TYPED THOUGHT SURVIVES THE NAVIGATION, which falls out of this
+    and is the behaviour you would want if asked: the box exists so the gap
+    between having a thought and saving it is as short as possible, and losing
+    one because the sidebar was clicked would be that promise breaking at the
+    worst moment. The 700ms autosave still owns the row; this just stops the DOM
+    holding it from being thrown away.
+
+    ⚠ NAMED EXPLICITLY. An unnamed `transition:persist` is matched by the
+    element's position in the tree, and these two are siblings of whatever the
+    room happens to render. The names are what make the match reliable.
+  */
+}
 <button
+  transition:persist="cap-fab"
   id="cap-open"
   type="button"
   class="cap-fab"
@@ -79,7 +110,12 @@ const { hasRoster = false } = Astro.props;
   <Icon name="ph:plus" class="text-2xl" />
 </button>
 
-<dialog id="cap-dialog" class="modal-dialog w-full max-w-xl" aria-label="Write something down">
+<dialog
+  transition:persist="cap-dialog"
+  id="cap-dialog"
+  class="modal-dialog w-full max-w-xl"
+  aria-label="Write something down"
+>
   <div class="cap-shell font-sans">
     {
       /*

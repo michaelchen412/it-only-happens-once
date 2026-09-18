@@ -19,148 +19,158 @@ import { announceFiled } from './jot-arrival';
 import { confirmDialog } from './confirm-dialog';
 import { wireEntryMeta } from './entry-meta';
 import { lazyMiniEditor, warmOnIdle } from './mini-editor-lazy';
+import { onPage } from './page';
 
-const zone = document.querySelector<HTMLElement>('[data-timeline]');
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage((page) => {
+  const zone = document.querySelector<HTMLElement>('[data-timeline]');
 
-if (zone) {
-  const personId = zone.dataset.personId!;
-  const today = zone.dataset.today!;
+  if (zone) {
+    const personId = zone.dataset.personId!;
+    const today = zone.dataset.today!;
 
-  const $ = <T extends HTMLElement>(sel: string) => zone.querySelector<T>(sel);
-  const $$ = <T extends HTMLElement>(sel: string) => Array.from(zone.querySelectorAll<T>(sel));
+    const $ = <T extends HTMLElement>(sel: string) => zone.querySelector<T>(sel);
+    const $$ = <T extends HTMLElement>(sel: string) => Array.from(zone.querySelectorAll<T>(sel));
 
-  /**
-   * The box — a mini editor since plan 43, storing the same Markdown.
-   *
-   * `breaks: false` MATCHES `.tl__body`, which renders entries with a bare
-   * `renderMarkdown(e.body)`. Mounting at `true` would have shown a line break
-   * the timeline then closed up — and note which way round the improvement
-   * falls: the textarea used to display two lines where the row beneath it
-   * displayed one, and the editor now agrees with the row.
-   */
-  /*
+    /**
+     * The box — a mini editor since plan 43, storing the same Markdown.
+     *
+     * `breaks: false` MATCHES `.tl__body`, which renders entries with a bare
+     * `renderMarkdown(e.body)`. Mounting at `true` would have shown a line break
+     * the timeline then closed up — and note which way round the improvement
+     * falls: the textarea used to display two lines where the row beneath it
+     * displayed one, and the editor now agrees with the row.
+     */
+    /*
     ⚠ LAZY — imported when this sheet is first warmed, not when the page loads.
     `mini-editor-lazy.ts` carries the measurement and the argument.
   */
-  const box = lazyMiniEditor({
-    editorEl: $<HTMLElement>('[data-log-input]')!,
-    // The whole zone: the two `.tt-btn`s live down in the foot, not over the
-    // box. `mountMiniEditor` takes ELEMENTS precisely so a caller can place its
-    // toolbar wherever the surface wants it.
-    toolbarRoot: zone,
-    placeholder: 'What happened?',
-    ariaLabel: `Log an entry about ${zone.dataset.personName ?? 'this person'}`,
-    docClass: 'f-prose',
-    breaks: false,
-    onChange: () => syncControls(),
-  });
-  const meta = $<HTMLElement>('[data-log-meta]')!;
-  const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
-  const cancelBtn = $<HTMLButtonElement>('[data-log-cancel]')!;
-  const errorEl = $<HTMLElement>('[data-log-error]')!;
-  /** The entry being corrected, or null when writing a new one. */
-  let editingId: string | null = null;
+    const box = lazyMiniEditor({
+      editorEl: $<HTMLElement>('[data-log-input]')!,
+      // The whole zone: the two `.tt-btn`s live down in the foot, not over the
+      // box. `mountMiniEditor` takes ELEMENTS precisely so a caller can place its
+      // toolbar wherever the surface wants it.
+      toolbarRoot: zone,
+      placeholder: 'What happened?',
+      ariaLabel: `Log an entry about ${zone.dataset.personName ?? 'this person'}`,
+      docClass: 'f-prose',
+      breaks: false,
+      onChange: () => syncControls(),
+    });
+    const meta = $<HTMLElement>('[data-log-meta]')!;
+    const saveBtn = $<HTMLButtonElement>('[data-log-save]')!;
+    const cancelBtn = $<HTMLButtonElement>('[data-log-cancel]')!;
+    const errorEl = $<HTMLElement>('[data-log-error]')!;
+    /** The entry being corrected, or null when writing a new one. */
+    let editingId: string | null = null;
 
-  // Kind, date and who are `entry-meta.ts` now — the same wiring the notes
-  // pile's log sheet runs (docs/plans/25 · §3). The picker here is "with",
-  // because a profile already knows whose entry this is and these are the
-  // OTHERS; in the pile the same control asks "Who?" and is required. That
-  // difference is the whole of what the two hosts still configure.
-  //
-  // ⚠ It also retires a local `shiftYmd` that used to sit here — five untested
-  // lines beside the tested one in `lib/hq/time.ts`, and the drift that made
-  // this extraction earn itself.
-  const entryMeta = wireEntryMeta(zone, {
-    today,
-    peopleAttr: 'with',
-    peopleLabel: (names) =>
-      names.length === 0 ? 'with' : names.length === 1 ? `with ${names[0]}` : `with ${names[0]} +${names.length - 1}`,
-  });
-
-  function showError(message: string | null) {
-    errorEl.textContent = message ?? '';
-    errorEl.hidden = !message;
-  }
-
-  // `grow()` used to live here — height to `auto`, then back from
-  // `scrollHeight`, on every keystroke. A contenteditable is as tall as its
-  // content, so the function, its two callers and the `overflow: hidden` that
-  // made the measurement possible are all deleted rather than ported.
-
-  function syncControls() {
-    // ⚠ `isBlank()`, NOT TIPTAP'S `editor.isEmpty` — AND THE SPEC SAYS WHY.
-    // "Whitespace alone is not something typed": a paragraph holding four
-    // spaces is a real node, so `isEmpty` is FALSE for it and Save would have
-    // appeared for a box containing nothing you meant. `.value.trim()` gave
-    // this for free on the textarea; the editor has to be asked.
+    // Kind, date and who are `entry-meta.ts` now — the same wiring the notes
+    // pile's log sheet runs (docs/plans/25 · §3). The picker here is "with",
+    // because a profile already knows whose entry this is and these are the
+    // OTHERS; in the pile the same control asks "Who?" and is required. That
+    // difference is the whole of what the two hosts still configure.
     //
-    // ⚠ THE NAME IS THE GUARD. `mini-editor-lazy`'s method is called `isBlank`
-    // precisely so it cannot be mistaken for the property this comment exists
-    // to warn against — it trims, and `editor.isEmpty` does not.
-    const has = !box.isBlank();
-    meta.hidden = !has && !editingId;
-    saveBtn.hidden = !has && !editingId;
-    cancelBtn.hidden = !editingId;
-  }
+    // ⚠ It also retires a local `shiftYmd` that used to sit here — five untested
+    // lines beside the tested one in `lib/hq/time.ts`, and the drift that made
+    // this extraction earn itself.
+    const entryMeta = wireEntryMeta(zone, {
+      today,
+      peopleAttr: 'with',
+      peopleLabel: (names) =>
+        names.length === 0 ? 'with' : names.length === 1 ? `with ${names[0]}` : `with ${names[0]} +${names.length - 1}`,
+    });
 
-  // ── writing, and correcting ──────────────────────────────────────────────
-  function reset() {
-    editingId = null;
-    // `emitUpdate: false` — `onChange` calls `syncControls`, which runs on the
-    // next line anyway; letting `setContent` fire it too would sync against a
-    // half-reset box (`editingId` cleared, meta not yet).
-    box.setContent('');
-    entryMeta.reset();
-    showError(null);
-    syncControls();
-  }
+    function showError(message: string | null) {
+      errorEl.textContent = message ?? '';
+      errorEl.hidden = !message;
+    }
 
-  cancelBtn.addEventListener('click', () => {
-    reset();
-    zone.querySelectorAll('.tl').forEach((r) => r.classList.remove('is-editing'));
-  });
+    // `grow()` used to live here — height to `auto`, then back from
+    // `scrollHeight`, on every keystroke. A contenteditable is as tall as its
+    // content, so the function, its two callers and the `overflow: hidden` that
+    // made the measurement possible are all deleted rather than ported.
 
-  $$<HTMLButtonElement>('[data-edit]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      const row = btn.closest<HTMLElement>('.tl')!;
-      reset();
-      editingId = row.dataset.entry!;
-      box.setContent(row.dataset.body ?? '');
-      entryMeta.set(
-        row.dataset.entryOn!,
-        row.dataset.entryKind!,
-        (row.dataset.entryWith ?? '').split(',').filter(Boolean),
-      );
+    function syncControls() {
+      // ⚠ `isBlank()`, NOT TIPTAP'S `editor.isEmpty` — AND THE SPEC SAYS WHY.
+      // "Whitespace alone is not something typed": a paragraph holding four
+      // spaces is a real node, so `isEmpty` is FALSE for it and Save would have
+      // appeared for a box containing nothing you meant. `.value.trim()` gave
+      // this for free on the textarea; the editor has to be asked.
+      //
+      // ⚠ THE NAME IS THE GUARD. `mini-editor-lazy`'s method is called `isBlank`
+      // precisely so it cannot be mistaken for the property this comment exists
+      // to warn against — it trims, and `editor.isEmpty` does not.
+      const has = !box.isBlank();
+      meta.hidden = !has && !editingId;
+      saveBtn.hidden = !has && !editingId;
+      cancelBtn.hidden = !editingId;
+    }
 
-      zone.querySelectorAll('.tl').forEach((r) => r.classList.toggle('is-editing', r === row));
+    // ── writing, and correcting ──────────────────────────────────────────────
+    function reset() {
+      editingId = null;
+      // `emitUpdate: false` — `onChange` calls `syncControls`, which runs on the
+      // next line anyway; letting `setContent` fire it too would sync against a
+      // half-reset box (`editingId` cleared, meta not yet).
+      box.setContent('');
+      entryMeta.reset();
+      showError(null);
       syncControls();
-      box.focus('end');
-    }),
-  );
+    }
 
-  saveBtn.addEventListener('click', async () => {
-    const body = box.getMarkdown().trim();
-    if (!body) return;
-    showError(null);
-    // The disable/label/format/restore lifecycle is `submitAction` now
-    // (docs/plans/25 · §2) — including the trap it was built around: a dead
-    // network THROWS rather than returning `{ error }`, which is what once left
-    // a button stuck on "Thinking…" for the life of the page.
-    const res = await submitAction(
-      () =>
-        actions.interactions.save({
-          id: editingId ?? undefined,
-          personId,
-          withIds: entryMeta.people(),
-          occurredOn: entryMeta.occurredOn(),
-          kind: entryMeta.kind() as never,
-          body,
-        }),
-      { button: saveBtn, busy: 'Saving…', onError: showError },
+    cancelBtn.addEventListener('click', () => {
+      reset();
+      zone.querySelectorAll('.tl').forEach((r) => r.classList.remove('is-editing'));
+    });
+
+    $$<HTMLButtonElement>('[data-edit]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const row = btn.closest<HTMLElement>('.tl')!;
+        reset();
+        editingId = row.dataset.entry!;
+        box.setContent(row.dataset.body ?? '');
+        entryMeta.set(
+          row.dataset.entryOn!,
+          row.dataset.entryKind!,
+          (row.dataset.entryWith ?? '').split(',').filter(Boolean),
+        );
+
+        zone.querySelectorAll('.tl').forEach((r) => r.classList.toggle('is-editing', r === row));
+        syncControls();
+        box.focus('end');
+      }),
     );
-    if (!res.ok) return;
 
-    /*
+    saveBtn.addEventListener('click', async () => {
+      const body = box.getMarkdown().trim();
+      if (!body) return;
+      showError(null);
+      // The disable/label/format/restore lifecycle is `submitAction` now
+      // (docs/plans/25 · §2) — including the trap it was built around: a dead
+      // network THROWS rather than returning `{ error }`, which is what once left
+      // a button stuck on "Thinking…" for the life of the page.
+      const res = await submitAction(
+        () =>
+          actions.interactions.save({
+            id: editingId ?? undefined,
+            personId,
+            withIds: entryMeta.people(),
+            occurredOn: entryMeta.occurredOn(),
+            kind: entryMeta.kind() as never,
+            body,
+          }),
+        { button: saveBtn, busy: 'Saving…', onError: showError },
+      );
+      if (!res.ok) return;
+
+      /*
       ⚠ THE JOT IS CONSUMED LAST, after the entry exists (plan 45 · Piece 3, on
       14 §10e's ordering). `announceFiled` reloads for us — and it is the same
       call the task and event sheets make, so the one rule about who cleans up
@@ -170,49 +180,49 @@ if (zone) {
       Only on a NEW entry: correcting an existing one is not a filing, and
       `editingId` is what tells them apart.
     */
-    const jotId = editingId ? null : zone.dataset.seedFrom;
-    if (jotId) {
-      delete zone.dataset.seedFrom;
-      void announceFiled({
-        noteId: jotId,
-        what: 'an entry',
-        href: null,
-        undo: { kind: 'interaction', id: res.data?.id },
-      });
-      return;
-    }
+      const jotId = editingId ? null : zone.dataset.seedFrom;
+      if (jotId) {
+        delete zone.dataset.seedFrom;
+        void announceFiled({
+          noteId: jotId,
+          what: 'an entry',
+          href: null,
+          undo: { kind: 'interaction', id: res.data?.id },
+        });
+        return;
+      }
 
-    // Reload rather than patching: the count, the ordering, the last-contact
-    // fact in the header and the card on the roster are all functions of the
-    // row that just changed, and re-deriving four of them by hand is four
-    // chances to disagree with the database.
-    location.reload();
-  });
-
-  $$<HTMLButtonElement>('[data-delete]').forEach((btn) =>
-    btn.addEventListener('click', async () => {
-      const row = btn.closest<HTMLElement>('.tl')!;
-      const ok = await confirmDialog({
-        title: 'Delete this entry?',
-        message: 'It is removed for good — there is no trash for log entries.',
-        confirmLabel: 'Delete',
-        danger: true,
-      });
-      if (!ok) return;
-
-      // Was a bare await with `error.message` straight onto the screen — so a
-      // dead network both skipped this branch entirely (it throws) and, when it
-      // did return, printed `Failed to fetch` at a human.
-      const res = await submitAction(() => actions.interactions.remove({ id: row.dataset.entry! }), {
-        button: btn,
-        onError: showError,
-      });
-      if (!res.ok) return;
+      // Reload rather than patching: the count, the ordering, the last-contact
+      // fact in the header and the card on the roster are all functions of the
+      // row that just changed, and re-deriving four of them by hand is four
+      // chances to disagree with the database.
       location.reload();
-    }),
-  );
+    });
 
-  /*
+    $$<HTMLButtonElement>('[data-delete]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const row = btn.closest<HTMLElement>('.tl')!;
+        const ok = await confirmDialog({
+          title: 'Delete this entry?',
+          message: 'It is removed for good — there is no trash for log entries.',
+          confirmLabel: 'Delete',
+          danger: true,
+        });
+        if (!ok) return;
+
+        // Was a bare await with `error.message` straight onto the screen — so a
+        // dead network both skipped this branch entirely (it throws) and, when it
+        // did return, printed `Failed to fetch` at a human.
+        const res = await submitAction(() => actions.interactions.remove({ id: row.dataset.entry! }), {
+          button: btn,
+          onError: showError,
+        });
+        if (!res.ok) return;
+        location.reload();
+      }),
+    );
+
+    /*
     A jot the ✚ sent here (plan 45 · Piece 3). The Log tab named this person and
     navigated; the words arrive with the page and go straight into the box.
 
@@ -225,26 +235,34 @@ if (zone) {
     already consumed — and this box, unlike a dialog, is on screen the moment
     the page loads.
   */
-  const seedBody = zone.dataset.seedBody;
-  if (seedBody) {
-    delete zone.dataset.seedBody;
-    box.setContent(seedBody);
-    box.focus('end');
-    const url = new URL(window.location.href);
-    url.searchParams.delete('from');
-    history.replaceState(null, '', url.pathname + url.search + url.hash);
-  }
+    const seedBody = zone.dataset.seedBody;
+    if (seedBody) {
+      delete zone.dataset.seedBody;
+      box.setContent(seedBody);
+      box.focus('end');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('from');
+      history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
 
-  // The initial paint. `grow()` used to lead here, sizing an empty textarea to
-  // one line; the editor is already the height of its own content.
-  syncControls();
+    // The initial paint. `grow()` used to lead here, sizing an empty textarea to
+    // one line; the editor is already the height of its own content.
+    syncControls();
 
-  /*
+    /*
     ⚠ OFF THE CRITICAL PATH, BUT RESIDENT BEFORE IT IS WANTED — the other half
     of `lazyMiniEditor`'s bargain, and the same one `capture.ts` strikes for the
     ✚. The page paints without TipTap in it; a moment later the editor is there,
     so a sheet opened in anger finds it already mounted and nothing about the
     typing feels deferred.
   */
-  warmOnIdle(box);
-}
+    warmOnIdle(box);
+
+    /*
+      ⚠ THE PREVIOUS ARRIVAL'S EDITOR IS TORN DOWN. `onPage` re-runs this boot on
+      every client-side arrival, so without this a second visit leaves the first
+      instance alive and unreachable — see `LazyMiniEditor.destroy`.
+    */
+    page.cleanup(() => box.destroy());
+  }
+});

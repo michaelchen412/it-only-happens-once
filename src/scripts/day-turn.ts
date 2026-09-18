@@ -46,12 +46,13 @@
   one function that answers it.
 */
 import { localToday, shiftYmd, zonedTimeToUtc } from '../lib/hq/time';
+import { onPage, type PageScope } from './page';
 
 /** The longest a `setTimeout` can be trusted to mean anything (~24.8 days is
  *  the real ceiling; this is a sanity clamp, not a limit we ever reach). */
 const MAX_DELAY = 6 * 60 * 60 * 1000;
 
-function mount(): void {
+function mount(page: PageScope): void {
   // `#hq` is where the layout parks the server's answer about *now* — the day,
   // the zone and the count — so this file and `attention.ts` read one source
   // rather than two elements that could be rendered from different values.
@@ -105,8 +106,10 @@ function mount(): void {
     if (document.visibilityState === 'visible') check();
   }
 
-  document.addEventListener('visibilitychange', onVisible);
+  // `page.on`: `document` SURVIVES the swap, so a plain listener would leave a
+  // second copy behind on every arrival — page.ts on the accumulate failure.
+  page.on(document, 'visibilitychange', onVisible);
   check();
 }
 
-mount();
+onPage(mount);

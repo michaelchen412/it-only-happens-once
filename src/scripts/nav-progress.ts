@@ -9,15 +9,24 @@
 // second, and then I get a response after my click… especially if I'm on mobile
 // and I can't even see the spinner in the tab."*
 //
-// ⚠ AND IT IS DELIBERATELY NOT A ROUTER. Turning on `<ClientRouter />` would
-// make the swap client-side, which sounds like the same fix and is not: a
-// `<script>` module runs ONCE per document, and a view-transition swap replaces
-// the DOM without re-running it — so every listener bound directly to a page
-// element dies after the first navigation. Counted 2026-08-07: **40 files and
-// ~250 element-bound listener sites** in the admin have no `astro:page-load`
-// re-init. That is a migration (24 · §9), and it buys the chrome not repainting.
-// It does NOT buy this: acknowledging the click is forty lines and no risk, and
-// it is the half Michael actually described. The two are separate jobs.
+// ⚠ IT IS NOT A ROUTER, AND IT DID NOT BECOME ONE. This file's original note
+// said turning on `<ClientRouter />` "would be a migration (24 · §9)" and that
+// acknowledging the click was the separate, smaller job Michael had actually
+// described. Both halves of that held: the bar shipped on 2026-08-07 and the
+// migration landed on 2026-09-18, six weeks later, as its own piece of work.
+//
+// The router is now ON for the Observatory, and this bar still earns its place:
+// a swap is fast but not instant — it still fetches the next page — so the frame
+// between the press and the arrival is exactly as empty as it ever was. What
+// changed is only the CLEAR, which now has a real event to listen for; see the
+// bottom of this file.
+//
+// The migration's own account is in `scripts/page.ts`. The number that made it
+// look expensive — counted 2026-08-07 as "40 files and ~250 element-bound
+// listener sites" — turned out to be the wrong measure: what mattered was the
+// 32 scripts the admin actually loads, and of those two needed nothing at all
+// (this one, and `keyboard-inset.ts`) because they were already bound only to
+// things that survive a swap.
 //
 // A BAR, NOT A SKELETON, and the loser is named because it will come back. A
 // skeleton has to know the shape of the room it stands in — Today's five zones,
@@ -104,10 +113,51 @@ function navigates(e: MouseEvent, link: HTMLAnchorElement): boolean {
 // `defaultPrevented` check above possible: by the time this runs, anything that
 // wanted to claim the click has. (Reader.astro captures for the opposite reason
 // and says so — it has to beat the router. Nothing here is racing anyone.)
+//
+// ⚠ THIS IS NOW THE FULL-LOAD PATH ONLY, and the reason is the whole of what
+// `<ClientRouter />` changed here (2026-09-18). The router claims every internal
+// link it will handle — `preventDefault()`, on the way past — so `navigates()`
+// sees `defaultPrevented` and bows out, and the bar never started. The check is
+// still right: it means *somebody else owns what happens next*. What changed is
+// that one of those somebodies now owns the exact case this bar exists for.
+//
+// So the click handler keeps the navigations the ROUTER does not take (a full
+// document load, a `download`, a foreign origin) and the router's own signal
+// below takes the rest. Loosening `navigates()` to ignore `defaultPrevented`
+// was the alternative and is wrong twice over: it would start the bar for a
+// dialog opener that claimed a click, and it would start it TWICE for a router
+// navigation, once here and once below.
 document.addEventListener('click', (e) => {
   const link = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
   if (!link || !navigates(e, link)) return;
   start(link);
+});
+
+/*
+  ⚠ THE ROUTER'S OWN "I AM FETCHING" EVENT. `astro:before-preparation` fires
+  when the router starts loading the next page and before anything is swapped —
+  which is the same instant the click handler above used to fire at, for the
+  navigations it no longer sees.
+
+  A swap is faster than a document load and is still not instant: it fetches the
+  page first. So the frame between the press and the arrival is exactly as empty
+  as it ever was, and this bar is still the only thing in it.
+
+  ⚠ THE LINK IS RECOVERED FROM THE DESTINATION, not from the event. The event
+  carries `to`, a URL, rather than the element that was pressed — so the sidebar
+  row is found by matching its `href`. That keeps the pending-highlight rule
+  exactly as it was: only a `[data-nav-row]` may move it, and a link in the
+  CONTENT pointing at the same room moves nothing.
+*/
+document.addEventListener('astro:before-preparation', (e) => {
+  const to = (e as Event & { to?: URL }).to;
+  if (!to) return;
+  const row = document.querySelector<HTMLAnchorElement>(
+    `[data-nav-row][href="${CSS.escape(to.pathname)}"], [data-nav-row][href="${CSS.escape(to.pathname + to.search)}"]`,
+  );
+  // No sidebar row means a link somewhere in the content: the bar still creeps,
+  // and `start` simply finds nothing to mark pending.
+  start(row ?? document.createElement('a'));
 });
 
 // The document is going away — or coming back from bfcache, where a bar frozen
@@ -117,6 +167,8 @@ document.addEventListener('click', (e) => {
 window.addEventListener('pagehide', stop);
 window.addEventListener('pageshow', stop);
 
-// Inert today: no admin page mounts `<ClientRouter />`. Here so that the day
-// 24 · §9 lands, the bar clears itself on arrival instead of needing to be found.
+// ⚠ LIVE SINCE 2026-09-18, and it was written a month and a half early for
+// exactly this. The line used to read "inert today: no admin page mounts
+// `<ClientRouter />`. Here so that the day 24 · §9 lands, the bar clears itself
+// on arrival instead of needing to be found." That day landed, and it did.
 document.addEventListener('astro:page-load', stop);

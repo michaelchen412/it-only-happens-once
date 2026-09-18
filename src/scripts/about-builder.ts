@@ -31,194 +31,213 @@ import { actions } from 'astro:actions';
 import { mountMiniEditor, mountRichEditor } from './rich-editor';
 import { formatActionError, nowTime, submitAction } from './action-error';
 import { uploadImage } from './upload';
-
-const init = JSON.parse(document.getElementById('about-init')!.textContent || '{}');
-
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const val = (id: string) => ($(id) as HTMLInputElement | HTMLTextAreaElement).value.trim();
-
-const saveBtn = $('save-about') as HTMLButtonElement;
-const spinner = $('about-spinner');
-const statusText = $('about-status-text');
-const errorBox = $('about-error') as HTMLParagraphElement;
-
-// ---- dirty tracking ----
-let dirty = false;
-function markDirty() {
-  dirty = true;
-  saveBtn.disabled = false;
-  statusText.textContent = 'Unsaved changes';
-  statusText.classList.add('text-warning');
-}
-
-// ---- the two movement editors ----
-const meEditor = mountRichEditor({
-  editorEl: $('me-editor'),
-  toolbarRoot: document.querySelector('[data-editor="me"] [role="toolbar"]') as HTMLElement,
-  linkDialog: $('me-link') as unknown as HTMLDialogElement,
-  placeholder: 'Your story…',
-  content: init.meBody || '',
-  ariaLabel: 'Who I am — body',
-  onChange: markDirty,
-});
-const siteEditor = mountRichEditor({
-  editorEl: $('site-editor'),
-  toolbarRoot: document.querySelector('[data-editor="site"] [role="toolbar"]') as HTMLElement,
-  linkDialog: $('site-link') as unknown as HTMLDialogElement,
-  placeholder: 'Why I write here…',
-  content: init.siteBody || '',
-  ariaLabel: 'What this is — body',
-  onChange: markDirty,
-});
-
-/**
- * The two SHORT prose fields — the name blurb and the contact intro.
- *
- * ⚠ MINI, NOT THE COMPOSER ABOVE. Both are a sentence or two that render into
- * the public About page's chrome, not movements you sit inside; the full
- * toolbar's headings, lists and images have nothing to offer a one-line intro.
- * Same split `MiniEditor`'s own header describes.
- *
- * `breaks: false` matches `about.astro`, which renders both with a bare
- * `renderMarkdown(…)`.
- *
- * ⚠ AND THEY NEED `onChange`, WHICH THE LINE BELOW CANNOT DO FOR THEM. A
- * contenteditable fires no `input` the form can hear, so the delegated listener
- * that has armed Save for every other field on this page would have let an edit
- * to either of these sit there with Save greyed out.
- */
-const blurbEditor = mountMiniEditor({
-  editorEl: $('f-blurb'),
-  toolbarRoot: $('f-blurb-wrap'),
-  placeholder: 'Where the name came from…',
-  ariaLabel: 'Where the name came from',
-  docClass: 'f-prose',
-  breaks: false,
-  onChange: markDirty,
-});
-const introEditor = mountMiniEditor({
-  editorEl: $('f-contact-intro'),
-  toolbarRoot: $('f-contact-intro-wrap'),
-  placeholder: 'Have a thought, a question, or a hello? I read everything.',
-  ariaLabel: 'Intro line',
-  docClass: 'f-prose',
-  breaks: false,
-  onChange: markDirty,
-});
-// `emitUpdate: false` — seeding is not editing, and `markDirty` above would
-// otherwise arm Save on a page nobody has touched.
-blurbEditor.editor.commands.setContent(init.blurb || '', { emitUpdate: false });
-introEditor.editor.commands.setContent(init.contactIntro || '', { emitUpdate: false });
-
-$('about-form').addEventListener('input', markDirty);
-
-// ---- portrait upload (browser session → site bucket, RLS = is_admin) ----
-const portraitInput = $('portrait-input') as HTMLInputElement;
-const portraitPath = $('portrait-path') as HTMLInputElement;
-const portraitPreview = $('portrait-preview') as HTMLImageElement;
-const portraitPlaceholder = $('portrait-placeholder');
-const portraitRemove = $('portrait-remove') as HTMLButtonElement;
-
-// Shares scripts/upload.ts with the essay composer (docs/plans/03) rather than
-// keeping its own copy. That matters now that the bucket enforces a mime
-// allowlist and a size cap: the helper rejects an unsupported file with a
-// sentence you can act on, where the raw upload would have come back with
-// whatever the storage API says. It also downscales, so a 12MP portrait stops
-// being a 5MB page load.
-//
-// The fixed path is why `pathFor` ignores the content hash: there is exactly
-// one portrait, and replacing it must overwrite rather than accumulate.
-portraitInput.addEventListener('change', async () => {
-  const file = portraitInput.files?.[0];
-  if (!file) return;
-  statusText.textContent = 'Uploading photo…';
-  spinner.hidden = false;
-  try {
-    const { path, url } = await uploadImage(file, {
-      pathFor: (_hash, ext) => `about/portrait.${ext}`,
-      upsert: true,
-    });
-    portraitPath.value = path;
-    // Cache-buster: the path is stable, so the browser would show the old one.
-    portraitPreview.src = `${url}?v=${Date.now()}`;
-    portraitPreview.classList.remove('hidden');
-    portraitPlaceholder.classList.add('hidden');
-    portraitRemove.classList.remove('hidden');
-    markDirty();
-  } catch (e) {
-    showError(formatActionError(e));
-  } finally {
-    spinner.hidden = true;
-    portraitInput.value = '';
-  }
-});
-
-portraitRemove.addEventListener('click', () => {
-  portraitPath.value = '';
-  portraitPreview.src = '';
-  portraitPreview.classList.add('hidden');
-  portraitPlaceholder.classList.remove('hidden');
-  portraitRemove.classList.add('hidden');
-  markDirty();
-});
-
-// ---- save ----
-function showError(msg: string) {
-  errorBox.textContent = msg;
-  errorBox.hidden = false;
-  spinner.hidden = true;
-  statusText.textContent = 'Save failed';
-  statusText.classList.remove('text-warning');
-  statusText.classList.add('text-error');
-}
-
-saveBtn.addEventListener('click', async () => {
-  errorBox.hidden = true;
-  spinner.hidden = false;
-  statusText.textContent = 'Saving…';
-  statusText.classList.remove('text-warning', 'text-error');
-
-  const content = {
-    me: {
-      portrait: portraitPath.value || null,
-      portrait_caption: val('f-portrait-caption'),
-      body: meEditor.getMarkdown(),
-    },
-    site: {
-      body: siteEditor.getMarkdown(),
-      name: {
-        blurb: blurbEditor.getMarkdown().trim(),
-        spotify_url: val('f-spotify'),
-      },
-    },
-    contact: {
-      intro: introEditor.getMarkdown().trim(),
-    },
-  };
-
-  // ⚠ THE CATCH IS THE POINT, and it is a little galling that this file's own
-  // fifteen-line header is about silent-save hazards. `astro:actions` THROWS on
-  // a dead network rather than returning `{ error }`, so before 2026-08-08 an
-  // offline save left **"Saving…" with a live spinner on screen forever** —
-  // and About is the one room with no autosave, so nothing else was ever going
-  // to come along and correct it.
-  //
-  // NOT `reusable`: on success Save SHOULD stay disabled, because there is
-  // nothing left to save. `markDirty` is what brings it back, and the next edit
-  // is exactly when it should return. On failure `submitAction` restores it, so
-  // a retry no longer requires typing a character first.
-  const res = await submitAction(() => actions.pages.save({ slug: 'about', content }), {
-    button: saveBtn,
-    onError: showError,
-  });
-  spinner.hidden = true;
-  if (!res.ok) return;
-  dirty = false;
-  statusText.textContent = 'Saved ' + nowTime();
-  statusText.classList.remove('text-warning', 'text-error');
-});
+import { onPage } from './page';
 
 /*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage((page) => {
+  /*
+    ⚠ BOW OUT ON A PAGE THAT IS NOT THIS ONE. `onPage` fires this boot on every
+    arrival anywhere in the Observatory, so a lookup that was safe when the
+    module only ran on its own page now runs in every room. Without this it
+    throws on each navigation — harmless, in that the room still works, and
+    noisy forever in a console nobody should have to learn to ignore.
+  */
+  const initEl = document.getElementById('about-init');
+  if (!initEl) return;
+  const init = JSON.parse(initEl.textContent || '{}');
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const val = (id: string) => ($(id) as HTMLInputElement | HTMLTextAreaElement).value.trim();
+
+  const saveBtn = $('save-about') as HTMLButtonElement;
+  const spinner = $('about-spinner');
+  const statusText = $('about-status-text');
+  const errorBox = $('about-error') as HTMLParagraphElement;
+
+  // ---- dirty tracking ----
+  let dirty = false;
+  function markDirty() {
+    dirty = true;
+    saveBtn.disabled = false;
+    statusText.textContent = 'Unsaved changes';
+    statusText.classList.add('text-warning');
+  }
+
+  // ---- the two movement editors ----
+  const meEditor = mountRichEditor({
+    editorEl: $('me-editor'),
+    toolbarRoot: document.querySelector('[data-editor="me"] [role="toolbar"]') as HTMLElement,
+    linkDialog: $('me-link') as unknown as HTMLDialogElement,
+    placeholder: 'Your story…',
+    content: init.meBody || '',
+    ariaLabel: 'Who I am — body',
+    onChange: markDirty,
+  });
+  const siteEditor = mountRichEditor({
+    editorEl: $('site-editor'),
+    toolbarRoot: document.querySelector('[data-editor="site"] [role="toolbar"]') as HTMLElement,
+    linkDialog: $('site-link') as unknown as HTMLDialogElement,
+    placeholder: 'Why I write here…',
+    content: init.siteBody || '',
+    ariaLabel: 'What this is — body',
+    onChange: markDirty,
+  });
+
+  /**
+   * The two SHORT prose fields — the name blurb and the contact intro.
+   *
+   * ⚠ MINI, NOT THE COMPOSER ABOVE. Both are a sentence or two that render into
+   * the public About page's chrome, not movements you sit inside; the full
+   * toolbar's headings, lists and images have nothing to offer a one-line intro.
+   * Same split `MiniEditor`'s own header describes.
+   *
+   * `breaks: false` matches `about.astro`, which renders both with a bare
+   * `renderMarkdown(…)`.
+   *
+   * ⚠ AND THEY NEED `onChange`, WHICH THE LINE BELOW CANNOT DO FOR THEM. A
+   * contenteditable fires no `input` the form can hear, so the delegated listener
+   * that has armed Save for every other field on this page would have let an edit
+   * to either of these sit there with Save greyed out.
+   */
+  const blurbEditor = mountMiniEditor({
+    editorEl: $('f-blurb'),
+    toolbarRoot: $('f-blurb-wrap'),
+    placeholder: 'Where the name came from…',
+    ariaLabel: 'Where the name came from',
+    docClass: 'f-prose',
+    breaks: false,
+    onChange: markDirty,
+  });
+  const introEditor = mountMiniEditor({
+    editorEl: $('f-contact-intro'),
+    toolbarRoot: $('f-contact-intro-wrap'),
+    placeholder: 'Have a thought, a question, or a hello? I read everything.',
+    ariaLabel: 'Intro line',
+    docClass: 'f-prose',
+    breaks: false,
+    onChange: markDirty,
+  });
+  // `emitUpdate: false` — seeding is not editing, and `markDirty` above would
+  // otherwise arm Save on a page nobody has touched.
+  blurbEditor.editor.commands.setContent(init.blurb || '', { emitUpdate: false });
+  introEditor.editor.commands.setContent(init.contactIntro || '', { emitUpdate: false });
+
+  $('about-form').addEventListener('input', markDirty);
+
+  // ---- portrait upload (browser session → site bucket, RLS = is_admin) ----
+  const portraitInput = $('portrait-input') as HTMLInputElement;
+  const portraitPath = $('portrait-path') as HTMLInputElement;
+  const portraitPreview = $('portrait-preview') as HTMLImageElement;
+  const portraitPlaceholder = $('portrait-placeholder');
+  const portraitRemove = $('portrait-remove') as HTMLButtonElement;
+
+  // Shares scripts/upload.ts with the essay composer (docs/plans/03) rather than
+  // keeping its own copy. That matters now that the bucket enforces a mime
+  // allowlist and a size cap: the helper rejects an unsupported file with a
+  // sentence you can act on, where the raw upload would have come back with
+  // whatever the storage API says. It also downscales, so a 12MP portrait stops
+  // being a 5MB page load.
+  //
+  // The fixed path is why `pathFor` ignores the content hash: there is exactly
+  // one portrait, and replacing it must overwrite rather than accumulate.
+  portraitInput.addEventListener('change', async () => {
+    const file = portraitInput.files?.[0];
+    if (!file) return;
+    statusText.textContent = 'Uploading photo…';
+    spinner.hidden = false;
+    try {
+      const { path, url } = await uploadImage(file, {
+        pathFor: (_hash, ext) => `about/portrait.${ext}`,
+        upsert: true,
+      });
+      portraitPath.value = path;
+      // Cache-buster: the path is stable, so the browser would show the old one.
+      portraitPreview.src = `${url}?v=${Date.now()}`;
+      portraitPreview.classList.remove('hidden');
+      portraitPlaceholder.classList.add('hidden');
+      portraitRemove.classList.remove('hidden');
+      markDirty();
+    } catch (e) {
+      showError(formatActionError(e));
+    } finally {
+      spinner.hidden = true;
+      portraitInput.value = '';
+    }
+  });
+
+  portraitRemove.addEventListener('click', () => {
+    portraitPath.value = '';
+    portraitPreview.src = '';
+    portraitPreview.classList.add('hidden');
+    portraitPlaceholder.classList.remove('hidden');
+    portraitRemove.classList.add('hidden');
+    markDirty();
+  });
+
+  // ---- save ----
+  function showError(msg: string) {
+    errorBox.textContent = msg;
+    errorBox.hidden = false;
+    spinner.hidden = true;
+    statusText.textContent = 'Save failed';
+    statusText.classList.remove('text-warning');
+    statusText.classList.add('text-error');
+  }
+
+  saveBtn.addEventListener('click', async () => {
+    errorBox.hidden = true;
+    spinner.hidden = false;
+    statusText.textContent = 'Saving…';
+    statusText.classList.remove('text-warning', 'text-error');
+
+    const content = {
+      me: {
+        portrait: portraitPath.value || null,
+        portrait_caption: val('f-portrait-caption'),
+        body: meEditor.getMarkdown(),
+      },
+      site: {
+        body: siteEditor.getMarkdown(),
+        name: {
+          blurb: blurbEditor.getMarkdown().trim(),
+          spotify_url: val('f-spotify'),
+        },
+      },
+      contact: {
+        intro: introEditor.getMarkdown().trim(),
+      },
+    };
+
+    // ⚠ THE CATCH IS THE POINT, and it is a little galling that this file's own
+    // fifteen-line header is about silent-save hazards. `astro:actions` THROWS on
+    // a dead network rather than returning `{ error }`, so before 2026-08-08 an
+    // offline save left **"Saving…" with a live spinner on screen forever** —
+    // and About is the one room with no autosave, so nothing else was ever going
+    // to come along and correct it.
+    //
+    // NOT `reusable`: on success Save SHOULD stay disabled, because there is
+    // nothing left to save. `markDirty` is what brings it back, and the next edit
+    // is exactly when it should return. On failure `submitAction` restores it, so
+    // a retry no longer requires typing a character first.
+    const res = await submitAction(() => actions.pages.save({ slug: 'about', content }), {
+      button: saveBtn,
+      onError: showError,
+    });
+    spinner.hidden = true;
+    if (!res.ok) return;
+    dirty = false;
+    statusText.textContent = 'Saved ' + nowTime();
+    statusText.classList.remove('text-warning', 'text-error');
+  });
+
+  /*
   ⌘/Ctrl+S SAVES (plan 42 · §4.C.3).
 
   ⚠ THE ADMIN HAD EXACTLY ONE KEYBOARD SAVE AND IT WAS ON THE WRONG SURFACE.
@@ -236,20 +255,21 @@ saveBtn.addEventListener('click', async () => {
   the browser's Save-page dialog is never what ⌘S meant, and offering it on a
   clean form would teach you to expect it.
 */
-document.addEventListener('keydown', (e) => {
-  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's' || e.altKey) return;
-  e.preventDefault();
-  // The button owns "is there anything to save" — it is disabled while clean,
-  // and re-disabled by the save itself. Reading it rather than `dirty` keeps
-  // one answer to that question instead of two that can disagree.
-  if (!saveBtn.disabled) saveBtn.click();
-});
-
-// warn on navigating away with unsaved edits
-window.addEventListener('beforeunload', (e) => {
-  if (dirty) {
-    // `preventDefault()` alone triggers the prompt; the legacy `returnValue`
-    // spelling (Chrome/Edge < 119) is deprecated. See writing-sheet.ts.
+  page.on(document, 'keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's' || e.altKey) return;
     e.preventDefault();
-  }
+    // The button owns "is there anything to save" — it is disabled while clean,
+    // and re-disabled by the save itself. Reading it rather than `dirty` keeps
+    // one answer to that question instead of two that can disagree.
+    if (!saveBtn.disabled) saveBtn.click();
+  });
+
+  // warn on navigating away with unsaved edits
+  page.on(window, 'beforeunload', (e) => {
+    if (dirty) {
+      // `preventDefault()` alone triggers the prompt; the legacy `returnValue`
+      // spelling (Chrome/Edge < 119) is deprecated. See writing-sheet.ts.
+      e.preventDefault();
+    }
+  });
 });

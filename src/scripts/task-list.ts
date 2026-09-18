@@ -17,96 +17,107 @@
 import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
 import { signalAttention } from './attention';
+import { onPage } from './page';
 
 // ⚠ EVERY LIST, NOT THE FIRST ONE. The tasks room has exactly one and this was a
 // `querySelector` for a day; Today has three — the day itself, Coming up and
 // past due — and binding only the first would have left two zones of dead
 // controls that look identical to live ones. Found by counting the lists on the
 // page rather than by pressing one.
-const lists = Array.from(document.querySelectorAll<HTMLElement>('[data-task-list]'));
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage(() => {
+  const lists = Array.from(document.querySelectorAll<HTMLElement>('[data-task-list]'));
 
-for (const list of lists) {
-  const errorEl = document.querySelector<HTMLElement>('[data-task-error]');
+  for (const list of lists) {
+    const errorEl = document.querySelector<HTMLElement>('[data-task-error]');
 
-  const show = (msg: string | null) => {
-    if (!errorEl) return;
-    errorEl.textContent = msg ?? '';
-    errorEl.hidden = !msg;
-  };
+    const show = (msg: string | null) => {
+      if (!errorEl) return;
+      errorEl.textContent = msg ?? '';
+      errorEl.hidden = !msg;
+    };
 
-  /** Every control on the row, so an in-flight answer cannot be double-sent. */
-  const controls = (row: HTMLElement) => Array.from(row.querySelectorAll<HTMLButtonElement>('.tick, .chip--act'));
+    /** Every control on the row, so an in-flight answer cannot be double-sent. */
+    const controls = (row: HTMLElement) => Array.from(row.querySelectorAll<HTMLButtonElement>('.tick, .chip--act'));
 
-  /**
-   * `1 of 2 done`, kept true after a tick.
-   *
-   * ⚠ IT COUNTS WHAT YOU DID AND NOTHING ELSE. Zero renders as no line at all
-   * rather than as `0 of 3 done` — the same rule `progressLabel` keeps on the
-   * server, restated here because a client that disagreed with it would put the
-   * arrears count back on the page the moment you undid something.
-   *
-   * A SKIP IS NOT PROGRESS. It is a recorded answer, not a completion, so it
-   * moves the row out of the unanswered state without moving this number.
-   */
-  const repaint = () => {
-    const el =
-      list.querySelector<HTMLElement>('[data-progress]') ??
-      list.closest('.zone')?.querySelector<HTMLElement>('[data-progress]');
-    const total = Number(list.dataset.progressTotal ?? 0);
-    if (!el || !total) return;
-    const done = list.querySelectorAll('.task--done').length;
-    el.textContent = done > 0 ? `${done} of ${total} done` : '';
-    el.hidden = done === 0;
-  };
+    /**
+     * `1 of 2 done`, kept true after a tick.
+     *
+     * ⚠ IT COUNTS WHAT YOU DID AND NOTHING ELSE. Zero renders as no line at all
+     * rather than as `0 of 3 done` — the same rule `progressLabel` keeps on the
+     * server, restated here because a client that disagreed with it would put the
+     * arrears count back on the page the moment you undid something.
+     *
+     * A SKIP IS NOT PROGRESS. It is a recorded answer, not a completion, so it
+     * moves the row out of the unanswered state without moving this number.
+     */
+    const repaint = () => {
+      const el =
+        list.querySelector<HTMLElement>('[data-progress]') ??
+        list.closest('.zone')?.querySelector<HTMLElement>('[data-progress]');
+      const total = Number(list.dataset.progressTotal ?? 0);
+      if (!el || !total) return;
+      const done = list.querySelectorAll('.task--done').length;
+      el.textContent = done > 0 ? `${done} of ${total} done` : '';
+      el.hidden = done === 0;
+    };
 
-  list.addEventListener('click', async (e) => {
-    const btn = (e.target as Element).closest<HTMLButtonElement>('[data-dispose], [data-undo]');
-    if (!btn) return;
-    const row = btn.closest<HTMLElement>('[data-task]');
-    if (!row) return;
+    list.addEventListener('click', async (e) => {
+      const btn = (e.target as Element).closest<HTMLButtonElement>('[data-dispose], [data-undo]');
+      if (!btn) return;
+      const row = btn.closest<HTMLElement>('[data-task]');
+      if (!row) return;
 
-    const id = row.dataset.id!;
-    const undoing = btn.hasAttribute('data-undo');
-    const outcome = (btn.dataset.dispose ?? 'done') as 'done' | 'skipped';
-    show(null);
+      const id = row.dataset.id!;
+      const undoing = btn.hasAttribute('data-undo');
+      const outcome = (btn.dataset.dispose ?? 'done') as 'done' | 'skipped';
+      show(null);
 
-    const buttons = controls(row);
-    buttons.forEach((b) => (b.disabled = true));
+      const buttons = controls(row);
+      buttons.forEach((b) => (b.disabled = true));
 
-    try {
-      const { error } = undoing ? await actions.tasks.undo({ id }) : await actions.tasks.dispose({ id, outcome });
-      if (error) throw new Error(error.message);
+      try {
+        const { error } = undoing ? await actions.tasks.undo({ id }) : await actions.tasks.dispose({ id, outcome });
+        if (error) throw new Error(error.message);
 
-      // The row's own record of what it is now. `data-undo` is what the next
-      // click reads, so flipping it here is what makes the same control undo.
-      row.classList.toggle('task--done', !undoing && outcome === 'done');
-      row.classList.toggle('task--skipped', !undoing && outcome === 'skipped');
-      const tick = row.querySelector<HTMLButtonElement>('.tick');
-      if (tick) {
-        if (undoing) tick.setAttribute('data-dispose', 'done');
-        else tick.removeAttribute('data-dispose');
-        tick.toggleAttribute('data-undo', !undoing);
+        // The row's own record of what it is now. `data-undo` is what the next
+        // click reads, so flipping it here is what makes the same control undo.
+        row.classList.toggle('task--done', !undoing && outcome === 'done');
+        row.classList.toggle('task--skipped', !undoing && outcome === 'skipped');
+        const tick = row.querySelector<HTMLButtonElement>('.tick');
+        if (tick) {
+          if (undoing) tick.setAttribute('data-dispose', 'done');
+          else tick.removeAttribute('data-dispose');
+          tick.toggleAttribute('data-undo', !undoing);
+        }
+        // On a past-due row the two chips ARE the question, so once it is
+        // answered they become the way back — one control, not two.
+        row.querySelectorAll<HTMLElement>('[data-answered]').forEach((el) => (el.hidden = !undoing));
+        row.querySelectorAll<HTMLElement>('[data-unanswered]').forEach((el) => (el.hidden = undoing));
+        repaint();
+
+        // The sidebar pill, the burger pill and the window title (20 · §7). This
+        // says only WHAT HAPPENED — the occurrence this row stands on is answered,
+        // or is not any more; `scripts/attention.ts` decides whether that is a day
+        // the badge counts. Deliberately not decided here: a past-due row is
+        // tickable and was never counted, and two files answering "does this
+        // count?" is how they come to disagree.
+        signalAttention({ kind: 'task', on: row.dataset.dueOn ?? null, answered: !undoing });
+      } catch (err) {
+        // ⚠ `astro:actions` THROWS on a dead network rather than returning
+        // `{ error }`. Without this the row would sit there with dead controls
+        // and a tick that never happened — the swallowed-save shape.
+        show(formatActionError(err));
+      } finally {
+        buttons.forEach((b) => (b.disabled = false));
       }
-      // On a past-due row the two chips ARE the question, so once it is
-      // answered they become the way back — one control, not two.
-      row.querySelectorAll<HTMLElement>('[data-answered]').forEach((el) => (el.hidden = !undoing));
-      row.querySelectorAll<HTMLElement>('[data-unanswered]').forEach((el) => (el.hidden = undoing));
-      repaint();
-
-      // The sidebar pill, the burger pill and the window title (20 · §7). This
-      // says only WHAT HAPPENED — the occurrence this row stands on is answered,
-      // or is not any more; `scripts/attention.ts` decides whether that is a day
-      // the badge counts. Deliberately not decided here: a past-due row is
-      // tickable and was never counted, and two files answering "does this
-      // count?" is how they come to disagree.
-      signalAttention({ kind: 'task', on: row.dataset.dueOn ?? null, answered: !undoing });
-    } catch (err) {
-      // ⚠ `astro:actions` THROWS on a dead network rather than returning
-      // `{ error }`. Without this the row would sit there with dead controls
-      // and a tick that never happened — the swallowed-save shape.
-      show(formatActionError(err));
-    } finally {
-      buttons.forEach((b) => (b.disabled = false));
-    }
-  });
-}
+    });
+  }
+});

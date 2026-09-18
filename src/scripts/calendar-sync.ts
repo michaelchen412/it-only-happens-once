@@ -12,6 +12,7 @@
 // network costs nothing but freshness, which is the failure mode ADR-0014
 // accepts in exchange for having no reconciliation to do.
 import { actions } from 'astro:actions';
+import { onPage } from './page';
 
 /**
  * ⚠ A FAILURE NEVER RELOADS, AND THAT IS WHAT MAKES THIS LOOP-PROOF.
@@ -38,37 +39,47 @@ import { actions } from 'astro:actions';
  * claim, so the next visit is throttled out with no error of its own — and the
  * line it would erase is the true one saying Google couldn't be reached.
  */
-const run = async () => {
-  try {
-    const { data, error } = await actions.calendar.sync({});
-    if (error || !data) return;
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage(() => {
+  const run = async () => {
+    try {
+      const { data, error } = await actions.calendar.sync({});
+      if (error || !data) return;
 
-    // Not configured answers `skipped` too, so it is covered here: a mirror
-    // nobody set up has nothing to be fresh about.
-    if (!data.skipped && !data.error) {
-      // Today and the Agenda room mark the line identically, so one selector
-      // serves both and neither page needs to know this script exists.
-      document.querySelectorAll('[data-stale]').forEach((el) => el.remove());
+      // Not configured answers `skipped` too, so it is covered here: a mirror
+      // nobody set up has nothing to be fresh about.
+      if (!data.skipped && !data.error) {
+        // Today and the Agenda room mark the line identically, so one selector
+        // serves both and neither page needs to know this script exists.
+        document.querySelectorAll('[data-stale]').forEach((el) => el.remove());
+      }
+
+      if (data.changed === 0) return;
+
+      // Never yank the page out from under an open editor. The sheet holds
+      // unsaved input, and a mirrored row appearing is not worth losing it — the
+      // next navigation will pick the change up anyway.
+      if (document.querySelector('dialog[open]')) return;
+      location.reload();
+    } catch {
+      // `astro:actions` throws on a dead network rather than returning `{ error }`.
+      // There is nothing to say about it here: the page already rendered.
     }
+  };
 
-    if (data.changed === 0) return;
-
-    // Never yank the page out from under an open editor. The sheet holds
-    // unsaved input, and a mirrored row appearing is not worth losing it — the
-    // next navigation will pick the change up anyway.
-    if (document.querySelector('dialog[open]')) return;
-    location.reload();
-  } catch {
-    // `astro:actions` throws on a dead network rather than returning `{ error }`.
-    // There is nothing to say about it here: the page already rendered.
+  // `requestIdleCallback` where it exists — this is the least urgent thing on the
+  // page, and on a phone at 7am it must not compete with the check-in's first
+  // paint. Safari has no such thing, hence the timeout.
+  if ('requestIdleCallback' in window) {
+    (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(run);
+  } else {
+    setTimeout(run, 400);
   }
-};
-
-// `requestIdleCallback` where it exists — this is the least urgent thing on the
-// page, and on a phone at 7am it must not compete with the check-in's first
-// paint. Safari has no such thing, hence the timeout.
-if ('requestIdleCallback' in window) {
-  (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(run);
-} else {
-  setTimeout(run, 400);
-}
+});

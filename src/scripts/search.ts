@@ -13,104 +13,115 @@ import { MIN_SEARCH } from '../lib/search-highlight';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { unlockScroll } from './scroll-lock';
+import { onPage } from './page';
 
 const PARTIAL = '/admin/search-panel';
 
-const sheet = document.getElementById('search-sheet') as HTMLDialogElement | null;
-const input = document.querySelector<HTMLInputElement>('[data-search-input]');
-const results = document.querySelector<HTMLElement>('[data-search-results]');
+/*
+  ⚠ THE WHOLE SHEET IS RE-FOUND ON EVERY ARRIVAL. `SearchSheet` is mounted by
+  `AdminLayout`, so these three elements are swapped out from under this module
+  on every client-side navigation — and the module has already run, so nothing
+  would look for them again. The ⌕ would answer in the room you loaded and be
+  dead in every room you walked to, which is most of them.
 
-/* ── the fetch ──────────────────────────────────────────────────────────── */
+  `PARTIAL` stays outside: it is a constant, not a piece of the page.
+*/
+onPage((page) => {
+  const sheet = document.getElementById('search-sheet') as HTMLDialogElement | null;
+  const input = document.querySelector<HTMLInputElement>('[data-search-input]');
+  const results = document.querySelector<HTMLElement>('[data-search-results]');
 
-/**
- * ⚠ THE TOKEN GUARD, WHICH IS NOT OPTIONAL HERE. Twelve queries stand behind
- * every request, so responses genuinely can land out of order — a short broad
- * term fired first can return AFTER the longer one that replaced it, leaving
- * results for a word you had already finished deleting. `blog-feed.ts` carries
- * the same guard for the same reason.
- */
-let token = 0;
+  /* ── the fetch ──────────────────────────────────────────────────────────── */
 
-async function run(term: string) {
-  if (!results) return;
-  const mine = ++token;
-  try {
-    const res = await fetch(`${PARTIAL}?q=${encodeURIComponent(term)}`, {
-      headers: { 'X-Requested-With': 'fetch' },
-    });
-    if (!res.ok || mine !== token) return;
-    const html = await res.text();
-    if (mine !== token) return; // a newer keystroke won while we awaited the body
-    results.innerHTML = html;
-  } catch {
-    // A dead network leaves the previous list standing rather than blanking it
-    // — the same thing the Fragment Manager does, and for the same reason: the
-    // last good answer is more use than an empty box.
+  /**
+   * ⚠ THE TOKEN GUARD, WHICH IS NOT OPTIONAL HERE. Twelve queries stand behind
+   * every request, so responses genuinely can land out of order — a short broad
+   * term fired first can return AFTER the longer one that replaced it, leaving
+   * results for a word you had already finished deleting. `blog-feed.ts` carries
+   * the same guard for the same reason.
+   */
+  let token = 0;
+
+  async function run(term: string) {
+    if (!results) return;
+    const mine = ++token;
+    try {
+      const res = await fetch(`${PARTIAL}?q=${encodeURIComponent(term)}`, {
+        headers: { 'X-Requested-With': 'fetch' },
+      });
+      if (!res.ok || mine !== token) return;
+      const html = await res.text();
+      if (mine !== token) return; // a newer keystroke won while we awaited the body
+      results.innerHTML = html;
+    } catch {
+      // A dead network leaves the previous list standing rather than blanking it
+      // — the same thing the Fragment Manager does, and for the same reason: the
+      // last good answer is more use than an empty box.
+    }
   }
-}
 
-/* ── the gate, and the debounce ─────────────────────────────────────────── */
+  /* ── the gate, and the debounce ─────────────────────────────────────────── */
 
-/* The comparison every shipped client makes (docs/search.md §3): below
+  /* The comparison every shipped client makes (docs/search.md §3): below
    MIN_SEARCH the term is dropped entirely, so typing or clearing a single
    letter costs no request at all. One constant, four enforcement sites. */
-const effective = (raw: string) => (raw.trim().length >= MIN_SEARCH ? raw.trim() : '');
+  const effective = (raw: string) => (raw.trim().length >= MIN_SEARCH ? raw.trim() : '');
 
-let last: string | null = null;
-let timer = 0;
+  let last: string | null = null;
+  let timer = 0;
 
-input?.addEventListener('input', () => {
-  clearTimeout(timer);
-  timer = window.setTimeout(() => {
-    const next = effective(input.value);
-    if (next === last) return; // nothing the server would do differently
-    last = next;
-    run(next);
-  }, 260);
-});
+  input?.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const next = effective(input.value);
+      if (next === last) return; // nothing the server would do differently
+      last = next;
+      run(next);
+    }, 260);
+  });
 
-/* ── opening and closing ────────────────────────────────────────────────── */
+  /* ── opening and closing ────────────────────────────────────────────────── */
 
-function open() {
-  if (!sheet) return;
-  openDialog(sheet);
-  // Caret to the end, not to 0 — reopening onto a live term must not make you
-  // retype it.
-  input?.focus();
-  input?.setSelectionRange(input.value.length, input.value.length);
-}
+  function open() {
+    if (!sheet) return;
+    openDialog(sheet);
+    // Caret to the end, not to 0 — reopening onto a live term must not make you
+    // retype it.
+    input?.focus();
+    input?.setSelectionRange(input.value.length, input.value.length);
+  }
 
-/**
- * ⚠ `closeWithExit`, NEVER `sheet.close()` — and a unit test enforces it.
- * `close()` drops a dialog out of the top layer in the same frame, and the
- * `overlay` property that would defer that is Chromium-only; on every iOS
- * browser the 0.28s slide would never render at all. The helper keeps the sheet
- * genuinely open for the length of its transition instead.
- *
- * ⚠ Dismissing costs NOTHING here, which is the answer ADR 0032 demands of every
- * sheet: this surface holds nothing unsaved — the results are a cache of a
- * query. So there is no guard, and closing is unconditional.
- */
-async function close() {
-  if (sheet?.open) await closeWithExit(sheet);
-}
+  /**
+   * ⚠ `closeWithExit`, NEVER `sheet.close()` — and a unit test enforces it.
+   * `close()` drops a dialog out of the top layer in the same frame, and the
+   * `overlay` property that would defer that is Chromium-only; on every iOS
+   * browser the 0.28s slide would never render at all. The helper keeps the sheet
+   * genuinely open for the length of its transition instead.
+   *
+   * ⚠ Dismissing costs NOTHING here, which is the answer ADR 0032 demands of every
+   * sheet: this surface holds nothing unsaved — the results are a cache of a
+   * query. So there is no guard, and closing is unconditional.
+   */
+  async function close() {
+    if (sheet?.open) await closeWithExit(sheet);
+  }
 
-if (sheet) {
-  /* ⚠ THE `close` EVENT RATHER THAN OUR OWN EXIT PATH, for the reason
+  if (sheet) {
+    /* ⚠ THE `close` EVENT RATHER THAN OUR OWN EXIT PATH, for the reason
      dialog-close.ts writes out at length: Chromium's close watcher can shut a
      dialog past every handler we installed, and a lock released only on our own
      path leaks — leaving a page that will not scroll and no dialog to close. */
-  sheet.addEventListener('close', () => unlockScroll(sheet));
-  /* All three ways out through one call (ADR 0032): the ✕, Escape, and a press
+    sheet.addEventListener('close', () => unlockScroll(sheet));
+    /* All three ways out through one call (ADR 0032): the ✕, Escape, and a press
      on the backdrop. ⚠ Escape has to be INTERCEPTED rather than observed, which
      is the half a hand-rolled listener always misses — `wireSheetDismiss` owns
      it. */
-  wireSheetDismiss(sheet, close);
-}
+    wireSheetDismiss(sheet, close);
+  }
 
-document.querySelectorAll('[data-search-open]').forEach((b) => b.addEventListener('click', open));
+  document.querySelectorAll('[data-search-open]').forEach((b) => b.addEventListener('click', open));
 
-/*
+  /*
   ⚠ ESCAPE HAS TO BE TAKEN OFF THE FIELD, AND `capture.ts` ALREADY HIT THIS WITH
   A DIFFERENT SWALLOWER. Its comment: *"A `<dialog>` turns Escape into a close
   request only if the keydown's default survives"* — there ProseMirror
@@ -132,20 +143,25 @@ document.querySelectorAll('[data-search-open]').forEach((b) => b.addEventListene
   paths mutually exclusive, so the native `cancel` does not run a second close on
   top of this one.
 */
-input?.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  e.preventDefault();
-  void close();
-});
+  input?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    void close();
+  });
 
-/*
+  /*
   ⌘K / Ctrl-K. ⚠ The shortcut is the DESKTOP affordance's other half, not its
   replacement: a 20px glyph cannot carry a hint, so the sidebar trigger's
   `title` says so and this makes it true. A phone has neither, which is why the
   top bar's ⌕ is the one that must always be visible.
 */
-addEventListener('keydown', (e) => {
-  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k' || e.altKey) return;
-  e.preventDefault();
-  sheet?.open ? void close() : open();
+  // ⚠ `page.on(window, …)` — a bare `addEventListener` here is `window`, which
+  // SURVIVES the swap, so this would be a second ⌘K handler after every
+  // navigation: two toggles per press, landing closed.
+  page.on(window, 'keydown', (e) => {
+    const k = e as KeyboardEvent;
+    if (!(k.metaKey || k.ctrlKey) || k.key.toLowerCase() !== 'k' || k.altKey) return;
+    k.preventDefault();
+    sheet?.open ? void close() : open();
+  });
 });

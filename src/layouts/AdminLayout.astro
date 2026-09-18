@@ -107,7 +107,22 @@ const nav = [
 ] as const;
 ---
 
-<Base title={`${prefix}${title} — Observatory`}>
+{
+  /*
+    ⚠⚠ `transitions` IS LOAD-BEARING FOR EVERY SCRIPT IN THE OBSERVATORY, which
+    is not obvious from the word and is why it is written here (ADR 0043).
+
+    It mounts `<ClientRouter />`, and `<ClientRouter />` is what makes
+    `astro:page-load` fire. Every admin script now boots through `onPage`, which
+    listens for exactly that event — so removing this prop does not merely turn
+    off client-side navigation, it stops **every** admin script from ever
+    running. Not a degraded building: an inert one, with no error anywhere.
+
+    The e2e guard is `tests/e2e/walk.spec.ts`, which would fail on the first
+    control it pressed.
+  */
+}
+<Base title={`${prefix}${title} — Observatory`} transitions>
   {
     /* The Observatory installs to the home screen (docs/admin.md §9): its own
       icon, its own window, opening straight into /admin rather than the
@@ -162,10 +177,17 @@ const nav = [
     Skip to content
   </a>
   {
-    /* THE CLICK LANDS FIRST (24 · Piece 1). Every navigation in here is a full
-      document load — no `<ClientRouter />` — so until this existed, pressing a
+    /* THE CLICK LANDS FIRST (24 · Piece 1). Until this existed, pressing a
       sidebar row was answered by nothing at all except the browser's tab
       spinner, which a phone hides behind a collapsed URL bar.
+
+      ⚠ AND IT STILL EARNS ITS PLACE UNDER THE ROUTER, which this comment used
+      to say was absent ("every navigation in here is a full document load — no
+      `<ClientRouter />`"). `<ClientRouter />` went on for the Observatory on
+      2026-09-18 (plan 24 · §9, `scripts/page.ts`). A swap is faster than a
+      document load and is still not instant — it fetches the next page first —
+      so the frame between the press and the arrival is exactly as empty as it
+      was, and this is still what fills it.
 
       Rendered here, always, and revealed by `nav-progress.ts` — the same shape
       `#day-turn` below uses, and for the same reason: a script that has to
@@ -245,6 +267,30 @@ const nav = [
         </button>
       </div>
 
+      {
+        /* ⚠ NOTHING IN THIS SIDEBAR PREFETCHES, AND IT IS CORRECTNESS RATHER THAN
+      THRIFT. `<ClientRouter />` turns prefetching on by itself — Astro sets
+      `prefetchAll: true` from inside it — with `hover` as the strategy. Every
+      admin response carries `Cache-Control: no-store` (middleware.ts), and a
+      `no-store` response MAY NOT BE STORED: the prefetch is thrown away and the
+      real navigation fetches the page again.
+
+      So hovering a row bought nothing and cost a full SSR render plus its
+      Supabase queries, every time the pointer crossed one. It also aborted
+      `page.goto` in the a11y spec, which is how it was noticed.
+
+      ⚠ HERE RATHER THAN `prefetch.prefetchAll: false` IN THE CONFIG, which is
+      the tidier-looking change and loses for the reason `index.astro` gives
+      about `defaultStrategy`: that setting is site-WIDE, and the public side
+      genuinely benefits from hover prefetch because its pages are cacheable.
+      This is a rule about the admin, written where the admin links are.
+
+      ⚠ AND THE ATTRIBUTE BELOW CARRIES NO COMMENT BESIDE IT. An Astro comment
+      in an attribute list does not parse, and the error it throws points at the
+      closing anchor tag thirty lines down — the same misdirection the
+      `data-nav-row` note warns about for apostrophes. The argument lives here
+      instead. */
+      }
       <nav class="flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
         {
           nav.map((item) => (
@@ -262,6 +308,7 @@ const nav = [
                   error it throws points at the `</a>` thirty lines below. */}
               <a
                 href={item.href}
+                data-astro-prefetch="false"
                 id={item.key === 'today' ? 'nav-today' : undefined}
                 aria-current={active === item.key ? 'page' : undefined}
                 aria-label={item.key === 'today' ? attentionLabel(total) : undefined}

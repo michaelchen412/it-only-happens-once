@@ -5,6 +5,7 @@ import { deleteWarning } from '../lib/library-delete';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { wireFilterFields } from './filter-field';
+import { onPage } from './page';
 
 const A: Record<string, any> = {
   subject: actions.subjects,
@@ -24,14 +25,25 @@ const A: Record<string, any> = {
   shelf: { update: actions.shelves.rename, remove: actions.shelves.remove },
 };
 
-const err = document.getElementById('lib-error') as HTMLParagraphElement;
-const showErr = (m: string) => {
-  err.textContent = m;
-  err.hidden = false;
-  err.scrollIntoView({ block: 'nearest' });
-};
+/*
+  ⚠ EVERY ARRIVAL (plan 24 · §9). This room binds Save, Merge… and Delete to
+  ~100 live rows, and under `<ClientRouter />` none of it re-runs on a second
+  visit — so a Delete you press after walking back in does nothing at all. That
+  is the worst shape a dead listener can take on a destructive control: "nothing
+  happened" is indistinguishable from "it was safe", and the next press is
+  harder, not easier.
 
-/* ⚠ THIS PAGE PUTS ~100 LIVE `<input>`s ON SCREEN AT ONCE and every write
+  `A` stays outside — it is a table of actions, not a piece of the page.
+*/
+onPage((page) => {
+  const err = document.getElementById('lib-error') as HTMLParagraphElement;
+  const showErr = (m: string) => {
+    err.textContent = m;
+    err.hidden = false;
+    err.scrollIntoView({ block: 'nearest' });
+  };
+
+  /* ⚠ THIS PAGE PUTS ~100 LIVE `<input>`s ON SCREEN AT ONCE and every write
    below ends in `location.reload()`. Until 2026-08-12 that meant: correct
    three subject definitions, press Save on the first, and the other two were
    gone — nothing asked, nothing said. [ADR
@@ -54,14 +66,17 @@ const showErr = (m: string) => {
    edits" that do not exist, which teaches you to click through the guard.
    The set that can be dirty is exactly the set `.lib-save` puts in the
    FormData below: `[data-field]`. */
-const markDirty = (e: Event) => {
-  const el = (e.target as Element)?.closest?.('[data-field]');
-  el?.closest('.lib-row')?.setAttribute('data-dirty', '');
-};
-document.addEventListener('input', markDirty);
-document.addEventListener('change', markDirty);
+  const markDirty = (e: Event) => {
+    const el = (e.target as Element)?.closest?.('[data-field]');
+    el?.closest('.lib-row')?.setAttribute('data-dirty', '');
+  };
+  // `page.on`: `document` survives the swap, so plain listeners here would be a
+  // second dirty-tracker per arrival — and this one guards an unsaved-changes
+  // prompt, so duplicates mean the prompt fires for edits that were saved.
+  page.on(document, 'input', markDirty);
+  page.on(document, 'change', markDirty);
 
-/* ⚠ THE GUARD ASKS AFTER THE WRITE, NOT BEFORE IT, AND THAT ORDER IS THE
+  /* ⚠ THE GUARD ASKS AFTER THE WRITE, NOT BEFORE IT, AND THAT ORDER IS THE
    WHOLE DESIGN. Asking first can only ever inform you — whichever row you
    then save still reloads the page and still discards the rest, so a
    warn-before is a dialog that makes you choose which two edits to lose.
@@ -79,29 +94,29 @@ document.addEventListener('change', markDirty);
    pins the current meaning (fill one field, press that row's Save, expect
    that row's write). Warn is one predicate and closes the data loss today;
    save-all is a shape decision and Michael's to take. */
-async function reloadUnless(mine: HTMLElement) {
-  const others = [...document.querySelectorAll<HTMLElement>('.lib-row[data-dirty]')].filter((r) => r !== mine);
-  if (others.length) {
-    const ok = await confirmDialog({
-      title: 'Saved',
-      message:
-        others.length === 1
-          ? 'One other row has edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save that row too.'
-          : `${others.length} other rows have edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save those rows too.`,
-      confirmLabel: 'Refresh anyway',
-      danger: true,
-    });
-    if (!ok) return;
+  async function reloadUnless(mine: HTMLElement) {
+    const others = [...document.querySelectorAll<HTMLElement>('.lib-row[data-dirty]')].filter((r) => r !== mine);
+    if (others.length) {
+      const ok = await confirmDialog({
+        title: 'Saved',
+        message:
+          others.length === 1
+            ? 'One other row has edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save that row too.'
+            : `${others.length} other rows have edits you haven’t saved. Refreshing the table now would discard them — cancel to keep editing and save those rows too.`,
+        confirmLabel: 'Refresh anyway',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    location.reload();
   }
-  location.reload();
-}
 
-document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
-  const entity = row.dataset.entity!;
-  const id = row.dataset.id!;
-  const api = A[entity];
+  document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
+    const entity = row.dataset.entity!;
+    const id = row.dataset.id!;
+    const api = A[entity];
 
-  /* ⚠ `submitAction`, NOT A BARE AWAIT — and the reason this file went four
+    /* ⚠ `submitAction`, NOT A BARE AWAIT — and the reason this file went four
      years' worth of audits without it is written into
      `src/tests/action-guard.test.ts:21-24`, which names its own blind spots.
      The first is "an action awaited through an alias", and `A[entity]` above
@@ -126,50 +141,50 @@ document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
 
      ⚠ DO NOT DELETE THESE AS REDUNDANT. `action-guard.test.ts` will stay
      green if you do; it cannot see this file. */
-  row.querySelector('.lib-save')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement;
-    const fd = new FormData();
-    fd.set('id', id);
-    row
-      .querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]')
-      .forEach((el) => fd.set(el.dataset.field!, el.value));
-    const res = await submitAction(() => api.update(fd), { button: btn, onError: showErr });
-    if (res.ok) await reloadUnless(row);
+    row.querySelector('.lib-save')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const fd = new FormData();
+      fd.set('id', id);
+      row
+        .querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]')
+        .forEach((el) => fd.set(el.dataset.field!, el.value));
+      const res = await submitAction(() => api.update(fd), { button: btn, onError: showErr });
+      if (res.ok) await reloadUnless(row);
+    });
+
+    row.querySelector('.lib-delete')?.addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: 'Delete',
+        // The counts are rendered onto the row above; this reads them back
+        // rather than re-querying, so the number in the dialog is exactly the
+        // number in the "Used" column beside the button you pressed.
+        message: deleteWarning({
+          entity: row.dataset.entity as 'subject' | 'author' | 'work' | 'shelf',
+          name: row.dataset.name,
+          uses: Number(row.dataset.uses ?? 0),
+          shelves: Number(row.dataset.shelves ?? 0),
+          shelfNotes: Number(row.dataset.shelfNotes ?? 0),
+          ownNote: !!row.dataset.ownNote,
+        }),
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      const fd = new FormData();
+      fd.set('id', id);
+      // `submitAction` for the same reason as Save above — the alias hides
+      // this await from the tripwire, and a delete that silently does nothing
+      // after you have answered a destructive confirm is the worst of the
+      // three to leave unguarded.
+      const res = await submitAction(() => api.remove(fd), {
+        button: row.querySelector<HTMLButtonElement>('.lib-delete'),
+        onError: showErr,
+      });
+      if (res.ok) await reloadUnless(row);
+    });
   });
 
-  row.querySelector('.lib-delete')?.addEventListener('click', async () => {
-    const ok = await confirmDialog({
-      title: 'Delete',
-      // The counts are rendered onto the row above; this reads them back
-      // rather than re-querying, so the number in the dialog is exactly the
-      // number in the "Used" column beside the button you pressed.
-      message: deleteWarning({
-        entity: row.dataset.entity as 'subject' | 'author' | 'work' | 'shelf',
-        name: row.dataset.name,
-        uses: Number(row.dataset.uses ?? 0),
-        shelves: Number(row.dataset.shelves ?? 0),
-        shelfNotes: Number(row.dataset.shelfNotes ?? 0),
-        ownNote: !!row.dataset.ownNote,
-      }),
-      confirmLabel: 'Delete',
-      danger: true,
-    });
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set('id', id);
-    // `submitAction` for the same reason as Save above — the alias hides
-    // this await from the tripwire, and a delete that silently does nothing
-    // after you have answered a destructive confirm is the worst of the
-    // three to leave unguarded.
-    const res = await submitAction(() => api.remove(fd), {
-      button: row.querySelector<HTMLButtonElement>('.lib-delete'),
-      onError: showErr,
-    });
-    if (res.ok) await reloadUnless(row);
-  });
-});
-
-/* ══ MERGE — a BUTTON and a picker, not a `<select>` (plan 38 · §1.2) ═══════
+  /* ══ MERGE — a BUTTON and a picker, not a `<select>` (plan 38 · §1.2) ═══════
    ⚠ THE OLD CONTROL FIRED ON ARROW-KEY. The merge hung on a `<select>`'s
    `change` event, so tabbing to "Merge into…" and pressing ↓ changed the value,
    fired `change`, and opened a confirm proposing to merge the row you were
@@ -189,54 +204,54 @@ document.querySelectorAll<HTMLElement>('.lib-row').forEach((row) => {
    vocabulary, so the same list serves every row and the cost is linear. Three
    plans wanted this control replaced; it waited for `VocabTable` so it could be
    built once instead of four times. */
-const mergeOptions: Record<string, { id: string; name: string }[]> = JSON.parse(
-  document.getElementById('merge-options')?.textContent || '{}',
-);
-const mergeDialog = document.getElementById('merge-dialog') as HTMLDialogElement | null;
-const mergeQ = document.getElementById('merge-q') as HTMLInputElement | null;
-const mergeList = document.getElementById('merge-list');
-const mergeLede = document.getElementById('merge-lede');
-const mergeEmpty = document.getElementById('merge-empty');
+  const mergeOptions: Record<string, { id: string; name: string }[]> = JSON.parse(
+    document.getElementById('merge-options')?.textContent || '{}',
+  );
+  const mergeDialog = document.getElementById('merge-dialog') as HTMLDialogElement | null;
+  const mergeQ = document.getElementById('merge-q') as HTMLInputElement | null;
+  const mergeList = document.getElementById('merge-list');
+  const mergeLede = document.getElementById('merge-lede');
+  const mergeEmpty = document.getElementById('merge-empty');
 
-if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
-  let source: { entity: string; id: string; name: string } | null = null;
+  if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
+    let source: { entity: string; id: string; name: string } | null = null;
 
-  const paint = () => {
-    if (!source) return;
-    const self = source;
-    const q = mergeQ.value.trim().toLowerCase();
-    const all = (mergeOptions[self.entity] ?? []).filter((o) => o.id !== self.id);
-    const hits = q ? all.filter((o) => o.name.toLowerCase().includes(q)) : all;
-    mergeEmpty.hidden = hits.length > 0;
-    mergeList.replaceChildren(
-      ...hits.map((o) => {
-        const li = document.createElement('li');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'hover:bg-base-200 w-full rounded px-2 py-1.5 text-left';
-        b.textContent = o.name;
-        b.dataset.target = o.id;
-        b.dataset.targetName = o.name;
-        li.append(b);
-        return li;
+    const paint = () => {
+      if (!source) return;
+      const self = source;
+      const q = mergeQ.value.trim().toLowerCase();
+      const all = (mergeOptions[self.entity] ?? []).filter((o) => o.id !== self.id);
+      const hits = q ? all.filter((o) => o.name.toLowerCase().includes(q)) : all;
+      mergeEmpty.hidden = hits.length > 0;
+      mergeList.replaceChildren(
+        ...hits.map((o) => {
+          const li = document.createElement('li');
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'hover:bg-base-200 w-full rounded px-2 py-1.5 text-left';
+          b.textContent = o.name;
+          b.dataset.target = o.id;
+          b.dataset.targetName = o.name;
+          li.append(b);
+          return li;
+        }),
+      );
+    };
+
+    document.querySelectorAll<HTMLElement>('[data-lib-merge]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        source = { entity: btn.dataset.entity!, id: btn.dataset.id!, name: btn.dataset.name ?? 'this one' };
+        mergeLede.textContent = `Everything filed under \u201c${source.name}\u201d moves onto the word you pick, and \u201c${source.name}\u201d is deleted.`;
+        mergeQ.value = '';
+        paint();
+        openDialog(mergeDialog);
+        mergeQ.focus();
       }),
     );
-  };
 
-  document.querySelectorAll<HTMLElement>('[data-lib-merge]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      source = { entity: btn.dataset.entity!, id: btn.dataset.id!, name: btn.dataset.name ?? 'this one' };
-      mergeLede.textContent = `Everything filed under \u201c${source.name}\u201d moves onto the word you pick, and \u201c${source.name}\u201d is deleted.`;
-      mergeQ.value = '';
-      paint();
-      openDialog(mergeDialog);
-      mergeQ.focus();
-    }),
-  );
+    mergeQ.addEventListener('input', paint);
 
-  mergeQ.addEventListener('input', paint);
-
-  /* All three exits through one door (ADR 0032), and the tripwire in
+    /* All three exits through one door (ADR 0032), and the tripwire in
      `sheet-dismiss.test.ts` is what caught this being missed — the first draft
      wired the ✕ by hand and left Escape half-native and the backdrop dead.
 
@@ -246,35 +261,36 @@ if (mergeDialog && mergeQ && mergeList && mergeLede && mergeEmpty) {
      exists to be thrown away, and a pick that does not commit anything on its
      own (it opens a confirm, which owns the destructive half). So all three
      gestures close it outright, with nothing asked. */
-  wireSheetDismiss(mergeDialog, () => void closeWithExit(mergeDialog), '[data-merge-close]');
+    wireSheetDismiss(mergeDialog, () => void closeWithExit(mergeDialog), '[data-merge-close]');
 
-  mergeList.addEventListener('click', async (e) => {
-    const hit = (e.target as Element).closest<HTMLButtonElement>('[data-target]');
-    if (!hit || !source) return;
-    const from = source;
-    const into = hit.dataset.target!;
-    const intoName = hit.dataset.targetName ?? 'it';
-    await closeWithExit(mergeDialog);
-    const ok = await confirmDialog({
-      title: 'Merge',
-      message: `Move everything from \u201c${from.name}\u201d onto \u201c${intoName}\u201d and delete \u201c${from.name}\u201d? This can\u2019t be undone.`,
-      confirmLabel: 'Merge',
-      danger: true,
+    mergeList.addEventListener('click', async (e) => {
+      const hit = (e.target as Element).closest<HTMLButtonElement>('[data-target]');
+      if (!hit || !source) return;
+      const from = source;
+      const into = hit.dataset.target!;
+      const intoName = hit.dataset.targetName ?? 'it';
+      await closeWithExit(mergeDialog);
+      const ok = await confirmDialog({
+        title: 'Merge',
+        message: `Move everything from \u201c${from.name}\u201d onto \u201c${intoName}\u201d and delete \u201c${from.name}\u201d? This can\u2019t be undone.`,
+        confirmLabel: 'Merge',
+        danger: true,
+      });
+      if (!ok) return;
+      const fd = new FormData();
+      fd.set('from', from.id);
+      fd.set('into', into);
+      const res = await submitAction(() => A[from.entity].merge(fd), { onError: showErr });
+      const row = document.querySelector<HTMLElement>(`.lib-row[data-id="${from.id}"]`);
+      if (res.ok && row) await reloadUnless(row);
     });
-    if (!ok) return;
-    const fd = new FormData();
-    fd.set('from', from.id);
-    fd.set('into', into);
-    const res = await submitAction(() => A[from.entity].merge(fd), { onError: showErr });
-    const row = document.querySelector<HTMLElement>(`.lib-row[data-id="${from.id}"]`);
-    if (res.ok && row) await reloadUnless(row);
-  });
-}
+  }
 
-// ⚠ WIRED LAST, AND IT MUST SURVIVE THE RELOAD ABOVE. Every per-row Save on this
-// page ends in `reloadUnless(row)` — a navigation, and ADR 0036 says that is
-// correct. So on the one page whose purpose is *filter to the duplicate, then
-// groom it*, the browser restores the query text across that reload while
-// `input` never fires again. `wireFilterField` re-applies from the field's own
-// value precisely so the filter you were working in is still there afterwards.
-wireFilterFields();
+  // ⚠ WIRED LAST, AND IT MUST SURVIVE THE RELOAD ABOVE. Every per-row Save on this
+  // page ends in `reloadUnless(row)` — a navigation, and ADR 0036 says that is
+  // correct. So on the one page whose purpose is *filter to the duplicate, then
+  // groom it*, the browser restores the query text across that reload while
+  // `input` never fires again. `wireFilterField` re-applies from the field's own
+  // value precisely so the filter you were working in is still there afterwards.
+  wireFilterFields();
+});

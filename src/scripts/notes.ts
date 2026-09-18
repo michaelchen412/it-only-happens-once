@@ -59,11 +59,22 @@ import type { RichEditorHandle } from './rich-editor';
 import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { onBackdropDismiss } from './backdrop-close';
+import { onPage } from './page';
+import { confirmDialog } from './confirm-dialog';
+import { deleteWarning } from '../lib/library-delete';
 
-const pile = document.getElementById('notes-pile');
-const undoBar = document.getElementById('notes-undo');
-
-if (undoBar) {
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room masks that completely:
+  Astro executes scripts that are new to the page, so walking into the pile the
+  first time works perfectly. Walk out and back and nothing re-runs — the pencil,
+  the →, the bin and the whole undo strip are bound to elements that were thrown
+  away. `scripts/page.ts` carries the full account.
+*/
+onPage((page) => {
+  const pile = document.getElementById('notes-pile');
+  const undoBar = document.getElementById('notes-undo');
+  if (!undoBar) return;
   const undoText = undoBar.querySelector<HTMLElement>('[data-undo-text]')!;
   const undoBtn = undoBar.querySelector<HTMLButtonElement>('[data-undo-do]')!;
 
@@ -193,6 +204,23 @@ if (undoBar) {
   */
   let rich: RichEditorHandle | null = null;
   let booting: Promise<RichEditorHandle> | null = null;
+
+  /*
+    ⚠ THE OLD EDITOR IS DESTROYED WHEN YOU LEAVE, and this line arrived with the
+    router (plan 24 · §9). `onPage` re-runs this boot on every arrival, so these
+    two are fresh each time and a second visit to the pile mounts a second
+    TipTap — into the new `#ns-editor`, correctly, while the first instance goes
+    on holding its plugins, its `beforeinput` hooks and a detached document
+    forever. Walk in and out ten times and ten editors are alive.
+
+    ProseMirror will not be collected while its own listeners keep it reachable,
+    so this cannot be left to the garbage collector; the instance has to be told.
+  */
+  page.cleanup(() => {
+    rich?.editor.destroy();
+    rich = null;
+    booting = null;
+  });
 
   function warmEditor(): Promise<RichEditorHandle> {
     return (booting ??= mountEditor());
@@ -330,6 +358,64 @@ if (undoBar) {
     return lock;
   };
 
+  /* ── where the open note lives (2026-09-18) ─────────────────────────────── */
+  /*
+    `NoteSheet.astro` carries the argument for the head rather than the foot.
+    This is only the wiring, and it deliberately owns no state: the CARD is still
+    the state, as everywhere in this room, and these chips are a second view of
+    the chips already in its foot.
+  */
+  const nsShelves = document.getElementById('ns-shelves');
+
+  /** Repaint the drawer's chips from the vocabulary and the open card. */
+  function drawShelfChips(card: HTMLElement) {
+    if (!nsShelves || !chooser) return;
+    const on = shelfIdsOf(card);
+    nsShelves.textContent = '';
+    /*
+      ⚠ THE VOCABULARY COMES FROM THE CHOOSER, which is the one element on this
+      page that already holds every shelf with its id, name and slug. Reading it
+      here means there is no second list to keep in step — a shelf created from
+      the → this session appears in the drawer without anything being told.
+    */
+    chooser.querySelectorAll<HTMLElement>('[data-shelf]').forEach((row) => {
+      const id = row.dataset.shelf!;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = on.includes(id) ? 'lchip lchip--on' : 'lchip';
+      chip.dataset.nsShelf = id;
+      chip.textContent = row.dataset.shelfName ?? '';
+      chip.setAttribute('aria-pressed', String(on.includes(id)));
+      nsShelves.append(chip);
+    });
+  }
+
+  nsShelves?.addEventListener('click', (e) => {
+    const chip = (e.target as Element).closest<HTMLElement>('[data-ns-shelf]');
+    const card = editing;
+    if (!chip || !card || !chooser) return;
+    const id = chip.dataset.nsShelf!;
+    const on = shelfIdsOf(card);
+    /*
+      ⚠ THE CAP BEHAVES AS IT DOES EVERYWHERE ELSE — a third pick replaces the
+      oldest rather than being refused. Same rule as the → chooser and the ✚,
+      and the server enforces the same number; a control that simply stopped
+      responding would teach nothing.
+    */
+    const next = on.includes(id)
+      ? on.filter((x) => x !== id)
+      : on.length >= MAX_SHELVES
+        ? [...on.slice(1), id]
+        : [...on, id];
+    void setShelves(
+      card,
+      next.map((sid) => {
+        const row = chooser!.querySelector<HTMLElement>(`[data-shelf="${sid}"]`);
+        return { id: sid, name: row?.dataset.shelfName ?? '', slug: row?.dataset.shelfSlug ?? '' };
+      }),
+    );
+  });
+
   /* ── the rail ───────────────────────────────────────────────────────────── */
 
   /**
@@ -456,6 +542,7 @@ if (undoBar) {
       change?
     */
     card.dataset.saved = r.getMarkdown();
+    drawShelfChips(card);
     if (nsStamp) {
       nsStamp.dateTime = card.dataset.updated ?? '';
       nsStamp.textContent = card.dataset.updated ? elapsedSince(card.dataset.updated) : '';
@@ -648,7 +735,7 @@ if (undoBar) {
 
   // The switch in either sheet comes back here, so one place decides which
   // sheet opens and both sheets stay ignorant of each other.
-  document.addEventListener('hq:kind-switch', (e) => {
+  page.on(document, 'hq:kind-switch', (e) => {
     const detail = (e as CustomEvent<{ to: 'task' | 'event' }>).detail;
     document.dispatchEvent(new CustomEvent(detail.to === 'event' ? 'hq:event-open' : 'hq:task-open', { detail }));
   });
@@ -854,6 +941,7 @@ if (undoBar) {
     if (!before.length && nextIds.length) bumpBadge('inbox', -1);
 
     drawShelves(card, next);
+    if (editing === card) drawShelfChips(card);
 
     // `?shelf=` / `?q=` decide what this room is currently showing. The inbox is
     // the only view a filing can push a note out of; a pressed shelf loses it
@@ -863,7 +951,21 @@ if (undoBar) {
     const inInbox = !pressed && (view.get('q') ?? '').trim().length < MIN_SEARCH;
     const leaves = inInbox ? nextIds.length > 0 : pressed ? !next.some((s) => s.slug === pressed) : false;
 
-    if (!leaves) return;
+    /*
+      ⚠⚠ NOT WHILE THE DRAWER IS OPEN ON THIS NOTE (2026-09-18, with the head's
+      chips). Filing from the pile is triage and the card going away IS the
+      feedback — that is the whole reason this branch exists. Filing from inside
+      the drawer is not triage: you are sitting and reading the thing, and the
+      pile is the rail beside you.
+
+      Letting the leave run there does three bad things at once: the row you are
+      reading drops out of the rail, the undo strip offers to reverse something
+      you can still see, and `finish()` eventually calls `remove()` on the card
+      `editing` still points at — so the drawer is left open on a note that is no
+      longer in the document. The pile re-reads on the next load and shows the
+      truth then, which is honest and costs nothing.
+    */
+    if (!leaves || editing === card) return;
     const label = next.length ? next.map((s) => s.name).join(' · ') : 'the inbox';
     showUndo(next.length ? `Filed under ${label}` : 'Back in the inbox', card, async () => {
       await actions.shelves.set({ noteId: id, shelfIds: before });
@@ -1014,7 +1116,7 @@ if (undoBar) {
    * order leaves behind is a dump still sitting in the pile — which you can see
    * and delete.
    */
-  document.addEventListener('hq:note-filed', async (e) => {
+  page.on(document, 'hq:note-filed', async (e) => {
     const { noteId, what, href, undo } = (
       e as CustomEvent<{
         noteId: string;
@@ -1233,9 +1335,176 @@ if (undoBar) {
    */
 
   // Anything still pending when the tab goes away.
-  document.addEventListener('visibilitychange', () => {
+  page.on(document, 'visibilitychange', () => {
     if (document.visibilityState === 'hidden' && editing) void save(editing);
   });
+
+  /* ── editing the vocabulary, from the strip ─────────────────────────────── */
+  /*
+    Moved out of the Library on 2026-09-18 — `notes.astro`'s strip carries why.
+    Every write here is one of the same three actions the chooser and the Library
+    row used; what changed is only which room you are standing in.
+  */
+  const manage = document.getElementById('shelf-manage') as HTMLDialogElement | null;
+  const manageList = document.getElementById('shelf-manage-list');
+  const manageErr = manage?.querySelector<HTMLElement>('[data-shelf-manage-error]');
+
+  const sayManage = (m: string | null) => {
+    if (!manageErr) return;
+    manageErr.textContent = m ?? '';
+    manageErr.hidden = !m;
+  };
+
+  /** Repaint one shelf's name everywhere the room already shows it. */
+  function renameEverywhere(id: string, name: string) {
+    for (const sel of [`[data-shelf-link="${id}"]`, `[data-shelf="${id}"]`]) {
+      document.querySelector(sel)?.querySelector('[data-name]')?.replaceChildren(name);
+    }
+    document.querySelector<HTMLElement>(`[data-shelf="${id}"]`)?.setAttribute('data-shelf-name', name);
+    // The chips on every card that sits on it.
+    pile?.querySelectorAll<HTMLElement>(`[data-shelf-id="${id}"]`).forEach((chip) => (chip.textContent = name));
+  }
+
+  /** Take a shelf out of the room — the strip, the chooser, and every chip. */
+  function forgetShelf(id: string) {
+    document.querySelector(`[data-shelf-link="${id}"]`)?.remove();
+    chooser?.querySelector(`[data-shelf="${id}"]`)?.remove();
+    manage?.querySelector(`[data-shelf-item="${id}"]`)?.remove();
+    /*
+      ⚠ THE NOTES COME BACK TO THE INBOX, and the badge has to say so in the same
+      breath. `fragment_shelves` cascades, so every card wearing this chip is
+      unfiled the moment the row goes — the page would otherwise keep showing a
+      count that no longer counts anything.
+    */
+    let freed = 0;
+    pile?.querySelectorAll<HTMLElement>(`[data-shelf-id="${id}"]`).forEach((chip) => {
+      const card = chip.closest<HTMLElement>('.dump');
+      chip.remove();
+      if (card && shelfIdsOf(card).length === 0) freed += 1;
+    });
+    bumpBadge('inbox', freed);
+    // Nothing left to groom, and nothing left to filter by.
+    if (!document.querySelector('[data-shelf-link]')) {
+      document.querySelector<HTMLElement>('[data-shelf-row]')?.setAttribute('hidden', '');
+      chooser?.querySelector<HTMLElement>('.pop__head')?.setAttribute('hidden', '');
+    }
+  }
+
+  document.getElementById('shelf-manage')?.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('[data-close]')) void closeWithExit(manage!);
+  });
+  document.querySelector('[data-shelf-manage]')?.addEventListener('click', () => {
+    sayManage(null);
+    if (manage) openDialog(manage);
+  });
+  if (manage) wireSheetDismiss(manage, () => void closeWithExit(manage));
+
+  /* A rename writes on blur and on Enter — the row you edited is the row that
+     gets written (the Library's per-row rule, and for its reason). */
+  manageList?.addEventListener('keydown', (e) => {
+    const k = e as KeyboardEvent;
+    if (k.key === 'Enter' && (k.target as Element).hasAttribute('data-shelf-rename')) {
+      k.preventDefault();
+      (k.target as HTMLInputElement).blur();
+    }
+  });
+
+  manageList?.addEventListener(
+    'blur',
+    async (e) => {
+      const field = e.target as HTMLInputElement;
+      if (!field.hasAttribute?.('data-shelf-rename')) return;
+      const row = field.closest<HTMLElement>('[data-shelf-item]');
+      const id = row?.dataset.shelfItem;
+      const name = field.value.trim();
+      if (!id || !name || name === field.defaultValue) {
+        // An emptied field is a slip, not an instruction to unname a shelf.
+        if (!name) field.value = field.defaultValue;
+        return;
+      }
+      const fd = new FormData();
+      fd.set('id', id);
+      fd.set('name', name);
+      const { error } = await actions.shelves.rename(fd);
+      if (error) {
+        field.value = field.defaultValue;
+        return sayManage(error.message);
+      }
+      field.defaultValue = name;
+      sayManage(null);
+      renameEverywhere(id, name);
+    },
+    true, // `blur` does not bubble — capture is how a delegated listener sees it
+  );
+
+  manageList?.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest<HTMLElement>('[data-shelf-remove]');
+    if (!btn) return;
+    const row = btn.closest<HTMLElement>('[data-shelf-item]');
+    const id = row?.dataset.shelfItem;
+    if (!id) return;
+    const uses = Number(row?.querySelector('.shelfman__n')?.textContent?.trim() || '0');
+    /*
+      ⚠ THE SAME SENTENCE THE LIBRARY WOULD HAVE SAID. `deleteWarning` owns the
+      wording for all four vocabularies, and a shelf's is the one that promises
+      the inbox rather than mere survival — see its own note on why that tail
+      differs in kind.
+    */
+    const ok = await confirmDialog({
+      title: 'Delete',
+      message: deleteWarning({
+        entity: 'shelf',
+        name: btn.dataset.shelfTitle,
+        uses,
+        shelves: 0,
+        shelfNotes: 0,
+        ownNote: false,
+      }),
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set('id', id);
+    const { error } = await actions.shelves.remove(fd);
+    if (error) return sayManage(error.message);
+    sayManage(null);
+    forgetShelf(id);
+  });
+
+  manage?.querySelector<HTMLFormElement>('[data-shelf-create]')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const field = form.querySelector('input')!;
+    const name = field.value.trim();
+    if (!name) return;
+    const { data, error } = await actions.shelves.create({ name });
+    if (error || !data) return sayManage(error?.message ?? 'could not make that shelf');
+    sayManage(null);
+    field.value = '';
+    // The strip and the chooser learn it through the one function that knows
+    // both spellings; this dialog gets its own row here.
+    addShelfToRoom(data);
+    addManageRow(data);
+  });
+
+  /** One row of the manager, cloned from the ones the server rendered. */
+  function addManageRow(sh: ShelfPick) {
+    const first = manageList?.querySelector<HTMLElement>('[data-shelf-item]');
+    if (!manageList) return;
+    if (!first) return void window.location.reload(); // nothing to clone from
+    const row = first.cloneNode(true) as HTMLElement;
+    row.dataset.shelfItem = sh.id;
+    const field = row.querySelector<HTMLInputElement>('[data-shelf-rename]')!;
+    field.value = sh.name;
+    field.defaultValue = sh.name;
+    field.setAttribute('aria-label', `Rename ${sh.name}`);
+    const n = row.querySelector<HTMLAnchorElement>('.shelfman__n')!;
+    n.textContent = '0';
+    n.href = `/admin/notes?shelf=${encodeURIComponent(sh.slug)}`;
+    row.querySelector<HTMLElement>('[data-shelf-remove]')!.dataset.shelfTitle = sh.name;
+    manageList.append(row);
+  }
 
   /* ── stamps ─────────────────────────────────────────────────────────────── */
 
@@ -1276,4 +1545,4 @@ if (undoBar) {
 
   const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
   idle(() => void warmEditor());
-}
+});

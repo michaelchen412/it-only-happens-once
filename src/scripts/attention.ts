@@ -46,6 +46,7 @@
   never counted it — must not move.
 */
 import { attentionLabel, titlePrefix } from '../lib/hq/attention';
+import { onPage, type PageScope } from './page';
 
 /** What a writer reports. Never a count, and never a verdict — just the fact. */
 export interface AttentionSignal {
@@ -98,7 +99,7 @@ function clearBadge(): void {
   });
 }
 
-function mount(): void {
+function mount(page: PageScope): void {
   const hq = document.getElementById('hq');
   const today = hq?.dataset.today;
   if (!hq || !today) return;
@@ -157,7 +158,7 @@ function mount(): void {
     paintBadge();
   }
 
-  document.addEventListener('hq:attention', (e) => {
+  page.on(document, 'hq:attention', (e) => {
     const s = (e as CustomEvent<AttentionSignal>).detail;
     if (!s || s.on !== today) return; // see the header: never the date bar
 
@@ -176,7 +177,7 @@ function mount(): void {
   // "what day is it" the way this one owns "what is the number". It reports the
   // fact; the decision about what that costs each renderer is made here, which
   // is the same split the two writers already get (see the header).
-  document.addEventListener('hq:dayturn', () => {
+  page.on(document, 'hq:dayturn', () => {
     turned = true;
     paintBadge();
   });
@@ -199,7 +200,7 @@ function mount(): void {
   // knowingly: the alternative is telling a close apart from a navigation,
   // which `pagehide` cannot do, and a brief blink is a smaller fault than a
   // stale number. If it reads badly on a real dock, that is a Phase 5 finding.
-  window.addEventListener('pagehide', clearBadge);
+  page.on(window, 'pagehide', clearBadge);
 
   // The badge has no server-rendered half — the pills and the title arrive
   // correct in the HTML and this file only has to keep them so. The icon starts
@@ -207,4 +208,4 @@ function mount(): void {
   paintBadge();
 }
 
-mount();
+onPage(mount);

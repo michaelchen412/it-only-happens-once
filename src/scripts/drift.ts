@@ -12,46 +12,59 @@
 // goes, the panel goes with it — an empty warm box is furniture.
 import { actions } from 'astro:actions';
 import { formatActionError } from './action-error';
+import { onPage } from './page';
 
-const panel = document.querySelector<HTMLElement>('[data-been-a-while]');
-const errorEl = panel?.querySelector<HTMLElement>('[data-drift-error]');
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage(() => {
+  const panel = document.querySelector<HTMLElement>('[data-been-a-while]');
+  const errorEl = panel?.querySelector<HTMLElement>('[data-drift-error]');
 
-function show(msg: string) {
-  if (!errorEl) return;
-  errorEl.textContent = msg;
-  errorEl.hidden = false;
-}
-
-/** Remove the row, and the panel too once it holds nothing. */
-function retire(row: HTMLElement) {
-  row.remove();
-  if (!panel?.querySelector('[data-drift]')) panel?.remove();
-}
-
-panel?.addEventListener('click', async (e) => {
-  const btn = (e.target as Element).closest<HTMLButtonElement>('[data-reached-out], [data-mute]');
-  if (!btn) return;
-
-  const row = btn.closest<HTMLElement>('[data-drift]');
-  const personId = btn.dataset.reachedOut ?? btn.dataset.mute!;
-  const reaching = !!btn.dataset.reachedOut;
-  if (errorEl) errorEl.hidden = true;
-
-  // Both buttons, not just the one pressed: they are opposite answers to the
-  // same question, and letting the other stay live during the round trip means
-  // a double-tap can log contact AND mute the same person.
-  const both = row?.querySelectorAll<HTMLButtonElement>('.bw__b') ?? [];
-  both.forEach((b) => (b.disabled = true));
-
-  try {
-    const { error } = reaching ? await actions.drift.reachedOut({ personId }) : await actions.drift.mute({ personId });
-    if (error) throw new Error(error.message);
-    if (row) retire(row);
-  } catch (err) {
-    // `astro:actions` THROWS on a dead network rather than returning
-    // `{ error }`. Without this catch the row would simply sit there with two
-    // dead buttons — the swallowed-save shape, twice paid for.
-    show(formatActionError(err));
-    both.forEach((b) => (b.disabled = false));
+  function show(msg: string) {
+    if (!errorEl) return;
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
   }
+
+  /** Remove the row, and the panel too once it holds nothing. */
+  function retire(row: HTMLElement) {
+    row.remove();
+    if (!panel?.querySelector('[data-drift]')) panel?.remove();
+  }
+
+  panel?.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest<HTMLButtonElement>('[data-reached-out], [data-mute]');
+    if (!btn) return;
+
+    const row = btn.closest<HTMLElement>('[data-drift]');
+    const personId = btn.dataset.reachedOut ?? btn.dataset.mute!;
+    const reaching = !!btn.dataset.reachedOut;
+    if (errorEl) errorEl.hidden = true;
+
+    // Both buttons, not just the one pressed: they are opposite answers to the
+    // same question, and letting the other stay live during the round trip means
+    // a double-tap can log contact AND mute the same person.
+    const both = row?.querySelectorAll<HTMLButtonElement>('.bw__b') ?? [];
+    both.forEach((b) => (b.disabled = true));
+
+    try {
+      const { error } = reaching
+        ? await actions.drift.reachedOut({ personId })
+        : await actions.drift.mute({ personId });
+      if (error) throw new Error(error.message);
+      if (row) retire(row);
+    } catch (err) {
+      // `astro:actions` THROWS on a dead network rather than returning
+      // `{ error }`. Without this catch the row would simply sit there with two
+      // dead buttons — the swallowed-save shape, twice paid for.
+      show(formatActionError(err));
+      both.forEach((b) => (b.disabled = false));
+    }
+  });
 });

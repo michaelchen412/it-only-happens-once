@@ -31,6 +31,7 @@
 */
 import { actions } from 'astro:actions';
 import { closeWithExit, openDialog } from './dialog-close';
+import { onPage } from './page';
 
 /** Public by design — it is the `applicationServerKey` the browser subscribes
  *  with, and it travels in every subscription request anyway. The PRIVATE half
@@ -187,4 +188,11 @@ function mount(): void {
   void sync();
 }
 
-mount();
+/*
+  ⚠ EVERY ARRIVAL. `NotificationsDialog` is mounted by `AdminLayout`, so its
+  elements are swapped out from under this module on every client-side
+  navigation — and because the module has already run once, nothing would rebind
+  them. Every listener here is element-bound, so no `PageScope` is needed: they
+  are discarded with the body that held them.
+*/
+onPage(mount);

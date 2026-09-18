@@ -16,138 +16,149 @@ import { submitAction } from './action-error';
 import { wireSheet } from './sheet';
 import { uploadPrivateImage } from './upload';
 import { photoPath } from '../lib/hq/people';
+import { onPage } from './page';
 
-const sheet = document.querySelector<HTMLDialogElement>('#person-sheet');
-const form = document.querySelector<HTMLFormElement>('#person-form');
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage(() => {
+  const sheet = document.querySelector<HTMLDialogElement>('#person-sheet');
+  const form = document.querySelector<HTMLFormElement>('#person-form');
 
-if (sheet && form) {
-  /* The tracker, the error line and the three ways out are `wireSheet` now
+  if (sheet && form) {
+    /* The tracker, the error line and the three ways out are `wireSheet` now
      (plan 41 · §4). It guards because it has something to lose: an explicit-save
      form holds everything typed into it until the button is pressed. */
-  const ui = wireSheet(sheet, { noun: 'This profile' });
-  const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-  const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]')!;
-  const photoPreview = form.querySelector<HTMLImageElement>('[data-photo-preview]')!;
-  const photoEmpty = form.querySelector<HTMLElement>('[data-photo-empty]')!;
-  const photoWell = form.querySelector<HTMLElement>('[data-photowell]')!;
-  const monthSel = form.querySelector<HTMLSelectElement>('[data-birth-month]')!;
-  const daySel = form.querySelector<HTMLSelectElement>('[data-birth-day]')!;
-  const circleValue = form.querySelector<HTMLInputElement>('[data-circle-value]')!;
+    const ui = wireSheet(sheet, { noun: 'This profile' });
+    const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const photoInput = form.querySelector<HTMLInputElement>('[data-photo-input]')!;
+    const photoPreview = form.querySelector<HTMLImageElement>('[data-photo-preview]')!;
+    const photoEmpty = form.querySelector<HTMLElement>('[data-photo-empty]')!;
+    const photoWell = form.querySelector<HTMLElement>('[data-photowell]')!;
+    const monthSel = form.querySelector<HTMLSelectElement>('[data-birth-month]')!;
+    const daySel = form.querySelector<HTMLSelectElement>('[data-birth-day]')!;
+    const circleValue = form.querySelector<HTMLInputElement>('[data-circle-value]')!;
 
-  // ── opening and closing ───────────────────────────────────────────────────
-  document.querySelectorAll<HTMLElement>('[data-open-person-sheet]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      ui.open(); // clears the error and forgets the fill — see `Sheet.open`
-      form.querySelector<HTMLInputElement>('input[name="displayName"]')?.focus();
-    }),
-  );
-
-  // ── the circle segmented control ──────────────────────────────────────────
-  form.querySelectorAll<HTMLButtonElement>('[data-circle]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      form
-        .querySelectorAll<HTMLButtonElement>('[data-circle]')
-        .forEach((o) => o.setAttribute('aria-checked', String(o === btn)));
-      circleValue.value = btn.dataset.circle!;
-    }),
-  );
-
-  // ── the birthday: offer only days the month actually has ──────────────────
-  // February keeps 29, because a leap-day birthday is real (`nextOccurrence`
-  // falls it back to 1 March in common years). Trimming the options is the
-  // honest fix for "31 April": the alternative is letting you choose it and
-  // then refusing the save, which teaches you nothing until after you have
-  // finished typing. The action and the table both still check.
-  const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  function trimDays() {
-    const month = Number(monthSel.value);
-    const max = month ? DAYS_IN_MONTH[month - 1] : 31;
-    Array.from(daySel.options).forEach((opt) => {
-      const day = Number(opt.value);
-      opt.hidden = day > max;
-      opt.disabled = day > max;
-    });
-    if (Number(daySel.value) > max) daySel.value = '';
-  }
-  monthSel.addEventListener('change', trimDays);
-  trimDays();
-
-  // ── the photo ─────────────────────────────────────────────────────────────
-  // The preview is an object URL, so it appears instantly and before anything
-  // has been uploaded — the upload only happens on save, which means backing
-  // out of the sheet leaves no orphan object in the bucket.
-  let previewUrl: string | null = null;
-  photoInput.addEventListener('change', () => {
-    const file = photoInput.files?.[0];
-    if (!file) return;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(file);
-    photoPreview.src = previewUrl;
-    photoPreview.hidden = false;
-    photoEmpty.hidden = true;
-    photoWell.classList.add('photowell--set');
-  });
-
-  // ── saving ────────────────────────────────────────────────────────────────
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    ui.showError(null);
-
-    const data = new FormData(form);
-    const str = (k: string) => String(data.get(k) ?? '');
-
-    // ⚠ THE THREE-STEP SAVE IS ONE LIFECYCLE, and it is why `submitAction`
-    // hands `work` a `busy` setter rather than taking a fixed label: this is
-    // the only consumer whose middle step needs to say something different.
-    // `formatActionError` covers both kinds of failure that can arrive here —
-    // an action's, and an `UploadError` carrying a sentence written for exactly
-    // this box. It overrides the message only when the failure is
-    // connectivity, which is the one case where "Upload failed: …" would be
-    // naming a symptom rather than the cause.
-    const res = await submitAction(
-      async (busy) => {
-        const { data: saved, error } = await actions.people.save({
-          id: form.dataset.id || undefined,
-          displayName: str('displayName'),
-          circle: str('circle') as 'family' | 'friends' | 'professional',
-          epithet: str('epithet'),
-          location: str('location'),
-          birthMonth: str('birthMonth'),
-          birthDay: str('birthDay'),
-          birthYear: str('birthYear'),
-          knownSinceYear: str('knownSinceYear'),
-          cadenceMonths: str('cadenceMonths') || 12,
-          birthdayLeadDays: str('birthdayLeadDays') || 30,
-        });
-        if (error || !saved) return { error };
-
-        const file = photoInput.files?.[0];
-        if (file) {
-          busy('Uploading…');
-          // The PRIVATE bucket, which is why nothing here gets a public URL
-          // back. The list mirrors the bucket's own `allowed_mime_types`, so an
-          // unsupported file is a sentence here rather than a 400 from storage.
-          const path = await uploadPrivateImage(file, {
-            pathFor: (hash, ext) => photoPath(saved.id, hash, ext),
-            accept: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
-          });
-          const { error: photoError } = await actions.people.setPhoto({ id: saved.id, path });
-          if (photoError) return { error: photoError };
-        }
-        return { data: saved };
-      },
-      { button: submitBtn, busy: 'Saving…', onError: ui.showError },
+    // ── opening and closing ───────────────────────────────────────────────────
+    document.querySelectorAll<HTMLElement>('[data-open-person-sheet]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        ui.open(); // clears the error and forgets the fill — see `Sheet.open`
+        form.querySelector<HTMLInputElement>('input[name="displayName"]')?.focus();
+      }),
     );
-    if (!res.ok) return;
 
-    // Reload rather than patching the DOM: the card, the section it belongs
-    // to and the coming-up rail are all functions of the row that just
-    // changed, and re-deriving three of them by hand is three chances to
-    // disagree with the database.
-    location.reload();
-  });
-}
+    // ── the circle segmented control ──────────────────────────────────────────
+    form.querySelectorAll<HTMLButtonElement>('[data-circle]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        form
+          .querySelectorAll<HTMLButtonElement>('[data-circle]')
+          .forEach((o) => o.setAttribute('aria-checked', String(o === btn)));
+        circleValue.value = btn.dataset.circle!;
+      }),
+    );
 
-// The role promises arrow keys and one tab stop; this is what keeps it
-// (plan 38 · §6.3). Idempotent — every group is wired exactly once.
-wireRadioGroups();
+    // ── the birthday: offer only days the month actually has ──────────────────
+    // February keeps 29, because a leap-day birthday is real (`nextOccurrence`
+    // falls it back to 1 March in common years). Trimming the options is the
+    // honest fix for "31 April": the alternative is letting you choose it and
+    // then refusing the save, which teaches you nothing until after you have
+    // finished typing. The action and the table both still check.
+    const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    function trimDays() {
+      const month = Number(monthSel.value);
+      const max = month ? DAYS_IN_MONTH[month - 1] : 31;
+      Array.from(daySel.options).forEach((opt) => {
+        const day = Number(opt.value);
+        opt.hidden = day > max;
+        opt.disabled = day > max;
+      });
+      if (Number(daySel.value) > max) daySel.value = '';
+    }
+    monthSel.addEventListener('change', trimDays);
+    trimDays();
+
+    // ── the photo ─────────────────────────────────────────────────────────────
+    // The preview is an object URL, so it appears instantly and before anything
+    // has been uploaded — the upload only happens on save, which means backing
+    // out of the sheet leaves no orphan object in the bucket.
+    let previewUrl: string | null = null;
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files?.[0];
+      if (!file) return;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      photoPreview.src = previewUrl;
+      photoPreview.hidden = false;
+      photoEmpty.hidden = true;
+      photoWell.classList.add('photowell--set');
+    });
+
+    // ── saving ────────────────────────────────────────────────────────────────
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      ui.showError(null);
+
+      const data = new FormData(form);
+      const str = (k: string) => String(data.get(k) ?? '');
+
+      // ⚠ THE THREE-STEP SAVE IS ONE LIFECYCLE, and it is why `submitAction`
+      // hands `work` a `busy` setter rather than taking a fixed label: this is
+      // the only consumer whose middle step needs to say something different.
+      // `formatActionError` covers both kinds of failure that can arrive here —
+      // an action's, and an `UploadError` carrying a sentence written for exactly
+      // this box. It overrides the message only when the failure is
+      // connectivity, which is the one case where "Upload failed: …" would be
+      // naming a symptom rather than the cause.
+      const res = await submitAction(
+        async (busy) => {
+          const { data: saved, error } = await actions.people.save({
+            id: form.dataset.id || undefined,
+            displayName: str('displayName'),
+            circle: str('circle') as 'family' | 'friends' | 'professional',
+            epithet: str('epithet'),
+            location: str('location'),
+            birthMonth: str('birthMonth'),
+            birthDay: str('birthDay'),
+            birthYear: str('birthYear'),
+            knownSinceYear: str('knownSinceYear'),
+            cadenceMonths: str('cadenceMonths') || 12,
+            birthdayLeadDays: str('birthdayLeadDays') || 30,
+          });
+          if (error || !saved) return { error };
+
+          const file = photoInput.files?.[0];
+          if (file) {
+            busy('Uploading…');
+            // The PRIVATE bucket, which is why nothing here gets a public URL
+            // back. The list mirrors the bucket's own `allowed_mime_types`, so an
+            // unsupported file is a sentence here rather than a 400 from storage.
+            const path = await uploadPrivateImage(file, {
+              pathFor: (hash, ext) => photoPath(saved.id, hash, ext),
+              accept: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
+            });
+            const { error: photoError } = await actions.people.setPhoto({ id: saved.id, path });
+            if (photoError) return { error: photoError };
+          }
+          return { data: saved };
+        },
+        { button: submitBtn, busy: 'Saving…', onError: ui.showError },
+      );
+      if (!res.ok) return;
+
+      // Reload rather than patching the DOM: the card, the section it belongs
+      // to and the coming-up rail are all functions of the row that just
+      // changed, and re-deriving three of them by hand is three chances to
+      // disagree with the database.
+      location.reload();
+    });
+  }
+
+  // The role promises arrow keys and one tab stop; this is what keeps it
+  // (plan 38 · §6.3). Idempotent — every group is wired exactly once.
+  wireRadioGroups();
+});

@@ -12,69 +12,80 @@ import { actions } from 'astro:actions';
 import { submitAction } from './action-error';
 import { wireSheet } from './sheet';
 import { wireFilterFields } from './filter-field';
+import { onPage } from './page';
 
-const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
-const form = document.querySelector<HTMLFormElement>('#tag-form');
+/*
+  ⚠ EVERY ARRIVAL, NOT ONCE (plan 24 · §9). Under `<ClientRouter />` a module
+  runs once per DOCUMENT, and the first visit to a room hides that completely —
+  Astro executes scripts that are new to the page, so walking in the first time
+  works. Walk out and back and nothing re-runs, and every control below is bound
+  to an element that was thrown away. `scripts/page.ts` has the full account,
+  including why `document` listeners must go through `page.on`.
+*/
+onPage((page) => {
+  const sheet = document.querySelector<HTMLDialogElement>('#tag-sheet');
+  const form = document.querySelector<HTMLFormElement>('#tag-form');
 
-if (sheet && form) {
-  /*
+  if (sheet && form) {
+    /*
     The dirty tracker, the error line, the three ways out and the discard
     confirm are all `wireSheet` now (plan 41 · §4). It GUARDS because it has
     something to lose: an explicit-save form holds everything ticked into it
     until the button is pressed, and the confirm cannot fire on a sheet nobody
     edited because `open()` resets the tracker after every populate.
   */
-  const ui = wireSheet(sheet, { noun: 'This' });
-  const titleEl = form.querySelector<HTMLElement>('[data-tag-title]')!;
-  const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-  const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.tag-check'));
+    const ui = wireSheet(sheet, { noun: 'This' });
+    const titleEl = form.querySelector<HTMLElement>('[data-tag-title]')!;
+    const submitBtn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const checks = () => Array.from(form.querySelectorAll<HTMLInputElement>('.tag-check'));
 
-  let subject: string | null = null;
+    let subject: string | null = null;
 
-  // Delegated: the day panel is server-rendered per request, so a listener per
-  // row would need rebinding on every navigation.
-  document.addEventListener('click', (e) => {
-    const trigger = (e.target as Element).closest<HTMLElement>('[data-tag]');
-    if (!trigger) return;
-    subject = trigger.dataset.tag ?? null;
-    if (!subject) return;
+    // Delegated: the day panel is server-rendered per request, so a listener per
+    // row would need rebinding on every navigation.
+    page.on(document, 'click', (e) => {
+      const trigger = (e.target as Element).closest<HTMLElement>('[data-tag]');
+      if (!trigger) return;
+      subject = trigger.dataset.tag ?? null;
+      if (!subject) return;
 
-    titleEl.textContent = trigger.dataset.tagTitle ?? '';
-    const on = new Set((trigger.dataset.tagPeople ?? '').split(',').filter(Boolean));
-    checks().forEach((c) => (c.checked = on.has(c.value)));
-    ui.open(); // populate first — `open` clears the error and forgets the fill
-  });
+      titleEl.textContent = trigger.dataset.tagTitle ?? '';
+      const on = new Set((trigger.dataset.tagPeople ?? '').split(',').filter(Boolean));
+      checks().forEach((c) => (c.checked = on.has(c.value)));
+      ui.open(); // populate first — `open` clears the error and forgets the fill
+    });
 
-  // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — these six lines
-  // existed here, in `event-sheet.ts` and in `tag-sheet.ts`, byte for byte, and
-  // all three were missing the no-match line the fourth copy had.
-  wireFilterFields(form);
+    // The pass is `filter-field.ts` now (plan 42 · §4.B.2) — these six lines
+    // existed here, in `event-sheet.ts` and in `tag-sheet.ts`, byte for byte, and
+    // all three were missing the no-match line the fourth copy had.
+    wireFilterFields(form);
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!subject) return;
-    ui.showError(null);
-    const externalId = subject; // captured: `subject` is a `let`, so the guard
-    // above does not narrow it inside the callback below.
-    // The disable/await/format/restore lifecycle is `submitAction` now
-    // (docs/plans/25 · §2). NO `busy` LABEL HERE, deliberately: this is the one
-    // Save in the set that holds an `<Icon>` beside its word, and `busy` writes
-    // `textContent`, which would delete the glyph and never bring it back. The
-    // disabled state carries the whole message instead.
-    const res = await submitAction(
-      () =>
-        actions.events.tag({
-          externalId,
-          personIds: checks()
-            .filter((c) => c.checked)
-            .map((c) => c.value),
-        }),
-      { button: submitBtn, onError: ui.showError },
-    );
-    if (!res.ok) return;
-    // Reload rather than patching: tagging somebody changes the day panel,
-    // the People zone's brief, and the drift guard — three surfaces, one of
-    // which is on another page.
-    location.reload();
-  });
-}
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!subject) return;
+      ui.showError(null);
+      const externalId = subject; // captured: `subject` is a `let`, so the guard
+      // above does not narrow it inside the callback below.
+      // The disable/await/format/restore lifecycle is `submitAction` now
+      // (docs/plans/25 · §2). NO `busy` LABEL HERE, deliberately: this is the one
+      // Save in the set that holds an `<Icon>` beside its word, and `busy` writes
+      // `textContent`, which would delete the glyph and never bring it back. The
+      // disabled state carries the whole message instead.
+      const res = await submitAction(
+        () =>
+          actions.events.tag({
+            externalId,
+            personIds: checks()
+              .filter((c) => c.checked)
+              .map((c) => c.value),
+          }),
+        { button: submitBtn, onError: ui.showError },
+      );
+      if (!res.ok) return;
+      // Reload rather than patching: tagging somebody changes the day panel,
+      // the People zone's brief, and the drift guard — three surfaces, one of
+      // which is on another page.
+      location.reload();
+    });
+  }
+});
