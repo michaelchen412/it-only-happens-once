@@ -1,7 +1,7 @@
 // The two Cache-Control answers a public page gives — one place, because six
 // rooms give them and they must not drift apart.
 //
-// ⚠ `max-age=60` IS FOR THE BROWSER, AND WITHOUT IT EVERY PREFETCH WAS WASTED
+// ⚠ `max-age=600` IS FOR THE BROWSER, AND WITHOUT IT EVERY PREFETCH WAS WASTED
 // (measured 2026-10-23, Chromium against production). Vercel's CDN consumes
 // `s-maxage` and `stale-while-revalidate` and STRIPS them before the response
 // leaves the edge, so the browser received a bare `public`: no lifetime, no
@@ -12,10 +12,18 @@
 // already sitting in memory. That is "a loading bar for clicking in and out of
 // constellations", and no amount of earlier or wider prefetching could fix it.
 //
-// ⚠ THE COST IS A MINUTE OF STALENESS IN ONE BROWSER, accepted 2026-10-23. A
-// reader who already holds a page sees an edit up to 60s late. The CDN already
-// imposed exactly that window on everyone, so this adds no new kind of
-// staleness — it only lets the reader's own copy last as long as the edge's.
+// ⚠ TEN MINUTES, NOT ONE, BECAUSE A PREFETCH HAPPENS ONCE (2026-10-23). Astro
+// prefetches each URL at most once per session (`prefetchedUrls`), so the
+// browser's copy is the only copy, and when it expires the next click is cold
+// again. At 60s that missed the ordinary case: a suite read for three minutes
+// fetched `/` cold on the way out, and a sky row clicked a minute after it
+// scrolled into view did the same. Ten minutes covers a visit, not just a
+// quick in-and-out.
+//
+// The cost, accepted by Michael the same day: a reader who already holds a page
+// sees an edit up to ten minutes late in that one browser. A fresh visitor is
+// unaffected — the edge still revalidates on `s-maxage=60`.
+//
 // The alternative that lost was an ETag: it makes the re-check cheaper but
 // keeps the round trip, and the round trip is the delay being removed.
 //
@@ -23,6 +31,6 @@
 // `PRIVATE_PAGE` — see the branch at each call site. A browser `max-age` on a
 // failure would pin the empty room in that reader's cache the way `s-maxage`
 // would pin it at the edge.
-export const PUBLIC_PAGE = 'public, max-age=60, s-maxage=60, stale-while-revalidate=86400';
+export const PUBLIC_PAGE = 'public, max-age=600, s-maxage=60, stale-while-revalidate=86400';
 
 export const PRIVATE_PAGE = 'private, no-store';
