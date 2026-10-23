@@ -146,30 +146,34 @@ const indentOf = (i: number) => INDENTS[i % 3 === 2 ? 2 : i % 2 === 1 ? 1 : 0];
         <div class="flex flex-col gap-12 sm:gap-16">
           {refs.map((c, i) => (
             <div class={indentOf(i)}>
-              {/* ⚠ `viewport`, AND ONLY ON THESE ELEVEN ROWS (24 · Piece 6).
-                  `<ClientRouter />` turns prefetching on by itself — Astro calls
-                  `init({ prefetchAll: true })` from inside it, which nobody
-                  configured — but the default strategy is `hover`, and a phone
-                  does not hover. So the front door prefetched nothing at all on
-                  the device Michael was describing: *"I notice there is some
-                  lag if I am a public user just trying to browse
-                  constellations."*
+              {/* ⚠ `load`, AND ONLY ON THESE ROWS — every suite is fetched the
+                  moment the sky arrives (2026-10-23). The rows are the site's
+                  centerpiece, and Michael's bar for them is "it feels
+                  instantaneous", not "it is usually quick".
 
-                  ⚠ NOT `prefetch.defaultStrategy: 'viewport'` in astro.config,
-                  which is the tidier-looking change and is the loser here. That
-                  setting is site-WIDE: the blog index would start fetching every
-                  post in the feed as you scrolled it, on a page built for
-                  scrolling. The sky is the one room where the number of links is
-                  small, fixed, and equal to the number of things you might do
-                  next — so the room opts in and the default stays `hover`.
+                  ⚠ `viewport` WAS THE ANSWER UNTIL THIS DATE, AND IT RACED THE
+                  CLICK. Astro waits 300ms after a row enters view before
+                  fetching it, and only rows on screen qualify — so the first
+                  constellation, tapped promptly, or one tapped just after it
+                  scrolled up, was clicked before its prefetch had landed. On
+                  the live site that read as a slow ~500ms creep on exactly the
+                  first click. (Before 2026-10-23 every prefetch was also thrown
+                  away by the browser — see `lib/http-cache.ts`.)
+
+                  The cost, accepted by Michael: every visit to the front door
+                  pulls every suite — 11 of them at ~32–40 KB compressed, so
+                  ~400 KB — whether or not the reader opens one. They go at the
+                  browser's lowest priority, behind the sky's own fonts and CSS.
+
+                  ⚠ NOT `prefetch.defaultStrategy` in astro.config. That setting
+                  is site-WIDE: the blog index would fetch every post in the
+                  feed. The sky is the one room where the links are few, fixed,
+                  and equal to the things you might do next — so the room opts
+                  in and the default stays `hover`.
 
                   Astro declines this by itself on save-data and 2g
                   (`isSlowConnection`), so there is no guard to write here. */}
-              <a
-                href={`/${c.slug}`}
-                data-astro-prefetch="viewport"
-                class:list={['group sky-row block', `cn-${c.color}`]}
-              >
+              <a href={`/${c.slug}`} data-astro-prefetch="load" class:list={['group sky-row block', `cn-${c.color}`]}>
                 {/* a DIV, not a span: it holds an h2, and a <span> may only
                     contain phrasing content. Nothing in `npm run verify`
                     catches that — astro check doesn't validate content models. */}

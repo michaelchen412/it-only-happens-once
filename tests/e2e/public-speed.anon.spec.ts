@@ -18,17 +18,22 @@ test('the sky and its suites are CDN-cacheable', async ({ page }) => {
   expect(suite?.headers()['cache-control']).toBe(PUBLIC_PAGE);
 });
 
-test('every sky row opts into viewport prefetch', async ({ page }) => {
+test('every suite has arrived before the reader scrolls', async ({ page }) => {
   await page.goto('/');
-  const rows = page.locator('a.sky-row');
-  const n = await rows.count();
-  expect(n).toBeGreaterThan(0);
-  // ⚠ `viewport`, not the site-wide default. `<ClientRouter />` enables prefetch
-  // by itself but defaults to `hover`, and a phone does not hover — so without
-  // this the front door prefetched nothing on the device it matters most on.
-  for (let i = 0; i < n; i++) {
-    await expect(rows.nth(i)).toHaveAttribute('data-astro-prefetch', 'viewport');
-  }
+  const hrefs = await page.locator('a.sky-row').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href));
+  expect(hrefs.length).toBeGreaterThan(0);
+  // ⚠ ARRIVED, NOT TAGGED. `viewport` was tagged correctly for months and still
+  // lost the race to the first click; what matters is that the document is in
+  // the browser before anyone presses. No scrolling here, on purpose — rows
+  // below the fold are exactly the ones `viewport` left cold.
+  await expect
+    .poll(() =>
+      page.evaluate((want) => {
+        const got = new Set(performance.getEntriesByType('resource').map((e) => e.name));
+        return want.filter((h) => !got.has(h));
+      }, hrefs),
+    )
+    .toEqual([]);
 });
 
 test('a suite still renders its stanzas after the query was collapsed', async ({ page }) => {

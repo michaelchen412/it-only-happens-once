@@ -56,6 +56,69 @@ const BAR = 'nav-progress';
 /** Give up if the navigation never lands — see `clear()`. */
 const SAFETY_MS = 10_000;
 
+/*
+  ⚠ A PAGE ALREADY IN THE BROWSER GETS NO BAR (2026-10-23) — and that is NOT
+  the 250ms grace delay that lost on 2026-08-27, though it looks like it.
+
+  That proposal withheld the bar from EVERY click, so a slow one sat in silence
+  for a quarter-second before anything answered; Michael's ruling was *"no
+  immediate response after clicking"* is the root problem. This withholds it
+  only from a navigation that has nothing to wait for. The sky prefetches every
+  suite on arrival, a suite prefetches `/`, and public pages now live in the
+  browser for ten minutes (`lib/http-cache.ts`) — so the commonest click on the
+  site is answered from memory in ~110ms (measured, production, 2026-10-23),
+  and the page changing IS the immediate response. Running the bar over it
+  showed a 1px line flash and finish for a wait that did not exist, which read
+  as a delay all of its own.
+
+  The ruling still holds for every click that really waits: a page not yet
+  fetched, or a prefetch still in flight when the press lands, gets the bar on
+  the frame you press, exactly as before.
+
+  ⚠ HOW "ALREADY HERE" IS KNOWN — Resource Timing, read by an observer. Every
+  prefetch (`<link rel=prefetch>` in Chromium, a `fetch()` in Safari) and every
+  router fetch leaves an entry when its response has fully arrived; an entry
+  younger than the browser's `max-age` names a document the router will get
+  back from cache. AN OBSERVER, NOT `getEntriesByType`: the timeline buffer
+  holds 250 entries and then silently drops new ones, and `<ClientRouter />`
+  means one document can live for a whole visit — a lookup would go blind
+  partway through a session, and the bar with it. Observers are still called
+  once the buffer is full.
+
+  ⚠ AND IT IS ONLY EVER A GUESS, SO IT HAS A FLOOR. An entry cannot tell a
+  cacheable response from a `no-store` one — a draft preview, a page whose read
+  failed — and either of those will go back to the network. So "warm" defers
+  the bar rather than cancelling it: if the page has not landed by `LATE_MS`,
+  the bar starts anyway. Measured warm navigations land at ~110–170ms, so 400ms
+  is past the slowest honest one and short enough that a wrong guess costs a
+  beat, not a silence.
+*/
+const WARM_MS = 540_000; // under the browser's `max-age=600`, with room to spare
+const LATE_MS = 400;
+const landedAt = new Map<string, number>();
+const withoutHash = (href: string) => href.replace(/#.*/, '');
+
+try {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries() as PerformanceResourceTiming[]) {
+      if (e.initiatorType !== 'link' && e.initiatorType !== 'fetch') continue;
+      if (!e.responseEnd) continue; // never arrived
+      // 0 where the browser does not report it; anything else but 200 is not a page.
+      if (e.responseStatus && e.responseStatus !== 200) continue;
+      landedAt.set(withoutHash(e.name), e.responseEnd);
+    }
+  }).observe({ type: 'resource', buffered: true });
+} catch {
+  // No Resource Timing: nothing is ever "warm", and every click gets the bar.
+}
+
+/** Is `to` a document the browser already holds? Unknown is "no". */
+function isWarm(to: URL | undefined): boolean {
+  if (!to) return false; // the lab bench dispatches bare events
+  const at = landedAt.get(withoutHash(to.href));
+  return at !== undefined && performance.now() - at < WARM_MS;
+}
+
 let timer = 0;
 
 /**
@@ -197,6 +260,9 @@ document.addEventListener('animationend', (e) => {
 function start(source: Element | undefined) {
   const el = bar();
   if (!el) return;
+  // A deferred start (see `isWarm`) may be pending, and a second press must not
+  // leave the first one's timer behind to restart the creep later.
+  if (timer) clearTimeout(timer);
 
   // Restart the creep from zero on a second press (impatience is a real input).
   // `is-done` comes off here too: a press landing inside the 200ms ending must
@@ -223,11 +289,7 @@ function start(source: Element | undefined) {
   // sidebar states: the visual state may run ahead of the truth, the
   // accessibility tree may not. Moving `aria-current` here would tell a screen
   // reader it is on a page that has not arrived.
-  const row = source?.closest?.('[data-nav-row]');
-  if (row) {
-    document.querySelector('[data-nav-pending]')?.removeAttribute('data-nav-pending');
-    row.setAttribute('data-nav-pending', '');
-  }
+  markPending(source);
 
   // A navigation that never completes: a cancelled `astro:before-preparation`,
   // a fetch that fails and falls back to a full page load, a 302 the browser
@@ -235,7 +297,27 @@ function start(source: Element | undefined) {
   timer = window.setTimeout(clear, SAFETY_MS);
 }
 
-document.addEventListener('astro:before-preparation', (e) => start(e.sourceElement));
+function markPending(source: Element | undefined) {
+  const row = source?.closest?.('[data-nav-row]');
+  if (row) {
+    document.querySelector('[data-nav-pending]')?.removeAttribute('data-nav-pending');
+    row.setAttribute('data-nav-pending', '');
+  }
+}
+
+document.addEventListener('astro:before-preparation', (e) => {
+  if (!isWarm(e.to)) {
+    start(e.sourceElement);
+    return;
+  }
+  // Already here: no bar unless the guess turns out wrong — see `isWarm`. The
+  // pressed chrome link still takes its ink now; that costs nothing and is
+  // never wrong. `timer` is the slot `reset()` clears, so the page landing (or
+  // the navigation dying) cancels the late start for free.
+  reset();
+  markPending(e.sourceElement);
+  timer = window.setTimeout(() => start(e.sourceElement), LATE_MS);
+});
 
 // ⚠ `astro:page-load` AND NOT `astro:after-preparation`, which is what the
 // Astro guide's loading-indicator snippet uses. After-preparation means the
