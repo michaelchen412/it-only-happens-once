@@ -55,6 +55,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import MusicSets from '../components/MusicSets.astro';
 import { resolveSet } from '../lib/music-sets';
 import { listSets } from '../lib/sets';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../lib/http-cache';
 
 // No `Astro.locals.supabase` — the room is the same for everyone, so the read
 // has no use for who is asking (see `publicSupabase`). `null` back means the
@@ -73,10 +74,7 @@ const selectedSet = resolveSet(Astro.url.searchParams.get('set'), sets);
 // thing to show one reader and the wrong thing to leave at the edge, where
 // `stale-while-revalidate` would keep serving an emptied room for a day after a
 // few seconds of trouble. Same branch as `/` and `/sitemap.xml`.
-Astro.response.headers.set(
-  'Cache-Control',
-  listed ? 'public, s-maxage=60, stale-while-revalidate=86400' : 'private, no-store',
-);
+Astro.response.headers.set('Cache-Control', listed ? PUBLIC_PAGE : PRIVATE_PAGE);
 ---
 
 <SiteLayout

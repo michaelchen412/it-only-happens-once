@@ -42,6 +42,7 @@ import { renderMarkdown } from '../lib/markdown';
 import { embedForUrl } from '../lib/media';
 import { noted } from '../lib/read-log';
 import { publicSupabase } from '../lib/supabase';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../lib/http-cache';
 
 /* No `Astro.locals.supabase` — there is one `about` row and everybody gets it,
    so the read has no use for who is asking (see `publicSupabase`).
@@ -104,10 +105,7 @@ const hasSite = !!(siteBodyHtml || blurbHtml || embed);
    state — right for the reader, and the wrong thing to hand the CDN, which
    would pin "This page is being composed." at the edge for a minute and then
    serve it for a day behind the revalidation. Same branch as `/`. */
-Astro.response.headers.set(
-  'Cache-Control',
-  error ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=86400',
-);
+Astro.response.headers.set('Cache-Control', error ? PRIVATE_PAGE : PUBLIC_PAGE);
 ---
 
 <SiteLayout title="About" active="about" description="Who Michael Chen is, and how to say hello.">

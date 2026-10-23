@@ -12,6 +12,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import ConstellationSuite from '../components/ConstellationSuite.astro';
 import { getConstellation } from '../lib/constellations';
 import { toPlainText } from '../lib/markdown';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../lib/http-cache';
 
 const supabase = Astro.locals.supabase;
 const { slug = '' } = Astro.params;
@@ -41,9 +42,9 @@ if (!constellation || constellation.items.length === 0) {
   the public truth by construction, so there is nothing there to leak.
 */
 if (constellation.status !== 'published') {
-  Astro.response.headers.set('Cache-Control', 'private, no-store');
+  Astro.response.headers.set('Cache-Control', PRIVATE_PAGE);
 } else {
-  Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+  Astro.response.headers.set('Cache-Control', PUBLIC_PAGE);
 }
 ---
 

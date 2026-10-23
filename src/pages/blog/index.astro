@@ -36,6 +36,7 @@ import { Icon } from 'astro-icon/components';
 import { attachNeighbourhoods, listWriting, listQuotes, listSubjects, neighbourhoodsFor } from '../../lib/blog';
 
 import { MIN_SEARCH } from '../../lib/search-highlight';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../../lib/http-cache';
 
 const supabase = Astro.locals.supabase;
 const params = Astro.url.searchParams;
@@ -253,10 +254,7 @@ const nextUrl = feed && feed.page < feed.pageCount ? buildHref({ page: feed.page
   cacheable either.
 */
 const degraded = !!feed?.failed || rail.failed;
-Astro.response.headers.set(
-  'Cache-Control',
-  degraded ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=86400',
-);
+Astro.response.headers.set('Cache-Control', degraded ? PRIVATE_PAGE : PUBLIC_PAGE);
 // The rendered page depends on X-Requested-With (partial page fetches honour
 // ?page; browser navigations always start at page 1), so cache it per-variant.
 Astro.response.headers.set('Vary', 'X-Requested-With');

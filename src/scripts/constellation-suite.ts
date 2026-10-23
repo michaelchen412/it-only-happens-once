@@ -1,4 +1,5 @@
 import { navigate } from 'astro:transitions/client';
+import { prefetch } from 'astro:prefetch';
 import { STAR_PATH } from '../lib/star-mark';
 import { splineFigure, type Pt } from '../lib/sky-figure';
 // Puts the overview back where you left it, so the name morphs home into its
@@ -281,6 +282,19 @@ function init() {
     `[data-wired]` handshake the Fragment Manager uses, for the same reason.
   */
   suiteEl.setAttribute('data-wired', '');
+  /*
+    ⚠ THE WAY OUT IS FETCHED ON ARRIVAL, BECAUSE EVERY WAY OUT GOES TO ONE PAGE
+    (2026-10-23). The sky prefetches each suite on sight; nothing prefetched
+    the way back, so coming OUT fetched `/` cold — measured, a network fetch on
+    Back as well as on the ✦. Six links and the Escape key all land on `/`,
+    and so does the browser's Back button, which has no element to tag; one
+    call here covers all of them where `data-astro-prefetch` on each link would
+    cover only the links. `/` is ~15 KB, and Astro skips it on save-data/2g.
+
+    It only reuses because `/` now carries a browser `max-age` — see
+    `lib/http-cache.ts`. Before that, this prefetch would have been thrown away.
+  */
+  prefetch('/');
   (document as any).fonts?.ready?.then(() => {
     drawLine();
     updateLight();

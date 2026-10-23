@@ -1,14 +1,13 @@
 // What the public side pays to open a constellation — docs/plans/24 · Pieces 3,
 // 4 and 6. Signed out, because that is who these three are for.
 import { test, expect } from './fixtures';
+import { PUBLIC_PAGE } from '../../src/lib/http-cache';
 
 test('the sky and its suites are CDN-cacheable', async ({ page }) => {
-  const PUBLIC = 'public, s-maxage=60, stale-while-revalidate=86400';
-
   // ⚠ Both of these had NO cache header at all until 2026-08-07 — the two
   // highest-traffic public rooms, while /blog and /about were both cached.
   const home = await page.goto('/');
-  expect(home?.headers()['cache-control']).toBe(PUBLIC);
+  expect(home?.headers()['cache-control']).toBe(PUBLIC_PAGE);
 
   const rows = page.locator('a.sky-row');
   expect(await rows.count()).toBeGreaterThan(0);
@@ -16,7 +15,7 @@ test('the sky and its suites are CDN-cacheable', async ({ page }) => {
   const href = await rows.first().getAttribute('href');
   const suite = await page.goto(href!);
   expect(suite?.status()).toBe(200);
-  expect(suite?.headers()['cache-control']).toBe(PUBLIC);
+  expect(suite?.headers()['cache-control']).toBe(PUBLIC_PAGE);
 });
 
 test('every sky row opts into viewport prefetch', async ({ page }) => {

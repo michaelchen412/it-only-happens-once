@@ -28,6 +28,7 @@ import QuoteArticle from '../../components/QuoteArticle.astro';
 import { getWritingBySlug } from '../../lib/blog';
 import { getQuotePage } from '../../lib/quote-page';
 import { toPlainText } from '../../lib/markdown';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../../lib/http-cache';
 
 const { slug } = Astro.params;
 const isAdmin = Astro.locals.user?.app_metadata?.role === 'admin';
@@ -73,9 +74,9 @@ const preview =
 if (!found) {
   Astro.response.status = 404;
 } else if (preview) {
-  Astro.response.headers.set('Cache-Control', 'private, no-store');
+  Astro.response.headers.set('Cache-Control', PRIVATE_PAGE);
 } else {
-  Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=86400');
+  Astro.response.headers.set('Cache-Control', PUBLIC_PAGE);
 }
 
 // A quote's description IS the quote: a client that ignores the card image

@@ -13,6 +13,7 @@
 //      set the attribute by hand instead — that is what the script does anyway,
 //      and it isolates the CSS from the script.
 import { test, expect } from './fixtures';
+import { PUBLIC_PAGE } from '../../src/lib/http-cache';
 
 test('the bar and the pending row answer on the frame of the click', async ({ page }) => {
   await page.goto('/admin');
@@ -152,5 +153,5 @@ test('a draft constellation is never publicly cacheable, a published one always 
   await page.goto('/');
   const href = await page.locator('a.sky-row').first().getAttribute('href');
   const published = await page.goto(href!);
-  expect(published?.headers()['cache-control']).toBe('public, s-maxage=60, stale-while-revalidate=86400');
+  expect(published?.headers()['cache-control']).toBe(PUBLIC_PAGE);
 });

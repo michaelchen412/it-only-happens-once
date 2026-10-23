@@ -37,6 +37,15 @@ export default defineConfig({
       PUBLIC_SUPABASE_ANON_KEY: envField.string({ context: 'client', access: 'public', min: 20 }),
     },
   },
+  // ⚠ THIS CHANGES NOTHING ABOUT HOW THE SITE PREFETCHES — it writes down what
+  // `<ClientRouter />` was already doing (`init({ prefetchAll: true })`, hover
+  // by default), because `import { prefetch } from 'astro:prefetch'` throws
+  // unless the key is declared. The router does not need the key; a script that
+  // calls `prefetch()` by hand does (constellation-suite.ts, 2026-10-23). And
+  // `npm run verify` does NOT catch its absence — `astro check` passed and the
+  // dev server 500'd the module, which killed every suite script on the page.
+  // Keep `hover` here: why the sky alone opts into `viewport` is in index.astro.
+  prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
   // SSR + edge caching for DB-backed content; the admin renders on demand.
   // See docs/adr/0001. Static pages opt back in with `export const prerender = true`.
   output: 'server',

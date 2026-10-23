@@ -17,6 +17,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import { listConstellations } from '../lib/constellations';
 import { renderMarkdown } from '../lib/markdown';
 import ConstellationStar from '../components/ConstellationStar.astro';
+import { PRIVATE_PAGE, PUBLIC_PAGE } from '../lib/http-cache';
 
 /* No `Astro.locals.supabase` here, and that is the point — see `publicSupabase`.
    The sky is the same for everyone, so this render has no use for who is
@@ -48,10 +49,7 @@ const refs = sky ?? [];
   not only by filter — so this page cannot contain a draft. A constellation
   permalink can, and does.
 */
-Astro.response.headers.set(
-  'Cache-Control',
-  sky ? 'public, s-maxage=60, stale-while-revalidate=86400' : 'private, no-store',
-);
+Astro.response.headers.set('Cache-Control', sky ? PUBLIC_PAGE : PRIVATE_PAGE);
 
 // weight → type scale: distinct counts, heaviest first, share tiers on ties
 const TIERS = [
