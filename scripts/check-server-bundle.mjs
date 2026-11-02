@@ -20,6 +20,7 @@
 //                                                     # to regenerate noExternal
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
+import { parse } from 'acorn';
 
 const FUNC = '.vercel/output/functions/_render.func';
 const ROOT = process.cwd();
@@ -127,11 +128,9 @@ const BUILTIN = new Set([
 ]);
 
 /**
- * A plausible npm specifier, and nothing else. Bundled sources contain plenty
- * of prose that trips a naive scan — postcss has `!("from" in this._opts)`,
- * which the `from "x"` pattern reads as an import of ` in this._opts)) warnOnce(`.
- * Checking the shape of the capture is cheaper and steadier than trying to
- * write patterns that can't be fooled.
+ * A bare npm specifier — not a relative path, an absolute one, or a URL-ish id
+ * like `data:`. Only these resolve through node_modules, so only these can go
+ * missing from the function.
  */
 const LOOKS_LIKE_A_PACKAGE = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*(?:\/[\w.-]+)*$/i;
 
@@ -159,30 +158,68 @@ if (!existsSync(serverDir)) {
   process.exit(1);
 }
 
-// Static `require("x")`, `from "x"`, `import("x")` with a literal specifier.
+// Every static `require("x")`, `import … from "x"`, `export … from "x"` and
+// `import("x")` with a literal specifier — found by PARSING each file, not by
+// pattern-matching its text.
 //
-// The `_*` prefix is not decoration. Rolldown emits its CommonJS interop as
-// `__require("htmlparser2")`, and `\brequire` cannot match that: `_` is a word
-// character, so there is no word boundary between the underscores and the name.
-// Without this, the check reported a clean bundle while production was
-// returning 500 on every request.
-const PATTERNS = [
-  /\b_*require\(\s*["']([^"'./][^"']*)["']\s*\)/g,
-  /\bfrom\s*["']([^"'./][^"']*)["']/g,
-  /\b_*import\(\s*["']([^"'./][^"']*)["']\s*\)/g,
-];
+// ⚠ This was a set of regexes until 2026-11-02, and a regex cannot tell code
+// from a comment or a string. Astro 7.4 ships its error docs in the server
+// bundle, and one JSDoc example reads `import type { APIContext } from 'astro'`
+// — so the check reported `astro` missing and failed a build whose function
+// never loads it. Before that, postcss's `!("from" in this._opts)` read as an
+// import of ` in this._opts)) warnOnce(`. Parsing ends that whole class, and a
+// file acorn cannot parse fails the check rather than being skipped: an
+// unreadable file is one this script cannot vouch for.
+//
+// The `_*` prefix on `require` is not decoration. Rolldown emits its CommonJS
+// interop as `__require("htmlparser2")`; a check that only knew `require`
+// reported a clean bundle while production was returning 500 on every request.
+const REQUIRE = /^_*require$/;
+
+function* specifiersIn(node) {
+  if (!node || typeof node.type !== 'string') return;
+  switch (node.type) {
+    case 'ImportDeclaration':
+    case 'ExportNamedDeclaration':
+    case 'ExportAllDeclaration':
+    case 'ImportExpression':
+      if (typeof node.source?.value === 'string') yield node.source.value;
+      break;
+    case 'CallExpression': {
+      const callee = node.callee.type === 'MemberExpression' ? node.callee.property : node.callee;
+      const [arg] = node.arguments;
+      if (REQUIRE.test(callee?.name ?? '') && arg?.type === 'Literal' && typeof arg.value === 'string') yield arg.value;
+      break;
+    }
+  }
+  for (const key of Object.keys(node)) {
+    const child = node[key];
+    if (Array.isArray(child)) for (const c of child) yield* specifiersIn(c);
+    else if (child && typeof child === 'object') yield* specifiersIn(child);
+  }
+}
 
 const referenced = new Map(); // package -> Set of files referencing it
 for (const file of walkFiles(serverDir)) {
   const src = readFileSync(file, 'utf8');
-  for (const re of PATTERNS) {
-    for (const [, spec] of src.matchAll(re)) {
-      if (spec.startsWith('node:') || BUILTIN.has(spec)) continue;
-      if (!LOOKS_LIKE_A_PACKAGE.test(spec)) continue;
-      const pkg = packageOf(spec);
-      if (!referenced.has(pkg)) referenced.set(pkg, new Set());
-      referenced.get(pkg).add(file.replace(FUNC + '/', ''));
-    }
+  let ast;
+  try {
+    ast = parse(src, {
+      ecmaVersion: 'latest',
+      sourceType: file.endsWith('.cjs') ? 'script' : 'module',
+      allowHashBang: true,
+      allowReturnOutsideFunction: true,
+    });
+  } catch (err) {
+    console.error(`✗ could not parse ${file.replace(FUNC + '/', '')}: ${err.message}`);
+    process.exit(1);
+  }
+  for (const spec of specifiersIn(ast)) {
+    if (spec.startsWith('node:') || BUILTIN.has(spec)) continue;
+    if (!LOOKS_LIKE_A_PACKAGE.test(spec)) continue;
+    const pkg = packageOf(spec);
+    if (!referenced.has(pkg)) referenced.set(pkg, new Set());
+    referenced.get(pkg).add(file.replace(FUNC + '/', ''));
   }
 }
 
