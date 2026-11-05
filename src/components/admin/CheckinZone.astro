@@ -31,8 +31,9 @@
     skipped   explicit, recorded, reversible — never a gap and never a scold
     fill      the form, prefilled from the row (or from your medians) · A SHEET
 
-  Everything that moves between them is `src/scripts/checkin.ts`, which still
-  finds all four by `[data-panel]` — the dialog carries its own.
+  Nothing moves between the three inline panels without a reload: the choice is
+  made once, below, from the row. `src/scripts/checkin.ts` opens the sheet and
+  saves; the dialog keeps its `data-panel` so "is the form showing?" is one selector.
 
   ══ THE LAYOUT, REDRAWN 2026-08-06 ══════════════════════════════════════════
   The night stopped being one sleep and the dream stopped being one dream, and
@@ -134,7 +135,15 @@ const suggest = isToday && !times.bed && !times.woke ? prefill : null;
 const bedValue = times.bed ?? suggest?.bed ?? '';
 const wokeValue = times.woke ?? suggest?.woke ?? '';
 
-const panel = skipped ? 'skipped' : answered ? 'done' : 'ask';
+/*
+  ⚠ THE SERVER DECIDES WHICH PANEL SHOWS, IN THE MARKUP. It used to render all
+  four `hidden` and leave the choice to `checkin.ts` — a deferred module, so the
+  first paint of every visit had a card with no body. Measured 2026-11-04: 51px
+  tall for ~190ms, then 234px, with everything below jumping 183px. That was the
+  flash after closing the sheet, because closing ends in a reload. The answer
+  was always known here and nothing on the client ever changes it.
+*/
+const panel = writable ? (skipped ? 'skipped' : answered ? 'done' : 'ask') : answered ? 'done' : 'closed';
 const summary = derive({
   bed: times.bed,
   woke: times.woke,
@@ -160,11 +169,18 @@ const summary = derive({
   data-checkin
   data-log-date={logDate}
   data-writable={writable ? 'true' : 'false'}
-  data-panel-initial={writable ? panel : answered ? 'done' : 'closed'}
+  data-panel-initial={panel}
 >
   {
     writable && (
-      <button slot="actions" type="button" class="zone__act" data-edit hidden aria-label="Edit this check-in">
+      <button
+        slot="actions"
+        type="button"
+        class="zone__act"
+        data-edit
+        hidden={panel !== 'done'}
+        aria-label="Edit this check-in"
+      >
         <Icon name="ph:pencil-simple" />
       </button>
     )
@@ -174,7 +190,7 @@ const summary = derive({
   <div
     class="zone__body flex flex-wrap items-center justify-between gap-4"
     data-panel="ask"
-    hidden
+    hidden={panel !== 'ask'}
     data-src="no daily_checkins row for this log_date"
   >
     <div>
@@ -190,7 +206,7 @@ const summary = derive({
   </div>
 
   {/* ════════════ SKIPPED ════════════ */}
-  <div class="zone__body" data-panel="skipped" hidden data-src="daily_checkins.skipped = true">
+  <div class="zone__body" data-panel="skipped" hidden={panel !== 'skipped'} data-src="daily_checkins.skipped = true">
     <p class="font-serif text-lg">{isToday ? 'Skipped today.' : 'Skipped.'}</p>
     <button type="button" class="btn btn-ghost btn-sm mt-3 font-sans" data-unskip>Fill it in anyway</button>
   </div>
@@ -199,12 +215,12 @@ const summary = derive({
     /* ════════════ CLOSED ════════════ a past date outside the window, with
       nothing on it. It is simply absent — never a failure, never a prompt. */
   }
-  <div class="zone__body" data-panel="closed" hidden>
+  <div class="zone__body" data-panel="closed" hidden={panel !== 'closed'}>
     <p class="admin-hint text-sm">Nothing recorded.</p>
   </div>
 
   {/* ════════════ DONE ════════════ */}
-  <DonePanel {row} {times} {dreams} {summary} {writable} {tz} />
+  <DonePanel {row} {times} {dreams} {summary} {writable} {tz} shown={panel === 'done'} />
 
   {/* ════════════ FILL ════════════ */}
   {

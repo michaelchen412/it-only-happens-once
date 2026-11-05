@@ -572,12 +572,102 @@ test('⚠ pressing B is not "leaving the field", so it does not post', async ({ 
  * covered by nothing at all.
  *
  * Nothing here writes: `stub` answers every check-in call with the row it asked
- * for, and each test touches no control before leaving, so no save is even
- * pending. Leaving reloads (the summary is rendered from the ROW, never from
- * the browser's idea of it), which is why each assertion is about the sheet
- * being GONE rather than about what replaced it.
+ * for. Leaving after a change reloads (the summary is rendered from the ROW,
+ * never from the browser's idea of it), which is why most assertions are about
+ * the sheet being GONE rather than about what replaced it.
  */
 test.describe('leaving the form', () => {
+  /** Hold every `checkin.save` for `ms`, then let `stub` answer it — or refuse it. */
+  const slowSave = (page: import('@playwright/test').Page, ms: number, outcome: 'land' | 'fail' = 'land') =>
+    page.route('**/_actions/checkin.save/**', async (route) => {
+      await new Promise((r) => setTimeout(r, ms));
+      if (outcome === 'fail') await route.abort('failed');
+      else await route.fallback();
+    });
+
+  test('⚠ an untouched form closes without reloading the page', async ({ page }) => {
+    const { seen } = await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+    let reloads = 0;
+    page.on('framenavigated', (f) => {
+      if (f === page.mainFrame()) reloads++;
+    });
+
+    await page.locator('dialog[data-panel="fill"] [data-close]').first().click();
+    await expect(page.locator('dialog[data-panel="fill"]')).toBeHidden();
+    await page.waitForTimeout(500);
+
+    expect(reloads, 'nothing changed, so there was nothing to redraw').toBe(0);
+    expect(seen()).toEqual([]);
+  });
+
+  test('⚠ the exit waits for a save that is already moving', async ({ page }) => {
+    await stub(page);
+    await slowSave(page, 1200);
+    await page.goto('/admin');
+    await openForm(page);
+
+    const order: string[] = [];
+    page.on('response', (r) => {
+      if (r.url().includes('checkin.save')) order.push('landed');
+    });
+    page.on('framenavigated', (f) => {
+      if (f === page.mainFrame()) order.push('reloaded');
+    });
+
+    await page.locator('[data-star="sleep_quality"][data-v="3"]').click();
+    await page.locator('[data-done]').click();
+    await expect.poll(() => order.includes('reloaded'), { timeout: 5000 }).toBe(true);
+
+    expect(order.slice(0, 2), 'the reload would have drawn the row from before the save').toEqual([
+      'landed',
+      'reloaded',
+    ]);
+  });
+
+  test('⚠ a save that fails after Done still stops to ask', async ({ page }) => {
+    await stub(page);
+    await slowSave(page, 800, 'fail');
+    await page.goto('/admin');
+    await openForm(page);
+
+    await page.locator('[data-star="sleep_quality"][data-v="3"]').click();
+    await page.locator('[data-done]').click();
+
+    await expect(page.getByRole('button', { name: 'Discard' })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('⚠ a time typed during a save is sent, not dropped by Escape', async ({ page }) => {
+    const { payloads } = await stub(page);
+    await slowSave(page, 300);
+    await page.goto('/admin');
+    await openForm(page);
+
+    await page.locator('[data-star="sleep_quality"][data-v="3"]').click();
+    await page.locator('dialog[data-panel="fill"] [data-field="bed"]').fill('23:47');
+    // The first save has landed and the 800ms debounce on the typing has not.
+    await page.waitForTimeout(450);
+    await expect(page.locator('[data-saved]'), '"Saved" would be untrue of the typing').toHaveText('Saving…');
+
+    await page.keyboard.press('Escape');
+    await expect.poll(() => payloads.at(-1)?.bed, { timeout: 5000 }).toBe('23:47');
+  });
+
+  test('⚠ a pending save cannot undo Skip', async ({ page }) => {
+    // `checkin.save` writes `skipped: false`, so the last write has to be the skip.
+    const { seen } = await stub(page);
+    await page.goto('/admin');
+    await openForm(page);
+
+    await page.locator('dialog[data-panel="fill"] [data-field="bed"]').fill('23:47');
+    await page.locator('dialog[data-panel="fill"] [data-skip]').click();
+    await expect.poll(seen, { timeout: 5000 }).toContain('checkin.setSkipped');
+    await page.waitForTimeout(1200);
+
+    expect(seen()).toEqual(['checkin.save', 'checkin.setSkipped']);
+  });
+
   test('⚠ Escape gets out from INSIDE a mini editor, where ProseMirror eats the key', async ({ page }) => {
     await stub(page);
     await page.goto('/admin');
@@ -663,5 +753,22 @@ test.describe('leaving the form', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog').filter({ hasText: 'Discard changes?' })).toHaveCount(0);
     await expect(page.locator('dialog[data-panel="fill"]')).toBeHidden();
+  });
+});
+
+/*
+  ⚠ WITH JAVASCRIPT OFF, BECAUSE THAT IS WHAT THE FIRST PAINT IS. The card's body
+  used to be chosen by a deferred module, so every load painted the zone empty and
+  then jumped everything below it 183px. `checkin.ts` no longer touches the panels;
+  this holds it there, since a green run with scripts on could not tell the two apart.
+*/
+test.describe('the first paint, before any script', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('the card already shows its panel', async ({ page }) => {
+    await page.goto('/admin');
+    const initial = await panelOf(page);
+    await expect(page.locator(`[data-panel="${initial}"]`)).toBeVisible();
+    await expect(page.locator('[data-checkin] [data-edit]')).toBeVisible({ visible: initial === 'done' });
   });
 });

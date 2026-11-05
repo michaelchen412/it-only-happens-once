@@ -49,8 +49,10 @@ interface Props {
   writable: boolean;
   /** The configured home zone — the no-JavaScript fallback for save stamps. */
   tz: string;
+  /** Is this the panel showing? Decided by the parent, from the row. */
+  shown: boolean;
 }
-const { row, times, dreams, summary, writable, tz } = Astro.props;
+const { row, times, dreams, summary, writable, tz, shown } = Astro.props;
 
 const dreamOf = (tone: string) => dreams.find((d) => d.tone === tone);
 const aids = row?.sleep_aids ?? null;
@@ -58,7 +60,7 @@ const aidsTaken = AIDS.filter((a) => aids?.includes(a.key));
 ---
 
 {/* ════════════ DONE ════════════ */}
-<div class="zone__body" data-panel="done" hidden>
+<div class="zone__body" data-panel="done" hidden={!shown}>
   <div class="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
     {
       /* The night, and everything that qualifies it. The dream badge and the

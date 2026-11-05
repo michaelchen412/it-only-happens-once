@@ -70,25 +70,10 @@ onPage((page) => {
     const savedEl = $<HTMLElement>('[data-saved]');
     const derivedEl = $<HTMLElement>('[data-derived]');
 
-    // ── panels ──────────────────────────────────────────────────────────────
-    // Four of the five are inline blocks on the card; `fill` is a sheet
-    // (FillPanel.astro has the account). It keeps `data-panel="fill"` so "is the
-    // form showing?" stays one selector, which costs this loop one guard:
+    // ── the sheet ───────────────────────────────────────────────────────────
+    // The inline panels are the server's (CheckinZone.astro says why); `fill` is
+    // the one this file opens.
     //
-    // ⚠ `:not(dialog)` IS NOT TIDINESS. A closed `<dialog>` is already
-    // `display: none`, so hiding it would be a no-op — but the ATTRIBUTE would
-    // persist, and Tailwind's preflight `[hidden] { display: none }` is an author
-    // rule that beats the UA's `dialog[open] { display: block }`. So the first
-    // `show()` after a close would arm a sheet that opens into nothing on the tap
-    // after that: `showModal()` succeeds, `[open]` is set, and the box never
-    // paints. Leave the dialog's visibility to `open`/`close` alone.
-    function show(panel: string) {
-      $$('[data-panel]:not(dialog)').forEach((p) => (p.hidden = p.dataset.panel !== panel));
-      const edit = $<HTMLElement>('[data-edit]');
-      if (edit) edit.hidden = panel !== 'done';
-    }
-    show(zone.dataset.panelInitial!);
-
     // Null on a date outside the backfill window — the parent renders no form at
     // all there, and everything below is guarded by `writable` for the same reason.
     const sheet = $<HTMLDialogElement>('dialog[data-panel="fill"]');
@@ -260,9 +245,25 @@ onPage((page) => {
       // A single in-flight save with a dirty flag, rather than a queue: the
       // payload is the WHOLE form every time, so a superseded request carries
       // nothing the next one will not.
+      //
+      // ⚠ `timer` IS UNDEFINED WHENEVER NOTHING IS WAITING ON IT. `clearTimeout`
+      // leaves the old id behind, so every path that stops or fires it resets it
+      // too — `drain` and `pagehide` both read it as "typing still in the debounce".
       let timer: number | undefined;
-      let inFlight = false;
+      /**
+       * The save loop running now, if one is.
+       *
+       * ⚠ A PROMISE RATHER THAN A BOOLEAN, because `leave()` has to wait for it.
+       * With an `inFlight` flag a second `flush()` returned at once, so "await
+       * flush()" meant nothing whenever a save was already moving — which is the
+       * usual case, since leaving an editor flushes on `focusout` before Done's
+       * click arrives. The reload then outran the save and drew the old row, and
+       * a save that failed after that point was never reported to anybody.
+       */
+      let running: Promise<void> | null = null;
       let dirty = false;
+      /** Has this visit changed anything a reload would need to redraw? */
+      let touched = false;
       /**
        * Has anything been answered since the last save that LANDED?
        *
@@ -282,18 +283,25 @@ onPage((page) => {
         savedEl.classList.toggle('text-error', bad);
       }
 
-      async function flush() {
-        if (inFlight) {
+      /** Resolves once everything asked for so far has landed or failed. */
+      function flush(): Promise<void> {
+        if (running) {
           dirty = true;
-          return;
+          return running;
         }
-        inFlight = true;
+        running = drain().finally(() => {
+          running = null;
+        });
+        return running;
+      }
+
+      async function drain() {
         try {
           // A LOOP, not a recursive call. Re-entering `flush()` to pick up a
-          // change made mid-request would find `inFlight` still true — the flag
-          // is only cleared in the `finally` below — so the change would be
-          // marked dirty and then never sent. `collect()` re-reads the DOM each
-          // pass, so the last iteration always carries the latest answers.
+          // change made mid-request would find `running` still set — it is only
+          // cleared once this returns — so the change would be marked dirty and
+          // then never sent. `collect()` re-reads the DOM each pass, so the last
+          // iteration always carries the latest answers.
           do {
             dirty = false;
             note('Saving…');
@@ -306,9 +314,16 @@ onPage((page) => {
               return;
             }
           } while (dirty);
-          pending = false;
           failed = false;
-          note('Saved');
+          // ⚠ TYPING THAT ARRIVED MID-REQUEST IS NOT IN WHAT JUST LANDED. It is
+          // still in the debounce, so it is still pending and "Saved" would be
+          // untrue of it — and clearing `pending` here is what let `leave()` drop
+          // it: a time typed during a save, then Escape, and the words on screen
+          // said "Saved" over an answer that was never sent.
+          if (timer === undefined) {
+            pending = false;
+            note('Saved');
+          }
 
           // The sidebar pill, the burger pill and the window title (20 · §7).
           //
@@ -335,23 +350,49 @@ onPage((page) => {
           // have. Caught by `checkin.spec.ts`, on its first ever run.
           failed = true;
           note('Not saved — check your connection', true);
-        } finally {
-          inFlight = false;
         }
       }
 
+      /** The debounce, stood down. Whoever calls this owns what happens next. */
+      const settle = () => {
+        clearTimeout(timer);
+        timer = undefined;
+      };
+      /**
+       * Everything answered so far, on its way or landed — for the exits.
+       *
+       * ⚠ NOT JUST `flush()`, WHICH TAKES ITS CALLER TO HAVE SOMETHING NEW. A save
+       * already moving carries all of the form unless typing is still in the
+       * debounce, so going through `dirty` here posted the same payload twice and
+       * made Done wait out both.
+       */
+      const finish = (): Promise<void> | undefined => {
+        const typing = timer !== undefined;
+        settle();
+        if (running && !typing) return running;
+        // ⚠ ONLY IF SOMETHING IS ACTUALLY WAITING. A bare `flush()` posts the whole
+        // form on every exit — including an exit from a card nobody touched — and
+        // offline that turns a clean dismissal into a failure, and then (in
+        // `leave`) into a confirm about edits that do not exist.
+        return pending ? flush() : undefined;
+      };
       /** A tap: save now. */
       const now = () => {
         pending = true;
-        clearTimeout(timer);
+        touched = true;
+        settle();
         void flush();
       };
       /** Typing: settle first. */
       const soon = () => {
         pending = true;
+        touched = true;
         note('Saving…');
         clearTimeout(timer);
-        timer = window.setTimeout(flush, 800);
+        timer = window.setTimeout(() => {
+          timer = undefined;
+          void flush();
+        }, 800);
       };
 
       // ── the live payback ──────────────────────────────────────────────────
@@ -509,6 +550,8 @@ onPage((page) => {
         const el = tpl.content.firstElementChild?.cloneNode(true) as HTMLElement | undefined;
         if (!el) return null;
         list.append(el);
+        // An empty row saves nothing, but it must not still be here on reopening.
+        touched = true;
         return el;
       }
 
@@ -609,6 +652,10 @@ onPage((page) => {
       // `location.reload()` on the next line tears the page down a frame or two
       // into it. The reload is what makes the summary behind agree with the row:
       // it is rendered from the ROW rather than from the browser's idea of it.
+      //
+      // ⚠ AND NO RELOAD AT ALL IF NOTHING CHANGED. Opening the form to read it and
+      // backing out has nothing to redraw, and a reload would refetch the whole of
+      // Today to show you the page you were already looking at.
       let leaving = false;
       async function leave() {
         // Four listeners point here and two of them can fire on one gesture
@@ -617,12 +664,7 @@ onPage((page) => {
         // ever see; flushing twice against a half-typed dream is.
         if (leaving) return;
         leaving = true;
-        clearTimeout(timer);
-        // ⚠ ONLY IF SOMETHING IS ACTUALLY WAITING. A bare `await flush()` posts
-        // the whole form on every exit — including an exit from a card nobody
-        // touched — and offline that turns a clean dismissal into a failure, and
-        // then (below) into a confirm about edits that do not exist.
-        if (pending) await flush();
+        await finish();
 
         // ⚠⚠ THE ONE STATE IN WHICH DISMISSING THIS SHEET COSTS SOMETHING, and it
         // is why the sheet has a guard at all. ADR 0032 asks every sheet what its
@@ -646,7 +688,8 @@ onPage((page) => {
           return;
         }
         if (sheet) await closeWithExit(sheet);
-        location.reload();
+        if (touched) location.reload();
+        else leaving = false;
       }
       $('[data-done]')?.addEventListener('click', () => void leave());
 
@@ -672,6 +715,11 @@ onPage((page) => {
       }
 
       const setSkipped = async (skipped: boolean) => {
+        // ⚠ ANSWERS FIRST, THEN THE SKIP, NEVER THE OTHER WAY ROUND. `checkin.save`
+        // writes `skipped: false` — it has to, an answered night is not a skipped
+        // one — so a debounced save firing behind this call undid it: type a time,
+        // tap Skip inside 800ms, and the day came back unskipped.
+        await finish();
         // ⚠ SKIP HAD NO CATCH while the autosave above has carried one since the
         // day its own spec found the bug. Same surface, same header promising
         // that *failure is loud*, and offline a Skip/Unskip tap did nothing at
@@ -698,7 +746,7 @@ onPage((page) => {
       // one at all — this is a backstop, not the mechanism.
       page.on(window, 'pagehide', () => {
         if (timer !== undefined) {
-          clearTimeout(timer);
+          settle();
           void flush();
         }
       });

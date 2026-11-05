@@ -211,6 +211,19 @@ test.describe('the walk does not leave duplicates behind', () => {
     ).toBe(1);
   });
 
+  test('Today’s date popover still closes on an outside click after walking away and back', async ({ page }) => {
+    await page.goto('/admin');
+    await hideDevToolbar(page);
+    await walkTo(page, '/admin/library');
+    await walkTo(page, '/admin');
+
+    const cal = page.locator('.cal-wrap');
+    await cal.locator('summary').click();
+    await expect(cal).toHaveJSProperty('open', true);
+    await page.mouse.click(1100, 700);
+    await expect(cal, 'the listener still points at the first visit’s popover').toHaveJSProperty('open', false);
+  });
+
   test('⚠ a card’s → opens ONE chooser after walking away and back', async ({ page }) => {
     await page.goto('/admin/notes');
     await hideDevToolbar(page);

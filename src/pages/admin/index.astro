@@ -415,27 +415,35 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     // this is the ONLY thing on the page the browser's zone is allowed to
     // influence: a sentence. It never moves the day.
     import { deviceZoneNote } from '../../lib/hq/time';
+    import { onPage } from '../../scripts/page';
 
-    const el = document.getElementById('tz-note');
-    const configured = el?.dataset.tz;
-    if (el && configured) {
-      const device = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const note = deviceZoneNote(configured, device);
-      if (note) {
-        el.textContent = note;
-        el.hidden = false;
+    // ⚠ INSIDE `onPage` FOR THE SAME REASON AS EVERY SCRIPT IT IMPORTS, and
+    // `page-boot.test.ts` cannot see this one: it reads `scripts/`, not a page's
+    // own `<script>`. At module scope `cal` stayed the element from the first
+    // visit, so after walking out and back an outside click closed nothing.
+    onPage((page) => {
+      const el = document.getElementById('tz-note');
+      const configured = el?.dataset.tz;
+      if (el && configured) {
+        const device = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const note = deviceZoneNote(configured, device);
+        if (note) {
+          el.textContent = note;
+          el.hidden = false;
+        }
       }
-    }
 
-    // A <details> closes on Escape and on a click outside, like every other
-    // popover in here. Progressive enhancement only: without this it still
-    // opens, closes and navigates.
-    const cal = document.querySelector<HTMLDetailsElement>('.cal-wrap');
-    document.addEventListener('click', (e) => {
-      if (cal?.open && !(e.target as Element).closest('.cal-wrap')) cal.open = false;
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && cal?.open) cal.open = false;
+      // A <details> closes on Escape and on a click outside, like every other
+      // popover in here. Progressive enhancement only: without this it still
+      // opens, closes and navigates.
+      const cal = document.querySelector<HTMLDetailsElement>('.cal-wrap');
+      if (!cal) return;
+      page.on(document, 'click', (e) => {
+        if (cal.open && !(e.target as Element).closest('.cal-wrap')) cal.open = false;
+      });
+      page.on(document, 'keydown', (e) => {
+        if (e.key === 'Escape' && cal.open) cal.open = false;
+      });
     });
   </script>
 </AdminLayout>

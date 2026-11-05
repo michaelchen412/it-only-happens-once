@@ -29,8 +29,7 @@
 
   IT ALSO KEEPS `data-panel="fill"`, which is now the dialog's own attribute. A
   closed `<dialog>` is `display: none`, so "is the form showing?" is still one
-  selector — and `checkin.ts`'s `show()` skips dialogs rather than setting
-  `hidden` on one.
+  selector.
 
   AND THE PHONE GAINS THE KEYBOARD INSET. `--kb` is only consumed by
   `.drawer-dialog` (admin.css) — inline content gets nothing — so until now the
