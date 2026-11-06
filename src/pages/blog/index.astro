@@ -309,7 +309,27 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
       feed && (
         <div class="grid gap-8 md:grid-cols-[13rem_1fr] md:gap-12">
           {/* ─────────  THE RAIL: search + subjects (the two TEXT views)  ───────── */}
-          <aside class="md:sticky md:top-20 md:self-start">
+          {/*
+            ⚠ THE RAIL SCROLLS ITSELF WHEN THE WINDOW CANNOT FIT IT. It is pinned,
+            and a pinned box only moves when the feed beside it runs out — but
+            infinite scroll keeps extending the feed, so on a laptop the last tags
+            slid into reach for a moment and snapped away as each page arrived,
+            and stayed out of reach until the whole corpus had loaded. Michael:
+            *"have to fight against the infinite scroll to see the bottom of
+            tags."* Dropping the sticky was the alternative, and loses the filters
+            the moment you start reading.
+
+            The max-height is the top-20 offset plus a 1rem gutter below.
+            `overscroll-contain` is half the fix: without it, the wheel reaching
+            the end of the tags carries on into the feed and starts loading pages.
+            The -mx-1/px-1/pb-1/scroll-py-1 are room for the 4px site-wide focus
+            ring (app.css), which `overflow` would otherwise slice off tags sitting
+            flush with this box. blog-rail.anon.spec.ts holds all of this down.
+          */}
+          <aside
+            data-blog-rail
+            class="md:sticky md:top-20 md:-mx-1 md:max-h-[calc(100dvh-6rem)] md:scroll-py-1 md:[scrollbar-width:thin] md:self-start md:overflow-y-auto md:overscroll-contain md:px-1 md:pb-1"
+          >
             <form method="get" action="/blog" role="search" id="blog-filters" class="relative">
               <Icon
                 name="ph:magnifying-glass"

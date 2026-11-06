@@ -153,6 +153,66 @@ test.describe('the rail counts every filter on the page', () => {
   });
 });
 
+// ⚠ SHORT WINDOW ON PURPOSE. The rail is ~785px tall with a 21-tag taxonomy, so
+// the Desktop Chrome default (720px) would only just exercise this, and would
+// stop exercising it the day a few tags were retired.
+test.describe('the whole rail is reachable on a short window', () => {
+  test.use({ viewport: { width: 1280, height: 500 } });
+
+  const lastTagBottom = (page: Page) =>
+    page
+      .locator('[data-subjects] li')
+      .last()
+      .evaluate((el) => el.getBoundingClientRect().bottom);
+
+  test('the wheel reaches the last tag and never moves the feed', async ({ page }) => {
+    await page.goto('/blog');
+    await expect(page.locator('#feed-sentinel')).toBeAttached();
+    // Read into the feed first: the rail is pinned from here on, which is where
+    // the tags used to be out of reach.
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(300);
+    const items = await page.locator('#feed-list > *').count();
+
+    await page.locator('[data-subjects]').hover();
+    // Far past the rail's own length, because the overshoot is the bug: a wheel
+    // that chains out of the rail scrolls the page and loads more feed.
+    for (let i = 0; i < 20; i++) await page.mouse.wheel(0, 200);
+
+    await expect.poll(() => lastTagBottom(page)).toBeLessThanOrEqual(500);
+    expect(await page.evaluate(() => window.scrollY)).toBe(300);
+    await expect(page.locator('#feed-list > *')).toHaveCount(items);
+  });
+
+  test('picking a tag from the bottom of the list leaves you there', async ({ page }) => {
+    // The router replaces the whole document on a tag click, so the scroller is
+    // a NEW element afterwards. Coming back at the top would make every tag below
+    // the fold a round trip, and subjects stack, so readers take that trip twice.
+    await page.goto('/blog');
+    const aside = page.locator('[data-blog-rail]');
+    await aside.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    const before = await aside.evaluate((el) => el.scrollTop);
+    expect(before).toBeGreaterThan(0);
+
+    await page.locator('[data-subject-link]').last().click();
+    await expect(page).toHaveURL(/subject=/);
+    await expect(page.locator('[data-subject-clear]')).toBeVisible();
+    expect(await aside.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  });
+
+  test('below the md breakpoint the rail stays in the page flow', async ({ page }) => {
+    // The cap is desktop-only: a phone's rail is not pinned, so a scroller there
+    // would be a list trapped inside the page for no reason.
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.goto('/blog');
+    const style = await page.locator('aside').evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { position: s.position, overflowY: s.overflowY, maxHeight: s.maxHeight };
+    });
+    expect(style).toEqual({ position: 'static', overflowY: 'visible', maxHeight: 'none' });
+  });
+});
+
 test.describe('the chip that shows the filter', () => {
   test('it names the author and removes only that filter', async ({ page }) => {
     const author = await someAuthor(page);

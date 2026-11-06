@@ -1192,7 +1192,8 @@ html.scroll-locked .sky-return {
 
 /* Subjects rail (blog/index.astro) — a long taxonomy crowds the top of the
    MOBILE page, so we cap it and reveal the tail behind "Show all". The desktop
-   rail has vertical room, so it always shows the whole list. */
+   rail always lists everything, and scrolls itself when a short window cannot
+   fit it (see the <aside> there). */
 .subject-extra {
   display: none;
 }

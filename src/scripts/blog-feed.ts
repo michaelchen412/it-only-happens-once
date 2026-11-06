@@ -227,6 +227,22 @@ document.addEventListener('click', (e) => {
   btn.setAttribute('aria-expanded', String(expanded));
 });
 
+// ⚠ THE RAIL KEEPS ITS PLACE ACROSS A TAG CLICK. `<ClientRouter />` claims that
+// click before the handler above runs and replaces the whole document, so the
+// rail's own scroller (see the <aside> in blog/index.astro) comes back at 0 — and
+// on a short window the tag just selected, and every tag next to it, is out of
+// sight. Subjects stack, so choosing two from the bottom of the list would mean
+// scrolling back down between them. Same-page only: a different room owes this
+// list nothing, and `transition:persist` is not the answer because it would keep
+// the old counts, which are the reason the rail re-renders at all.
+let railScroll = 0;
+document.addEventListener('astro:before-swap', (e) => {
+  railScroll = e.from.pathname === e.to.pathname ? (document.querySelector('[data-blog-rail]')?.scrollTop ?? 0) : 0;
+});
+document.addEventListener('astro:after-swap', () => {
+  document.querySelector('[data-blog-rail]')?.scrollTo(0, railScroll);
+});
+
 // The form + feed are swapped on view-transition navigation, so (re)bind against
 // the fresh DOM each time. Fires on first load too.
 document.addEventListener('astro:page-load', () => {
