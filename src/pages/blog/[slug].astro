@@ -147,8 +147,8 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
          that there is a collection behind the line. */
       <main class="px-6 pb-24">
         <div class="mx-auto max-w-3xl pt-6 sm:pt-10">
-          <a href="/blog?view=quotes" class="reader-back">
-            <Icon name="ph:caret-left" class="size-3.5" /> All quotes
+          <a href="/blog?view=quotes" class="reader-back" data-feed-return>
+            <Icon name="ph:caret-left" class="size-3.5" /> <span data-feed-return-label>All quotes</span>
           </a>
         </div>
         <section class="mx-auto flex min-h-[72vh] max-w-3xl flex-col justify-center">
@@ -161,8 +161,8 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
          ways home; sharing the class makes that literally true — the same 44px
          target, the caret aligned to the prose, the same lean on hover. */
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
-        <a href="/blog" class="reader-back">
-          <Icon name="ph:caret-left" class="size-3.5" /> The blog
+        <a href="/blog" class="reader-back" data-feed-return>
+          <Icon name="ph:caret-left" class="size-3.5" /> <span data-feed-return-label>The blog</span>
         </a>
 
         <div class="prose-measure mt-6">
@@ -177,11 +177,26 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
             "Blog" is below this, but it is a row of furniture, not an answer to
             "where do I go now?" */}
         <div class="mt-8">
-          <a href="/blog" class="reader-back">
-            <Icon name="ph:caret-left" class="size-3.5" /> The blog
+          <a href="/blog" class="reader-back" data-feed-return>
+            <Icon name="ph:caret-left" class="size-3.5" /> <span data-feed-return-label>The blog</span>
           </a>
         </div>
       </div>
     ) : null
   }
 </SiteLayout>
+
+<script>
+  /*
+    `data-feed-return` on the three ways back above: when this page was reached
+    FROM the feed — an essay's title in the reading sheet, or a ⌕ result opened
+    over the list — each one is re-pointed at the exact place the reader left
+    (same filters, same depth, same card), and relabelled for the list it now
+    leads to. Reached any other way — a shared link above all — the href the
+    server wrote stands: the top of the list, because a stranger dropped into
+    the middle of it would be lost, not helped. The whole argument is in
+    scripts/feed-return.ts.
+  */
+  import { initFeedReturn } from '../../scripts/feed-return';
+  initFeedReturn();
+</script>

@@ -33,7 +33,15 @@ import QuoteCard from '../../components/QuoteCard.astro';
 import Reader from '../../components/Reader.astro';
 import QuoteArticle from '../../components/QuoteArticle.astro';
 import { Icon } from 'astro-icon/components';
-import { attachNeighbourhoods, listWriting, listQuotes, listSubjects, neighbourhoodsFor } from '../../lib/blog';
+import {
+  attachNeighbourhoods,
+  listWriting,
+  listQuotes,
+  listSubjects,
+  neighbourhoodsFor,
+  PAGE_SIZE,
+  QUOTES_PAGE_SIZE,
+} from '../../lib/blog';
 
 import { MIN_SEARCH } from '../../lib/search-highlight';
 import { PRIVATE_PAGE, PUBLIC_PAGE } from '../../lib/http-cache';
@@ -503,13 +511,13 @@ Astro.response.headers.set('Vary', 'X-Requested-With');
                   </p>
                 </div>
               ) : view === 'writing' ? (
-                <div id="feed-list" class="divide-base-content/10 divide-y">
+                <div id="feed-list" data-page-size={PAGE_SIZE} class="divide-base-content/10 divide-y">
                   {writing!.items.map((item) => (
                     <PostCard item={item} term={q} />
                   ))}
                 </div>
               ) : (
-                <div id="feed-list" class="divide-base-content/10 divide-y">
+                <div id="feed-list" data-page-size={QUOTES_PAGE_SIZE} class="divide-base-content/10 divide-y">
                   {quotes!.items.map((item) => (
                     <QuoteCard item={item} term={q} />
                   ))}

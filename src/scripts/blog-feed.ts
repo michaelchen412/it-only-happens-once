@@ -13,7 +13,13 @@
 //   · Infinite scroll — an IntersectionObserver on #feed-sentinel appends the next
 //     page (fetched via X-Requested-With so the server honours ?page) into
 //     #feed-list. Re-armed after every swap on the fresh sentinel.
+//   · Its place — `feed-return.ts` records how deep the reader is and where,
+//     and the page-load handler below restores it (Back, Forward, reload, and
+//     the way back from a piece's own page).
 import { MIN_SEARCH } from '../lib/search-highlight';
+import { initFeedReturn, markSettled, savedSpot, scrollToSpot, stamp, watchIntent } from './feed-return';
+
+initFeedReturn();
 
 let io: IntersectionObserver | null = null;
 let loadingMore = false;
@@ -48,6 +54,48 @@ function observeSentinel() {
   io.observe(sentinel);
 }
 
+type Page = { nodes: Element[]; next: string | null };
+
+/** One page of the feed, as a partial (the server honours `?page` only for this). */
+async function fetchPage(url: string, signal?: AbortSignal): Promise<Page> {
+  const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' }, signal });
+  if (!res.ok) throw new Error('bad status');
+  const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+  return {
+    nodes: Array.from(doc.getElementById('feed-list')?.children ?? []),
+    next: doc.getElementById('feed-sentinel')?.getAttribute('data-next-url') ?? null,
+  };
+}
+
+const slugOf = (card: Element) => card.querySelector<HTMLElement>('[data-read]')?.dataset.read;
+
+/**
+ * Append a page's cards — skipping any already on the list. Pages are cut by
+ * position, so a piece published or retracted between two fetches shifts every
+ * later page by one, and the seam would otherwise show the same card twice. It
+ * matters most for a restore, which re-fetches pages minutes after the first.
+ */
+function appendPage(list: HTMLElement, page: Page) {
+  const seen = new Set(Array.from(list.children, slugOf));
+  for (const node of page.nodes) {
+    const slug = slugOf(node);
+    if (slug && seen.has(slug)) continue;
+    list.append(node.cloneNode(true));
+  }
+}
+
+/** Point the sentinel at the next page, or retire it at the end of the feed. */
+function advanceSentinel(next: string | null) {
+  const sentinel = document.getElementById('feed-sentinel');
+  if (!sentinel) return;
+  if (next) {
+    sentinel.dataset.nextUrl = next;
+  } else {
+    io?.disconnect();
+    sentinel.remove(); // reached the end
+  }
+}
+
 /** Fetch the next page and append its items; advance or retire the sentinel. */
 async function loadMore(): Promise<void> {
   const sentinel = document.getElementById('feed-sentinel') as HTMLElement | null;
@@ -59,18 +107,10 @@ async function loadMore(): Promise<void> {
   loadingMore = true;
   sentinel.classList.add('is-loading');
   try {
-    const res = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
-    if (!res.ok) throw new Error('bad status');
-    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-    const fetchedList = doc.getElementById('feed-list');
-    if (fetchedList) for (const node of Array.from(fetchedList.children)) list.append(node.cloneNode(true));
-    const next = doc.getElementById('feed-sentinel')?.getAttribute('data-next-url');
-    if (next) {
-      sentinel.dataset.nextUrl = next;
-    } else {
-      io?.disconnect();
-      sentinel.remove(); // reached the end
-    }
+    const page = await fetchPage(url);
+    appendPage(list, page);
+    advanceSentinel(page.next);
+    stamp(); // the entry learns the new depth now, not only on the way out
   } catch {
     // Leave the manual link in place so the reader can retry by clicking it.
   } finally {
@@ -83,6 +123,72 @@ async function loadMore(): Promise<void> {
   const s = document.getElementById('feed-sentinel') as HTMLElement | null;
   if (s?.dataset.nextUrl && s.getBoundingClientRect().top < window.innerHeight + 600) {
     requestAnimationFrame(() => loadMore());
+  }
+}
+
+/*
+  The deepest a restore will reach. The whole corpus is nine pages of writing
+  and four of quotes; this only stops a corrupt or hand-edited entry asking for
+  a thousand fetches.
+*/
+const MAX_RESTORE_PAGES = 30;
+
+/**
+ * Put the feed back the way the reader left it: as many pages as they had,
+ * scrolled so the card that was at the top is at the top again.
+ *
+ * The pages come in PARALLEL and are appended IN ORDER. They are the same URLs
+ * the reader loaded the first time, so the browser's ten-minute cache
+ * (lib/http-cache.ts, `Vary: X-Requested-With`) usually answers every one of
+ * them without a request reaching the network.
+ *
+ * ⚠ IT RUNS BEFORE THE SENTINEL IS OBSERVED (see the page-load handler), and
+ * that order is the fix for a race, not tidiness. On Back the router has
+ * already scrolled to its saved position over page 1 alone, which leaves the
+ * reader at the bottom of that page — sentinel in view. Arming the observer
+ * first is what produced the measured "14 cards": it fetched page 2 while the
+ * restore would be fetching it too, and the seam doubled.
+ */
+async function restoreFeed(signal: AbortSignal): Promise<void> {
+  const spot = savedSpot();
+  const list = document.getElementById('feed-list');
+  if (!spot || !list) return;
+  const intent = watchIntent();
+  const token = swapToken;
+  try {
+    const size = Number(list.dataset.pageSize) || 1;
+    const have = Math.ceil(list.children.length / size);
+    const want = Math.min(spot.feedPages, MAX_RESTORE_PAGES);
+    const next = document.getElementById('feed-sentinel')?.dataset.nextUrl;
+    if (want > have && next) {
+      const feed = document.getElementById('blog-feed');
+      feed?.classList.add('list-loading');
+      try {
+        const urls: string[] = [];
+        for (let k = have + 1; k <= want; k++) {
+          const u = new URL(next, location.href);
+          u.searchParams.set('page', String(k));
+          urls.push(u.pathname + u.search);
+        }
+        const pages = await Promise.allSettled(urls.map((u) => fetchPage(u, signal)));
+        if (signal.aborted || token !== swapToken || !list.isConnected) return;
+        for (const page of pages) {
+          // A failed page stops the restore there, and the sentinel already
+          // points at it — scrolling down simply tries it again.
+          if (page.status === 'rejected') break;
+          appendPage(list, page.value);
+          advanceSentinel(page.value.next);
+          if (!page.value.next) break;
+        }
+      } finally {
+        feed?.classList.remove('list-loading');
+      }
+    }
+    if (signal.aborted || token !== swapToken) return;
+    // The reader's own scroll since arriving outranks where they used to be.
+    if (spot.feedAnchor && !intent()) scrollToSpot(spot.feedAnchor);
+  } finally {
+    intent();
   }
 }
 
@@ -129,7 +235,9 @@ async function swapTo(target: string): Promise<boolean> {
     // ClientRouter keeps its own bookkeeping there — `index`, `scrollX/Y` — and
     // `{}` erased it, so a later Back to this entry ran with no index and no
     // scroll to restore.
-    history.replaceState({ ...history.state }, '', target);
+    // A new filter or search IS a fresh feed, so the place recorded for the old
+    // one (feed-return.ts) is reset rather than inherited.
+    history.replaceState({ ...history.state, feedPages: 1, feedAnchor: null }, '', target);
     observeSentinel(); // the swap brought a fresh sentinel (or none)
     return true;
   } catch {
@@ -249,7 +357,26 @@ document.addEventListener('astro:after-swap', () => {
 
 // The form + feed are swapped on view-transition navigation, so (re)bind against
 // the fresh DOM each time. Fires on first load too.
-document.addEventListener('astro:page-load', () => {
+//
+// ⚠ RESTORE, THEN OBSERVE — see `restoreFeed`. `loadingMore` is held for the
+// duration so a "Load older" click cannot append the page being restored.
+let restoring: AbortController | null = null;
+document.addEventListener('astro:before-preparation', () => restoring?.abort());
+document.addEventListener('astro:page-load', async () => {
   setupSearch();
-  observeSentinel();
+  const ctl = (restoring = new AbortController());
+  loadingMore = true;
+  try {
+    await restoreFeed(ctl.signal);
+  } catch {
+    // An aborted or failed restore leaves page 1 — the feed as it always was.
+  } finally {
+    if (restoring === ctl) restoring = null;
+    // Aborted means this page is being left: the next page-load owns the flags.
+    if (!ctl.signal.aborted) {
+      loadingMore = false;
+      observeSentinel();
+      markSettled();
+    }
+  }
 });
