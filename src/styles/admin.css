@@ -248,7 +248,12 @@ html.scroll-locked {
    was only ever there to keep a floating glyph legible over moving text. A bar
    with its own ground needs no such trick. Nothing else in the tree references
    `.reader-close`; the JS and the e2e suite both key on `[data-reader-close]`,
-   which both new controls carry. */
+   which both new controls carry.
+
+   ⚠ `.reader-back` IS ALSO THE PERMALINK'S WAY BACK (`pages/blog/[slug].astro`,
+   2026-11-09) — on an <a> there, a <button> here. The sheet borrowed the page's
+   words; the page now borrows the sheet's control, so the two are one thing.
+   Nothing below assumes it is inside the dialog: keep it that way. */
 .reader-top {
   position: sticky;
   top: 0;

@@ -47,9 +47,11 @@ const isAdmin = Astro.locals.user?.app_metadata?.role === 'admin';
   quote page and on every 404 — plan 24's finding, and it matters more on a
   reader-facing page than on any admin one. Two queries, one latency.
 
-  A side effect worth having: Reader.astro already falls back to /blog/<slug>
-  for anything not on the page it is open in. That fallback becomes CORRECT for
-  a quote instead of landing on this file's 404.
+  A side effect worth having: Reader.astro FETCHES /blog/<slug> for anything
+  not on the page it is open in, and lifts the article out of this render —
+  `article.post-article` for an essay, `.quote-article` for a quote. That is
+  what lets a "related" row inside a sheet open the next piece in the same
+  sheet rather than stranding the reader on a bare permalink (2026-11-09).
 */
 const [item, quote] = slug
   ? await Promise.all([
@@ -59,6 +61,20 @@ const [item, quote] = slug
   : [null, null];
 
 const found = item ?? quote;
+
+/*
+  `?in=<constellation>` — the room the asker is standing in, sent ONLY by the
+  Reader when a suite's sheet fetches a quote it has no template for. It means
+  exactly what `QuoteArticle`'s `inConstellation` means: drop that room from
+  "Appears in", because a door back into the room you are already in is not a
+  door. The suite's own templates pass it at render time; a fetched quote has no
+  other way to say it, and without this a related quote opened inside a
+  constellation listed that same constellation as somewhere else to go.
+
+  Harmless on a link anyone types: it can only REMOVE one row from a popover.
+  It does not split the page's identity — `lib/canonical.ts` drops the query.
+*/
+const inConstellation = quote ? Astro.url.searchParams.get('in')?.trim() || undefined : undefined;
 
 // Anything not published is a preview — drafts and notes alike. One rule, so a
 // tier added later can't quietly fall through to the public cache branch. The
@@ -117,23 +133,53 @@ const title = item ? item.title : quote ? `${quoteTitle}${quoteTitle.length < 70
     ) : quote ? (
       /* The permalink's own frame: a full screen with the line floated in the
          middle of it. The Reader supplies a different one for the same content
-         — see QuoteArticle, which carries neither. */
+         — see QuoteArticle, which carries neither.
+
+         ⚠ THE WAY BACK IS TO THE QUOTES, NOT "THE BLOG" (2026-11-09). This page
+         shipped with no way back at all: the strip's doors all lead SIDEWAYS
+         (a subject, an author, a constellation, a kin), and the nav's "Blog"
+         lands on Writing — the wrong view — and on a phone sits behind the
+         burger. Michael: *"there is no easy way to navigate back to just
+         browsing quotes."* The essay's words were the obvious copy and are
+         wrong here for the same reason the nav is: "The blog" names a room
+         whose door opens on the other view. "All quotes" also tells a stranger
+         arriving from a shared link the thing this page exists to tell them —
+         that there is a collection behind the line. */
       <main class="px-6 pb-24">
-        <section class="mx-auto flex min-h-[76vh] max-w-3xl flex-col justify-center">
-          <QuoteArticle page={quote} />
+        <div class="mx-auto max-w-3xl pt-6 sm:pt-10">
+          <a href="/blog?view=quotes" class="reader-back">
+            <Icon name="ph:caret-left" class="size-3.5" /> All quotes
+          </a>
+        </div>
+        <section class="mx-auto flex min-h-[72vh] max-w-3xl flex-col justify-center">
+          <QuoteArticle page={quote} inConstellation={inConstellation} />
         </section>
       </main>
     ) : item ? (
+      /* ⚠ `.reader-back`, THE SHEET'S OWN CLASS, ON PURPOSE. Reader.astro took
+         its words and its mark from this page so a reader is never taught two
+         ways home; sharing the class makes that literally true — the same 44px
+         target, the caret aligned to the prose, the same lean on hover. */
       <div class="mx-auto w-full max-w-2xl px-5 py-10 sm:py-16">
-        <a
-          href="/blog"
-          class="text-whisper hover:text-base-content inline-flex items-center gap-1 font-sans text-sm transition-colors"
-        >
+        <a href="/blog" class="reader-back">
           <Icon name="ph:caret-left" class="size-3.5" /> The blog
         </a>
 
-        <div class="prose-measure mt-8">
+        <div class="prose-measure mt-6">
           <PostArticle item={item} />
+        </div>
+
+        {/* ⚠ AND AGAIN AT THE FOOT, which is the half the sheet already had and
+            this page did not. Reader.astro: the bottom control "is the half
+            that earns the change" — a reader who has just finished an essay
+            averaging 5,700 characters is at the far end of it, and the only
+            explicit way back was thousands of pixels up. The site footer's
+            "Blog" is below this, but it is a row of furniture, not an answer to
+            "where do I go now?" */}
+        <div class="mt-8">
+          <a href="/blog" class="reader-back">
+            <Icon name="ph:caret-left" class="size-3.5" /> The blog
+          </a>
         </div>
       </div>
     ) : null

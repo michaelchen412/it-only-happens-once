@@ -276,9 +276,18 @@ const allSubjectsHref =
           <Fragment slot="content">
             <p class="qp-label">Along the same lines</p>
             <ul class="qp-list">
+              {/* ⚠ `data-read`: INSIDE A SHEET, KIN OPENS IN THE SHEET (2026-11-09).
+                      Without it this was a full navigation to a bare permalink —
+                      the reader browsing quotes lost the list under them and
+                      landed somewhere with no way back to it. Reader.astro claims
+                      the click (and swaps the sheet, replacing its history entry);
+                      on the permalink there is no Reader, the attribute is inert,
+                      and the href is the link it always was. Constellations above
+                      stay plain links on purpose: going to one is changing room,
+                      not reading the next piece. */}
               {related.map((r) => (
                 <li>
-                  <a href={`/blog/${r.slug}`} class="qp-row">
+                  <a href={`/blog/${r.slug}`} data-read={r.slug} class="qp-row">
                     <span class="qp-row__title">{r.type === 'writing' ? r.title : preview(r.body)}</span>
                     <span class="qp-row__sub">
                       {r.type === 'writing' ? 'an essay' : (r.attribution ?? 'unattributed')}

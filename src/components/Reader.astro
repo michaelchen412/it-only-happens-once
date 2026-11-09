@@ -69,11 +69,20 @@ interface Props {
    * an ellipsis is a return control you have to think about.
    */
   returnLabel: string;
+  /**
+   * The constellation slug this sheet is standing in, on a suite.
+   *
+   * Sent with every FETCH as `?in=`, so a quote the page has no template for
+   * comes back with this room already dropped from its "Appears in" — the same
+   * thing the suite's own templates do at render time (`inConstellation`). Off
+   * the suite there is no room to drop, so it is omitted.
+   */
+  room?: string;
 }
-const { returnLabel } = Astro.props;
+const { returnLabel, room } = Astro.props;
 ---
 
-<dialog id="site-reader" class="reader drawer-dialog" aria-label="Reading view">
+<dialog id="site-reader" class="reader drawer-dialog" aria-label="Reading view" data-reader-room={room}>
   {
     /* Inside the scroller rather than absolutely positioned over it, which is
       what the ✕ was. `position: sticky` then costs the sheet ~44px of height
@@ -197,13 +206,22 @@ const { returnLabel } = Astro.props;
 
   async function fetchArticle(slug: string): Promise<Node | null> {
     try {
-      const res = await fetch(`/blog/${encodeURIComponent(slug)}`, { headers: { Accept: 'text/html' } });
+      const room = reader()?.dataset.readerRoom;
+      const url = `/blog/${encodeURIComponent(slug)}${room ? `?in=${encodeURIComponent(room)}` : ''}`;
+      const res = await fetch(url, { headers: { Accept: 'text/html' } });
       if (!res.ok) return null;
       // DOMParser rather than innerHTML on a live node: the document it builds is
       // inert, so nothing in it runs or loads until the one element we choose is
       // adopted into this page.
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-      const article = doc.querySelector('article.post-article');
+      // ⚠ AN ESSAY OR A QUOTE — the permalink renders whichever the slug is,
+      // and each has one root its every surface shares (PostArticle,
+      // QuoteArticle). This took essays only until 2026-11-09, which was fine
+      // while nothing inside a sheet linked to a quote it lacked a template for.
+      // The strip's "related" rows now open in the sheet, and a third of those
+      // are quotes; without the second selector each one fell back to the bare
+      // permalink, which is the exact strand that change exists to remove.
+      const article = doc.querySelector('article.post-article, .quote-article');
       if (!article) return null;
       // ⚠ THE ARTICLE'S OWN SCRIPTS COME OUT, because they are already dead and
       // leaving them in is what made this bug so hard to see. A script parsed
@@ -324,8 +342,8 @@ const { returnLabel } = Astro.props;
    * fragment navigation, `hashchange` DOES fire, and `sync()` runs twice —
    * harmless, because `open()` no-ops when the sheet already shows that slug.
    */
-  async function goTo(slug: string) {
-    await navigate(`#${PREFIX}${encodeURIComponent(slug)}`);
+  async function goTo(slug: string, replace = false) {
+    await navigate(`#${PREFIX}${encodeURIComponent(slug)}`, { history: replace ? 'replace' : 'auto' });
     await sync();
   }
 
@@ -360,8 +378,25 @@ const { returnLabel } = Astro.props;
         e.stopPropagation();
         const slug = trigger.getAttribute('data-read');
         if (slug) {
-          openedViaTrigger = true;
-          void goTo(slug);
+          /*
+            ⚠ A HOP INSIDE THE SHEET REPLACES ITS ENTRY; IT DOES NOT ADD ONE
+            (2026-11-09). A "related" row opens the next piece HERE rather than
+            navigating to its permalink — the navigation is what stranded a
+            reader browsing quotes on a page with no way back to them. Pushing
+            each hop would make "Back to the blog" (one `history.back()`) and
+            the browser's Back step through every piece read along the way
+            before reaching the list. Michael agreed the trade: leaving the
+            sheet always lands on the room you opened it from, and the chain of
+            kin is not retraceable step by step.
+
+            `openedViaTrigger` is untouched on a hop: whether there is a pushed
+            entry to pop is decided by how the sheet FIRST opened, and a replace
+            neither creates one nor removes one.
+          */
+          const d = reader();
+          const hop = Boolean(d?.open && !d.dataset.closing && d.contains(trigger));
+          if (!hop) openedViaTrigger = true;
+          void goTo(slug, hop);
         }
         return;
       }
