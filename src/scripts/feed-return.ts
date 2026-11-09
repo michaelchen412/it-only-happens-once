@@ -64,13 +64,15 @@ type Shared = {
   /** A place captured as a navigation leaves `/blog` for a piece's page,
    *  waiting for that page's entry to exist so it can be written onto it. */
   pending: (FeedReturn & { to: string }) | null;
+  /** The reader's input since the arriving feed was swapped in — see `takeIntent`. */
+  intent: (() => boolean) | null;
 };
 declare global {
   interface Window {
     __feedReturn?: Shared;
   }
 }
-const shared = (): Shared => (window.__feedReturn ??= { settled: false, pending: null });
+const shared = (): Shared => (window.__feedReturn ??= { settled: false, pending: null, intent: null });
 
 const isList = (p: string) => p === '/blog' || p === '/blog/';
 const isPiece = (p: string) => /^\/blog\/[^/]+\/?$/.test(p);
@@ -182,9 +184,10 @@ export function initFeedReturn() {
     if (e.navigationType !== 'traverse' && isList(location.pathname)) {
       stamp();
       const spot = spotNow();
-      // `location`, not `e.from`: a live search moves the URL with
-      // replaceState behind the router's back, so `e.from` can still be the
-      // pre-search address — and the search is part of the place.
+      // `location`, the address actually on screen — including the search,
+      // which is part of the place. (Since 2026-11-09 a search is a router
+      // navigation, so `e.from` agrees; it did not before, when the search
+      // moved the URL behind the router's back.)
       if (spot && isPiece(e.to.pathname)) {
         s.pending = { ...spot, list: location.pathname + location.search, to: e.to.pathname };
       }
@@ -198,6 +201,13 @@ export function initFeedReturn() {
   // finds the place already written.
   document.addEventListener('astro:after-swap', () => {
     const s = shared();
+    // ⚠ INTENT IS WATCHED FROM THE SWAP, NOT FROM PAGE-LOAD. The router fires
+    // page-load only after the view transition has finished, so a key or a
+    // swipe in that gap — exactly when a reader who has just arrived starts
+    // moving — was missed, and the restore jumped over it (caught on the phone
+    // run of feed-return.anon.spec.ts, 2026-11-09).
+    s.intent?.();
+    s.intent = isList(location.pathname) ? watchIntent() : null;
     const p = s.pending;
     s.pending = null;
     if (p && location.pathname === p.to) {
@@ -252,12 +262,13 @@ export function initFeedReturn() {
 }
 
 /**
- * True once the reader has scrolled, swiped or pressed a key on the PAGE since
- * `since` — their intent outranks a jump to where they used to be. Input inside
- * an open dialog does not count: Back to `#read=<slug>` reopens the sheet over
- * the list being restored, and reading it must not cancel the restore beneath.
+ * Starts watching; the function it returns stops watching and says whether the
+ * reader scrolled, swiped or pressed a key on the PAGE meanwhile — their intent
+ * outranks a jump to where they used to be. Input inside an open dialog does
+ * not count: Back to `#read=<slug>` reopens the sheet over the list being
+ * restored, and reading it must not cancel the restore beneath.
  */
-export function watchIntent(): () => boolean {
+function watchIntent(): () => boolean {
   let moved = false;
   const on = (e: Event) => {
     if (!(e.target as Element | null)?.closest?.('dialog[open]')) moved = true;
@@ -268,4 +279,16 @@ export function watchIntent(): () => boolean {
     for (const k of kinds) window.removeEventListener(k, on, { capture: true });
     return moved;
   };
+}
+
+/**
+ * The watcher armed when this feed was swapped in, handed over to the restore
+ * (or a fresh one on a first load, where nothing precedes page-load). Taken
+ * exactly once per arrival, so a watcher is never left listening.
+ */
+export function takeIntent(): () => boolean {
+  const s = shared();
+  const w = s.intent ?? watchIntent();
+  s.intent = null;
+  return w;
 }

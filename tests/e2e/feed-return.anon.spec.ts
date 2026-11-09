@@ -119,7 +119,17 @@ test('Back, closing the sheet, and a reload all keep the depth', async ({ page }
 
   // Back lands on the entry that WAS the sheet — it reopens, over a list that
   // is now the reader's list rather than page 1.
-  await page.goBack();
+  // ⚠ BACK UNTIL THE SHEET'S ENTRY, NOT ONE BACK. An essay paired with a song
+  // embeds a Spotify player, and an iframe that navigates itself after load adds
+  // its own entry to the tab's joint history — so the first Back can be spent
+  // inside the iframe while the page stays put (caught on this spec,
+  // 2026-11-09). That is the browser's behaviour, not this feature's, and what
+  // is under test is what the entry BEHIND the piece's page restores.
+  for (let i = 0; i < 3 && !/#read=/.test(page.url()); i++) {
+    await page.goBack();
+    await page.waitForTimeout(300);
+  }
+  expect(page.url()).toMatch(/\/blog#read=/);
   await expect(page.locator(READER)).toHaveJSProperty('open', true);
   await restored(page);
   expect(await cardCount(page)).toBe(n);
@@ -137,13 +147,6 @@ test('Back, closing the sheet, and a reload all keep the depth', async ({ page }
   await noDuplicates(page);
 });
 
-// ⚠ A LIVE SEARCH IS NOT COVERED HERE, AND THAT IS A KNOWN GAP RATHER THAN AN
-// OMISSION. `swapTo` moves the URL with replaceState behind the router's back,
-// so the next sheet opened on a searched list is taken by the router for a
-// different page and re-renders it — page 1, top — before this feature can do
-// anything (measured 2026-11-09: 14 cards at y≈2,973 → 7 at 0). That predates
-// feed-return and needs its own fix; until then a searched list returns at
-// page-1 depth, which is no worse than it was.
 test('a filtered list comes back filtered', async ({ page }) => {
   await page.goto('/blog');
   // Any subject deep enough for two pages, chosen live so the corpus can move.

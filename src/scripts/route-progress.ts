@@ -51,6 +51,8 @@
 // is dispatched, in either direction. Closing via `history.back()` takes the
 // mirrored branch. Nothing to suppress here; the router already did.
 
+import { NAV_FEED_SEARCH } from '../lib/nav-info';
+
 const BAR = 'nav-progress';
 
 /** Give up if the navigation never lands — see `clear()`. */
@@ -306,6 +308,11 @@ function markPending(source: Element | undefined) {
 }
 
 document.addEventListener('astro:before-preparation', (e) => {
+  // A live search on /blog is a router navigation now, so the router can own
+  // its URL — but it is typing, not leaving, and a bar across the top of the
+  // page at every pause would be a new tic. The dimmed feed answers it, as it
+  // did before (lib/nav-info.ts).
+  if (e.info === NAV_FEED_SEARCH) return;
   if (!isWarm(e.to)) {
     start(e.sourceElement);
     return;

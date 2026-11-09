@@ -35,6 +35,18 @@ function wire() {
   const input = document.querySelector<HTMLInputElement>('[data-ss-input]');
   const results = document.querySelector<HTMLElement>('[data-ss-results]');
   if (!sheet) return;
+  /*
+    ⚠ ONCE PER SHEET, BECAUSE `astro:page-load` NO LONGER MEANS A NEW BODY
+    (2026-11-09). A live search on /blog is a router navigation that swaps only
+    the feed and the rail (scripts/blog-feed.ts), so the router fires page-load
+    over a document whose sheet, triggers and field are the SAME elements this
+    already wired — and wiring them again stacked a second copy of every
+    listener per search: one ⌕ press opening twice, one Escape closing twice.
+    A fresh body brings a fresh sheet without the flag, so a real navigation
+    still wires everything. `live` needs no refresh: same sheet, same handles.
+  */
+  if (sheet.dataset.ssWired) return;
+  sheet.dataset.ssWired = '1';
 
   /**
    * ⚠ THE TOKEN GUARD. Seven queries stand behind every request, so responses
