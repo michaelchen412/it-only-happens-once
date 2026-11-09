@@ -32,7 +32,7 @@
 # Every run was printing "Node.js 20 is deprecated … being forced to run on
 # Node.js 24". That is a warning about the ACTIONS' OWN runtime, not about this
 # repo's `node-version` below, and the two are unrelated: the checks still run
-# on the 22.12.0 that matches `engines.node`. Forced is the operative word — the
+# on the 22.23.4 that matches `engines.node`. Forced is the operative word — the
 # runner was already executing v4 on a runtime it was not built against, which
 # is a state to leave rather than to sit in. v5 declares `using: node24`, and v7
 # is where that line currently is.
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           # Matches `engines.node` in package.json.
-          node-version: '22.12.0'
+          node-version: '22.23.4'
           cache: npm
       - run: npm ci
       # format:check + lint + astro check + test — ~22s locally.
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '22.12.0'
+          node-version: '22.23.4'
           cache: npm
       - run: npm ci
       # `build`, not `build:unchecked` — the full thing, so the PR is held to
@@ -227,7 +227,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.tree.outputs.run == 'true'
         with:
-          node-version: '22.12.0'
+          node-version: '22.23.4'
           cache: npm
       - run: npm ci
         if: steps.tree.outputs.run == 'true'
