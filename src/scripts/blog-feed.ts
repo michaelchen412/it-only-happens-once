@@ -125,7 +125,11 @@ async function swapTo(target: string): Promise<boolean> {
       rail.remove(); // filtered into a state with no subjects at all
     }
 
-    history.replaceState({}, '', target);
+    // ⚠ THE ENTRY'S STATE IS KEPT, NOT REPLACED WITH `{}` (2026-11-09). The
+    // ClientRouter keeps its own bookkeeping there — `index`, `scrollX/Y` — and
+    // `{}` erased it, so a later Back to this entry ran with no index and no
+    // scroll to restore.
+    history.replaceState({ ...history.state }, '', target);
     observeSentinel(); // the swap brought a fresh sentinel (or none)
     return true;
   } catch {

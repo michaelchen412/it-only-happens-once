@@ -355,7 +355,13 @@ const { returnLabel, room } = Astro.props;
       openedViaTrigger = false;
       history.back();
     } else {
-      history.replaceState(null, '', location.pathname + location.search);
+      // ⚠ `history.state`, NOT `null` (2026-11-09). This branch runs whenever
+      // the sheet was not opened by a click on THIS page — a deep link, a
+      // reload, and every Back from a permalink to `#read=<slug>`, which is the
+      // main path. `null` erased the router's `index` and scroll, after which
+      // it ignores the entry for good (its popstate handler drops null-state
+      // entries).
+      history.replaceState(history.state, '', location.pathname + location.search);
       close();
     }
   }
