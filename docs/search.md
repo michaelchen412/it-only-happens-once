@@ -171,7 +171,7 @@ containers against the real corpus in the real chrome.
 
 1. **Grouped by kind, not ranked.** §5's *"no ranking"* was free with one table.
    Across twelve there is no shared order to keep — ⚠ `updated_at` does not exist
-   on sets, songs, constellations, works, authors or subjects — so a recency sort
+   on sets, constellations, works, authors or subjects — so a recency sort
    would file half the building at the bottom by accident rather than by
    relevance. Grouping never asks the question, which is how §5 survives.
 2. **At most 3 per kind.** ⚠ **The bench found this variable rather than starting
@@ -181,8 +181,8 @@ containers against the real corpus in the real chrome.
    hits of which **23 are essays**, so one kind buried the other seven in any box.
    Capping at 3 took the sheet from **1 of 8 to 6 of 8**. No container can fix a
    head that long; bounding it where it is produced can.
-3. **No excerpt when the name already carries the match.** A quote, a jotting and
-   a song are named by their own first words, so the marked name *is* the
+3. **No excerpt when the name already carries the match.** A quote and a jotting
+   are named by their own first words, so the marked name *is* the
    context; a window repeating it costs a line of the fold and says nothing.
 
 > The general lesson, and it is §4's from a third angle: **the count that bounds a
@@ -224,9 +224,9 @@ in it**:
 
 | Lands on the thing | Lands on a filtered view | Lands in the room |
 |---|---|---|
-| essay, goal, person, constellation | note, quote (`?q=`), subject, work, author (`?subject=` / `?work=` / `?author=`) | task, set, song |
+| essay, goal, person, constellation | note, quote (`?q=`), subject, work, author (`?subject=` / `?work=` / `?author=`) | task, set |
 
-⚠ **The three in the last column are the weak ones**, and the refinement is
+⚠ **The two in the last column are the weak ones**, and the refinement is
 `?open=<id>` on their rooms. The convention exists today only for *create* —
 `?person=X&new=quote`, `/admin/notes?new=1` — and nowhere for opening an existing
 row. That is the remaining work, and it is plumbing rather than search.

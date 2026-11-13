@@ -178,9 +178,9 @@ export interface Fixtures {
    *  essay with zero. Same idiom as `richQuoteSlug`: discover the richer shape,
    *  skip when the corpus has none. */
   subjectedEssaySlug: string | null;
-  /** An essay with a song paired to it — the shape ADR 0035 changed under the
-   *  admin's `get`, and the only one that exercises the `paired_song` embed. */
-  pairedEssayId: string | null;
+  /** An essay that carries music (`music_url`, ADR 0044) — the only kind that
+   *  exercises the Music tab's half of the admin's `get`. */
+  musicEssayId: string | null;
   /** Any constellation — the only route to the fragment browser. */
   constellationId: string | null;
   /** One with at least two fragments placed in it — the composer specs need a

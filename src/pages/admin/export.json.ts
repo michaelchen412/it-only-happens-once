@@ -53,11 +53,10 @@ export const TABLES = [
   // why it has to be here: a shelf name Michael invented exists nowhere else.
   'shelves',
   'pages',
-  // Before `fragments`, which carries `paired_song_id` into it — this list is
-  // in foreign-key order so an importer walking it top to bottom never trips a
-  // reference. A song is not re-derivable either: the recording lives on
-  // Spotify, but which essay wanted it does not.
-  'songs',
+  // An essay's music rides on its own row now (`music_url`, ADR 0044), so the
+  // `songs` table that stood here — first, for foreign-key order — went with
+  // the table. This list stays in FK order so an importer walking it top to
+  // bottom never trips a reference.
   'fragments',
   'fragment_subjects',
   // Where a jotting lives. Not re-derivable and not visible to any reader — the

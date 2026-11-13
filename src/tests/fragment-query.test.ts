@@ -65,26 +65,19 @@ describe('parseListParams — filters', () => {
   });
 });
 
-describe('parseListParams — the pair picker scope', () => {
-  // ⚠ IT IS NOT A URL PARAM, AND THAT IS THE PROPERTY UNDER TEST (plan 39 · §2).
-  // `pairable` is a property of the ROOM — a quote cannot be paired — and
-  // `fragments-panel.astro` sets it. If it ever became readable from the query
-  // string, a crafted URL would widen the picker in a way its own page never
-  // intended, and the failure would be silent: rows offered that the action
-  // then refuses.
+describe('parseListParams — the epigraph picker scope', () => {
+  // ⚠ IT IS NOT A URL PARAM, AND THAT IS THE PROPERTY UNDER TEST. `quotable` is
+  // a property of the ROOM and `fragments-panel.astro` sets it. If it ever
+  // became readable from the query string, a crafted URL would change what the
+  // picker offers in a way its own page never intended.
   //
-  // (`placeable` was tested alongside it until 2026-08-17 and is gone — see
+  // (`pairable` was tested here until 2026-11-13, for the song sheet's pair
+  // picker, and went with it — ADR 0044. `placeable` went 2026-08-17; see
   // `queryFragmentList` for why it had to be removed rather than corrected.)
   it('never lets the URL set the scope', () => {
-    for (const qs of ['pairable=1', 'pairable=true', 'placeable=1', 'mode=pair', 'mode=pick']) {
-      expect(parseListParams(new URLSearchParams(qs)).pairable).toBe(false);
+    for (const qs of ['quotable=1', 'quotable=true', 'mode=epigraph', 'mode=pick']) {
+      expect(parseListParams(new URLSearchParams(qs)).quotable).toBe(false);
     }
-  });
-
-  it('reads the song to mark pairings against, and defaults it to null', () => {
-    expect(parseListParams(new URLSearchParams('')).pairedSong).toBeNull();
-    expect(parseListParams(new URLSearchParams('song=  ')).pairedSong).toBeNull();
-    expect(parseListParams(new URLSearchParams('song=abc-123')).pairedSong).toBe('abc-123');
   });
 });
 
@@ -101,14 +94,14 @@ describe('queryFragmentList — what each picker is allowed to offer', () => {
       .filter((o) => o.args[0] === 'type')
       .map((o) => `${o.method}:${o.args[1]}`);
 
-  it('offers writing ONLY when pairing — a quote is something songs.pair refuses', async () => {
+  it('offers quotes ONLY for an epigraph — a set cites one quote', async () => {
     const db = fakeDb({}, { record: true });
-    await queryFragmentList(db.client, params({ pairable: true }));
+    await queryFragmentList(db.client, params({ quotable: true }));
     // The DISTINCT set, because `scoped` is applied twice on purpose — once to
     // the row query and once to the per-type counts, so a badge can never
     // disagree with the rows under it. Asserting the set rather than
     // `toContain` still fails if any OTHER type predicate appears.
-    expect([...new Set(typeOps(db))]).toEqual(['eq:writing']);
+    expect([...new Set(typeOps(db))]).toEqual(['eq:quote']);
   });
 
   it('constrains type NOWHERE else — including the composer picker', async () => {
@@ -140,7 +133,7 @@ describe('queryFragmentList — what each picker is allowed to offer', () => {
   // spread over every boolean the interface has, so a scope added later is
   // covered the moment it exists rather than when someone writes its test.
   it('never filters on a kind the vocabulary no longer has', async () => {
-    const scopes = [params(), params({ pairable: true }), params({ view: 'trash' })];
+    const scopes = [params(), params({ quotable: true }), params({ view: 'trash' })];
     for (const p of scopes) {
       const db = fakeDb({}, { record: true });
       await queryFragmentList(db.client, p);
@@ -151,60 +144,6 @@ describe('queryFragmentList — what each picker is allowed to offer', () => {
         );
       }
     }
-  });
-});
-
-describe('queryFragmentList — marking what is already paired', () => {
-  const rows = [
-    { id: 'w1', type: 'writing', status: 'draft', paired_song_id: 'song-a' },
-    { id: 'w2', type: 'writing', status: 'draft', paired_song_id: 'song-b' },
-    { id: 'w3', type: 'writing', status: 'published', paired_song_id: null },
-  ];
-  const params = (over: Record<string, unknown> = {}) => ({
-    ...parseListParams(new URLSearchParams('')),
-    ...over,
-  });
-
-  it('derives pairedIds from the rows it already has, with no extra query', async () => {
-    // ⚠ THE ASYMMETRY WITH `placedIds` IS THE DATA MODEL, not an optimisation:
-    // membership is a link table you must go and read, `paired_song_id` is a
-    // column on the row. If this ever starts querying, the picker got slower
-    // for nothing.
-    const db = fakeDb({ fragments: { data: rows } }, { record: true });
-    const data = await queryFragmentList(db.client, params({ pairable: true, pairedSong: 'song-a' }));
-    expect([...data.pairedIds]).toEqual(['w1']);
-    expect(db.ops('fragments').some((o) => o.method === 'eq' && o.args[0] === 'paired_song_id')).toBe(false);
-  });
-
-  it('names the OTHER song a pick would steal from, and not the target itself', async () => {
-    const db = fakeDb({ fragments: { data: rows } }, { record: true });
-    await queryFragmentList(db.client, params({ pairable: true, pairedSong: 'song-a' }));
-    // Only song-b is looked up: w1 is ours (pairedIds says so) and w3 is free.
-    /*
-      ⚠ FROM `songs`, AND THIS ASSERTION USED TO SAY `fragments` — which is how
-      the drift survived ADR 0035 for a day. A song WAS a fragment when this was
-      written, so the table was right; the ADR moved them and this test went on
-      passing, because a fake DB answers whatever table you ask it about. It was
-      not a test that missed the bug. It was a test that PINNED it: green, and
-      asserting the query against a table the ids had left.
-
-      That is the failure mode worth naming — a stub records the call you made,
-      not the schema you made it against. Which table this reads is exactly the
-      fact worth asserting, so the assertion stays; it just has to name the one
-      the foreign key points at. `fragment-open.spec.ts` is the other half, and
-      it runs against the real schema for this reason.
-    */
-    const lookup = db.ops('songs').find((o) => o.method === 'in');
-    expect(lookup?.args).toEqual(['id', ['song-b']]);
-    // And nothing goes looking for a song among the writing any more.
-    expect(db.ops('fragments').some((o) => o.method === 'in')).toBe(false);
-  });
-
-  it('asks nothing about other songs outside pair mode', async () => {
-    const db = fakeDb({ fragments: { data: rows } }, { record: true });
-    const data = await queryFragmentList(db.client, params());
-    expect(data.songTitleById).toEqual({});
-    expect(data.pairedIds.size).toBe(0);
   });
 });
 

@@ -32,7 +32,6 @@ const EXPECTED: Record<KindKey, string> = {
   person: '/admin/people',
   constellation: '/admin/constellations',
   set: '/admin/sets',
-  song: '/admin/sets',
   subject: '/admin/library',
   work: '/admin/library',
   author: '/admin/library',

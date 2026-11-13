@@ -13,7 +13,7 @@
 // namespace lives in its own module beside it. Shared internals are in
 // _shared.ts. Add a namespace by adding a file, never by growing this one.
 // ============================================================================
-import { fragments, songs } from './fragments';
+import { fragments, music } from './fragments';
 import { versions } from './versions';
 import { subjects, authors, works } from './vocabulary';
 import { constellations } from './constellations';
@@ -35,7 +35,7 @@ export const server = {
   fragments,
   shelves,
   versions,
-  songs,
+  music,
   subjects,
   authors,
   works,

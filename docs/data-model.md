@@ -6,14 +6,14 @@
 
 ## 1. The unifying idea
 
-**Everything shareable is a `fragment`.** A post, a quote, a song — one table, three types. Then:
+**Everything shareable is a `fragment`.** A post or a quote — one table, two types. Then:
 
-- **The blog** = chronological / filtered *views* over fragments (writing by date; songs; quotes).
+- **The blog** = chronological / filtered *views* over fragments (writing by date; quotes).
 - **The Sky** = constellation-grouped views over the fragments that have been *placed*.
 - **"Elevation into the Sky" is not a flag** — it is simply *having a row in `fragment_constellations`*. An unplaced fragment lives in the blog forever. (This is the "no placement debt" rule, expressed in the schema.)
 - **Links between constellations are emergent** — two constellations are related whenever a fragment belongs to both. There is deliberately **no** fragment-to-fragment link table.
 - **There is one vocabulary over fragments: subjects — what a piece is *about*.** A second one ran the other way for four days: `feelings`, what a song *does to you*, in its own table for the same reason it is now gone — a song is a different kind of object. **Retired 2026-08-15 ([ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md))** after one song of 48 was ever tagged; the 54 words are recorded in `supabase/migrations/20260815161554_the_feelings_were_never_tagged.sql`.
-- **And a song is filed by nothing at all.** It carries no subjects ([ADR 0031](adr/0031-a-song-carries-a-feeling-not-an-idea.md)) — a song is not *about* anything you can paraphrase — and it is **never a member of a constellation**: music accompanies one as its `score_url`, or a single essay through `paired_song_id` / `paired_playlist_url`, all relations rather than membership. Measured at zero on every axis over three weeks. ⚠ **That is why a song is leaving `fragments` for a `songs` table** ([ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md)): the exceptions were the proof. This section describes the schema as it stands *before* that migration runs.
+- **Music is not a fragment, and not a row of any kind.** It is a **link**: a constellation's `score_url`, a set's playlist, or one essay's `fragments.music_url` ([ADR 0044](adr/0044-music-is-a-link-on-the-essay.md)) — all relations rather than membership, and none of them a thing with a title to file. A song was a fragment until 2026-08-15 and a row in a `songs` table until 2026-11-13; each step took away a property nobody had used (subjects, constellations, a page, a note, a title).
 
 ## 2. Entities
 
@@ -99,7 +99,7 @@ erDiagram
 ## 3. Enums
 
 ```sql
-create type fragment_type   as enum ('writing', 'quote', 'song');
+create type fragment_type   as enum ('writing', 'quote');
 create type fragment_status as enum ('note', 'draft', 'published');
 create type date_precision  as enum ('day', 'year');
 ```
@@ -118,29 +118,22 @@ create table fragments (
   id             uuid primary key default gen_random_uuid(),
   type           fragment_type   not null,
   slug           text            not null unique,
-  title          text,            -- writing/song title; usually null for quotes
-  body           text,            -- Markdown: full essay / full quote text /
-                                  -- a song's PUBLIC NOTE (ADR-0031). Not the
-                                  -- "why": that field asked for a
-                                  -- justification and was filled once in
-                                  -- seventeen days. Its private twin is a
-                                  -- separate table, §"fragment_private_notes".
+  title          text,            -- writing title; usually null for quotes
+  body           text,            -- Markdown: full essay / full quote text
   excerpt        text,            -- authored snippet (writing); may be derived if null
-  attribution    text,            -- the shown line. song: the artist, typed.
-                                  -- quote: DERIVED (see §"the three facts"),
+  attribution    text,            -- the shown line. quote: DERIVED (see §"the three facts"),
                                   -- written by saveQuote on every save.
   is_self        boolean         not null default false,
                                   -- quote: Michael's own words. Silences the
                                   -- line while staying distinguishable from
                                   -- "source unknown", which is also silent.
-  source_url     text,            -- book link / Spotify or YouTube URL (canonical, no ?si=)
-  paired_song_id uuid references fragments(id) on delete set null,
-                                  -- an essay's paired song (ADR-0009). SET NULL,
-                                  -- never cascade: deleting a song must not take
-                                  -- the essay with it.
+  source_url     text,            -- a quote's book or web link
+  music_url      text,            -- writing only: the music that plays above
+                                  -- the essay (ADR 0044). Canonical, no ?si=.
+                                  -- See §"music_url".
   details        jsonb           not null default '{}',
   status         fragment_status not null default 'draft',
-  occurred_at    timestamptz     not null default now(), -- "the date": posted (writing) / added (song, quote)
+  occurred_at    timestamptz     not null default now(), -- "the date": posted (writing) / added (quote)
   date_precision date_precision  not null default 'day',
   published_at   timestamptz,
   created_at     timestamptz     not null default now(),
@@ -178,8 +171,8 @@ create table constellations (
               -- A SLOT, never a raw value — app.css owns what the slot means in
               -- each theme, so design.md's one-palette law survives. A new
               -- constellation auto-takes the least-used slot.
-  score_url text  -- the suite's playlist (ADR-0009). A playlist is deliberately
-                  -- not a song fragment; it belongs to the constellation.
+  score_url text  -- the suite's playlist (ADR-0009); it belongs to the
+                  -- constellation, as an essay's `music_url` belongs to it.
 );
 -- ⚠ `status` here is a plain `text` + CHECK, NOT the `fragment_status` enum, and
 -- the difference reaches the app: `_shared.ts` splits the Zod schema into
@@ -334,22 +327,20 @@ Type-specific fields that don't deserve their own columns:
 
 | type | `details` shape |
 |---|---|
-| `song` | `{ "spotify_id": "…", "album": "…", "thumbnail_url": "…", "release_year": 2022, "spotify_album_id": "…", "spotify_artist_ids": ["…"] }` — `spotify_id` is a **track or album** id parsed from `source_url` (the one source of truth for both id and kind); a YouTube citation carries `youtube_id` instead. The three Web-API fields arrived with plan 04 Piece 4 and are absent on anything saved before it. `release_year` is the **album's** year and is deliberately not `occurred_at`, which on a song means the year *you added it*. |
 | `quote` | `{ "citation": "Book 2:2" }` — the **Where**, and the only key left. Free text on purpose: the corpus already holds six citation traditions (books and verses, letters and verses, chapter-and-verse, acts and scenes, a bare circumstance, an attribution-within-an-attribution), and a structured locator would have to know which one it is in. Four keys were deleted 2026-08-05 — `source_author` and `work_year` (0 rows, dead in three files), `source_title` (42 rows, 41 of them verbatim copies of `works.title`) and `page` (7 rows, folded into `citation` as *"p. 41"* — a locator like any other). |
-| `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render). ⚠ The legacy `{ "media": { … } }` shape Squarespace brought over was **deleted from all 50 rows that carried it on 2026-08-15** — 48 duplicated a `paired_song_id` pointing at the same track, and the 2 that did not moved to `paired_playlist_url`. |
+| `writing` | `{ "reading_minutes": 6 }` (may instead be computed from `body` at render). ⚠ The legacy `{ "media": { … } }` shape Squarespace brought over was **deleted from all 50 rows that carried it on 2026-08-15** — every one of them is carried by `music_url` now. |
 
 Kept in JSONB because the type set is small and stable, and these fields are rarely queried on. Anything that becomes a filter/sort target should graduate to a real column.
 
 ## 6. Field semantics
 
 - **`slug`** — URL identity (`/blog/forgiveness`). Unique across all fragments.
-- **`occurred_at` + `date_precision`** — the *public* date, driving the `Timestamp` component. `writing` → the *posted* date (`day`); `song`/`quote` → *provenance* (often `year`). Verb ("Posted"/"Added") is presentation-only, chosen by type. For `writing` it is **set automatically to the publish moment on first publish**; the composer only exposes it as an optional override for backdating legacy posts (see [admin.md](admin.md) §5). It is distinct from the three **system-maintained audit timestamps**, which are never hand-edited: `created_at` (row created), `published_at` (first went live; stamped once, kept on unpublish), `updated_at` (last edit, via the `moddatetime` trigger).
+- **`occurred_at` + `date_precision`** — the *public* date, driving the `Timestamp` component. `writing` → the *posted* date (`day`); `quote` → *provenance* (often `year`). Verb ("Posted"/"Added") is presentation-only, chosen by type. For `writing` it is **set automatically to the publish moment on first publish**; the composer only exposes it as an optional override for backdating legacy posts (see [admin.md](admin.md) §5). It is distinct from the three **system-maintained audit timestamps**, which are never hand-edited: `created_at` (row created), `published_at` (first went live; stamped once, kept on unpublish), `updated_at` (last edit, via the `moddatetime` trigger).
 - **`status`** — a linear tier, `note → draft → published`. `note` and `draft` are visible only to the admin, enforced by RLS: `fragments_select_published` is an **allowlist** on `status = 'published'`, so a tier added below the line is private by construction and can never leak by omission. Publishing sets `status='published'` and `published_at`; `published_at` is never cleared afterwards, so demoting a piece back to a note keeps the historical "first went live". See [admin.md](admin.md) §5b.
 - **`deleted_at`** — soft delete (migration `..._soft_delete.sql`). "Delete" sets it and the fragment moves to the admin **Trash** (restorable); public reads exclude `deleted_at is not null`; the admin still sees trashed rows. A "purge" is a real `DELETE`. Keeps years of writing recoverable.
 - **`excerpt`** — the authored snippet the card shows for `writing`; if null, derive from the first ~160 chars of `body`.
 - **`position`** (join) — the composed order of a fragment within a given constellation. A fragment can sit at different positions in different constellations.
-- **`paired_song_id`** — *the song that goes with this piece* ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). A self-FK from a `writing` row to a `song` row, rendered at the head of the essay. **`ON DELETE SET NULL`** — deleting a song blanks the pairing rather than taking the essay with it. The FK deliberately does *not* enforce `type = 'song'`: a composite FK on `(id, type)` would need a generated column holding the constant, and a generated column cannot be set to null, which is precisely what SET NULL must do — so the check lives in the `songs.pair` action, where the error can be a sentence. **RLS needs no help here:** a PostgREST embed re-applies the fragments policies, so an unpublished paired song simply doesn't come back. The reader that consumes this (`pairedMediaOf`) must therefore treat "id set, embed null" as *no pairing* and never fall through to the second branch. That branch used to read `details.media`, which all 48 promoted essays carried — so the fall-through had a track to find on any of them, and did once. It now reads `paired_playlist_url`, which two rows have.
-- **`paired_playlist_url`** — *a Spotify playlist to play through this piece* ([ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md), added 2026-08-15). Two imported essays are paired with a **playlist**, which ADR 0009 forbids a song fragment from citing — so they never had a song row and could not get one. This is the same relation a constellation's `score_url` expresses, one level down, and it exists so the legacy `details.media` fallback could be deleted without taking a player away from a reader.
+- **`music_url`** — *the music that plays above this piece* ([ADR 0044](adr/0044-music-is-a-link-on-the-essay.md), 2026-11-13). One link: a Spotify track, album or playlist, or a YouTube video, stored in the canonical form `musicRefUrl` builds (no `?si=` token, no `intl-xx/` path). Two constraints: `fragments_music_url_is_writing` (a quote carries none) and `fragments_music_url_is_a_link` (`https://`, no whitespace) — the provider rules stay in `lib/media.ts`, the one parser. It is visible exactly when its essay is, because it is a column of the essay; there is no second row with its own policy to get out of step. ⚠ **Changing it is not an edit:** the `fragments_set_updated_at` trigger skips an update that touched `music_url` and nothing else (`music_is_not_an_edit`), because `updated_at` is both the writing sheet's concurrency token and the public "updated" date. It replaced `paired_song_id` → `songs` and `paired_playlist_url`; all 50 links moved across unchanged.
 - **The `feelings` vocabulary is gone, and its one durable lesson is not.** Its slug was FROZEN while its name was renameable — the opposite of every other vocabulary here — because the slug went into a public URL people send each other, and [plan 32](plans/archive/32.md) §1 found that moving a slug hard-404s every link already handed out. **That rule outlives the table**: any vocabulary whose slug reaches a URL a reader can share must freeze it and let the name drift. Retired 2026-08-15 ([ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md)).
 - **`fragment_versions.kind`** — `working` (one per fragment, enforced by a partial unique index; the autosave target for a published piece) or `snapshot` (a preserved past state, written automatically by every promote). A version carries **words only** — title, excerpt, body — so promoting rewrites a piece without moving its slug, dates, status, subjects or placements. The table has **no `anon` policy at all**, which is why an unfinished rewrite can't leak even through a forgotten join. See [admin.md](admin.md) §5a.
 
@@ -442,7 +433,7 @@ Writes are bounded to a **three-day backfill window**, enforced in [`src/actions
 | Table | Key | Why |
 |---|---|---|
 | `person_works` | `(person_id, work_id)` | The two-hop link. Resolved at read time, never materialised — see above. |
-| `person_fragments` | `(person_id, fragment_id)` | The direct edge, for what that path cannot reach: a song somebody sent, a line they said out loud that never came from a book. |
+| `person_fragments` | `(person_id, fragment_id)` | The direct edge, for what that path cannot reach: a line they said out loud that never came from a book. |
 
 Both carry an optional free-text `note` (*"recommended, Mar 2024"*) and **no enum of link kinds**. "Recommended" / "gave me" / "we read it together" is a taxonomy that looks right on paper and is wrong after a month; the note holds the nuance until a pattern actually emerges. There is **no `person_authors`** — plausible, weaker, largely derivable from the works already linked, and deferred until it earns itself.
 
@@ -536,7 +527,7 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 - **Where a recurring task goes next** — `advance()` in the same file. **Not stored, and not a queue.** `after_completion` counts from the day you *ticked* it, never from the date it was due; `fixed` rolls forward to the first occurrence **strictly after today**, so three weeks away costs one tap rather than four. The occurrences in between leave no rows, because there were never any rows ([ADR 0013](adr/0013-absence-never-accumulates.md)).
 - **The mirror's health** — `staleness()` in [`src/lib/hq/mirror.ts`](../src/lib/hq/mirror.ts), over `calendar_sync`. Not a column and not a badge: it returns **null while the sync is working**, because a permanent "synced 4 minutes ago" is the status line you read once and ignore for ever. ADR-0014 buys its simplicity by introducing exactly one new silent failure — a mirror that has quietly stopped refreshing, on a page whose job is to be trusted — and this is the whole of the price it pays for that.
 - **What is on Today, and what is coming up** — [`src/lib/hq/today.ts`](../src/lib/hq/today.ts). `announces()` decides whether something appears in *Coming up*, and it is a function of the item alone: **there is no window setting anywhere in the feature**, so the list is short because the leads are honest rather than because a dial was turned down. `progressLabel()` is the `1 of 2 done` line, and it **returns null at zero** — `0 of 3 done` is arithmetic about what you have not done, which is the arrears count this page exists not to have. Ordering defers to the calendar's `byTime`, never a second sort.
-- **The writing signal** — `publishedSignal()` in the same file, over `max(published_at)` for **published writing only**. Not stored, so it can never be stale, and not a task: a self-imposed writing commitment turned into an overdue row is the guilt engine HQ exists to prevent. Two things decide its shape and both are facts about the data: `published_at` is honest for essays (50 of 50) and not for quotes (1 of 73) or songs (whose stamp is the import date); and the newest essay is from 2023, so it ships reading *"3 years ago"* — which means the register has to go **quieter** past eight weeks rather than louder. Cold-start guard, third appearance: nothing published means nothing said.
+- **The writing signal** — `publishedSignal()` in the same file, over `max(published_at)` for **published writing only**. Not stored, so it can never be stale, and not a task: a self-imposed writing commitment turned into an overdue row is the guilt engine HQ exists to prevent. Two things decide its shape and both are facts about the data: `published_at` is honest for essays (50 of 50) and not for quotes (1 of 73); and the newest essay is from 2023, so it ships reading *"3 years ago"* — which means the register has to go **quieter** past eight weeks rather than louder. Cold-start guard, third appearance: nothing published means nothing said.
 - **The brief** — `briefsFor()` in [`src/lib/hq/brief.ts`](../src/lib/hq/brief.ts). Four facts from four tables about somebody on today's calendar, assembled at read time and **labelled by source on the page**, because run together they read as a system-written summary of a friendship. Gated on the first query — a day with no tagged event costs one round trip and stops — and capped at three *before* the history is fetched. ⚠ **The drift guard is not computed from it**: a guest the cap dropped is still somebody you are seeing today, so `seenOn()` is asked separately.
 - **A person's next birthday** — `nextOccurrence(birth_month, birth_day)` in [`src/lib/hq/dates.ts`](../src/lib/hq/dates.ts). A month/day pair has **no weekday until the occurrence is resolved**, and it rolls to next year the day after it passes. 29 February falls back to 1 March in a common year: celebrating early is wrong, and skipping drops the person off the page three years out of four.
 
@@ -545,7 +536,8 @@ There is deliberately **no check that `ends_at > starts_at`**: an event crossing
 | `vision.md` term | Schema |
 |---|---|
 | Fragment (atom) | `fragments` row |
-| Song / Quote / Writing | `fragments.type` |
+| Quote / Writing | `fragments.type` |
+| An essay's music | `fragments.music_url` |
 | Provenance date | `occurred_at` + `date_precision` |
 | Constellation | `constellations` row |
 | Composed suite / adjacency | `fragment_constellations.position` |

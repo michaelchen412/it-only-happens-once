@@ -51,29 +51,29 @@ test.describe('a fragment opens with its contents', () => {
     await expect(page.locator('#wsheet .tiptap')).not.toBeEmpty();
   });
 
-  test('an essay paired to a song loads the pairing, not a rejected select', async ({ page }) => {
-    // ⚠ THE PAIRING IS THE POINT, because the `paired_song` embed is what broke.
-    // An unpaired essay exercises none of it: the select still names the columns
-    // and still fails, but a row with no song proves only that the row exists.
-    const { pairedEssayId } = fixtures();
-    test.skip(!pairedEssayId, 'no essay in the database carries a song');
+  test('an essay that carries music loads its link and player, not a rejected select', async ({ page }) => {
+    // ⚠ THE MUSIC IS THE POINT. An essay without any exercises nothing about
+    // it: the select still names the column and would still fail, but a row
+    // with no music proves only that the row exists. (The column was a
+    // `paired_song` embed until ADR 0044, and that embed is what broke once —
+    // asking `songs` for an `attribution` column it did not have.)
+    const { musicEssayId } = fixtures();
+    test.skip(!musicEssayId, 'no essay in the database carries music');
 
     await allowActions(page, ['fragments.get']);
     // `#edit=<id>` is the manager's own deep link — the same one the notes room
     // hands you after "make it a piece". It opens the sheet on arrival, so the
     // action has to be allowed before navigating.
-    await page.goto(`/admin/fragments#edit=${pairedEssayId}`);
+    await page.goto(`/admin/fragments#edit=${musicEssayId}`);
     await expect(page.locator('#wsheet')).toHaveJSProperty('open', true);
     await expect(page.locator('#ws-error')).toBeHidden();
 
-    // ⚠ THE MUSIC TAB IS FILLED FROM THE SAME `get` RESPONSE, so a rejected
-    // select empties it WITHOUT SAYING SO: "Nothing paired yet." on an essay
-    // that is paired reads exactly like an essay that isn't. That silence is
-    // why this asserts on the name rather than on the absence of an error.
+    // ⚠ THE MUSIC TAB IS FILLED FROM THE SAME `get` RESPONSE, so a dropped
+    // column empties it WITHOUT SAYING SO: an empty field on an essay that has
+    // music reads exactly like an essay that hasn't. That silence is why this
+    // asserts on the value rather than on the absence of an error.
     await page.locator('#wsheet [data-tab="music"]').click();
-    await expect(page.locator('#ws-music-none')).toBeHidden();
-    // The text comes from `songs.artist` — the column whose old spelling
-    // (`attribution`) is what took the whole query down.
-    await expect(page.locator('#ws-music-name')).not.toBeEmpty();
+    await expect(page.locator('#ws-music-url')).toHaveValue(/^https:\/\/(open\.spotify\.com|www\.youtube\.com)\//);
+    await expect(page.locator('#ws-music-player iframe')).toHaveCount(1);
   });
 });

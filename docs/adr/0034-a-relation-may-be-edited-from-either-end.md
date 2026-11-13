@@ -2,7 +2,10 @@
 
 Status: **Accepted** *(2026-08-12 — built the same day it was written. It
 reverses a decision taken on 2026-08-11 and states the general rule that
-decision got locally right and globally wrong.)*
+decision got locally right and globally wrong.)* — ⚠ **its worked example is
+superseded by [ADR 0044](0044-music-is-a-link-on-the-essay.md)** *(2026-11-13)*:
+there is no song to edit a pairing from, so the song-sheet door is gone. The
+general rule — one write *path*, not one control — stands.
 Date: 2026-08-12
 
 ## Context

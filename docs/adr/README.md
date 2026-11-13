@@ -98,9 +98,9 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0006](0006-composer-editor-tiptap.md) | Composer editor is TipTap (ProseMirror) with a fixed toolbar; stores Markdown | Accepted |
 | [0007](0007-ai-subject-tagging.md) | AI subject suggestions via Claude Haiku 4.5 (structured output, human-in-loop, privacy) | Accepted |
 | [0008](0008-provenance-and-facets.md) | Authors/works as optional query facets, decoupled from display (the "Bible rule") | Accepted — display half superseded by 0017 |
-| [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted — the annotated-fragment role superseded by 0031, then retired by 0035; the score and the pairing stand |
+| [0009](0009-music-three-roles.md) | Music in three roles (score / paired / annotated fragment); a song's `body` is its "why" | Accepted — the annotated-fragment role superseded by 0031, then retired by 0035; the pairing became a link by 0044; the score stands |
 | [0010](0010-online-first-writing.md) | The workshop is online-first; offline capture lives in iCloud Notes | Accepted |
-| [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Accepted |
+| [0011](0011-paired-media-is-a-fragment.md) | A paired song is a fragment row, and it leads the essay | Superseded by 0044 — the music is a link on the essay; "it leads the essay" stands |
 | [0012](0012-hq-is-a-private-second-domain.md) | HQ is a private second domain in the same app — its own tables, no `anon` policy | Accepted |
 | [0013](0013-absence-never-accumulates.md) | Absence never accumulates: a recurrence is a rule plus one date, and a row is written only on disposition | Accepted |
 | [0014](0014-calendar-is-one-way.md) | The calendar is one-way: Google reads in, HQ owns the personal, and tags are additive | Accepted |
@@ -123,7 +123,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0031](0031-a-song-carries-a-feeling-not-an-idea.md) | A song carries a feeling, not an idea: no subjects, never a suite stanza, filed by feeling, and the annotation becomes a public note and a private one | **Superseded by [0035](0035-a-set-is-a-listen-you-can-take-away.md)** — 1 song of 48 was ever tagged |
 | [0032](0032-a-sheet-is-dismissible-and-says-what-that-costs.md) | Every sheet is dismissible by its backdrop and must answer what that costs — nothing (it applies or flushes) or something (so it guards, on all three gestures); a test enforces it | Accepted |
 | [0033](0033-the-observatory-has-one-field-grammar.md) | One field grammar for every admin form — `.f__k` carrying `.admin-label`'s register at an ink that passes AA in both themes; the geometry converges, the domain hues never do | Accepted |
-| [0034](0034-a-relation-may-be-edited-from-either-end.md) | The invariant is one write **path**, not one control — a relation may be edited from either end, where the question it answers actually arises; and where the cardinality is asymmetric, the end that can take another row's slot must say so | Accepted |
+| [0034](0034-a-relation-may-be-edited-from-either-end.md) | The invariant is one write **path**, not one control — a relation may be edited from either end, where the question it answers actually arises; and where the cardinality is asymmetric, the end that can take another row's slot must say so | Accepted — its song-sheet example superseded by 0044; the rule stands |
 | [0035](0035-a-set-is-a-listen-you-can-take-away.md) | A set is a listen you can take away: one curated playlist, one quote, one description, replacing the feelings room — a constellation is where an idea is worked out, a set is where a feeling is isolated | Accepted |
 | [0036](0036-a-reload-is-how-the-observatory-tells-the-truth.md) | After a write, an admin surface re-derives by reloading, and patches only where a reload would destroy something the page holds — the database is the only model | Accepted |
 | [0037](0037-a-seeded-write-is-throwaway-gated-and-swept.md) | A spec may create rows in the live project only if all five hold: flagged off by default, `zzz-e2e-throwaway` prefix, `afterEach` sweep, service key under `tests/` only, real control driven through the admin's own session. Extends [0028](0028-the-e2e-suite-is-read-only-against-live.md) | Accepted |
@@ -133,6 +133,7 @@ even locally, because plans 18, 22 and 23 had moved to `archive/`.*
 | [0041](0041-a-capture-surface-declares-a-destination.md) | A capture surface DECLARES where a thought is going and never becomes that destination's form — the destination room does the collecting | Accepted |
 | [0042](0042-a-shelf-is-where-a-jotting-lives.md) | Filing to a shelf is triage: unshelved is the inbox, shelved is kept. A shelf is what a jotting is FOR and is private; a subject is what a piece is ABOUT and is public — the two never merge | Accepted |
 | [0043](0043-a-script-binds-per-arrival-not-per-document.md) | The Observatory navigates client-side, and an admin script binds its DOM work on every arrival rather than once per document; a `document`/`window` listener inside a boot is scoped so it cannot accumulate | Accepted |
+| [0044](0044-music-is-a-link-on-the-essay.md) | An essay's music is one link on the essay (`music_url`) — a Spotify track, album or playlist, or a YouTube video — with no song record behind it; changing it is not an edit. Supersedes 0011 | Accepted |
 
 ⚠ **0024–0028 are a BACKFILL, written 2026-08-10 in one sitting**
 (plan 35 (`docs/plans/35-the-decision-has-one-home.md`) · §2), after a sweep of all

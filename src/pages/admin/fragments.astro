@@ -5,7 +5,7 @@
   FragmentListPanel (also served as the fragments-panel partial to the
   composer's browser sheet). Filtering/sorting swap the table in place
   (fragment-panel.ts) — no full reload. Every fragment edits in an overlay:
-  quotes/songs in the FragmentSheet, writing in the WritingSheet — the page
+  quotes in the FragmentSheet, writing in the WritingSheet — the page
   underneath never navigates away.
 
   It lived at `/admin` until 2026-08-02; the root is Today now (ADR-0015). The
@@ -20,7 +20,6 @@ import FragmentListPanel from '../../components/admin/FragmentListPanel.astro';
 import TypeMark from '../../components/admin/TypeMark.astro';
 import StarMark from '../../components/StarMark.astro';
 import FragmentSheet from '../../components/admin/FragmentSheet.astro';
-import SongSheet from '../../components/admin/SongSheet.astro';
 import WritingSheet from '../../components/admin/WritingSheet.astro';
 import { parseListParams, queryFragmentList } from '../../lib/fragment-query';
 import { jotSeed } from '../../lib/hq/jot-seed';
@@ -169,21 +168,8 @@ const SUBTITLES = {
                   >
                     <TypeMark type="quote" class="w-3 text-center" /> Quote
                   </button>
-                  {/* ⚠ NO SONG, AND ITS ABSENCE IS THE DECISION (ADR 0031). A
-                      song enters the corpus from the ESSAY THAT WANTED IT —
-                      the writing sheet's Music tab, where a pasted link
-                      resolves and offers to create (plan 40). It used to enter
-                      at /admin/listening in the same motion as the listening,
-                      and that room is gone with the feelings it existed for. A "New
-                      song" button on a management table is precisely the split
-                      that ruling refuses: it would make a row first and a
-                      decision about the music later, which is a queue of
-                      obligations where there was an act of attention.
-
-                      The other door is the writing sheet's Music tab, which
-                      creates one from a pasted link. Both go through
-                      `createSong` → `saveSong`, so they are two doors and not
-                      two write paths. */}
+                  {/* No song: music is a link on an essay, set in the writing
+                      sheet's Music tab (ADR 0044) — not a thing this room makes. */}
                 </div>
               </div>
             </>
@@ -307,19 +293,6 @@ const SUBTITLES = {
     seedFrom={seed?.id ?? null}
   />
   <WritingSheet subjects={subjectNames} constellations={data.allConstellations} />
-  {
-    /* ⚠ THE ONLY PLACE THIS SHEET IS MOUNTED, since /admin/listening was
-      retired (plan 40 phase 2) — it used to be the second. A song
-      row here opens THIS, through the `song:edit` seam in open-editor.ts — so
-      the manager keeps LISTING songs, which is what search, trash and bulk
-      publish are for, and stops EDITING them, which is what had two homes.
-
-      That is what the paste bar living inside the sheet bought: a sheet with
-      its own front door is mountable anywhere, where a page-level one would
-      have forced either a second copy or a navigation out of the room. */
-  }
-  <SongSheet people={people.data ?? []} sharedBy={sharedBy} />
-
   <script>
     import '../../scripts/admin-list';
   </script>

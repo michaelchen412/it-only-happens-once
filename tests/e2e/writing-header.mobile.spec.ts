@@ -39,7 +39,7 @@ async function openPublished(page: Page) {
       constellationIds: [],
       occurredIso: ISO,
       updatedAt: ISO,
-      paired: null,
+      music: null,
     }),
     'versions.list': (): Returns<typeof actions.versions.list> => ({
       canonical: { title: 'A published piece', preview: 'x', updatedAt: ISO },

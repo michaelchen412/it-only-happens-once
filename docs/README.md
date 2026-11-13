@@ -29,7 +29,7 @@ links are the first thing a stranger meets in `docs/`.)*
 | Content surface name | Stays **"blog"** for now (Library/Commonplace/Record judged misleading) | — |
 | Rendering | Astro **`output: 'server'`** + Vercel adapter; public SSR + edge caching; admin SSR | [0001](adr/0001-rendering-and-hosting.md) |
 | Auth | **Supabase Auth** — Google OAuth, single admin. *(0002 also took beta passkeys; they were never built — [`auth.md`](auth.md) §1)* | [0002](adr/0002-authentication-provider.md) |
-| Data model | Single **`fragments`** table, three types | [0003](adr/0003-fragments-single-table.md) |
+| Data model | Single **`fragments`** table, two types (writing, quote) | [0003](adr/0003-fragments-single-table.md) |
 | Content store | **Supabase** is the single source of truth; **no** content collections | [0004](adr/0004-supabase-over-content-collections.md) |
 | Type direction | **Editorial** — Newsreader + Atkinson Hyperlegible | `design.md` |
 | Themes | **dusk** (dark) / **paper** (light), OKLCH, semantic tokens only | `design.md` |
@@ -40,7 +40,7 @@ links are the first thing a stranger meets in `docs/`.)*
 | Quote provenance | A quote is **three facts — Who / From / Where**; the shown line is *derived* from them, and the citation opens behind the attribution itself | [0017](adr/0017-quote-provenance-three-facts.md) |
 | Music | Three roles — **score / paired / annotated fragment**; a song's `body` is its *why*, the embed is the citation | [0009](adr/0009-music-three-roles.md) |
 | Offline | **Online-first.** No outbox, no service worker, no queue — one was built and removed within two days | [0010](adr/0010-online-first-writing.md) |
-| Paired media | A song paired to an essay is **a fragment**, not a column | [0011](adr/0011-paired-media-is-a-fragment.md) |
+| An essay's music | **One link on the essay** (`music_url`) — no song record behind it. Supersedes 0011's "a fragment, not a column" | [0044](adr/0044-music-is-a-link-on-the-essay.md) |
 | HQ | A **private second domain** — its tables carry no `anon` policy at all; private by omission | [0012](adr/0012-hq-is-a-private-second-domain.md) |
 | Arrears | **Absence never accumulates.** One row and one date per answer, so a queue of overdue occurrences cannot come into existence | [0013](adr/0013-absence-never-accumulates.md) |
 | Google calendar | **One-way mirror.** The token carries `calendar.events.readonly`, so the rule is enforced by the credential rather than by discipline | [0014](adr/0014-calendar-is-one-way.md) |

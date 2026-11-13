@@ -92,7 +92,7 @@ import { wireConstellationPicker } from './constellation-picker';
 import { readIntent } from './open-editor';
 import { wireSheetTabs } from './sheet-tabs';
 import { wireVersionsPanel } from './versions-panel';
-import { wireMusicPanel, type PairedSong } from './music-panel';
+import { wireMusicPanel, type PieceMusic } from './music-panel';
 import { wireAddMenu } from './fragment-panel';
 import { wireProofread } from './writing-proofread';
 import { wirePublishDialog } from './writing-publish-dialog';
@@ -508,6 +508,11 @@ onPage((page) => {
       // Whatever was ticked before the piece existed (including the
       // composer's pre-tick) can only be written now that the row exists.
       await picker.flush(idField.value);
+      // ⚠ AND THE MUSIC TAB OPENS NOW, not on the next visit. It said "save
+      // this piece first" and then went on saying it after the save, until the
+      // sheet was closed and reopened — the row existed, the panel was never
+      // told. A brand-new piece has no music to carry over, hence null.
+      musicPanel.setFragment(idField.value, null);
       setHash(`#edit=${idField.value}`);
       deleteZone.hidden = false;
     }
@@ -616,18 +621,15 @@ onPage((page) => {
   const cnCount = document.getElementById('ws-cn-count')!;
   const toolbar = document.getElementById('ws-toolbar') as HTMLElement;
 
-  // ---- the paired song (its own tab, ADR-0009) ----
+  // ---- the piece's music (its own tab, ADR 0044) ----
   const musicPanel = wireMusicPanel({
     root: document.getElementById('ws-panel-music') as HTMLElement,
     markEl: document.getElementById('ws-music-mark')!,
   });
 
   // The formatting toolbar belongs to the document; hide it on the other tabs.
-  // The music panel loads its list here rather than on open — one round trip,
-  // and only if you actually go looking for a song.
   const tabs = wireSheetTabs(sheet, (key) => {
     toolbar.hidden = key !== 'doc';
-    if (key === 'music') musicPanel.refresh();
   });
 
   // ---- draft versions (its own tab, published pieces only) ----
@@ -715,8 +717,8 @@ onPage((page) => {
     updatedAt: string;
     subjects: string;
     constellationIds?: string[];
-    /** The paired song (ADR-0009), or null. Comes from `fragments.get`. */
-    paired?: PairedSong | null;
+    /** The piece's music (ADR 0044), or null. Comes from `fragments.get`. */
+    music?: PieceMusic | null;
   }
 
   function populate(d: Loaded | null) {
@@ -759,9 +761,9 @@ onPage((page) => {
     const memberIds = d?.constellationIds ?? [];
     picker.setFragment(d?.id ?? null, memberIds);
     setCnLabel(memberIds.length);
-    // A brand-new piece has no row yet, so there's nothing to point a pairing at
-    // until the first save — `pair` updates by id, which must exist.
-    musicPanel.setFragment(d?.id ?? null, d?.paired ?? null);
+    // A brand-new piece has no row yet, so there's nothing to write music to
+    // until the first save — `music.set` updates by id, which must exist.
+    musicPanel.setFragment(d?.id ?? null, d?.music ?? null);
     tabs.select('doc'); // always open on the writing, never mid-composition
     pfReset(); // a mark from the last piece must not linger (docs/plans/22 · Piece 7)
     acquireEditLock(idField.value);

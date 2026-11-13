@@ -569,9 +569,8 @@ export type Database = {
           excerpt: string | null
           id: string
           is_self: boolean
+          music_url: string | null
           occurred_at: string
-          paired_playlist_url: string | null
-          paired_song_id: string | null
           published_at: string | null
           slug: string
           source_url: string | null
@@ -592,9 +591,8 @@ export type Database = {
           excerpt?: string | null
           id?: string
           is_self?: boolean
+          music_url?: string | null
           occurred_at?: string
-          paired_playlist_url?: string | null
-          paired_song_id?: string | null
           published_at?: string | null
           slug: string
           source_url?: string | null
@@ -615,9 +613,8 @@ export type Database = {
           excerpt?: string | null
           id?: string
           is_self?: boolean
+          music_url?: string | null
           occurred_at?: string
-          paired_playlist_url?: string | null
-          paired_song_id?: string | null
           published_at?: string | null
           slug?: string
           source_url?: string | null
@@ -633,13 +630,6 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "authors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fragments_paired_song_id_fkey"
-            columns: ["paired_song_id"]
-            isOneToOne: false
-            referencedRelation: "songs"
             referencedColumns: ["id"]
           },
           {
@@ -1040,30 +1030,6 @@ export type Database = {
           name?: string
           slug?: string
           sort?: number
-        }
-        Relationships: []
-      }
-      songs: {
-        Row: {
-          artist: string | null
-          created_at: string
-          id: string
-          source_url: string
-          title: string
-        }
-        Insert: {
-          artist?: string | null
-          created_at?: string
-          id?: string
-          source_url: string
-          title: string
-        }
-        Update: {
-          artist?: string | null
-          created_at?: string
-          id?: string
-          source_url?: string
-          title?: string
         }
         Relationships: []
       }

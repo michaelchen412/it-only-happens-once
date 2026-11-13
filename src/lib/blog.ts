@@ -26,34 +26,6 @@ export interface SubjectRef {
   slug: string;
 }
 
-/**
- * The song paired with one essay — *this song goes with this piece* (ADR-0009).
- *
- * NORMALISED OVER TWO SOURCES. The renderer treats them identically; only
- * `fragmentId` records which answered, and only so a caller that needs to link
- * back to the song can:
- *
- *   1. `paired_song_id` → a real `song` fragment. What the backfill promoted
- *      the 48 citable pairings to, and what the writing sheet's picker sets.
- *   2. `paired_playlist_url` → a Spotify PLAYLIST on the essay itself
- *      (plan 40 §1b). Two rows take this path, and only they can: ADR-0009
- *      forbids a song fragment from citing a playlist, so these never had a
- *      song row to be promoted to. Until 2026-08-15 the same two rode the
- *      Squarespace `details.media` shape, which is now gone from the database.
- *
- * The playlist path has no title and no artist, so its caption is empty and the
- * embed speaks for itself. That is fine for a playlist, which names itself.
- */
-export interface PairedMedia {
-  /** The song fragment's id, or null when this came from a paired playlist. */
-  fragmentId: string | null;
-  /** Empty on the legacy path — render no caption rather than a fake one. */
-  title: string;
-  artist: string | null;
-  /** What to embed. Parsed by the renderer, which owns provider knowledge. */
-  url: string;
-}
-
 export interface WritingItem {
   id: string;
   slug: string;
@@ -67,8 +39,12 @@ export interface WritingItem {
   precision: 'day' | 'year';
   readMinutes: number;
   subjects: SubjectRef[];
-  /** The paired song, if this piece has one (ADR-0009). */
-  paired: PairedMedia | null;
+  /**
+   * The music that plays above this piece, as the link it was pasted as
+   * (canonical — `music_url`, ADR 0044). The renderer turns it into a player;
+   * there is no title or artist, because the player prints its own.
+   */
+  music: string | null;
   /** The closing strip's neighbourhood, when a caller has loaded it. Absent on
    *  a card that only ever renders an excerpt (plan 32 · §11). */
   neighbourhood?: QuotePage | null;
@@ -143,107 +119,6 @@ function sanitizeQuery(q: string): string {
     .replace(/[%,()\\]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-/**
- * The embed that fetches an essay's paired song, plus the legacy column.
- *
- * `paired_song:paired_song_id(...)` — the COLUMN-name hint, not the constraint
- * name. `fragments!fragments_paired_song_id_fkey(...)` looks more explicit and
- * is what you'd write from habit, but PostgREST answers it with PGRST200 for a
- * self-referencing FK (verified against live 2026-07-31). Don't "fix" this.
- *
- * RLS does the security here, not the query: the embed applies the fragments
- * policies a second time, so an anon reader whose paired song is a draft gets
- * `paired_song: null` and the essay simply renders without one. There is no
- * status filter below because there must not be one — the admin preview is
- * supposed to see its own drafts (plan 01), and the boundary is the policy.
- *
- * THE RAW `paired_song_id` IS SELECTED TOO, and it is load-bearing. Without it,
- * a hidden song and an essay with no song look identical — both arrive as
- * `paired_song: null` — and `pairedMediaOf` falls through to the second branch.
- * When that branch read `details.media`, which all 48 promoted essays carried,
- * unpublishing a song kept playing it from the legacy URL. Found by probe, not
- * by reading: the embed correctly returned null and the page still showed a
- * player. The branch now reads `paired_playlist_url`, which only two rows have,
- * so the fall-through has almost nothing to find — but the guard stays, because
- * "almost nothing" is not the property worth relying on.
- */
-export const PAIRED_SELECT =
-  'paired_song_id, paired_song:paired_song_id(id, title, artist, source_url), paired_playlist_url';
-
-/**
- * Shape of what PAIRED_SELECT adds to a row.
- *
- * ⚠ IT USED TO END IN `details`, TYPED `unknown`, because four callers each had
- * a different idea of that column's type and the read was a runtime shape check
- * anyway. That looseness was load-bearing in a way nobody intended: `unknown`
- * overlaps with everything, so a caller could satisfy this interface WITHOUT
- * carrying the pairing at all and still compile. `composer-suite`'s
- * `PlacedFragment` did exactly that — it declared `details` and not
- * `paired_song_id`, and only worked because the query fetched the field the
- * type never mentioned. Naming a real column here made the compiler say so.
- */
-export interface PairedRow {
-  paired_song_id?: string | null;
-  paired_song?: {
-    id: string;
-    title: string;
-    artist: string | null;
-    source_url: string;
-  } | null;
-  paired_playlist_url?: string | null;
-}
-
-/**
- * Normalise a row's pairing to one shape, from either source.
- *
- * THE ORDER OF THESE BRANCHES IS THE SECURITY PROPERTY, not a preference:
- *
- *   1. `paired_song_id` set → the song row is the ONLY truth. If the embed came
- *      back null (RLS hid an unpublished song) or the row is soft-deleted, the
- *      answer is NO PAIRING. It must not fall through.
- *   2. `paired_song_id` null → the essay may carry a PLAYLIST instead
- *      (`paired_playlist_url`, plan 40 §1b). Two do. A playlist is not a song
- *      and never had a row: ADR 0009 forbids a song fragment from citing one.
- *
- * Falling through from 1 to 2 is the bug this shape exists to prevent — an
- * unpublished song must not go on playing from a second source.
- *
- * ⚠ BRANCH 2 USED TO READ `details.media`, the shape Squarespace brought over,
- * and it was the last reader of it anywhere. That was worse in a way worth
- * recording: all 48 promoted essays ALSO carried a `details.media` copy of the
- * same track, so the fallback was one missed `return` away from playing a
- * withdrawn song. A column that only these two rows have cannot do that.
- */
-export function pairedMediaOf(row: PairedRow): PairedMedia | null {
-  if (row.paired_song_id) {
-    const song = row.paired_song;
-    /*
-      ⚠ THE `deleted_at` CHECK IS GONE BECAUSE THE COLUMN IS. A song used to be
-      a fragment and inherited soft delete, so the FK resolved a row that was in
-      the trash and an essay went on playing it. `songs` has no bin: there is
-      nothing in a song a minute of retyping cannot restore, and `ON DELETE SET
-      NULL` blanks the pairing rather than orphaning the essay.
-
-      The null check STAYS and is still the security property. RLS could hide a
-      song, or the FK could be null — either way "id set, embed null" means NO
-      pairing and must not fall through to the playlist branch below.
-    */
-    if (!song || !song.source_url) return null;
-    return {
-      fragmentId: song.id,
-      title: song.title,
-      artist: song.artist,
-      url: song.source_url,
-    };
-  }
-  if (row.paired_playlist_url) {
-    // No title and no artist: a playlist's name lives inside the embed, and
-    // inventing a caption here is what ADR 0009's retired annotation did.
-    return { fragmentId: null, title: '', artist: null, url: row.paired_playlist_url };
-  }
-  return null;
 }
 
 /** Flatten the embedded `fragment_subjects(subjects(...))` shape. With a `rank`
@@ -330,7 +205,7 @@ export async function listWriting(
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), ${PAIRED_SELECT}`,
+      `id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), music_url`,
       { count: 'exact' },
     )
     .eq('type', 'writing')
@@ -359,7 +234,7 @@ export async function listWriting(
       precision: r.date_precision,
       readMinutes: readingMinutes(r.body),
       subjects: subjectsOf(r, opts.subjectRank),
-      paired: pairedMediaOf(r),
+      music: r.music_url ?? null,
     };
   });
 
@@ -533,7 +408,7 @@ export async function getWritingBySlug(
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subject_id, subjects(name, slug)), ${PAIRED_SELECT}`,
+      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subject_id, subjects(name, slug)), music_url`,
     )
     .eq('type', 'writing')
     .is('deleted_at', null)
@@ -575,7 +450,7 @@ export async function getWritingBySlug(
     precision: r.date_precision,
     readMinutes: readingMinutes(r.body),
     subjects: subjectsOf(r),
-    paired: pairedMediaOf(r),
+    music: r.music_url ?? null,
   };
 }
 

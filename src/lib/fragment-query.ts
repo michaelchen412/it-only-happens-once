@@ -54,26 +54,12 @@ export interface FragmentListParams {
    * `scoped` in `queryFragmentList` for what that cost.)
    */
   /**
-   * Only fragments that may be PAIRED to a song — the song sheet's own picker
-   * (plan 39 · §2). It admits writing only, where a suite takes either kind:
-   * `songs.pair` writes `paired_song_id` on a row it filters to
-   * `type = 'writing'`, so a quote here would be an offer the action declines.
+   * epigraph mode: published QUOTES only. A fact about the surface rather than
+   * a filter the reader chose, so it is NOT a URL param — `fragments-panel.astro`
+   * sets it, the way it pins `view` to 'list', and a crafted URL cannot widen
+   * the picker into offering rows the action then refuses.
    *
-   * ⚠ NOT A URL PARAM, and deliberately not one. This is a property of the ROOM
-   * rather than a filter the reader chose: a quote is not something you have
-   * filtered out of this picker, it is something that cannot be paired at all.
-   * `fragments-panel.astro` sets it in pair mode, the way it already pins `view`
-   * to 'list' there. Were it readable from the query string, a crafted URL could
-   * widen the picker into offering rows `songs.pair` then refuses.
-   */
-  pairable: boolean;
-  /**
-   * epigraph mode: published QUOTES only, and — like `pairable` — it is a fact
-   * about the surface rather than a filter the reader chose.
-   *
-   * ⚠ IT PINS `status` AS WELL AS `type`, WHICH `pairable` DOES NOT, and the
-   * asymmetry is the two actions' own. `songs.pair` accepts a draft essay: the
-   * pairing is private until the essay publishes. `sets.save` runs `checkQuote`,
+   * ⚠ IT PINS `status` AS WELL AS `type`. `sets.save` runs `checkQuote`,
    * which refuses a quote in the bin and allows a draft one only because "you
    * may well be writing both at once" — but a set's epigraph is the FIRST thing
    * a reader meets on the music page, so offering a draft here would invite a
@@ -81,12 +67,6 @@ export interface FragmentListParams {
    * purpose: the picker offers what is safe, the action refuses what is wrong.
    */
   quotable: boolean;
-  /**
-   * pair mode: mark rows already paired to THIS song. The sibling of
-   * `constellation` above, and it needs no query of its own — `paired_song_id`
-   * is a column on the row, so the marking is a read of what we already have.
-   */
-  pairedSong: string | null;
   filtered: boolean;
 }
 
@@ -116,9 +96,7 @@ export function parseListParams(sp: URLSearchParams): FragmentListParams {
     workSlug,
     constellation: (sp.get('constellation') || '').trim() || null,
     membership,
-    pairable: false, // the pair picker turns it on; fragments-panel.astro, never the URL
-    quotable: false, // ditto — the epigraph picker, and never a crafted URL
-    pairedSong: (sp.get('song') || '').trim() || null,
+    quotable: false, // the epigraph picker turns it on; fragments-panel.astro, never the URL
 
     filtered:
       !!typeParam || subjectSlugs.length > 0 || q.length >= MIN_SEARCH || !!authorSlug || !!workSlug || !!membership,
@@ -145,13 +123,13 @@ export interface ConstellationRefLite {
 
 /**
  * Which room is rendering the panel — `manage` is /admin/fragments, `pick` is
- * the composer's browser, `pair` is the song sheet's picker (plan 39).
+ * the composer's browser, `epigraph` is the set sheet's quote picker.
  *
  * ⚠ ONE DECLARATION, IMPORTED TWICE, rather than the same union hand-written in
  * `FragmentListPanel` and `FragmentRow` — which is what it was, and adding a
  * third value to two copies is exactly the drift plans/29 · §3 named.
  */
-export type PanelMode = 'manage' | 'pick' | 'pair' | 'epigraph';
+export type PanelMode = 'manage' | 'pick' | 'epigraph';
 
 export interface FragmentListData {
   rows: FragmentRowT[];
@@ -178,14 +156,6 @@ export interface FragmentListData {
   trashCount: number;
   /** fragment ids already placed in params.constellation (empty set otherwise) */
   placedIds: Set<string>;
-  /** fragment ids already paired to params.pairedSong (empty set otherwise) */
-  pairedIds: Set<string>;
-  /**
-   * Titles of the songs OTHER listed rows are paired to, for the sentence a
-   * collision has to say out loud (plan 39 · ruling 2). Only populated in pair
-   * mode — nothing else has a use for it, and it costs a query.
-   */
-  songTitleById: Record<string, string>;
 }
 
 export async function queryFragmentList(supabase: DB, p: FragmentListParams): Promise<FragmentListData> {
@@ -293,16 +263,9 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
   // `TYPE_META` already states: a kind written out by hand is a copy that cannot
   // be revoked. `placeable` is gone rather than corrected, because with songs out
   // of the union it selected everything — both remaining kinds are suite stanzas.
-  //
-  // ⚠ PAIRING STILL NARROWS, and its literal is safe because `writing` is a
-  // value the enum actually has (plan 39 · §2). `songs.pair` writes
-  // `paired_song_id` on a row it filters to `type = 'writing'`, so a quote in
-  // that picker is an offer the action declines — and a quote looks like a
-  // perfectly reasonable thing to pair music to until you press it.
   const scoped = <T extends { not: any; is: any; eq: any; neq: any }>(qb: T) => {
     const live = p.view === 'trash' ? qb.not('deleted_at', 'is', null) : qb.is('deleted_at', null);
     const working = live.neq('status', 'note') as T;
-    if (p.pairable) return working.eq('type', 'writing') as T;
     // Both pins, because a published quote is the whole of what a set may cite.
     if (p.quotable) return working.eq('type', 'quote').eq('status', 'published') as T;
     return working as T;
@@ -344,7 +307,7 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
 
   // per-type counts (the badge numbers) for the current view, independent of filters
   const { data: typeRows } = await scoped(supabase.from('fragments').select('type'));
-  const typeCounts = { writing: 0, quote: 0, song: 0 } as Record<string, number>;
+  const typeCounts = { writing: 0, quote: 0 } as Record<string, number>;
   for (const r of typeRows ?? []) typeCounts[r.type]++;
 
   // subjects per fragment (editor prefill) + all subjects + trash count
@@ -397,42 +360,6 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     for (const l of links ?? []) placedIds.add(l.fragment_id);
   }
 
-  // pair mode: which of these are already paired to the target song, and what
-  // the REST are paired to.
-  //
-  // ⚠ NO QUERY FOR THE FIRST HALF, unlike `placedIds` one line up, and the
-  // asymmetry is the data model rather than an optimisation: membership is a
-  // link table you have to go and read, whereas `paired_song_id` is a column on
-  // the row we already selected with `*`.
-  const pairedIds = new Set<string>();
-  const songTitleById: Record<string, string> = {};
-  if (p.pairedSong) for (const r of rows) if (r.paired_song_id === p.pairedSong) pairedIds.add(r.id);
-  if (p.pairable) {
-    // The second half DOES cost a query, and only this mode pays it. These are
-    // the essays a pick would STEAL from, and ruling 2 says the steal has to
-    // name what it is taking.
-    const others = [
-      ...new Set(rows.map((r) => r.paired_song_id).filter((id): id is string => !!id && id !== p.pairedSong)),
-    ];
-    if (others.length) {
-      /*
-        ⚠ `songs`, NOT `fragments`, AND IT READ `fragments` UNTIL 2026-08-15.
-        These ids come from `paired_song_id`, which ADR 0035 repointed at a table
-        of its own — so this went on looking for songs among the writing and the
-        quotes, found none, and left `songTitleById` empty.
-
-        ⚠ AND IT FAILED SILENTLY, which is what makes it worse than the crash in
-        `fragments.get` next door. No error, no empty state: the picker just
-        stopped naming what a pick would take, so `pairedToOther` fell back to
-        `''` and every row rendered a plain ＋ instead of "Replace «song»". Plan
-        39 ruling 2 exists precisely to stop that — *"the steal is legible before
-        the press"* — and a green build said nothing.
-      */
-      const { data: songs } = await supabase.from('songs').select('id, title').in('id', others);
-      for (const s of songs ?? []) songTitleById[s.id] = s.title || '(untitled)';
-    }
-  }
-
   return {
     rows,
     truncated: rows.length >= LIST_CEILING,
@@ -448,7 +375,5 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     totalCount: (typeRows ?? []).length,
     trashCount: trashCount ?? 0,
     placedIds,
-    pairedIds,
-    songTitleById,
   };
 }

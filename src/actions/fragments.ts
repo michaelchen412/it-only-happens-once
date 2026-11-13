@@ -1,6 +1,6 @@
 // ============================================================================
-// Fragment mutations — writing, quote and song, plus trash/bulk and the two
-// read-only helpers the editor sheets call (docs/admin.md §4–§6).
+// Fragment mutations — writing and quote, plus trash/bulk, the read-only
+// helpers the editor sheets call, and an essay's music (docs/admin.md §4–§6).
 //
 // `persist` lives here rather than in _shared.ts: it is the fragment write, not
 // a general utility, and it owns the two date rules and the concurrency guard.
@@ -9,7 +9,7 @@ import { defineAction } from 'astro:actions';
 import { getSecret } from 'astro:env/server';
 import { z } from 'astro/zod';
 import { slugify } from '../lib/slug';
-import { MediaUnreachable, lookupSong, parseSongRef, songEmbed, songRefUrl } from '../lib/media';
+import { musicEmbed, musicRefUrl, parseMusicRef } from '../lib/media';
 import { provenanceLine } from '../lib/provenance';
 import type { Database, Json } from '../lib/database.types';
 import {
@@ -21,12 +21,8 @@ import {
   optDatetimeLocal,
   optText,
   optUrl,
-  optInt,
   optUuid,
 } from './_shared';
-// ⚠ THE ONE DEFINITION OF "how you select a paired song", and this action is
-// here because it used to carry a second one. See `get` below.
-import { PAIRED_SELECT, type PairedRow } from '../lib/blog';
 // ⚠ THE CORPUS BORROWS HQ'S CLOCK, AND ONLY FOR THE CALENDAR HALF. `homeTimezone`
 // reads the configured zone from `settings`; `localToday` + `ymdToUtc` turn it
 // into the calendar position `occurred_at` is supposed to hold. See `autoOccurredAt`.
@@ -494,95 +490,6 @@ export const fragments = {
   }),
 
   /**
-   * Create or edit a `song` fragment. Title/art/artist/album come from the
-   * Spotify Web API when it's configured (docs/plans/04 Piece 4) and are
-   * editable regardless — a five-artist track joins to a mouthful nobody wants
-   * as an attribution. `body` is the ANNOTATION — Michael's words on why this
-   * song (ADR-0009), which is what makes a song a fragment rather than a link.
-   * It is optional, always: a song may say nothing and simply play.
-   */
-  saveSong: defineAction({
-    accept: 'form',
-    input: z.object({
-      id: optText,
-      spotify_url: z.url('Paste a Spotify or YouTube link'),
-      title: z.string().min(1, 'A song title is required'),
-      attribution: z.string().min(1, 'Who’s the artist?'),
-      album: optText,
-      thumbnail_url: optText,
-      /** Web API extras, carried as hidden fields so provenance can be exact. */
-      release_year: optInt,
-      spotify_artist_ids: optText,
-      spotify_album_id: optText,
-      year: z.coerce.number().int(),
-      status: fragmentStatus,
-      slug: optText,
-    }),
-    /*
-      ⚠ NO `body` AND NO `subjects` IN THAT INPUT, AND BOTH ABSENCES ARE THE
-      DECISION (ADR 0031).
-
-      `body` is the song's PUBLIC NOTE now, and `songs.setNotes` is its only
-      writer. Keeping it here would be worse than redundant: this action saves
-      the metadata, and `persist` updates whatever keys the row object carries —
-      so a save from the song sheet's "The song" tab would silently blank a note
-      written on the Notes tab beside it. Omitting the key is what leaves it
-      alone.
-
-      `subjects` is gone because a song has none. A subject is what a piece is
-      ABOUT, and a song is not about anything you can paraphrase; the one time
-      this corpus filed one that way it produced `jazz`, a genre alone in a
-      taxonomy of words about living, deleted 2026-08-11 as a category error.
-      Songs are filed by FEELING, in the Listening room, with the track playing.
-
-      ⚠ THE ORDER MATTERED. Zod strips unknown keys SILENTLY, so removing these
-      while the old song form still rendered would have left its "Why this one"
-      editor accepting typing and discarding it on save. They came out in the
-      commit that deleted the form, not before it.
-    */
-    handler: async (input, ctx) => {
-      requireAdmin(ctx);
-      const sb = ctx.locals.supabase;
-      // The URL is the single source of truth for what's being cited — the id
-      // and the kind both come from it, so a stale hidden field can't disagree.
-      const ref = parseSongRef(input.spotify_url);
-      if (!ref) throw fail('That doesn’t look like a Spotify track, album, or YouTube link', 'BAD_REQUEST');
-      /*
-        ⚠ THREE FIELDS, AND EVERYTHING ELSE THIS USED TO WRITE IS GONE WITH THE
-        TABLE (ADR 0035). It used to freeze a slug, resolve an author from the
-        artist and a work from the album, build a `details` blob of Web-API
-        metadata, set a status and a year. `songs` has title, artist and a URL,
-        because that is all a recording needs to be played under the essay that
-        wanted it:
-
-          · no slug   — nothing addresses a song
-          · no status — a song is visible exactly when its essay is
-          · no author/work — provenance is the Library's job for QUOTES, and a
-            song's artist is a string on the row, not an entity to be groomed
-          · no `details` — `spotify_id` was derived from `source_url`, which
-            data-model.md already calls the one source of truth for id and kind,
-            and nothing rendered the rest
-      */
-      const row = {
-        title: input.title,
-        artist: input.attribution,
-        // Canonical, not what was pasted: Spotify's share sheet appends a `?si=`
-        // tracking token, and that token has no business on a public page.
-        source_url: songRefUrl(ref),
-      };
-
-      if (input.id) {
-        const { error } = await sb.from('songs').update(row).eq('id', input.id);
-        if (error) throw fail(error.message);
-        return { id: input.id };
-      }
-      const { data, error } = await sb.from('songs').insert(row).select('id').single();
-      if (error) throw fail(error.message);
-      return { id: data.id };
-    },
-  }),
-
-  /**
    * Load one fragment for the WritingSheet (drafts included — the session
    * client sees them via RLS; anon sessions only ever get published rows).
    * Fetched on demand so the manager table doesn't embed every essay body.
@@ -591,27 +498,10 @@ export const fragments = {
     input: z.object({ id: z.uuid() }),
     handler: async ({ id }, ctx) => {
       requireAdmin(ctx);
-      /*
-        ⚠ `PAIRED_SELECT`, NOT A SECOND COPY OF IT, AND THE COPY IS WHY THIS
-        BROKE. This handler hand-rolled its own embed —
-        `paired_song:paired_song_id(id, title, attribution, deleted_at)` — while
-        `lib/blog.ts` has exported the canonical one all along, used by the feed,
-        the permalink and the composer. So when ADR 0035 moved songs out of
-        `fragments` into a table of their own, the sweep updated the constant and
-        every reader of it, and could not see this. `songs` has `artist`, not
-        `attribution`, and has no `deleted_at` at all — a song has no bin — so
-        PostgREST rejected the select outright and the WHOLE ROW came back as an
-        error. Michael, 2026-08-15: *"Why am I getting 'That fragment no longer
-        exists' when I try to open in fragment browser? data is fine in
-        database."* The data was fine. The query was not.
-
-        A duplicated select string is a duplicated schema assumption, and this
-        one had no way to be told the schema had changed. Now there is one.
-      */
       const { data, error } = await ctx.locals.supabase
         .from('fragments')
         .select(
-          `id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id), ${PAIRED_SELECT}`,
+          `id, type, title, slug, excerpt, body, status, occurred_at, updated_at, fragment_subjects(subjects(name)), fragment_constellations(constellation_id), music_url`,
         )
         .eq('id', id)
         .maybeSingle();
@@ -626,11 +516,12 @@ export const fragments = {
       */
       if (error) throw fail(error.message);
       if (!data) throw fail('That fragment no longer exists', 'NOT_FOUND');
-      // The Music tab shows what's paired without a second round trip.
-      const song = (data as PairedRow).paired_song;
-      const paired = song ? { id: song.id, title: song.title ?? '(untitled)', artist: song.artist ?? '' } : null;
       return {
-        paired,
+        // The Music tab shows the link and its player without a second round
+        // trip. The embed is built HERE so the sheet does not re-derive it:
+        // `embedForUrl` is the renderer's own answer, the same one PostArticle
+        // gives a reader.
+        music: data.music_url ? { url: data.music_url, embed: embedOf(data.music_url) } : null,
         constellationIds: (data.fragment_constellations ?? []).map((l) => l.constellation_id),
         id: data.id,
         type: data.type,
@@ -953,192 +844,65 @@ export const fragments = {
   }),
 };
 
-/**
- * The song already in the corpus for a pasted link, if there is one.
- *
- * ⚠ MATCHED ON THE PARSED REF, NEVER ON THE PASTED STRING (plans/33 §6a). The
- * same track arrives as `open.spotify.com/track/ID?si=…` from the share sheet,
- * as `open.spotify.com/intl-de/track/ID` from a German browser, and as
- * `spotify:track:ID` from the desktop app. All three are one song, and comparing
- * raw text would grow a twin for each — which is the failure mode that matters
- * most here, because a duplicate row splits a song's feelings across two shelves
- * and neither one is wrong enough to notice.
- *
- * `songRefUrl` is the canonical form `saveSong` already stores, so this is an
- * exact-match lookup rather than a fuzzy one.
- */
-async function songForRef(sb: DB, url: string) {
-  const ref = parseSongRef(url);
-  if (!ref) return null;
-  const { data } = await sb
-    .from('songs')
-    .select('id, title, artist')
-    .eq('source_url', songRefUrl(ref))
-    .limit(1)
-    .maybeSingle();
-  return data ? { id: data.id, title: data.title, artist: data.artist ?? '' } : null;
+/** The player for a stored link, in the plain shape the Music tab renders. */
+function embedOf(url: string) {
+  const ref = parseMusicRef(url);
+  const e = ref ? musicEmbed(ref) : null;
+  return e ? { src: e.src, height: e.height, allow: e.allow } : null;
 }
 
-export const songs = {
+/**
+ * An essay's music — ONE LINK on the row (ADR 0044). There is no song to make,
+ * search or name: a Spotify track, album or playlist, or a YouTube video is
+ * pasted onto the piece and plays above it.
+ */
+export const music = {
   /**
-   * Resolve a pasted track / album / video link to everything we can learn
-   * about it. Answers from the Spotify Web API when credentials are configured
-   * and falls back to oEmbed otherwise — `source` says which, so the sheet can
-   * explain why the artist field is still empty rather than looking broken.
+   * Set an essay's music, or clear it (`url` absent or blank).
+   *
+   * Applies IMMEDIATELY, like constellation membership: it is not a field of
+   * the document, so it must not ride along with `saveWriting`'s
+   * compare-and-set — setting music can never be what loses a rewrite, and a
+   * draft takes music without going near the publish dialog. The
+   * `music_is_not_an_edit` trigger is what keeps it from moving the
+   * concurrency token that compare-and-set reads.
+   *
+   * The link is stored CANONICAL (`musicRefUrl`), never as pasted: Spotify's
+   * share sheet appends a `?si=` tracking token that has no business on a
+   * public page. The answer carries the canonical form back, so the field
+   * shows what was saved rather than what was typed.
    */
-  lookup: defineAction({
-    input: z.object({ url: z.string().min(1).max(500) }),
-    handler: async (input, ctx) => {
+  set: defineAction({
+    input: z.object({ fragment_id: z.uuid(), url: z.string().max(500).optional() }),
+    handler: async ({ fragment_id, url }, ctx) => {
       requireAdmin(ctx);
-      // ⚠ TWO FAILURES, TWO SENTENCES (plans/30 · §5). "That is not a link a
-      // song may cite" is something you fix by pasting a different link;
-      // "nobody answered" is something you fix by waiting. `lookupSong` used to
-      // let the second escape as a bare 500 from an unwrapped oEmbed call, and
-      // the obvious tidy-up — catch it and return null — would have been worse
-      // than the 500: it would have told you your working Spotify link was the
-      // wrong kind of link.
-      let found;
-      try {
-        found = await lookupSong(input.url);
-      } catch (e) {
-        if (e instanceof MediaUnreachable) throw fail(e.message, 'GATEWAY_TIMEOUT');
-        throw e;
+      const pasted = (url ?? '').trim();
+      let stored: string | null = null;
+      if (pasted) {
+        const ref = parseMusicRef(pasted);
+        // One sentence for every refusal, and it names what WILL work — the
+        // fix for a wrong link is always "paste a different one".
+        if (!ref) {
+          throw fail(
+            'That link can’t play here — paste a Spotify track, album or playlist, or a YouTube video.',
+            'BAD_REQUEST',
+          );
+        }
+        stored = musicRefUrl(ref);
       }
-      if (!found) throw fail('Couldn’t read that link — Spotify track/album or YouTube video, please', 'BAD_REQUEST');
-      return {
-        ...found,
-        // ⚠ THE EMBED IS BUILT HERE BECAUSE IT CANNOT BE BUILT THERE.
-        // `lib/media.ts` reaches `astro:env/server` and says in its header that
-        // nothing in `src/scripts/` may import it — so the listening bench,
-        // which has to raise a player for a link pasted a moment ago, would
-        // otherwise have to re-implement provider parsing in the browser. Two
-        // parsers for one question is how the `?si=` and `intl-xx/` forms end up
-        // handled in one place and not the other.
-        embed: songEmbed(found.ref),
-        existing: await songForRef(ctx.locals.supabase, input.url),
-      };
-    },
-  }),
-
-  /**
-   * Everything the song sheet shows, in one read (plan 37 §2).
-   *
-   * ⚠ AN ACTION RATHER THAN DATA ATTRIBUTES ON THE ROW, and the choice is about
-   * what a list is allowed to weigh. The listening bench used to carry title,
-   * artist and a pre-resolved embed on every `<li>`; the sheet needs
-   * the album, the year, the private note, the public note and the paired essays
-   * too, and putting those on every row would ship every note in the corpus to
-   * open one of them. One round trip on open is cheaper than a page that grows
-   * with the library.
-   *
-   * The embed is resolved HERE for the same reason `songs.lookup` resolves one:
-   * `lib/media.ts` reaches `astro:env/server` and forbids `src/scripts/` from
-   * importing it, so the browser cannot turn a stored URL into a player.
-   */
-  forSheet: defineAction({
-    input: z.object({ id: z.uuid() }),
-    handler: async ({ id }, ctx) => {
-      requireAdmin(ctx);
-      const sb = ctx.locals.supabase;
-      const [{ data: song }, { data: essays }] = await Promise.all([
-        sb.from('songs').select('id, title, artist, source_url').eq('id', id).maybeSingle(),
-        // ⚠ ids AND status, not just titles (plan 39 · §3). The Facts tab used
-        // to join these into one read-only string; it is a list of controls
-        // now, so each row needs an id to unpair BY and a status to say whether
-        // the piece is still in progress — which is the question you are
-        // actually asking about a paired essay while the song is playing.
-        sb.from('fragments').select('id, title, status').eq('paired_song_id', id).is('deleted_at', null),
-      ]);
-      if (!song) throw fail('That song no longer exists.', 'NOT_FOUND');
-
-      const ref = parseSongRef(song.source_url);
-      const embed = ref ? songEmbed(ref) : null;
-      return {
-        id: song.id,
-        title: song.title,
-        artist: song.artist ?? '',
-        url: song.source_url,
-        paired: (essays ?? []).map((e) => ({ id: e.id, title: e.title || '(untitled)', status: e.status })),
-        embed: { src: embed?.src ?? '', height: embed?.height ?? 0, allow: embed?.allow ?? '' },
-      };
-    },
-  }),
-
-  /**
-   * Songs to choose from when pairing one to an essay (ADR-0009 "paired
-   * media"). Newest first with no term, so the picker opens on what you added
-   * most recently — which after the backfill is what you were just editing.
-   */
-  search: defineAction({
-    input: z.object({ q: optText }),
-    handler: async ({ q }, ctx) => {
-      requireAdmin(ctx);
-      let query = ctx.locals.supabase
-        .from('songs')
-        .select('id, title, artist')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      // PostgREST `.or()` values can't contain its own delimiters.
-      const term = (q ?? '')
-        .replace(/[%,()\\]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (term) query = query.or(`title.ilike.%${term}%,attribution.ilike.%${term}%`);
-      const { data, error } = await query;
-      if (error) throw fail(error.message);
-      return (data ?? []).map((s) => ({
-        id: s.id,
-        title: s.title,
-        artist: s.artist ?? '',
-        // ⚠ ALWAYS FALSE, AND THE FIELD STAYS FOR NOW. The picker marked songs
-        // that carried an annotation; a song has no note since ADR 0035, so
-        // nothing is ever marked. Kept rather than removed in the same pass
-        // that removed the notes, so the picker's shape is one change at a time.
-        annotated: false,
-      }));
-    },
-  }),
-
-  /**
-   * Pair a song to an essay, or clear the pairing (`song_id` absent).
-   *
-   * Applies IMMEDIATELY, like constellation membership and for the same reason:
-   * it is a relation, not a field of the document, so it must not ride along
-   * with saveWriting's compare-and-set — pairing a song should never be able to
-   * lose a rewrite, and a draft must be pairable without a publish dialog.
-   *
-   * This is where `type = 'song'` is enforced. The FK deliberately doesn't (see
-   * the migration: a composite FK would need a generated column, which can't be
-   * nulled, which would break ON DELETE SET NULL) — so the check lives here,
-   * where it can be a sentence instead of a constraint name.
-   */
-  pair: defineAction({
-    input: z.object({ fragment_id: z.uuid(), song_id: optUuid }),
-    handler: async ({ fragment_id, song_id }, ctx) => {
-      requireAdmin(ctx);
-      const sb = ctx.locals.supabase;
-      if (song_id) {
-        if (song_id === fragment_id) throw fail('A piece can’t be paired with itself.', 'BAD_REQUEST');
-        // ⚠ THE TYPE CHECK IS GONE BECAUSE THE TYPE IS. `paired_song_id` now
-        // references `songs`, so "only a song" is a foreign key rather than a
-        // sentence — the thing ADR 0034 wanted and could not have while a song
-        // was a fragment. The existence check stays: the FK would refuse an
-        // unknown id with a constraint name, and this refuses it with English.
-        const { data: song } = await sb.from('songs').select('id').eq('id', song_id).maybeSingle();
-        if (!song) throw fail('That song no longer exists.', 'NOT_FOUND');
-      }
-      // `.eq('type', 'writing')` so this can only ever touch an essay. RLS is
-      // still the boundary — a non-admin's update matches zero rows regardless.
-      const { data, error } = await sb
+      // `.eq('type', 'writing')`: music plays above an essay, and the
+      // `fragments_music_url_is_writing` constraint says so too. RLS is still
+      // the boundary — a non-admin's update matches zero rows regardless.
+      const { data, error } = await ctx.locals.supabase
         .from('fragments')
-        .update({ paired_song_id: song_id ?? null })
+        .update({ music_url: stored })
         .eq('id', fragment_id)
         .eq('type', 'writing')
         .select('id')
         .maybeSingle();
       if (error) throw fail(error.message);
       if (!data) throw fail('That piece no longer exists.', 'NOT_FOUND');
-      return { ok: true, songId: song_id ?? null };
+      return { url: stored, embed: stored ? embedOf(stored) : null };
     },
   }),
 };

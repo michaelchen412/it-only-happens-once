@@ -4,8 +4,8 @@
  * ⚠ THIS EXISTS BECAUSE §4.B.5 COUNTED THE MARKUP AND MISSED THE SCRIPTS. The
  * finding listed four `＋` call sites, all of them `.astro`; swapping those left
  * **two more still rendering the character**, both built at runtime —
- * `pair-browser.ts`'s rebuilt pair cell and `entity-combo.ts`'s "＋ Add «text»"
- * — so the same button came out as an SVG or as a font glyph depending on
+ * `pair-browser.ts`'s rebuilt pair cell (gone with the songs table, ADR 0044)
+ * and `entity-combo.ts`'s "＋ Add «text»" — so the same button came out as an SVG or as a font glyph depending on
  * whether the server or the browser had drawn it last. That is a worse split
  * than the one the finding set out to close, and it is invisible to a grep for
  * `<Icon`.

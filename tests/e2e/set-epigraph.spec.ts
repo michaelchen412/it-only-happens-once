@@ -1,8 +1,7 @@
-// Choosing a set's epigraph from the FragmentBrowser's third mode
+// Choosing a set's epigraph from the FragmentBrowser's second mode
 // (plan 42 · §4.D.4).
 //
-// ⚠ THIS IS THE HALF GREEN CHECKS CANNOT COVER, and it is the same class
-// `song-pairing.spec.ts` names: stacked dialogs, a fetched partial, and an admin
+// ⚠ THIS IS THE HALF GREEN CHECKS CANNOT COVER: stacked dialogs, a fetched partial, and an admin
 // session. The unit tests pin what the query ASKS for; nothing below the type
 // checker knows whether the drawer opens, whether it offers rows `sets.save`
 // would refuse, or whether a pick reaches the field that gets saved.
@@ -59,10 +58,6 @@ test.describe('the epigraph picker', () => {
     await expect(drawer.locator('.select-all')).toHaveCount(0);
     await expect(drawer.locator('.fb-bulkbar')).toHaveCount(0);
     await expect(drawer.locator('.fb-add-btn')).toHaveCount(0);
-    // ⚠ AND NOT THE PAIR MODE'S CREATE BAR EITHER. That one starts a DRAFT ESSAY
-    // and pairs a song to it, which is a sentence this picker cannot finish — it
-    // was `!pick` until a third mode made that wrong rather than merely loose.
-    await expect(drawer.locator('.fb-createbar')).toHaveCount(0);
   });
 
   test('the type segments are gone — every one of them would report the same number', async ({ page }) => {
@@ -73,13 +68,11 @@ test.describe('the epigraph picker', () => {
     await expect(drawer.getByRole('radiogroup', { name: 'Filter by type' })).toHaveCount(0);
   });
 
-  test('author and work SURVIVE here, where the pair picker withholds them', async ({ page }) => {
-    // ⚠ THE ONE PLACE THE TWO SINGLE-SELECT PICKERS GENUINELY DIFFER, and the
-    // reason is the corpus rather than the picker: those two selects are dead in
-    // a writing-only list because a piece of Michael's own writing has neither
-    // facet. A quotes-only list is exactly what they describe — "the Marcus
-    // Aurelius one", "the one from Meditations" is how you find a half-remembered
-    // line. Pinned so a later tidy-up cannot fold them into one rule.
+  test('author and work are offered here — a quote is what they describe', async ({ page }) => {
+    // A quotes-only list is exactly what author and work describe — "the
+    // Marcus Aurelius one", "the one from Meditations" is how you find a
+    // half-remembered line. (The song sheet's pair picker withheld them, because
+    // a writing-only list has neither facet; it went with ADR 0044.)
     const sheet = await openSheet(page);
     await sheet.locator('[data-quote-pick]').click();
     const drawer = page.locator('#epigraph-browser');

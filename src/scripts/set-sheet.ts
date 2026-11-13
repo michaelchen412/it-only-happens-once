@@ -185,9 +185,8 @@ onPage((page) => {
         sfd.set('id', id);
         sfd.set('status', statusEl.checked ? 'published' : 'draft');
         const { error } = await callAction(actions.sets.setStatus(sfd));
-        // ⚠ THE CARD IS ALREADY SAVED, so this reports rather than rolls back —
-        // the same shape SongSheet uses when a queued pairing misses. Reloading
-        // anyway would show the new title beside the old chip and read as a bug.
+        // ⚠ THE CARD IS ALREADY SAVED, so this reports rather than rolls back.
+        // Reloading anyway would show the new title beside the old chip and read as a bug.
         if (error) return ui.showError(`Saved, but the visibility didn’t change: ${formatActionError(error)}`);
       }
 

@@ -4,30 +4,14 @@
   composer's browser sheet (mode="pick"). The TITLE is the real, focusable
   control — a <button> for every type, and each type names its own surface
   through `scripts/open-editor.ts`: quotes carry `data-fragment` and open the
-  FragmentSheet, writing carries `data-writing` and opens the WritingSheet,
-  songs carry `data-song` and open the SongSheet (ADR 0031). A click anywhere else on
-  the row is a mouse-only convenience that triggers the same thing
+  FragmentSheet, writing carries `data-writing` and opens the WritingSheet. A
+  click anywhere else on the row is a mouse-only convenience that triggers the same thing
   (src/scripts/fragment-panel.ts). In trash view the row isn't an edit target
   and shows Restore / Delete-forever actions.
 
   mode="pick" (the browser sheet): rows already placed in the target
   constellation render dimmed with a disabled checkbox — visible, never
   re-addable; everything else gets a per-row `ph:plus` place button (data-act).
-
-  mode="pair" (the song sheet's picker, plan 39): the same dimming for rows
-  already paired to THIS song, and no checkbox column at all — `paired_song_id`
-  is one key on one row, so there is nothing to multi-select. Two ⚠ deviations
-  from pick, both deliberate:
-
-   · THE TITLE PAIRS INSTEAD OF OPENING (ruling 5). `.row-open` is still the
-     control; what the host does with it is the host's business, and the pair
-     picker's host pairs. The composer opens editors because placing is
-     curation and you must read what you curate — pairing is not curation, you
-     already know what the piece is.
-   · THE MEMBERSHIP CELL STOPS BEING A BUTTON, for the same reason: pressing it
-     opens this fragment's editor, and /admin/listening does not mount one. It
-     renders as a plain label so the column still says where the piece lives and
-     the four columns beside it stay in line.
 
   The CONSTELLATIONS CELL is a control, not a label: it opens this fragment's
   editor already on its Constellations tab (`data-act="constellations"` →
@@ -37,10 +21,11 @@
   When a search term is active, the title/attribution highlight matches and a
   `writing` fragment shows an excerpt line per match window (search-highlight.ts).
 
-  `data-status` is on the row for the pair picker, which repaints the song
-  sheet's paired list from the row it just picked rather than refetching the
-  song. Reading the status chip's rendered text was the alternative, and it is
-  one relabelling away from breaking.
+  `data-status` is on the row so a test can read a row's status without parsing
+  the chip's rendered text — `set-epigraph.spec.ts` uses it to prove the
+  epigraph picker offers PUBLISHED quotes only. (It was added for the song
+  sheet's pair picker, which repainted its list from the row it picked; that
+  picker is gone, ADR 0044, and the attribute stays for the spec.)
 */
 import { Icon } from 'astro-icon/components';
 import type { Database } from '../../lib/database.types';
@@ -62,15 +47,6 @@ interface Props {
   view?: 'list' | 'trash';
   mode?: PanelMode;
   placed?: boolean;
-  /** pair mode: already paired to the song the picker is open on. */
-  paired?: boolean;
-  /**
-   * pair mode: the title of the song this piece is paired to, when it is a
-   * DIFFERENT one. Empty otherwise — including for the target song itself,
-   * which `paired` already covers. It rides on the row so the confirm can name
-   * what a pick is about to take without a second round trip (ruling 2).
-   */
-  pairedToOther?: string;
   searchTerm?: string;
 }
 const {
@@ -82,8 +58,6 @@ const {
   view = 'list',
   mode = 'manage',
   placed = false,
-  paired = false,
-  pairedToOther = '',
   searchTerm = '',
 } = Astro.props;
 // The combo prefill needs ids (to select the existing entity), not just names.
@@ -95,19 +69,16 @@ const authorId = r.author_id ?? '';
 const workId = r.work_id ?? '';
 const trash = mode === 'manage' && view === 'trash';
 const pick = mode === 'pick';
-const pair = mode === 'pair';
 // The set sheet's epigraph picker (plan 42 · §4.D.4). ⚠ IT MARKS NOTHING, which
-// is the difference from its two neighbours: `pick` dims what is already placed
-// and `pair` dims what is already paired, because both are MEMBERSHIPS you can
-// hold many of. A set cites exactly one quote — `quote_fragment_id` is a scalar
-// — so there is no "already in the target" state to render, only a swap.
+// is the difference from `pick`: that dims what is already placed, because
+// membership is something you hold many of. A set cites exactly one quote —
+// `quote_fragment_id` is a scalar — so there is no "already in the target"
+// state to render, only a swap.
 const epigraph = mode === 'epigraph';
-/** The two pickers that write ONE value — no cart, no select-all. */
-const single = pair || epigraph;
-// "Already in the target" — placed for a constellation, paired for a song. One
-// name because every use below is the same question, and writing both conditions
-// at each of the five sites is how the two modes drift apart.
-const taken = pick ? placed : pair && paired;
+/** The picker that writes ONE value — no cart, no select-all. */
+const single = epigraph;
+// "Already in the target" — placed in the constellation the picker is open on.
+const taken = pick && placed;
 const term = searchTerm.trim();
 
 // Excerpt the essay body (writing only — for quotes the body IS the shown title).
@@ -154,19 +125,12 @@ const primaryText = r.type === 'quote' ? toPlain(rowTitle(r)) : rowTitle(r);
   run-up ("It is a truth universally acknowledged, that a single man in") and
   tells you nothing about which quote it is.
 */
-const quoteClamp = pick || pair ? 'line-clamp-2' : 'line-clamp-3';
+const quoteClamp = pick ? 'line-clamp-2' : 'line-clamp-3';
 
 /*
-  ⚠ QUOTES ONLY NOW (ADR 0031). Writing has always opened its own workshop from
-  `data-writing`; a SONG now opens `SongSheet` from `data-song`, the same way and
-  for the same reason — one editor per kind, named by an id rather than by a
-  payload. So this blob, which exists to fill the FragmentSheet's fields without
-  a round trip, has one consumer left.
-
-  A song deliberately does NOT get the same treatment. Its sheet needs the
-  album, the year, both notes and the paired essays, and carrying those on every
-  row would ship every private note in the corpus into the manager's HTML in
-  order to open one of them. `songs.forSheet` is one read on open instead.
+  ⚠ QUOTES ONLY. Writing opens its own workshop from `data-writing`, named by
+  an id rather than by a payload, so this blob — which exists to fill the
+  FragmentSheet's fields without a round trip — has one consumer.
 */
 const editorData =
   r.type !== 'quote'
@@ -213,15 +177,12 @@ const editorData =
   data-writing={r.type === 'writing' ? r.id : undefined}
   data-fragment={editorData || undefined}
   data-placed={placed ? '' : undefined}
-  data-paired={paired ? '' : undefined}
-  data-paired-to={pairedToOther || undefined}
   data-constellations={constellations.map((c) => c.id).join(',')}
 >
   {
-    /* ⚠ NO CART IN EITHER SINGLE-SELECT PICKER, and the panel's matching <th>
-       has to agree or every row shifts one cell left. `pair` writes one foreign
-       key and `epigraph` writes one scalar column, so "select four of these" is
-       a sentence neither can finish. */
+    /* ⚠ NO CART IN THE SINGLE-SELECT PICKER, and the panel's matching <th>
+       has to agree or every row shifts one cell left. `epigraph` writes one
+       scalar column, so "select four of these" is a sentence it cannot finish. */
     !single && (
       <td class="w-8 px-3 py-2.5 align-top" data-noedit>
         <input
@@ -320,58 +281,23 @@ const editorData =
 
       The cell is `data-noedit` so its dead space does NOTHING rather than
       falling through to "open this fragment" — one region, one answer. */
-    !trash &&
-      /* ⚠ A SONG GETS THE COLUMN BUT NOT THE CONTROL (ADR 0031). A song is
-        never a member of a constellation — `constellations.place` and
-        `setMembership` both refuse one — so the ＋ here would be an invitation
-        the action declines, and pressing it would open the song sheet, which
-        has no Constellations tab to land on. Silently doing something other
-        than what a control promises is worse than not offering it.
-
-        The `<td>` still renders, empty: the table's columns are shared by every
-        row, and dropping the cell on one type would shift the two dates beside
-        it out of line with the rows above and below. */
-      (pair ? (
-        /* ⚠ THE SAME CHIPS, NOT A CONTROL (plan 39 · ruling 5). This cell's
-          whole job elsewhere is to open the fragment's editor on its
-          Constellations tab — and the pair picker has ruled that it opens no
-          editors, because /admin/listening does not mount the writing sheet and
-          a control that silently does nothing is worse than one that isn't
-          there. The column still earns its width: where a piece already lives
-          is exactly the context you want while deciding what to pair to it. */
-        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
-          <span class="cn-cell cn-cell--static" title={cnTitle}>
-            <span class="cn-cell__chips">
-              {constellations.length === 0 ? (
-                <span class="admin-chip admin-chip--none">none</span>
-              ) : (
-                constellations.map((c) => (
-                  <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
-                    <StarMark class="mr-1" />
-                    {c.name}
-                  </span>
-                ))
-              )}
-            </span>
+    !trash && (
+      <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
+        <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
+          <span class="cn-cell__chips">
+            {constellations.length === 0 ? (
+              <span class="admin-chip admin-chip--none">none</span>
+            ) : (
+              constellations.map((c) => (
+                <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
+                  <StarMark class="mr-1" />
+                  {c.name}
+                </span>
+              ))
+            )}
           </span>
-        </td>
-      ) : (
-        <td class="hidden max-w-[13rem] align-top lg:table-cell" data-noedit>
-          <button type="button" class="cn-cell" data-act="constellations" title={cnTitle} aria-label={cnLabel}>
-            <span class="cn-cell__chips">
-              {constellations.length === 0 ? (
-                <span class="admin-chip admin-chip--none">none</span>
-              ) : (
-                constellations.map((c) => (
-                  <span class:list={['admin-chip admin-chip--in max-w-[11rem] truncate', c.color && `cn-${c.color}`]}>
-                    <StarMark class="mr-1" />
-                    {c.name}
-                  </span>
-                ))
-              )}
-            </span>
-            {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
-            {/* ⚠ THE ONE `＋` THAT STAYS A CHARACTER (plan 42 · §4.B.5), and the
+          {/* Reserved, never inserted on hover — see .cn-cell in app.css. */}
+          {/* ⚠ THE ONE `＋` THAT STAYS A CHARACTER (plan 42 · §4.B.5), and the
                 reason is this slot rather than this table. `.cn-cell__mark` is
                 0.85rem wide at `font-size: .7rem` with `line-height: 1.15rem`
                 and `text-align: center` — geometry tuned to a GLYPH, in the
@@ -382,12 +308,12 @@ const editorData =
                 held" and that was too wide: the other two in this file were
                 ordinary `btn btn-ghost btn-xs` rows with nothing tuned about
                 them, and they are `ph:plus` now. */}
-            <span class="cn-cell__mark" aria-hidden="true">
-              ＋
-            </span>
-          </button>
-        </td>
-      ))
+          <span class="cn-cell__mark" aria-hidden="true">
+            ＋
+          </span>
+        </button>
+      </td>
+    )
   }
   <td class="hidden px-3 pt-2.5 align-top sm:table-cell">
     <StatusChip status={r.status} />
@@ -431,38 +357,11 @@ const editorData =
     epigraph && (
       <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
         {/* One verb, and it is not ＋. Picking here REPLACES whatever the set
-            cites, the way the writing sheet's Music tab replaces a pairing —
-            so the control says Use rather than implying it adds to a list. */}
+            cites, so the control says Use rather than implying it adds to a
+            list. */}
         <button type="button" class="btn btn-ghost btn-xs font-sans normal-case" data-act="epigraph" data-id={r.id}>
           Use
         </button>
-      </td>
-    )
-  }
-  {
-    pair && (
-      <td class="px-3 pt-1.5 text-right align-top whitespace-nowrap" data-noedit>
-        {paired ? (
-          <span class="text-primary/70 font-sans text-[0.65rem] tracking-wide uppercase">
-            <StarMark /> paired
-          </span>
-        ) : (
-          /* ⚠ THE BUTTON SAYS WHAT IT WILL COST, and this is the one row where
-            ＋ alone would be a lie: pairing a piece that already holds another
-            song REPLACES that song. The word is on the control and the whole
-            sentence is in the confirm behind it (ruling 2), so the steal is
-            legible before the press and impossible without a second one. */
-          <button
-            type="button"
-            class:list={['btn btn-ghost btn-xs font-sans normal-case', pairedToOther && 'text-warning']}
-            data-act="pair"
-            data-id={r.id}
-            title={pairedToOther ? `Replace ${pairedToOther} with this song` : 'Pair this song to it'}
-            aria-label={pairedToOther ? `Replace ${pairedToOther} with this song` : 'Pair this song to it'}
-          >
-            {pairedToOther ? 'Replace' : <Icon name="ph:plus" />}
-          </button>
-        )}
       </td>
     )
   }

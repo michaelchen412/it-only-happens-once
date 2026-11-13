@@ -13,7 +13,7 @@
 // not one of those was assertable without driving a browser.
 import { excerpt, readingMinutes } from './markdown';
 import { revealOf } from './provenance';
-import { pairedMediaOf, type SubjectRef } from './blog';
+import type { SubjectRef } from './blog';
 import type { SuiteItem } from './constellations';
 import { publicShapeHint, suiteHints } from './suite-shape';
 import { FRAGMENT_TYPES, type FragmentType } from './fragments-display';
@@ -38,18 +38,8 @@ export type PlacedFragment = {
   authors: { name: string; slug: string } | null;
   works: { title: string } | null;
   fragment_subjects: { subjects: SubjectRef | null }[] | null;
-  // ⚠ DECLARED, BECAUSE THE QUERY HAS ALWAYS FETCHED THEM. `PAIRED_SELECT` is
-  // spliced into the constellation read, so these arrive on every placed row —
-  // this type simply never said so, and `pairedMediaOf(f)` type-checked through
-  // an `unknown` overlap rather than because the shapes matched.
-  paired_song_id?: string | null;
-  paired_song?: {
-    id: string;
-    title: string;
-    artist: string | null;
-    source_url: string;
-  } | null;
-  paired_playlist_url?: string | null;
+  /** The essay's music (ADR 0044) — the admin read selects it for the Reader. */
+  music_url: string | null;
 };
 
 /** A `fragment_constellations` row, joined to its fragment. */
@@ -155,10 +145,10 @@ export function buildSuite(placements: Placement[] | null, allLinks: Link[] | nu
                 .map((fs) => fs.subjects)
                 .filter((s): s is SubjectRef => !!s)
                 .sort((a, b) => a.name.localeCompare(b.name)),
-              // Same PostArticle as the public Reader, so the pairing has to
+              // Same PostArticle as the public Reader, so the music has to
               // travel here too — this is the construction site plan 04's
               // Piece 1 missed, and it is still the easy one to forget.
-              paired: pairedMediaOf(f),
+              music: f.music_url ?? null,
             },
           };
 

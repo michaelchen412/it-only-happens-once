@@ -1,6 +1,6 @@
 # 0011 — A paired song is a fragment row, and it leads the essay
 
-Status: Accepted
+Status: **Superseded by [ADR 0044](0044-music-is-a-link-on-the-essay.md)** *(2026-11-13)* — an essay's music is one link on the essay (`music_url`); there is no song row behind it. "It leads the essay" still holds.
 Date: 2026-07-31
 
 Settles two of the three questions [ADR 0009](0009-music-three-roles.md)

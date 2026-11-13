@@ -128,9 +128,9 @@ const { subjects, constellations = [] } = Astro.props;
             Constellations<span id="ws-cn-count" class="admin-tab__n"></span>
           </button>
           {
-            /* The paired song (ADR-0009). A tab for the same reason membership
-              is one: a DRAFT never opens the publish dialog, and pairing a
-              song to a piece you're still writing is the whole habit this
+            /* The piece's music (ADR 0044). A tab for the same reason membership
+              is one: a DRAFT never opens the publish dialog, and giving music
+              to a piece you're still writing is the whole habit this
               restores. */
           }
           <button
@@ -425,10 +425,24 @@ const { subjects, constellations = [] } = Astro.props;
       </div>
 
       {
-        /* The paired song (ADR-0009 "paired media", docs/plans/04 Piece 3).
-          Applies IMMEDIATELY like constellation membership — it's a relation,
-          not a field of the document, so it must never ride along with the
-          compare-and-set save and risk a rewrite. */
+        /* The piece's music — ONE LINK (ADR 0044). Applies IMMEDIATELY like
+          constellation membership: it's a relation, not a field of the
+          document, so it must never ride along with the compare-and-set save
+          and risk a rewrite.
+
+          ⚠ A LINK FIELD, AND NOTHING ELSE TO OPERATE. This tab used to be a
+          song picker: search a catalogue of saved songs, pick one, or paste a
+          link and "add it to the corpus" first. Michael, 2026-11-13: *"I don't
+          care to browse songs. I just care to link certain ones … it's just
+          dropping a Spotify link and forgetting about it forever."* So there is
+          no catalogue, no search and no create step — paste, and it is saved.
+
+          ⚠ THE PLAYER IS THE CONFIRMATION. Title and artist used to be shown
+          as text, which could not tell you whether the link was the RIGHT
+          recording. The embed prints both, with the artwork, and plays — so it
+          is the only preview worth having. `loading="lazy"` keeps it from
+          loading until this tab is shown, and the panel is hidden rather than
+          removed on a tab switch, so the music keeps playing while you write. */
       }
       <div
         id="ws-panel-music"
@@ -437,56 +451,34 @@ const { subjects, constellations = [] } = Astro.props;
         hidden
         class="mx-auto w-full max-w-2xl px-6 pt-8 pb-24"
       >
-        <h3 class="font-display text-lg">The song that goes with this</h3>
+        <h3 class="font-display text-lg">Music</h3>
         <p class="admin-hint mt-1 mb-4">
-          One song, paired to this piece — it plays at the top, before the words. Changes apply immediately, no save
-          needed. This is the pairing 50 of the imported essays already carried; a constellation's score is a different
-          thing, set in the composer.
+          Plays at the top of the piece, above the words. Saved the moment you paste it.
         </p>
         <p id="ws-music-error" hidden role="alert" class="admin-alert mb-3"></p>
 
-        {/* What's paired now (or nothing) */}
-        <div id="ws-music-current" class="rounded-box border-base-300 mb-5 flex items-center gap-3 border px-4 py-3">
-          <span id="ws-music-none" class="admin-hint italic">Nothing paired yet.</span>
-          <span
-            id="ws-music-name"
-            hidden
-            class="font-serif text-[1.05rem] tracking-[0.06em] [font-variant:all-small-caps]"></span>
+        <label class="f">
+          <span class="f__k">Link <span>— a Spotify track, album or playlist, or a YouTube video</span></span>
+          {
+            /* `type="url"`: one kind of string, and the keyboard a phone raises
+              for it is the one with the slash on it. Not `required` — empty is
+              a real answer ("no music"), and Remove is how you give it. */
+          }
+          <input
+            id="ws-music-url"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://open.spotify.com/track/…"
+          />
+        </label>
+        <div id="ws-music-player" class="mt-4 empty:mt-0"></div>
+        <div class="mt-3 flex min-h-8 items-center gap-3">
+          <span id="ws-music-status" class="admin-hint" aria-live="polite"></span>
           <button type="button" id="ws-music-clear" hidden class="btn btn-ghost btn-xs text-error ml-auto normal-case">
-            Unpair
+            Remove
           </button>
         </div>
-
-        <label class="f">
-          <span class="f__k">Find a song</span>
-          {
-            /* ONE FIELD, TWO KINDS OF INPUT (plan 33 §6a). It used to take only a
-              query, so pairing a song that wasn't in the corpus meant leaving for
-              the Fragment Manager, making it, and coming back to a sheet you had
-              lost your place in. Pasting a link now offers to add it here.
-
-              ⚠ `type="search"` is kept even though it also takes URLs. The type
-              buys the clear-field affordance and the right keyboard for the
-              common case, which is still typing a title; a URL pasted into a
-              search field is not a validation problem, because nothing here
-              validates it — `songs.lookup` does, on the server, once. */
-          }
-          <input id="ws-music-q" type="search" autocomplete="off" placeholder="Title or artist — or paste a link" />
-        </label>
-        <ul id="ws-music-results" class="mt-3 space-y-1"></ul>
-        {
-          /* ⚠ THE `{' '}` IS LOAD-BEARING, not a formatting artifact. Astro drops
-            the newline-plus-indent before an inline element at the start of a
-            line, so `the same\n<code>saveSong</code>` renders as
-            "the samesaveSong". Prettier reflows this paragraph on every save and
-            decides where the line breaks fall, so the space has to be written
-            rather than left to the wrapping. */
-        }
-        <p class="admin-hint mt-4">
-          Paste a Spotify or YouTube link and it can be added and paired without leaving this sheet — the same{' '}
-          <code>saveSong</code> the Fragment Manager uses, reached from here. A song already in the corpus under a different
-          form of its link is recognised rather than duplicated.
-        </p>
       </div>
 
       {

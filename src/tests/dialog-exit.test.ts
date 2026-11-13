@@ -73,7 +73,7 @@ const NOT_DIALOGS: Record<string, string> = {
   handle: 'The ShellHandle in scripts/browser-shell.ts, whose own `close()` calls closeWithExit.',
   // ⚠ THE SAME OBJECT UNDER THE NAME ITS CONSUMERS ACTUALLY USE. `handle` above
   // is what `browser-shell.ts` calls it INSIDE itself; every file that wires one
-  // — fragment-browser, pair-browser, epigraph-browser — binds it as `shell`.
+  // — fragment-browser, epigraph-browser — binds it as `shell`.
   // The epigraph picker is simply the first to close the drawer from a consumer
   // rather than from a dismissal, which is what surfaced the gap. Keyed by
   // receiver name, this list needs both spellings or it exempts the definition

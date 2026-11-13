@@ -6,7 +6,7 @@
 import { publicSupabase, type createSupabaseServerClient } from './supabase';
 import { excerpt, readingMinutes } from './markdown';
 import type { WritingItem, QuoteItem, SubjectRef } from './blog';
-import { attachNeighbourhoods, PAIRED_SELECT, pairedMediaOf } from './blog';
+import { attachNeighbourhoods } from './blog';
 import { getQuoteNeighbourhoods, type QuotePage, type QuoteSeed } from './quote-page';
 import { noted, required } from './read-log';
 import { revealOf } from './provenance';
@@ -33,7 +33,7 @@ export interface ConstellationRef {
 
   ⚠ THERE IS NO `song` VARIANT, AND THERE USED TO BE (ADR 0031). A song is never
   a suite stanza: music accompanies a constellation as its SCORE
-  (`constellations.score_url`) or through one essay's `paired_song_id`, and both
+  (`constellations.score_url`) or through one essay's `music_url`, and both
   of those are relations rather than membership. A suite is a sequence read at
   the reader's pace; a four-minute song does not queue — which ADR 0009 observed
   and then gave a stanza to anyway. Zero of 48 songs were ever placed in one, in
@@ -154,7 +154,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       // quote reveal (2026-08-05, plan 17a). They cost one join on a query that
       // already embeds three, and they are what stops the suite and the blog
       // feed from being two places that decide what a quote came from.
-      `id, name, slug, description, sort, status, score_url, color, fragment_constellations(position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, author_id, occurred_at, updated_at, date_precision, authors(name, slug), works(title), fragment_subjects(subject_id, subjects(name, slug)), ${PAIRED_SELECT}))`,
+      `id, name, slug, description, sort, status, score_url, color, fragment_constellations(position, fragments!inner(id, type, slug, title, body, excerpt, attribution, is_self, details, source_url, author_id, occurred_at, updated_at, date_precision, authors(name, slug), works(title), fragment_subjects(subject_id, subjects(name, slug)), music_url))`,
     )
     .eq('slug', slug)
     .eq('fragment_constellations.fragments.status', 'published')
@@ -191,14 +191,7 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
       date_precision: 'day' | 'year';
       author_id?: string | null;
       fragment_subjects: { subject_id: string; subjects: SubjectRef | null }[] | null;
-      paired_song_id?: string | null;
-      paired_song?: {
-        id: string;
-        title: string;
-        artist: string | null;
-        source_url: string;
-      } | null;
-      paired_playlist_url?: string | null;
+      music_url?: string | null;
       details?: unknown;
       is_self?: boolean | null;
       authors?: { name: string; slug: string } | null;
@@ -254,9 +247,9 @@ export async function getConstellation(supabase: DB, slug: string): Promise<Cons
             .filter((s): s is SubjectRef => !!s)
             .sort((a, b) => a.name.localeCompare(b.name)),
           // The Reader here renders through the same PostArticle the blog uses,
-          // so a paired song has to travel with the essay or it would appear on
-          // /blog and vanish inside a suite.
-          paired: pairedMediaOf(f),
+          // so the music has to travel with the essay or it would play on /blog
+          // and vanish inside a suite.
+          music: f.music_url ?? null,
         },
       });
     }

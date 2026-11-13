@@ -63,7 +63,6 @@ const ALL: Record<keyof Database['public']['Tables'], true> = {
   sets: true,
   settings: true,
   shelves: true,
-  songs: true,
   subjects: true,
   task_events: true,
   tasks: true,

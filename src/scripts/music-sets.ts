@@ -772,10 +772,9 @@ document.addEventListener('astro:page-load', () => wireMusicSets());
 /**
  * ⚠ THE ONLY PROVIDER KNOWLEDGE IN THE BROWSER, and deliberately the smallest
  * possible: the id out of a URL the SERVER has already validated and stored
- * canonically. `song-link.ts` explains why the client must not learn to answer
- * *"may this be cited?"* — that is `parseSongRef`'s job and a second copy would
- * drift. These ask a much narrower question of a string already known to be a
- * playlist URL.
+ * canonically. *"May this be cited?"* is `lib/media.ts`'s question, answered
+ * once — a second copy here would drift. These ask a much narrower question of
+ * a string already known to be a playlist URL.
  */
 function playlistId(url: string): string {
   return url.split('/playlist/')[1]?.split(/[/?#]/)[0] ?? '';

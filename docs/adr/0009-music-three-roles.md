@@ -2,7 +2,10 @@
 
 Status: **Accepted — the third role (the annotated song fragment, and `body` as
 its "why") superseded by
-[ADR 0031](0031-a-song-carries-a-feeling-not-an-idea.md)** *(2026-08-11)*
+[ADR 0031](0031-a-song-carries-a-feeling-not-an-idea.md)** *(2026-08-11)*; the
+paired role's *shape* (a song row) superseded by
+[ADR 0044](0044-music-is-a-link-on-the-essay.md) *(2026-11-13)* — the paired
+music is one link on the essay, and may be a playlist
 Date: 2026-07-25
 
 > ⚠ **Read 0031 before trusting the "Decision" section below.** The **score** and

@@ -1,6 +1,6 @@
 // The row → editor seam. A row says WHICH FRAGMENT it wants opened and WHICH
 // TAB it wants opened on; it never names a surface. That distinction is the
-// whole point of this file: quotes and songs open the FragmentSheet, writing
+// whole point of this file: quotes open the FragmentSheet, writing
 // opens the workshop, and a row must not have to know which — every host had
 // its own copy of that `if (row.dataset.writing)` branch, and the tab hint
 // would have made a fourth copy of it.
@@ -26,17 +26,6 @@ export interface EditIntent {
 export function openEditorFor(el: HTMLElement, tab?: string): boolean {
   if (el.dataset.writing) {
     document.dispatchEvent(new CustomEvent('writing:edit', { detail: { id: el.dataset.writing, tab } }));
-    return true;
-  }
-  // ⚠ A SONG IS AN ID, NOT A PAYLOAD (ADR 0031), and it is the third surface
-  // this seam was written to make swappable. `SongSheet` needs the album, the
-  // year, both notes and the paired essays; carrying all of that on every row
-  // would put every private note in the corpus into the manager's HTML in order
-  // to open one of them. So the row says WHICH song and the sheet does one read
-  // — which is also why this branch looks like `writing` above rather than like
-  // `fragment` below.
-  if (el.dataset.song) {
-    document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: el.dataset.song, tab } }));
     return true;
   }
   if (el.dataset.fragment) {

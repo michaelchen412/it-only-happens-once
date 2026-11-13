@@ -37,10 +37,9 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 ⚠ **A shelf made from the → chooser now reaches the whole room**: both the menu row and the filter link are cloned from `<template>`s authored beside the loops that render the server's copies, so a glyph added to either lands in both. Before, the script hand-built a row with `textContent` — no tick element, and nothing added to the strip at all. Replaced `?view=notes` on 2026-08-03, which now redirects here. |
 | **Kind bar** | top of the task & event sheets | *"Task — it repeats, and an event cannot"*, with the other shape one tap away (§5d). Visible only when a reading filled the sheet in. |
 | **Log sheet** | dialog, the Notes room | Turn a dump into a log entry (§5b). The same action, kinds and date register as the profile's log box, plus the one control that box never needs: **who**. Rendered only when the roster is non-empty. |
-| **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing/song** show a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote · song) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
+| **Fragment list** | `/admin/fragments` | The Fragment Manager: a flat, **sortable table** over all fragments (Type · Title · Status · Posted · Edited; click Title/Posted/Edited to sort). The Title column absorbs all slack (`w-full`); date/status stay content-width. **Writing** shows a one-line truncated title; **quotes** have no title, so the quote *text* fills that column (italic, clamped to 3 lines — short quotes in full, long ones clipped) with a citation line beneath — `— Author, Work`, or, for a quote whose line is silent, `your words` / `source unknown` in muted italic (§7). **Drafts are always pinned to the top.** A segmented **type filter with live counts** (All · writing · quote) + subject filter + [**search with match-highlighting**](search.md); whole-row click opens the editor; shift-click range-selects; [**a selection that behaves like a cart**](#2b-the-selection-is-a-cart); bulk actions; an **Add ▾** menu; a Trash button. Filtering/sorting swap the table in place (no reload). *(Posted = `occurred_at`, the public date; the separate `published_at` audit timestamp isn't shown — for a normal post it equals Posted.)* |
 | **Trash** | `/admin/fragments?view=trash` | Soft-deleted fragments — restore, delete-forever, or empty. Delete is a *soft* delete (`deleted_at`); nothing is hard-deleted until explicitly purged. |
 | **Quote quick-editor** | slide-over, any admin page | **Quote** (a minimal TipTap editor → Markdown, `breaks:true` so poetry survives) is the **only required field**, and it alone gates Save. Beneath it, the three provenance facts in the order the machinery flows — **Who said it** (a person, *Me*, or blank) → **From what** → **Where in it** — and a live preview of the line they produce (*Shows as* / *Behind it*), with `change` to override it (§7). Nothing needed is inside a collapsed box. Subjects, with **✦ Suggest with AI** (Claude Haiku 4.5 reads the quote and pre-fills subjects — see §8). Date is **automatic** (now) unless "Set a specific date" is toggled to backdate a legacy quote — same convention as the writing sheet. A collapsed **Shared by** field says which person put these words in front of you (§12) — applied immediately, like constellation membership. **Quotes publish on save** — no draft picker (a quote has no draft lifecycle); unpublish via the list's bulk actions. |
-| **Song sheet** | slide-over, `/admin/fragments` | **The one editor for a song** (§6b). Its own paste bar, a player, and two tabs: **Facts** (title/artist/album/year, Shared by, and the pieces it is paired to, §6c) and **Notes** (one public, one private). It was a TRIAD until 2026-08-15 — Feelings led, and its job was to state ADR 0031's claim in the interface: a feeling is not a property of the song and a fact is. [ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md) retired the vocabulary, so the distinction has nothing left to draw. No subjects, no constellations. **Publishes on save** (like quotes); unpublish via the list. |
 | **Writing sheet** | near-fullscreen slide-over | Deep: title, auto-slug, WYSIWYG Markdown body **with images** (toolbar, paste or drag-drop — §5c), excerpt, backdatable posted date, subjects (with **✦ Suggest with AI**, in the publish dialog — §8), draft↔publish (§5). An overlay like the quick-editors, just wide — the old standalone page `/admin/writing/[id]` is **retired** and 302s to `/admin/fragments#edit=<id>` / `#new-writing`, which auto-open the sheet. A hash never reaches the server, so those links are updated at every *producer* rather than redirected; `/admin` keeps a client-side bounce for old ones. |
 | **Constellations index** | `/admin/constellations` | Every constellation, draft + published: create (a "pile" is just a draft), publish/unpublish, reorder the sky's authored order, delete (placements cascade; fragments untouched). |
 | **The composer** | `/admin/constellations/[id]` | The composing room (design.md §13): the suite in two views over one sequence — **Compose** (dense rows; drag or Alt+↑/↓ to reorder, ✕ unplaces) and **Read** (the public stanzas verbatim, drafts included) — plus the constellation's name/slug/colour/visibility/description/score, the three tests as quiet gauges, Preview → the real public page (drafts render for the admin only). One **Add** button opens the fragment browser. **The settings card, reworked 2026-08-11:** visibility is a **switch** beside the URL (not a select), and it saves with the card rather than on flip — so the line under it says *"It joins/leaves the sky when you press Save"* until you do, and a chip beside the page title mirrors it. Under that sits the **publish preflight** — *"2 of the 6 placed are drafts — a reader would see 4"* — the one fact the room could not see before, recomputed in the browser after every unplace. The description is a **rich field** (the same bold/italic mini editor a quote body uses; stored as Markdown, carried into the form by a hidden input). The score is `type="url"` with an **Open ↗** that follows what you type. **⌘/Ctrl+S saves** — swallowed while any sheet is open, so it can never save the constellation behind the fragment you are editing. |
@@ -51,9 +50,9 @@ Everything the admin does maps to a small set of screens. The plumbing depth dif
 **The fragment → constellation view** (added 2026-07-24). The composer answers *what is in this constellation*; these answer *where does this fragment live* — the same join read from the other end:
 
 - **A Constellations column** in the shared table (so it appears in the manager *and* the browser sheet): a filled ✦ chip per constellation, or a dashed **none** chip. The two treatments are deliberately different shapes, not just different text, so a column of orphans reads as absence while scanning. Hidden below `lg` — acceptable only because the paths it shortcuts (open the row → its tab; the bulk menu) both survive that breakpoint. An action may vanish at a breakpoint; a *only* way to do something may not.
-- **The column is also the door.** The whole cell is one button: it opens that fragment's editor already on its Constellations tab — the same door for all three types, because you shouldn't have to know a row's type to predict what a click does. It is deliberately **not** a button per chip: `<button>` cannot contain interactive content, so a per-chip ✕ would break the cell into small targets with dead gaps, and it would hang an unassign on a fast, unaimed click. Removal stays in the picker, labelled and reversible. The ＋ is visible at rest (hover is not a signal touch or the keyboard can read) and occupies a reserved slot (nothing reflows under the cursor), and the cell's hover outline is deliberately unlike the row's tint, because it is a different door. Rows say *which fragment, which tab* and never name a surface ([open-editor.ts](../src/scripts/open-editor.ts)) — so if this ever becomes a popover instead of a sheet, no row changes.
+- **The column is also the door.** The whole cell is one button: it opens that fragment's editor already on its Constellations tab — the same door for both types, because you shouldn't have to know a row's type to predict what a click does. It is deliberately **not** a button per chip: `<button>` cannot contain interactive content, so a per-chip ✕ would break the cell into small targets with dead gaps, and it would hang an unassign on a fast, unaimed click. Removal stays in the picker, labelled and reversible. The ＋ is visible at rest (hover is not a signal touch or the keyboard can read) and occupies a reserved slot (nothing reflows under the cursor), and the cell's hover outline is deliberately unlike the row's tint, because it is a different door. Rows say *which fragment, which tab* and never name a surface ([open-editor.ts](../src/scripts/open-editor.ts)) — so if this ever becomes a popover instead of a sheet, no row changes.
 - **A membership filter** (`?in=<slug>`, or `?in=none`). Note `in` is deliberately distinct from the `constellation` param, which only *marks* rows in pick mode. Empty is a meaningful value in this corner of the app: Astro turns a blank form field into `null`, so the membership action coerces it back (`idList`) — a bare `z.string()` rejected the exact case that means "belongs to none". The orphan view is the point: at the time of writing, 85 of 124 fragments belonged to no constellation, and nothing in the workshop could surface them.
-- **A picker in each editor** ([ConstellationPicker](../src/components/admin/ConstellationPicker.astro)) — a checkbox list of the whole sky, living in its own **tab** (`Quote|Song` / `Document` beside `Constellations`, with a live count). It's a tab rather than a field or a popover because membership is a peer of the content, not chrome hanging off it — and because a draft essay never opens the publish dialog, so that was never a home for it. Each row shows the constellation's **full description** (four-line cap for a runaway one): you're deciding where a piece belongs, and a truncated opening clause just makes you hover to finish the thought. A filter field appears past eight constellations; there's no inner scrollbox, since the sheet already scrolls.
+- **A picker in each editor** ([ConstellationPicker](../src/components/admin/ConstellationPicker.astro)) — a checkbox list of the whole sky, living in its own **tab** (`Quote` / `Document` beside `Constellations`, with a live count). It's a tab rather than a field or a popover because membership is a peer of the content, not chrome hanging off it — and because a draft essay never opens the publish dialog, so that was never a home for it. Each row shows the constellation's **full description** (four-line cap for a runaway one): you're deciding where a piece belongs, and a truncated opening clause just makes you hover to finish the thought. A filter field appears past eight constellations; there's no inner scrollbox, since the sheet already scrolls.
 - **A toggle applies immediately** — membership is a relationship, not a field on the fragment, so it needs no save and is instantly reversible. Two consequences worth knowing: membership events are excluded from both sheets' dirty guards (otherwise closing warns about "unsaved edits" that were already written, and the writing sheet kicks off a spurious autosave), and a fragment that doesn't exist yet queues its ticks and flushes them the moment the first save mints an id — which *replaces* the old implicit `data-place-in` behavior with a pre-ticked box you can see and untick.
 - The same full-description treatment appears in the bulk menu, and the browser sheet's header names the constellation you're composing into. **Everywhere a fragment can be assigned, you can read what you're assigning it to.**
 - **Bulk elevate** from the selection bar. "Remove from" lists only constellations the selection actually belongs to, read off each row's `data-constellations`. With a cart (§2b) a selected row may not be on screen, and its memberships are then unknown — the list **under-offers**, which is the safe direction.
@@ -96,7 +95,7 @@ per-kind: a mirrored row's title links to Google, a birthday stays inert.
 **DELETE — apart from the benign controls, and it says what it takes.** The rule
 is a zone at the END of the thing it destroys, below a rule, with a line naming
 what survives ([`WritingSheet`](../src/components/admin/WritingSheet.astro), the
-quote and song sheets, the composer, the profile's Archive).
+quote sheet, the composer, the profile's Archive).
 
 ⚠ **The footer variant is legal when the form does not scroll** — a short record
 has no "end of the object" distinct from its footer, so the zone buys ceremony
@@ -128,7 +127,7 @@ reason, and the test of it is the one that file states: a sheet belongs to the
 shared shell only if it has **something to lose, an error line, and an explicit
 save**. This one has the middle term and neither of the others.
 
-**A primary names what it commits** — *Save quote*, *Save song*, *Save set*,
+**A primary names what it commits** — *Save quote*, *Save set*,
 *Add task*, *Save changes*. ⚠ **A bare `Save` is legal when the surface commits
 exactly one object and something above it names that object**: the composer's
 sits beside the constellation's own name, `/admin/about` is one object on a
@@ -138,39 +137,34 @@ titled page, and the Library's per-row Save sits beside the name input it writes
 reason not to (a trash glyph and one word, where the disabled state is the whole
 signal). The confirmation is usually **the sheet closing**.
 
-### 2e. The picker that serves three rooms
+### 2e. The picker that serves two rooms
 
-`FragmentBrowser` is one drawer in three modes, and **the instinct while reading
+`FragmentBrowser` is one drawer in two modes, and **the instinct while reading
 it will be to make them symmetrical; don't.**
 
-| | `pick` | `pair` | `epigraph` |
-|---|---|---|---|
-| Room | the composer | the song sheet | the set sheet |
-| Writes | `constellations.place` | `songs.pair` | ⚠ **nothing** |
-| Offers | everything but notes/trash | writing only | published quotes only |
-| Cart | ✅ (a cart, §2b) | — | — |
-| Add ▾ | ✅ | — | — |
-| Create bar | — | ✅ *write about «term»* | — |
-| Author/work filters | ✅ | ⚠ **withheld** | ✅ **kept** |
-| Type segments | ✅ | — | — |
+| | `pick` | `epigraph` |
+|---|---|---|
+| Room | the composer | the set sheet |
+| Writes | `constellations.place` | ⚠ **nothing** |
+| Offers | everything but notes/trash | published quotes only |
+| Cart | ✅ (a cart, §2b) | — |
+| Add ▾ | ✅ | — |
+| Author/work filters | ✅ | ✅ |
+| Type segments | ✅ | — |
 
-- **`epigraph` writes nothing, and that is the deep difference.** A placement and
-  a pairing are **relations** — join rows, instantly reversible, so they apply on
-  touch (§4a). A set's epigraph is a **scalar column**, so the pick is held on the
+- **`epigraph` writes nothing, and that is the deep difference.** A placement is
+  a **relation** — a join row, instantly reversible, so it applies on touch
+  (§4a). A set's epigraph is a **scalar column**, so the pick is held on the
   sheet's form and rides its Save. That is also what lets an unsaved *new* set
   carry a quote.
-- ⚠ **Author and work are withheld from `pair` and kept in `epigraph`, and the
-  reason is the corpus rather than the picker.** Both facets are empty on a piece
-  of Michael's own writing, so in a writing-only list every option would answer
-  nothing — which is worse than a dead control, it is one that answers "no
-  results" and reads as an empty corpus. A quotes-only list is *exactly* what
-  those two facets describe. Pinned by `tests/e2e/set-epigraph.spec.ts` so a
-  later tidy-up cannot fold them into one rule.
-- **`pair` and `epigraph` have no cart** — one foreign key and one column are
-  neither of them a multi-select. ⚠ `FragmentRow`'s `<td>` and the panel's `<th>`
-  must agree or every row shifts one cell left.
-- **The create bar is `pair`'s alone.** It starts a draft essay and pairs the song
-  to it — a sentence the other two cannot finish.
+- **Author and work are kept in `epigraph`** because a quotes-only list is
+  *exactly* what those two facets describe — "the Marcus Aurelius one" is how you
+  find a quote you half remember. Pinned by `tests/e2e/set-epigraph.spec.ts`.
+- **`epigraph` has no cart** — one column is not a multi-select. ⚠
+  `FragmentRow`'s `<td>` and the panel's `<th>` must agree or every row shifts
+  one cell left.
+- There was a third mode, `pair` — the song sheet's "Pair with a piece" drawer.
+  It went with the songs table on 2026-11-13 ([ADR 0044](adr/0044-music-is-a-link-on-the-essay.md)).
 
 ### 2b. The selection is a cart
 
@@ -236,11 +230,11 @@ Moving it also deleted a class of bug rather than fixing it: the composer carrie
 
 The first four were made together with Michael on 2026-07-18. The architecturally significant two (mutations, editor) are in [ADR 0005](adr/0005-admin-editing-architecture.md).
 
-1. **List + quick-editors + full composer.** One unified list is the spine (cross-type view, bulk actions live in one place). Light types (quote/song) edit in a slide-over so they stay fast; writing gets a dedicated page. This mirrors the plumbing gradient rather than fighting it.
+1. **List + quick-editors + full composer.** One unified list is the spine (cross-type view, bulk actions live in one place). Light types (quotes) edit in a slide-over so they stay fast; writing gets a dedicated page. This mirrors the plumbing gradient rather than fighting it.
 2. **WYSIWYG that stores Markdown.** The writing editor is a true WYSIWYG surface, but the file it writes is **Markdown** — because `fragments.body` is contractually Markdown ([data-model.md](data-model.md) §4, [ADR 0003](adr/0003-fragments-single-table.md)). The editor is **TipTap** (ProseMirror) with `tiptap-markdown` for Markdown in/out and a fixed, Google-Docs-style toolbar. See [ADR 0006](adr/0006-composer-editor-tiptap.md) (which superseded the original Milkdown pick in [ADR 0005](adr/0005-admin-editing-architecture.md)).
-3. **Songs auto-fetch from the link.** Paste a Spotify track/album or YouTube URL; the **Spotify Web API** fills title, artist, album and release year (keyless **oEmbed** is the fallback when no credential is configured), and the id + kind come from the URL. See §6 for exactly what auto-fills and what stays manual.
+3. **Music is a link, not a thing.** An essay carries one Spotify or YouTube link and the player prints everything else — there is no song record to fill in, look up or groom (§6, [ADR 0044](adr/0044-music-is-a-link-on-the-essay.md)).
 4. **Constellation placement is deferred to the Sky phase.** Admin v1 is fragments + subjects + full CRUD/bulk. Placing fragments into constellations with composed order ([data-model.md](data-model.md) §4, `fragment_constellations.position`) ships alongside the Sky, where that UI belongs. This keeps the phase focused on getting content *in*.
-5. **Quotes & songs publish on save; only writing has a draft lifecycle** (added 2026-07-20). A quote or song is a short, finished thing — a draft-then-publish cycle is pointless friction — so their quick-editors have no status picker and save straight to `published`. The `status` column stays (it's the public-visibility gate, and the list's bulk publish/unpublish still uses it); edits preserve the current state, so a deliberately-unpublished fragment isn't force-republished. Writing keeps drafts/autosave (§5), because essays genuinely evolve over time.
+5. **Quotes publish on save; only writing has a draft lifecycle** (added 2026-07-20). A quote is a short, finished thing — a draft-then-publish cycle is pointless friction — so its quick-editor has no status picker and save straight to `published`. The `status` column stays (it's the public-visibility gate, and the list's bulk publish/unpublish still uses it); edits preserve the current state, so a deliberately-unpublished fragment isn't force-republished. Writing keeps drafts/autosave (§5), because essays genuinely evolve over time.
 6. **Everything edits in an overlay; the writing page is retired** (2026-07-23, Michael's call). The original split — quotes/songs in a sheet, writing on its own page — broke context: clicking an essay while composing a constellation threw you out of the room. Now writing opens in a near-fullscreen sheet everywhere (with `#edit=<id>` in the hash so a refresh reopens it), and the composer adds fragments through a browser sheet that IS the Fragment Manager in miniature — one shared table implementation, not a parallel "shelf". The cost accepted knowingly: no more middle-click-to-new-tab on writing rows.
 7. **The composer reads in the public's own register** (2026-07-25, Michael's call). A suite composed against 110-character snips can't be judged — you're sequencing database rows, not writing. So the suite gained a **Read** view beside Compose: the stanzas from [`SuiteStanza.astro`](../src/components/SuiteStanza.astro), shared *verbatim* with the public sky (§2.3 of design.md — the pattern became a primitive rather than a second copy), quotes whole, essays opening the blog's own Reader. It includes **drafts**, which the public page structurally can't — `getConstellation` stays published-only, so the composer builds its own items from the admin query. It deliberately stops at the content: no drawn figure, lamplight or score. **Read asks "is this composition any good?"; Preview asks "does the page look right?"** — two questions, two surfaces. In the same pass the row-nudge arrows became touch-only (`@media (hover: hover)` removes them): with a pointer you drag and with a keyboard you Alt+↑/↓, so on desktop they only reserved row width for a duplicate of drag.
 
@@ -311,7 +305,7 @@ Ten surfaces commit ten slightly different ways, and until 2026-08-12 nothing on
 
 - A **relation** is a row in a join table — a constellation membership, a pairing, a "Shared by" tick. It is instantly reversible, so it never waits, and it never rides along with a compare-and-set save that could lose a rewrite. (That is why the picker and `pair` write immediately from *inside* the writing sheet, which has exactly such a save.)
 - A **document** is prose you sit inside — an essay, a note. Leaving must not lose it, so it autosaves and says when it last did.
-- A **record** is a set of fields that mean something only together — a task, a goal, a person, a quote, a song, the About page. It commits once, deliberately, on a named Save.
+- A **record** is a set of fields that mean something only together — a task, a goal, a person, a quote, the About page. It commits once, deliberately, on a named Save.
 
 **Read it as a predictor, not a description.** The value of the rule is that a surface which does not yet exist has an answer before anyone argues about it; a surface that *contradicts* it should either change or write down why in the file.
 
@@ -319,7 +313,7 @@ Ten surfaces commit ten slightly different ways, and until 2026-08-12 nothing on
 
 - **The Library** commits **per row** where every other record surface commits per object. It is a hundred records on one page, and a per-row Save is why saving one row could discard edits in the others (guarded since 2026-08-12; see `library.astro`).
 
-⚠ **The quote sheet was listed here as a second exception until 2026-08-17, and the entry was wrong.** It read: *"commits like a record and then says nothing at all — no timestamp, no chip, no sentence. Every other record surface confirms."* Measured against its neighbours, **the confirmation is the sheet closing** — which is exactly what the task, goal, event, person and song sheets do, none of which carries a timestamp or a chip either. What the quote sheet actually lacked was the **busy label while the save ran**: it was the one `submitAction` call in the admin passing no `busy`, on a full-width primary reading *Save quote*. Fixed (plan 42 · §4.A.6). ⚠ **The lesson is the reason this correction is written out rather than quietly deleted:** the entry named the wrong half of a real problem, and a surface listed as non-compliant for the wrong reason is one nobody re-measures.
+⚠ **The quote sheet was listed here as a second exception until 2026-08-17, and the entry was wrong.** It read: *"commits like a record and then says nothing at all — no timestamp, no chip, no sentence. Every other record surface confirms."* Measured against its neighbours, **the confirmation is the sheet closing** — which is exactly what the task, goal, event and person sheets do, none of which carries a timestamp or a chip either. What the quote sheet actually lacked was the **busy label while the save ran**: it was the one `submitAction` call in the admin passing no `busy`, on a full-width primary reading *Save quote*. Fixed (plan 42 · §4.A.6). ⚠ **The lesson is the reason this correction is written out rather than quietly deleted:** the entry named the wrong half of a real problem, and a surface listed as non-compliant for the wrong reason is one nobody re-measures.
 
 ⚠ **This is a `docs/` paragraph and not an ADR on purpose.** It describes what the app does; it does not yet refuse anything. **The day it turns down a proposed surface, it has become a decision and belongs in `adr/`** — that is the test in [`plans/GROUND-RULES.md`](../docs/plans/GROUND-RULES.md), and this line is the marker for when it flips.
 
@@ -771,116 +765,27 @@ did with it.
 
 ⚠ **The two AI calls were deliberately not merged**, though they read the same essay. The saving was about ten cents across the whole corpus, and sharing would have cost the feature: `suggestSubjects` sends `getMarkdown()`, so every `before` would come back carrying `**` that does not exist as characters in the ProseMirror document, and **every position would be wrong**. This call sends plain text, so the model and the document read one alphabet — and the text sent is built by the same walk that later locates the fix, which is what keeps them agreeing. The locator renders every inline leaf as exactly one character, because `textContent` skips leaves while positions advance past them: one hard break above the typo would otherwise shift every mark after it.
 
-## 6. Songs — what auto-fills, what doesn't
+## 6. Music — one link on the essay
 
-Paste a Spotify **track or album** URL, or a **YouTube video** URL. The id and the kind both come from the URL, which stays the single source of truth (no hidden id field to fall out of step). What we store in `source_url` is the *canonical* form, so Spotify's `?si=` share token never reaches a public page. Playlists are deliberately *not* songs — a playlist is a constellation's `score_url` (§`constellations`, [ADR 0009](adr/0009-music-three-roles.md)).
+An essay may carry **one link** in `fragments.music_url` ([ADR 0044](adr/0044-music-is-a-link-on-the-essay.md)): a Spotify **track, album or playlist**, or a **YouTube video**. It renders at the **head** of the essay, below the title block and above the prose — *press play, then read*, the same invitation a constellation's score makes above its suite, but this one belongs to the piece. There is no song object behind it: nothing to browse, search, name or edit. Michael, 2026-11-13: *"it's just dropping a Spotify link and forgetting about it forever."*
 
-**Two tiers of lookup, and the first one is new (2026-07-31, plan 04 Piece 4).**
-`src/lib/media.ts` tries the **Spotify Web API** and falls back to keyless **oEmbed**:
+**The Music tab is one field.** Paste a link and it is saved — no button, no Save. Typing or editing by hand saves on Enter or when you leave the field; **Remove** clears it. The player appears under the field, and **it is the confirmation**: it prints the title, the artist and the artwork and it plays, which a line of text never could. The tab panel is hidden rather than removed on a tab switch, so the music keeps playing while you write; closing the sheet removes the frame, which is the only way to stop a cross-origin player.
 
-| Field | Source |
-|---|---|
-| `title` (song) | **auto** — Web API `name`, or oEmbed `title` |
-| `attribution` (artist) | **auto** from the Web API (`artists[]` joined) — *was manual until Piece 4*. Still editable, and worth editing: a five-artist track joins to a credit list, not an attribution. |
-| `details.album` | **auto** from the Web API — *was manual* |
-| `details.release_year` | **auto** from the Web API — the *album's* year, kept distinct from `occurred_at` |
-| `details.spotify_artist_ids` / `spotify_album_id` | **auto** — exact ids, so provenance isn't name-string matching |
-| `details.spotify_id` / `details.youtube_id` | parsed from the URL — **auto** |
-| artwork / embed | **auto** (the stanza embeds at 152px for a track, 352px for an album — Spotify's own numbers; a YouTube video is a 16:9 box) |
-| `body` (the public note) | **manual, and usually empty** — see below |
-| `occurred_at` (added) | manual; usually `year` precision (provenance — when it entered his life) |
+- **Stored canonical, never as pasted.** `musicRefUrl` drops Spotify's `?si=` share token, the `intl-xx/` locale path and the `spotify:` URI form — none of that has any business on a public page — and the field shows what was stored.
+- **One parser, asked twice.** `parseMusicRef` in [`lib/media.ts`](../src/lib/media.ts) refuses an episode, a show or an artist the instant you paste, in the browser, and `music.set` asks it again on the server, which is the authority. It is the same function in both places: `media.ts` is pure since the Spotify Web API lookup went with the songs table.
+- **A relation, not a field of the document.** Like constellation membership it applies immediately, so setting music can never be what loses a rewrite, and a draft takes music without going near the publish dialog. A piece that has never been saved has no row to write to; the tab says so, and opens the moment the first save lands.
+- **Not an edit.** The `fragments_set_updated_at` trigger skips an update that changed `music_url` and nothing else (`music_is_not_an_edit`). `updated_at` is both the writing sheet's concurrency token and the public "updated" date, and a music write was wrong for both: it went on to make the next autosave answer CONFLICT, and it stamped a 2019 essay "updated" today.
+- **No confirm before replacing.** The current link *is* the field's value, so replacing it means selecting it and pasting over it — an edit of a visible value, not a press with a hidden cost.
 
-Autofill only ever writes into an **empty** field — merge, never replace — so a correction you typed survives re-pasting the link.
-
-**Two notes, split by audience** ([ADR 0031](adr/0031-a-song-carries-a-feeling-not-an-idea.md), 2026-08-11). Both are short-form editors (bold/italic, the same one the quote body uses — `mountMiniEditor`), both live on the song sheet's **Notes** tab, and both are optional:
-
-- **A note anyone can open** → `fragments.body`. ⚠ **It renders nowhere since [ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md)** — the music room behind whose **†** it appeared is gone, and one song in 48 ever carried one. Kept on the sheet; retired from the page.
-- **A note for Michael** → `fragment_private_notes`, admin-only in RLS *and* revoked from `anon` at the privilege layer. Where a song came from, the week it belongs to, what to listen for at 2:41. It is never rendered on any public surface.
-
-⚠ **This replaced "Why this one", and the rename is the whole point.** [ADR 0009](adr/0009-music-three-roles.md) gave a song `body` as an annotation — the sentence on *why this song* — and in seventeen days one song in forty-eight used it. What it was used for was *"I love Janek's playing in the beginning; it really sets the tone for the whole piece"*: an observation, not a justification. The field was mislabelled from the hour it was created, and the label is what kept it empty. Michael, 2026-08-11: *"I don't need to tell you why the music is good. That's violating a really big aesthetic principle of mine — I want to show and not tell."*
-
-⚠ **`saveSong` does not write `body`, and its absence from the row object is load-bearing.** `persist` updates whatever keys it is handed, so a save of the metadata tab would otherwise blank a note written on the tab beside it. `songs.setNotes` is the column's only writer.
-
-**What the Web API costs, stated plainly.** `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`, client-credentials (no user OAuth, no redirect — the redirect URI on the dashboard is required but never used). One token per 3600s, cached in module scope. **The app owner must hold an active Spotify Premium subscription**: Development Mode requires it since Feb 2026, and the app stops working if it lapses. That is a real, ongoing dependency — but it degrades rather than breaks: with no credential, or with Premium lapsed, `lookupSong` falls back to oEmbed and you get exactly the pre-Piece-4 behaviour (a title, and you type the artist). The lookup reports which tier answered, and the sheet says so rather than showing an empty Artist field that looks like a bug.
-
-Also priced in, and all survivable: batch endpoints are gone (single `GET /v1/tracks/{id}` only), search is capped at 10 results, and `preview_url` / audio-features are gone for post-2024 apps — **build nothing on them**.
-
-## 6a. Paired media — the song that goes with one essay
-
-An essay may point at one song fragment through `fragments.paired_song_id` ([ADR 0009](adr/0009-music-three-roles.md)'s third role, built 2026-07-31). It renders at the **head** of the essay, below the title block and above the prose: *press play, then read* — the same invitation a constellation's score makes above its suite, but this one belongs to the piece.
-
-**The player carries no caption** (2026-08-10). It printed `♪ Title — Artist` above the embed until the embed was looked at properly: it already shows the track, the artist, and the artwork, in larger type than the caption used. The one fact the player doesn't know — *this song goes with this piece* — survives as the iframe's `title`, so a screen reader still hears the pairing; a sighted reader gets it from position alone.
-
-Set it in the writing sheet's **Music** tab, or from the song's own Facts tab (§6c) — **two doors, one write path** ([ADR 0034](adr/0034-a-relation-may-be-edited-from-either-end.md)). Like constellation membership it applies **immediately, with no save** — it's a relation, not a field of the document, so pairing can never be the thing that loses a rewrite, and a draft can be paired without touching the publish dialog.
-
-**One field, a query or a link** (2026-08-11, plan 33 §6a). It used to take only a query, so pairing a song that wasn't in the corpus meant stopping, leaving for the Fragment Manager, making it, and coming back to a sheet you'd lost your place in. Paste a link now and it is added and paired without leaving.
-
-⚠ **A second *door* is not a second *write path*, and that distinction is the whole of it.** The panel's old comment said adding a song was the Fragment Manager's job because *"duplicating that flow here would be a second way to write a song fragment"* — right instinct, wrong conclusion. A duplicated **form** would be a second write path; a control calling the existing `saveSong` through the shared `createSong` helper is not. `EntityCombo` set the precedent on the quote sheet, where an author who doesn't exist can be made without leaving; this panel was the outlier that never got it.
-
-Four behaviours worth knowing, because three of them are failure modes designed for rather than discovered:
-
-- **A song already in the corpus is recognised, not duplicated.** Dedupe is server-side on the **parsed** `{provider, kind, id}` — `?si=` share tokens, `intl-de/` paths and `spotify:track:` URIs are all one song, and comparing raw strings would grow a twin for each.
-- **A new song shows a create row that previews what the lookup found**, so you confirm rather than trust — including *"artist unknown — you can fix it after"* when the keyless oEmbed tier answered, because a blank artist reads as a bug in the panel rather than as a fact about the lookup.
-- **Two failures, two sentences.** *"Spotify track/album or YouTube video, please"* is fixed by pasting something else; *"couldn't reach Spotify or YouTube just now"* is fixed by waiting. Both appear in the list rather than the alert bar, because both are about the text in the field above them.
-- **Which round trip to make is decided by `looksLikeLink`**, which knows nothing about Spotify or YouTube on purpose. *"May a song cite this?"* is `parseSongRef`'s question and is answered exactly once, on the server. Discovery lives in the empty state — *"No songs match — paste a Spotify or YouTube link to add it"* — which is the moment the affordance is the answer, and not before.
-
-The new song is created with no subjects, which is correct rather than an omission: a song is not *about* anything (ADR 0031), and since [ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md) there is nothing else to file it under either. What a song carries is the link, who played it, and which essay wanted it.
-
-**Two sources, one shape.** `pairedMediaOf` in `src/lib/blog.ts` normalises them and the renderer can't tell which answered:
-
-1. `paired_song_id` → a real song fragment. 48 of the 50 imported pairings were promoted to these on 2026-07-31 (`scripts/backfill-paired-songs.mjs`).
-2. `details.media` → the raw `{ provider, url }` Squarespace brought over. **Only two rows still take this path** — the imported *playlists*, which a song fragment may not cite. It is a fallback, not a second write path: nothing in the app writes `details.media`.
-
-**The branch order is a security property.** If `paired_song_id` is set, the song row is the only truth — if RLS hid it (the song is a draft) or it's in the trash, the answer is *no pairing*, never a fall-through to `details.media`. All 48 promoted essays still carry that legacy column pointing at the same track, so falling through would keep playing a song you had just unpublished.
+**The public player carries no caption** (2026-08-10). The embed already shows the track, the artist and the artwork in larger type than a caption would. The one fact it doesn't know — *this goes with this piece* — is the iframe's accessible name, `Music for «essay title»`.
 
 **Nothing loads in the feed.** Every surface but the permalink renders `PostArticle` inside a `<template>`, and template contents are inert — so a seven-essay page of `/blog` spawns zero third-party frames, and the iframe only starts when the Reader clones it. Measured, not assumed.
 
-## 6b. Where a song enters the corpus
-
-**From the essay that wanted it.** The writing sheet's Music tab takes a pasted
-Spotify or YouTube link, resolves it through `songs.lookup`, and offers
-confirm-before-create — so a song that does not exist yet never costs you a trip
-to another room ([plan 33](plans/33-many-words-for-one-song.md) §6a). Editing one
-afterwards is `SongSheet`, opened from a song row in the Fragment Manager
-through the `song:edit` seam.
-
-⚠ **THERE USED TO BE A ROOM, AND IT WAS RETIRED WITH THE THING IT EXISTED FOR**
-([ADR 0035](adr/0035-a-set-is-a-listen-you-can-take-away.md), 2026-08-15).
-`/admin/listening` was built so that adding a song and *sitting with it* were one
-act: paste, listen, press the words the track left you with, save, next. The
-words were the `feelings` vocabulary, and in seventeen days one song out of 48
-was ever tagged. With the vocabulary gone the room had no second half, and
-pasting a link is something you were already doing from the essay.
-
-What survives from that design is the rule it was built on and the reason it
-died: **no import and no AI.** Michael, 2026-08-10: *"AI can't tell me what I
-feel."* The corpus tags **subjects** with a model
-([ADR 0007](adr/0007-ai-subject-tagging.md)) because a subject is what a piece is
-*about* and that is legible from the text. Nothing about a song ever was — and
-since ADR 0031 took subjects off songs too, **no part of a song is
-machine-taggable at all.** What is left on one is the link, who played it, and
-which essay wanted it.
-
-⚠ **A song is published the moment it is created, and has no draft register.**
-The paired player under an essay resolves the song through a policy that
-requires it, so a song filed as a draft would go silent under its own essay for
-every reader but Michael.
-
-## 6c. Pairing, from the song's side
-
-**A pairing has two doors, and one write path** ([ADR 0034](adr/0034-a-relation-may-be-edited-from-either-end.md)). The writing sheet's Music tab answers *what song goes with this piece?*; the song sheet's Facts tab answers *what am I going to write about this?* Both call the same `songs.pair` against the same column. The second existed nowhere until 2026-08-12, and reaching the first meant closing the song sheet — **which destroys the iframe**, so the only route to the control ended the listening that produced the thought.
-
-**＋ Pair with a piece** opens the `FragmentBrowser` in `mode="pair"`: the same table and filters as the composer's picker, narrowed to **writing** (`songs.pair` refuses anything else) and single-select. It has no cart, no `Add ▾`, and **opens no editors** — the writing sheet is not mounted on `/admin/listening`, and a row click here pairs rather than opening, because pairing is not curation.
-
-⚠ **The cardinality is not symmetric, and it is why the two doors behave differently.** A writing has at most **one** song (`paired_song_id` is a single column); a song may be paired to **many** writings. So from the essay pairing *replaces*, and from here it *appends into a slot that may already belong to another song*. Picking such a piece **confirms first** and names what it is taking. The steal is possible on purpose — refusing would mean "go to another room to do this" — but never silent.
-
-**The piece that does not exist yet.** Type a title nothing matches and the footer offers **＋ Write about "…"**: one `saveWriting` (no editor — `saveWriting` only demands a title and body when publishing) and then the pair. ⚠ **It creates a `draft`, not a `note`.** A note is a dump of *words* and here there are none — a title, a song and an intention is an empty draft — and the working list excludes notes unconditionally, so a note would vanish from the picker the instant it was made.
-
-**A pairing made before the song is saved is queued** and lands on the first Save, the way **Shared by** queues its ticks. Disabling the control until then was the alternative and it loses for the reason above: Save destroys the iframe, so *"save first, then pair"* is *"stop the music, then pair"*. The piece created by the footer is **not** queued — it is written immediately, because a thought you have named should not be lost by dismissing the sheet.
+⚠ **What this replaced, in one paragraph** (the full account is ADR 0044). Until 2026-11-13 a song was a row in a `songs` table with a title and an artist, paired to an essay by `paired_song_id`, beside a separate `paired_playlist_url` for the two essays whose music was a playlist. The Music tab was a picker over that table, and there was a song sheet for editing a song, a pair-with-a-piece drawer for pairing from the song's side, and song results in search. None of it was something Michael used — and the picker's search had been querying a column the table did not have since 2026-08-15, so typing anything answered with an error. The title and artist rendered nowhere a reader could see.
 
 ## 7. Quotes
 
-Mostly manual, all light. No external calls. Subjects and the "added" date as for songs.
+Mostly manual, all light. No external calls. Subjects, and an "added" date.
 
 **Three facts, and a line derived from them** (2026-08-05; specified in `docs/plans/17a`). The only thing you type that a reader sees is the quote itself.
 
@@ -1029,8 +934,7 @@ theme you actually chose. *(It followed the system colour scheme until
 - ~~**Spotify Web API metadata** (auto artist/album)~~ — **shipped 2026-07-31** (§6). Client credentials, oEmbed kept as the fallback. It carries an ongoing dependency the other integrations don't: the app owner must keep Spotify Premium, or lookups quietly drop to the oEmbed tier.
 - **Subjects management UI** (rename/merge/delete-with-reassign) — §8.
 - ~~**Revision history / timeline**~~ — **shipped 2026-07-30** as draft versions (§5a), and it arrived by a side door: history stopped being a feature to build and became a *consequence* of how editing a published piece works. What is still deferred is a **diff view** — side-by-side preview is enough for one author.
-- **Bulk import tooling** beyond paste (quote capture) — [architecture.md](architecture.md) §6.5. *Batch Spotify is off the table, not deferred:* Spotify removed the batch endpoints for Development Mode apps in Feb 2026, so it's one request per track now.
-- **`/listening`** — songs have no public surface of their own (no permalink, no `/blog` view); they appear only as stanzas inside a constellation. Plan 04 Piece 5.
+- **Bulk import tooling** beyond paste (quote capture) — [architecture.md](architecture.md) §6.5.
 
 ## 11. The morning check-in
 
@@ -1149,9 +1053,9 @@ Everywhere else the boundary is absolute: HQ data never becomes corpus data, and
 
 **A work is the link that keeps paying.** Link somebody to a book once and **every quote carrying that `work_id` appears on their profile — including ones added years later**. That is why the link routes through `works` rather than tagging each quote: hand-tagging gives the same page today and a stale one in a year. The row is a `<details>`; the quotes are one tap below it, not behind a navigation, because the thing asked for was *"on their profile I want to see the quotes from that book."*
 
-**A fragment is the direct edge**, for what that path cannot reach: a song somebody sent, a line they said out loud that never came from a book. A fragment reachable **both** ways appears exactly once — under its work, carrying the direct link's note — because the same row twice reads as a rendering bug.
+**A fragment is the direct edge**, for what that path cannot reach: a line they said out loud that never came from a book. A fragment reachable **both** ways appears exactly once — under its work, carrying the direct link's note — because the same row twice reads as a rendering bug.
 
-**Both directions get UI.** From a profile, the ＋ opens a two-mode drawer; from the quote and song editors, a collapsed **Shared by** field. And when you search the corpus for a line somebody said and find it is not there, the sheet offers **"Add a quote from them →"**, which opens the fragments room with the quote sheet already attributed. That is a real link rather than an overlay: the quote editor is TipTap, and the profile deliberately ships no composer bundle.
+**Both directions get UI.** From a profile, the ＋ opens a two-mode drawer; from the quote editor, a collapsed **Shared by** field. And when you search the corpus for a line somebody said and find it is not there, the sheet offers **"Add a quote from them →"**, which opens the fragments room with the quote sheet already attributed. That is a real link rather than an overlay: the quote editor is TipTap, and the profile deliberately ships no composer bundle.
 
 **Unlinking lives inside the fold**, one tap into the expanded row rather than on the summary. Two reasons, and the second is load-bearing: removing a link is deliberate and has no business under the cursor while you are only reading, and **a `<button>` inside a `<summary>` is activated by the same click that toggles the `<details>`** — so an unlink control on the summary row would open or close it every time.
 
@@ -1357,7 +1261,7 @@ The one guard kept is a **cap on the list, not a hidden section** — eight rows
 
 Michael asked for the writing nudge in these words: *"Hey, you haven't actually posted anything, any piece of writing, this week."* It is built as a **quiet line and never an overdue item**, because a self-imposed writing commitment turned into a red row is precisely the guilt engine HQ exists to prevent. Nothing in this zone can be pressed, and **cold reads quieter rather than redder** — the moment one of these turns amber it is a debt.
 
-**Writing only**, and that is a fact about the data as much as about the ask: `published_at` is stamped on every published essay, but on 1 quote in 73, and every song's stamp is the day the catalogue was imported. A "last published" line over all three types would report an import as an act of writing.
+**Writing only**, and that is a fact about the data as much as about the ask: `published_at` is stamped on every published essay, but on 1 quote in 73. A "last published" line over both types would report an import as an act of writing.
 
 Beside it sit the active goals' observations (§14), which keep their own cold-start guard: **a goal with nothing to observe says nothing at all.**
 

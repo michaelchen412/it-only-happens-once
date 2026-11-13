@@ -1,20 +1,21 @@
-// The SET SHEET's quote picker (plan 42 · §4.D.4) — the third room to use the
+// The SET SHEET's quote picker (plan 42 · §4.D.4) — the second room to use the
 // FragmentBrowser drawer.
 //
 // It answers one question: *which quote belongs beside this playlist?* — and it
-// is the narrowest of the three modes by some distance. Published quotes only,
+// is the narrower of the two modes by some distance. Published quotes only,
 // one pick, no cart, no editors, no create bar.
 //
-// ⚠ IT WRITES NOTHING. `pick` calls `constellations.place` and `pair` calls
-// `songs.pair`, both immediately, because both are RELATIONS — join rows that
-// are instantly reversible (docs/admin.md §4a). A set's epigraph is not: it is
+// ⚠ IT WRITES NOTHING. `pick` calls `constellations.place` immediately, because
+// membership is a RELATION — a join row that is instantly reversible
+// (docs/admin.md §4a). A set's epigraph is not: it is
 // a scalar column on the set, saved with the rest of the card by `sets.save`.
 // So this hands the choice back to the sheet and the sheet holds it until Save,
 // which is what makes an unsaved new set able to carry a quote at all.
 //
-// That is also why there is no confirm here where `pair-browser.ts` has one. A
-// pick from the song side can STEAL an essay's existing pairing; picking a quote
-// can only ever replace this set's own, in a field the sheet is showing you.
+// That is also why there is no confirm here. Picking a quote can only ever
+// replace this set's own, in a field the sheet is showing you. (The song
+// sheet's pair picker had one, because a pick there could STEAL an essay's
+// existing pairing; it went with the songs table, ADR 0044.)
 import { wireBrowserShell } from './browser-shell';
 
 /** What the sheet shows once a quote is chosen. */

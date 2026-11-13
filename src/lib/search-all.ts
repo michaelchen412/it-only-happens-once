@@ -58,18 +58,7 @@ import { MIN_SEARCH, toPlain } from './search-highlight';
 type DB = SupabaseClient<Database>;
 
 export type KindKey =
-  | 'essay'
-  | 'note'
-  | 'quote'
-  | 'task'
-  | 'goal'
-  | 'person'
-  | 'constellation'
-  | 'set'
-  | 'song'
-  | 'subject'
-  | 'work'
-  | 'author';
+  'essay' | 'note' | 'quote' | 'task' | 'goal' | 'person' | 'constellation' | 'set' | 'subject' | 'work' | 'author';
 
 export interface Hit {
   kind: KindKey;
@@ -91,8 +80,8 @@ export interface Hit {
    * to your word, with the jotting on screen; a subject opens the corpus
    * filtered to that subject, which is the thing you wanted anyway.
    *
-   * ⚠ THE REFINEMENT IS `?open=<id>`, and it is deliberately not here. Three
-   * rooms (tasks, sets, songs) land you without a filter, which is the weakest
+   * ⚠ THE REFINEMENT IS `?open=<id>`, and it is deliberately not here. Two
+   * rooms (tasks, sets) land you without a filter, which is the weakest
    * of the three answers — see docs/search.md §8.
    */
   href: string;
@@ -114,7 +103,6 @@ export const KINDS: Record<KindKey, KindInfo> = {
   person: { label: 'People' },
   constellation: { label: 'Constellations' },
   set: { label: 'Sets' },
-  song: { label: 'Songs' },
   subject: { label: 'Subjects' },
   work: { label: 'Works' },
   author: { label: 'Authors' },
@@ -148,7 +136,6 @@ export function moreHref(kind: KindKey, q: string): string {
     case 'constellation':
       return '/admin/constellations';
     case 'set':
-    case 'song':
       return '/admin/sets';
     default:
       // The library vocabulary — subjects, works, authors.
@@ -409,24 +396,6 @@ export async function searchEverything(
     }));
   }
 
-  async function songs(): Promise<Hit[]> {
-    const { data } = await supabase
-      .from('songs')
-      .select('id, title, artist')
-      .or(like(['title', 'artist']))
-      .limit(CEILING)
-      .then(noted('search-all: songs'));
-    return (data ?? []).map((r) => ({
-      kind: 'song' as const,
-      id: r.id,
-      name: r.title,
-      body: '',
-      meta: r.artist ?? '',
-      href: '/admin/sets',
-      when: null,
-    }));
-  }
-
   async function subjects(): Promise<Hit[]> {
     const { data } = await supabase
       .from('subjects')
@@ -501,7 +470,6 @@ export async function searchEverything(
     people(),
     constellations(),
     sets(),
-    songs(),
     subjects(),
     works(),
     authors(),

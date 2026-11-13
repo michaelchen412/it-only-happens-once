@@ -88,11 +88,11 @@ import SheetError from './SheetError.astro';
           `FragmentBrowser` in `mode="epigraph"` shows a quote the way the corpus
           does: whole, italic, with its citation beneath, searchable, and
           filterable by author and work — which are exactly the two facets a
-          quote has and a writing does not (see FragmentListPanel's note on why
-          the pair picker withholds them and this one keeps them).
+          quote has and a writing does not (see FragmentListPanel's note on
+          author and work).
 
-          ⚠ THE PICK IS HELD, NOT WRITTEN. A constellation membership and a song
-          pairing are RELATIONS and apply on touch; a set's epigraph is a scalar
+          ⚠ THE PICK IS HELD, NOT WRITTEN. A constellation membership and an
+          essay's music are RELATIONS and apply on touch; a set's epigraph is a scalar
           column on the set, so it rides the card's own Save. That is also what
           lets an unsaved NEW set carry a quote. */
       }
@@ -122,8 +122,8 @@ import SheetError from './SheetError.astro';
           — the one prose field in the building where what you type and what
           ships were different languages.
 
-          The same control the quote body, the song notes and the constellation
-          description use, for the reason that last one gives: ADR 0006 chose
+          The same control the quote body and the constellation description
+          use, for the reason that last one gives: ADR 0006 chose
           WYSIWYG-storing-Markdown for essays and ADR 0018 retired "plain
           textarea, ever" for notes, and this was the last room those two
           rulings had not reached.
@@ -184,17 +184,17 @@ import SheetError from './SheetError.astro';
       </button>
       <button type="button" data-close class="btn btn-ghost btn-sm ml-auto font-sans">Cancel</button>
       {
-        /* Named, per the rule in `SongSheet.astro`: this room holds several
-          savable sets, so the label carries the noun. */
+        /* Named. A bare "Save" is legal only when the surface commits exactly
+          one object and something above it names that object; this room holds
+          several savable sets, so the label carries the noun. */
       }
       <button type="submit" class="btn btn-primary btn-sm font-sans normal-case" data-submit>Save set</button>
     </div>
   </form>
 
   {
-    /* ⚠ A SIBLING OF THE FORM, NOT A CHILD — the rule `SongSheet` states about
-      its own pair drawer: a <dialog> nested inside another <dialog> inherits the
-      parent's `display: none` when the parent is closed, and the top layer does
+    /* ⚠ A SIBLING OF THE FORM, NOT A CHILD: a <dialog> nested inside another
+      <dialog> inherits the parent's `display: none` when the parent is closed, and the top layer does
       not care about DOM depth anyway. Inside the `<form>` it would also nest a
       form's worth of controls in the card's own FormData. */
   }

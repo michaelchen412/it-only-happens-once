@@ -85,7 +85,7 @@ public content.
 
 Both halves are shipped. Full design in [`admin.md`](admin.md).
 
-**The Workshop** — the fragment manager (filter / search / sort / bulk), the writing composer (TipTap, storing Markdown — [ADR 0006](adr/0006-composer-editor-tiptap.md)), quote and song quick-editors with Spotify/YouTube auto-fill, draft versions and promotion ([ADR 0010](adr/0010-online-first-writing.md)), constellations and placement, the Library (subjects / authors / works), and the About builder.
+**The Workshop** — the fragment manager (filter / search / sort / bulk), the writing composer (TipTap, storing Markdown — [ADR 0006](adr/0006-composer-editor-tiptap.md)), the quote quick-editor, an essay's music as one pasted link ([ADR 0044](adr/0044-music-is-a-link-on-the-essay.md)), draft versions and promotion ([ADR 0010](adr/0010-online-first-writing.md)), constellations and placement, the Library (subjects / authors / works), and the About builder.
 
 **HQ** — Today (the check-in, the day, coming up, people, practice, past due), People (roster, profiles, interactions, drift), the Agenda (calendar, tasks, goals), and Notes. Its three load-bearing decisions: absence never accumulates ([ADR 0013](adr/0013-absence-never-accumulates.md)), the Google calendar mirror is one-way ([ADR 0014](adr/0014-calendar-is-one-way.md)), and HQ is private by construction ([ADR 0012](adr/0012-hq-is-a-private-second-domain.md)).
 

@@ -45,7 +45,7 @@ import { toPlain } from './search-highlight';
 
 type DB = SupabaseClient<Database>;
 
-export type PublicKind = 'writing' | 'quote' | 'constellation' | 'set' | 'song' | 'subject' | 'author';
+export type PublicKind = 'writing' | 'quote' | 'constellation' | 'set' | 'subject' | 'author';
 
 export interface PublicHit {
   kind: PublicKind;
@@ -53,7 +53,7 @@ export interface PublicHit {
   name: string;
   /** What gets excerpted — and only ever text the destination will render. */
   body: string;
-  /** A small trailing fact: an attribution, an artist. */
+  /** A small trailing fact: an attribution. */
   meta: string;
   /** Always a route that exists. See the `works` note above for why. */
   href: string;
@@ -75,13 +75,12 @@ export const PUBLIC_KINDS: Record<PublicKind, { label: string }> = {
   quote: { label: 'Quotes' },
   constellation: { label: 'Constellations' },
   set: { label: 'Sets' },
-  song: { label: 'Songs' },
   subject: { label: 'Subjects' },
   author: { label: 'Voices' },
 };
 
 /** Grouping order: the writing first, then the listening, then the ways in. */
-export const PUBLIC_ORDER: PublicKind[] = ['writing', 'quote', 'constellation', 'set', 'song', 'subject', 'author'];
+export const PUBLIC_ORDER: PublicKind[] = ['writing', 'quote', 'constellation', 'set', 'subject', 'author'];
 
 /** A quote's opening words, since it has no title. */
 function opening(body: string, max = 72): string {
@@ -181,25 +180,6 @@ export async function searchPublic(supabase: DB, q: string): Promise<PublicHit[]
     }));
   }
 
-  async function songs(): Promise<PublicHit[]> {
-    const { data } = await supabase
-      .from('songs')
-      .select('title, artist')
-      .or(like(['title', 'artist']))
-      .limit(CEILING)
-      .then(noted('public search: songs'));
-    return (data ?? []).map((r) => ({
-      kind: 'song' as const,
-      name: r.title,
-      body: '',
-      meta: r.artist ?? '',
-      // ⚠ No per-song address — a song lives inside a set's list, so this lands
-      // in the room and lets the reader look. The weakest destination here, and
-      // the only one without a better option today.
-      href: '/listening',
-    }));
-  }
-
   async function subjects(): Promise<PublicHit[]> {
     // ⚠ `name` ONLY. `definition` is the live invisible column — see the header.
     const { data } = await supabase
@@ -238,6 +218,6 @@ export async function searchPublic(supabase: DB, q: string): Promise<PublicHit[]
     }));
   }
 
-  const results = await Promise.all([writing(), quotes(), constellations(), sets(), songs(), subjects(), authors()]);
+  const results = await Promise.all([writing(), quotes(), constellations(), sets(), subjects(), authors()]);
   return results.flat();
 }

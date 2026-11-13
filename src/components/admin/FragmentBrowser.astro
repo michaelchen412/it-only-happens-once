@@ -10,14 +10,19 @@
      (`constellations.place`). Rows already in this constellation render dimmed
      and unselectable. Clicking a row opens its real editor in a sheet on top;
      the header's Add ▾ creates fragments that auto-place.
-   · mode="pair"  — the song sheet's pairing picker (plan 39). ONE writing, one
-     foreign key (`songs.pair`). No cart, no Add ▾, and no editors at all.
+   · mode="epigraph" — the set sheet's quote picker (plan 42 · §4.D.4). One
+     published quote, one scalar column. No cart, no Add ▾, and no editors.
 
-  ⚠ `pick` IS THE BIGGER MODE, NOT THE DEFAULT ONE. Everything `pair` lacks it
-  lacks for a stated reason, not by not-yet-being-built — see each region below.
-  The instinct while reading this file will be to make the two symmetrical;
-  don't. Placing is curation (you must read what you curate, hence the editors),
-  pairing is one decision you have already made by the time you open the drawer.
+  ⚠ `pick` IS THE BIGGER MODE, NOT THE DEFAULT ONE. Everything `epigraph` lacks
+  it lacks for a stated reason, not by not-yet-being-built — see each region
+  below. The instinct while reading this file will be to make the two
+  symmetrical; don't. Placing is curation (you must read what you curate, hence
+  the editors); choosing an epigraph is one decision you have already made by
+  the time you open the drawer.
+
+  There was a third mode, `pair` — the song sheet's "Pair with a piece" picker
+  (plan 39). It went on 2026-11-13 with the songs table (ADR 0044): music is a
+  link on the essay now, so there is no song to start from.
 
   ⚠ AND EVERYTHING INSIDE IS CLASS-SCOPED. The dialog itself carries the only
   id, because /admin/fragments now mounts BOTH a manage-mode panel and this
@@ -38,7 +43,7 @@ import BackToTop from '../BackToTop.astro';
 
 interface Props {
   /** Which room this instance serves. See the header. */
-  mode?: 'pick' | 'pair' | 'epigraph';
+  mode?: 'pick' | 'epigraph';
   /** The dialog's own id — the ONE id in here, so two can coexist on a page. */
   id?: string;
   /** pick only: the target constellation. */
@@ -52,7 +57,7 @@ interface Props {
 }
 const {
   mode = 'pick',
-  id = mode === 'pair' ? 'pair-browser' : mode === 'epigraph' ? 'epigraph-browser' : 'fbrowser',
+  id = mode === 'epigraph' ? 'epigraph-browser' : 'fbrowser',
   constellation,
   constellationName = '',
   constellationDescription,
@@ -60,7 +65,7 @@ const {
 } = Astro.props;
 const pick = mode === 'pick';
 /*
-  ⚠ mode="epigraph" — THE SET SHEET'S QUOTE PICKER (plan 42 · §4.D.4). The third
+  ⚠ mode="epigraph" — THE SET SHEET'S QUOTE PICKER (plan 42 · §4.D.4). The second
   room to use this drawer, and the narrowest: published quotes only, one pick,
   no cart, no editors, no Add ▾.
 
@@ -71,14 +76,7 @@ const pick = mode === 'pick';
   sets a quote the way the corpus does: italic, clamped, with its citation line
   beneath. The finding was never "the select is long"; it was that a quote does
   not fit in one.
-
-  ⚠ AND IT IS A THIRD MODE RATHER THAN A GENERALISED `pair`, per this file's own
-  warning against making its modes symmetrical. They are not: `pair` writes a
-  foreign key on the SONG side of a many-to-one and confirms a steal; this
-  writes a scalar column on the set and can only ever swap.
 */
-const epigraph = mode === 'epigraph';
-const pair = mode === 'pair';
 ---
 
 <dialog
@@ -90,62 +88,40 @@ const pair = mode === 'pair';
   data-constellation-color={constellationColor}
   aria-labelledby={`${id}-title`}
 >
-  {
-    /* ⚠ A DECLARED CLONE SOURCE for `pair-browser.ts` (plan 42 · §4.B.5). When
-      you un-pair a song, `drop()` rebuilds that row's button — the one
-      `FragmentRow` renders with `<Icon ph:plus>` — and `icon.ts` clones from a
-      `ph:plus` already on the page. In a drawer where every row is paired there
-      is none to clone, and the rebuilt button would come back bare. Declaring
-      one here makes the source a fact of the component rather than a property
-      of what happens to be listed. */
-  }
-  <span hidden data-icon-source><Icon name="ph:plus" /></span>
-
   <div class="flex h-full flex-col">
     <header class="border-base-300 flex shrink-0 items-center gap-3 border-b px-6 py-3">
       <div class="min-w-0">
         {
-          /* ⚠ ONE HEADING, THREE VERBS — and it is a three-way branch rather
-            than a ternary plus a second block, because that shape renders TWO
-            `<h2>`s carrying the SAME id the dialog's `aria-labelledby` points
-            at. Valid JSX, passes `astro check`, and names the drawer twice.
+          /* ⚠ ONE HEADING, TWO VERBS — one `<h2>` per branch, never a
+            ternary plus a second block, because that shape renders TWO `<h2>`s
+            carrying the SAME id the dialog's `aria-labelledby` points at. Valid
+            JSX, passes `astro check`, and names the drawer twice.
 
-            The name is filled at open time in two of the three: one drawer
-            serves every song the song sheet loads and every set the set sheet
-            loads. The VERB is the whole difference between the modes, and a
-            picker that says the wrong one is how you end up believing you
-            placed something in a suite. */
+            In epigraph mode the name is filled at open time: one drawer serves
+            every set the set sheet loads. The VERB is the whole difference
+            between the modes, and a picker that says the wrong one is how you
+            end up believing you placed something in a suite. */
           pick ? (
             <h2 id={`${id}-title`} class="font-display truncate text-xl">
               Add to <span class="fb-cname text-primary">{constellationName}</span>
             </h2>
-          ) : epigraph ? (
-            <h2 id={`${id}-title`} class="font-display truncate text-xl">
-              Quote for <span class="fb-cname text-primary" />
-            </h2>
           ) : (
             <h2 id={`${id}-title`} class="font-display truncate text-xl">
-              Pair <span class="fb-cname text-primary" /> with a piece
+              Quote for <span class="fb-cname text-primary" />
             </h2>
           )
         }
         {
           /* Rendered even when empty, so a description added in the form behind
           this drawer has somewhere to land without a reload (sky:changed). In
-          pair mode it is a fixed line rather than a constellation's words. */
+          epigraph mode it is a fixed line rather than a constellation's words. */
         }
         <p
           class="fb-cdesc admin-hint line-clamp-1"
           title={pick ? constellationDescription : undefined}
           hidden={pick && !constellationDescription}
         >
-          {
-            pick
-              ? constellationDescription
-              : epigraph
-                ? 'Published quotes only — it leads the open set, above your description.'
-                : 'One piece at a time. Anything already holding another song will say so.'
-          }
+          {pick ? constellationDescription : 'Published quotes only — it leads the open set, above your description.'}
         </p>
       </div>
       {
@@ -161,13 +137,6 @@ const pair = mode === 'pair';
           only as the thing Tailwind hangs the header layout on. */
       }
       <p class="fb-error admin-alert px-2 py-1 text-xs" data-sheet-error hidden role="alert"></p>
-      {
-        /* ⚠ NO Add ▾ IN PAIR MODE, and its replacement is the footer bar below.
-          This menu makes a fragment *to place in this suite*; the pair picker's
-          equivalent question — "the piece I mean does not exist yet" — is
-          answered by typing its name in the search field, which is where you
-          already are. A menu would ask you to name it twice. */
-      }
       {
         pick && (
           <div class="relative ml-auto">
@@ -201,14 +170,6 @@ const pair = mode === 'pair';
               >
                 <TypeMark type="quote" class="w-3 text-center" /> Quote
               </button>
-              {/* NO SONG, and its absence is the decision rather than an omission
-                  (ADR 0031). This menu makes a fragment *to place in this suite*,
-                  and a song is never a suite stanza — it accompanies a
-                  constellation through `score_url` or through an essay's
-                  `paired_song_id`, both relations rather than membership. Offering
-                  a create here would make something the picker below cannot show
-                  and `constellations.place` refuses. Songs enter at
-                  /admin/listening, in the same motion as the listening. */}
             </div>
           </div>
         )
@@ -235,9 +196,8 @@ const pair = mode === 'pair';
         "change the filter" is no longer the way to empty it, so there has to be
         one.
 
-        ⚠ PICK ONLY. `paired_song_id` is one key on one row; there is no "pair
-        all four of these" to express, so the pair drawer has no cart to show
-        and its footer holds a different verb entirely. */
+        ⚠ PICK ONLY. An epigraph is one column on one set; there is no "use
+        all four of these" to express, so that drawer has no cart to show. */
     }
     {
       pick && (
@@ -251,46 +211,6 @@ const pair = mode === 'pair';
         </footer>
       )
     }
-
-    {
-      /* ⚠ THE PIECE THAT DOES NOT EXIST YET (plan 39 · rulings 6 and 7), and it
-        sits in the footer for two reasons rather than one.
-
-        The reason it is not a row inside the table: the table is a SHARED
-        SERVER PARTIAL that knows nothing about this mode, and it is replaced
-        wholesale on every filter change — a create row rendered into it would
-        have to be re-injected after each swap, and would carry a stale search
-        term for the frame in between.
-
-        The reason the footer is right anyway: EntityCombo settled the ordering
-        question already — ＋ Add «what you typed» goes AFTER the matches, never
-        above them, because putting "make a new one" first offers a duplicate
-        before the real thing. A bar below the list is that ordering, and it is
-        the same corner of the drawer where pick keeps its own verb.
-
-        It types nothing twice: the search term IS the title.
-
-        ⚠ `pair`, NOT `!pick` — narrowed when the epigraph mode arrived (plan 42
-        · §4.D.4). `!pick` meant "the other mode" while there were two, and a
-        third made it wrong rather than merely loose: this bar starts a DRAFT
-        ESSAY and pairs the song to it, which is a sentence the set sheet's
-        picker cannot finish. Its equivalent — "this quote isn't written down
-        yet" — is a different flow with a different editor, and offering the
-        wrong one is worse than offering none. */
-    }
-    {
-      pair && (
-        <footer
-          class="fb-createbar border-base-300 bg-base-200 flex shrink-0 items-center gap-3 border-t px-6 py-2.5 font-sans text-sm"
-          hidden
-        >
-          <button class="fb-create btn btn-primary btn-xs gap-1 normal-case">
-            <Icon name="ph:plus" /> Write about “<span class="fb-create-term" />”
-          </button>
-          <span class="admin-hint">Starts a draft with that title and pairs this song to it.</span>
-        </footer>
-      )
-    }
   </div>
 </dialog>
 
@@ -301,9 +221,9 @@ const pair = mode === 'pair';
     would silently ship a dead drawer. `fragment-browser.ts` looks for a
     pick-mode root and returns if there isn't one.
 
-    The pair drawer is wired by song-sheet.ts instead, because it has to be told
-    WHICH song it is open on and that changes every time the sheet loads one.
-    A self-wiring module has no way to be told. */
+    The epigraph drawer is wired by set-sheet.ts instead, because it has to be
+    told WHICH set it is open on and that changes every time the sheet loads
+    one. A self-wiring module has no way to be told. */
 }
 <script>
   import '../../scripts/fragment-browser';

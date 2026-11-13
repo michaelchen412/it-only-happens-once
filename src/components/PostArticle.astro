@@ -46,7 +46,7 @@ const { item, linkTitle = false, share = true } = Astro.props;
 // line, so one seam covers all four.
 const bodyHtml = await enhanceEssayImages(renderMarkdown(item.bodyMarkdown));
 
-// The paired song (ADR-0009): *this song goes with this piece*. It sits at the
+// The piece's music (ADR 0044): *this goes with this piece*. It sits at the
 // HEAD, below the title block and above the prose — "press play, then read",
 // the same invitation a constellation's score makes above its suite. The score
 // is the constellation's; this one belongs to the essay.
@@ -56,20 +56,21 @@ const bodyHtml = await enhanceEssayImages(renderMarkdown(item.bodyMarkdown));
 // and template contents are inert — so a 7-essay page spawns zero third-party
 // frames, and the iframe only starts when the Reader clones it.
 
-// `embedForUrl`, NOT `parseSongRef`: two imported essays are paired with a
-// Spotify playlist, which no song fragment may cite but which still has to
-// play. "What may a song cite" and "what can we embed" are different questions.
-const pairedEmbed = item.paired ? embedForUrl(item.paired.url) : null;
+// `embedForUrl`, the renderer's question ("can this play?"), rather than
+// `parseMusicRef`, the writer's ("may an essay carry this?"). `music.set` only
+// ever stores what the second admits, so today they agree — but a row edited
+// by hand should still play if it can, rather than vanish.
+const pairedEmbed = item.music ? embedForUrl(item.music) : null;
 // NO VISIBLE CAPTION. The player already prints the track, the artist, and the
 // artwork in type larger than ours — a "♪ Title — Artist" line above it said
 // the same thing twice, and the second saying was the smaller one. What we knew
-// that the embed doesn't (that this song goes with THIS piece) is the only fact
+// that the embed doesn't (that this music goes with THIS piece) is the only fact
 // worth carrying, and it goes where it reads better: the iframe's accessible
 // name, for anyone arriving by screen reader. Sighted readers get the embed and
 // its position — under the title, above the prose — which is the whole sentence.
-const pairedTitle = item.paired?.title
-  ? `${item.paired.title} — paired with ${item.title}`
-  : `Paired with ${item.title}`;
+// (It used to lead with the song's title. The link carries none, and the
+// player's own frame announces the track.)
+const pairedTitle = `Music for ${item.title}`;
 ---
 
 <article class="post-article">

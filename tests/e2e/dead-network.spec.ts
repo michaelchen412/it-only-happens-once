@@ -2,7 +2,7 @@
 // network"). `astro:actions` THROWS on a dead network rather than returning
 // `{ error }`, and a full-repo audit on 2026-08-08 found nine client scripts
 // whose saves had no catch at all — including the worst user-facing bug in the
-// tree, the quote/song Save that stuck disabled with nothing on screen.
+// tree, the quote Save that stuck disabled with nothing on screen.
 //
 // ⚠ THIS IS THE EXACT CLASS WHERE GREEN CHECKS PROVE NOTHING, which is why it
 // gets its own file rather than a line inside somebody else's. Network
@@ -21,7 +21,6 @@ import { expect, test, fixtures, hideDevToolbar, stubActions } from './fixtures'
 
 type SetMembership = Awaited<ReturnType<typeof actions.constellations.setMembership.orThrow>>;
 type FragmentGet = Awaited<ReturnType<typeof actions.fragments.get.orThrow>>;
-type SongsSearch = Awaited<ReturnType<typeof actions.songs.search.orThrow>>;
 
 /**
  * ⚠ WAIT FOR THE JS, NOT THE MARKUP — the same race `constellation-cell.spec.ts`
@@ -69,56 +68,6 @@ test.describe('the quote sheet — the audit’s one HIGH', () => {
   });
 });
 
-/*
-  ⚠ THIS MOVED ROOMS RATHER THAN GOING AWAY (ADR 0031). The claim used to be
-  driven against the quote sheet's song form, which no longer exists — a song
-  has its own sheet now, and the paste bar in it owns the `songs.lookup` call.
-  The BEHAVIOUR is the reason the spec survives the move: a lookup that throws
-  must clear "Looking it up…" and say something, and it is exactly the class
-  this file exists for, because a stuck status line has a clean typecheck.
-*/
-test.describe('the song sheet — the lookup that never answers', () => {
-  test('a dead lookup stops saying "Looking it up…" and says what happened', async ({ page }) => {
-    // No handler for anything → every action aborts, which is what a dead
-    // network looks like from the browser's side.
-    await stubActions(page, {});
-    await page.goto('/admin/fragments');
-    await hideDevToolbar(page);
-    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
-    // sheet has no door left, because a song now enters from the essay that
-    // wanted it. The URL field and its debounced lookup still exist on an
-    // existing song's Facts tab, which is the surface this behaviour lives on
-    // now. `song:edit` is the documented row → editor seam.
-    await page.evaluate(() =>
-      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
-    );
-    await expect(page.locator('#song-sheet')).toBeVisible();
-
-    // `input`, not `change`: the paste bar debounces on input (350ms) so the
-    // lookup fires while you are still typing rather than when you leave.
-    await page.locator('#sng-url').fill('https://open.spotify.com/track/abc');
-
-    const status = page.locator('#sng-status');
-    const error = page.locator('#sng-error');
-    // The status line clears rather than sitting on "Looking it up…" forever,
-    // and the sentence lands in the sheet's own alert.
-    await expect(error).toBeVisible();
-    await expect(error).not.toBeEmpty();
-    await expect(status).not.toHaveText('Looking it up…');
-
-    // ⚠ AND THE SENTENCE IS A SENTENCE. `TypeError` extends `Error`, so the
-    // hand-rolled `err instanceof Error ? err.message : '…'` idiom prints the
-    // raw fetch failure at a human in precisely the case its friendly fallback
-    // was written for. `formatActionError` is what keeps that string out.
-    await expect(error).not.toContainText('Failed to fetch');
-    await expect(error).not.toContainText('undefined');
-    // A dead network is not a bad link, and the sentence has to know the
-    // difference — sending you off to re-check a URL that was fine is the
-    // wrong instruction.
-    await expect(error).not.toContainText('Spotify track');
-  });
-});
-
 test.describe('the promise chain — the swallowed save, by name', () => {
   test('a failed toggle does not poison every toggle after it', async ({ page }) => {
     // The plan's own hands item, made assertable: "toggle membership offline,
@@ -147,7 +96,7 @@ test.describe('the promise chain — the swallowed save, by name', () => {
 
     await openManager(page);
     const row = page.locator('tr.fragment-row[data-fragment]').first();
-    test.skip((await row.count()) === 0, 'needs a quote or song row to edit');
+    test.skip((await row.count()) === 0, 'needs a quote row to edit');
     // The membership cell opens the sheet already on its Constellations tab —
     // and, crucially, on an EXISTING fragment, so ticks persist immediately
     // rather than queueing for a first save.
@@ -175,25 +124,30 @@ test.describe('the promise chain — the swallowed save, by name', () => {
   });
 });
 
-test.describe('the optimistic pairing', () => {
-  test('rolls back on a THROWN failure, not just a returned one', async ({ page }) => {
-    // The panel painted the song as paired and only un-painted itself on the
-    // `{ error }` return path — so on a dead network the screen showed a
-    // pairing the server had never heard of. An optimistic control that cannot
-    // roll back is a lie with a transition on it.
+/*
+  ⚠ THE MUSIC TAB, AND IT IS HERE FOR TWO HISTORIES. Its song picker painted a
+  pairing optimistically and only rolled back on the RETURNED error, so a dead
+  network left a pairing on screen the server had never heard of. And the song
+  sheet's lookup sat on "Looking it up…" forever when nobody answered. The tab
+  is one link field now (ADR 0044) and paints only what the server confirmed —
+  but "a write that throws must clear its status and say something" is exactly
+  the class this file exists for, because a stuck status line has a clean
+  typecheck.
+*/
+test.describe('the Music tab — a save that never answers', () => {
+  test('stops saying "Saving…", says what happened, and claims nothing was saved', async ({ page }) => {
     const { constellationId } = fixtures();
     test.skip(!constellationId, 'no constellation to reach the composer from');
 
     const FRAGMENT = '11111111-2222-3333-4444-555555555555';
-    const SONG = 'aaaaaaaa-2222-3333-4444-555555555555';
     const ISO = '2023-07-20T12:00:00.000Z';
 
     await stubActions(page, {
       'fragments.get': (): FragmentGet => ({
         id: FRAGMENT,
         type: 'writing',
-        title: 'A piece with no song yet',
-        slug: 'a-piece-with-no-song-yet',
+        title: 'A piece with no music yet',
+        slug: 'a-piece-with-no-music-yet',
         excerpt: '',
         body: 'Some words.',
         status: 'draft',
@@ -201,27 +155,33 @@ test.describe('the optimistic pairing', () => {
         updatedAt: ISO,
         subjects: '',
         constellationIds: [],
-        paired: null,
+        music: null,
       }),
-      'songs.search': (): SongsSearch => [{ id: SONG, title: 'Hush', artist: 'Bob Reynolds', annotated: false }],
       'versions.list': () => ({ canonical: null, versions: [] }),
-      // `songs.pair` is deliberately ABSENT — unhandled means aborted, which is
+      // `music.set` is deliberately ABSENT — unhandled means aborted, which is
       // the throw this spec exists for.
     });
 
     await page.goto(`/admin/constellations/${constellationId}#edit=${FRAGMENT}`);
     await expect(page.locator('#wsheet')).toBeVisible();
     await page.getByRole('tab', { name: /Music/ }).click();
-    await expect(page.locator('#ws-music-none')).toBeVisible();
 
-    await page.getByRole('button', { name: /Hush/ }).click();
+    await page.locator('#ws-music-url').fill('https://open.spotify.com/track/697MdxMbVWn1Ajbw8iaPv5');
+    await page.locator('#ws-music-url').press('Enter');
 
-    await expect(page.locator('#ws-music-error')).toBeVisible();
-    // Back to nothing paired — the name, the tab's mark and the "none" line all
-    // have to agree with the database, which never heard of this.
-    await expect(page.locator('#ws-music-none')).toBeVisible();
-    await expect(page.locator('#ws-music-name')).toBeHidden();
+    const error = page.locator('#ws-music-error');
+    await expect(error).toBeVisible();
+    await expect(page.locator('#ws-music-status')).not.toHaveText('Saving…');
+    // ⚠ AND THE SENTENCE IS A SENTENCE — `formatActionError`, never the raw
+    // fetch failure. A dead network is not a bad link either, so it must not
+    // send you off to re-check a URL that was fine.
+    await expect(error).not.toContainText('Failed to fetch');
+    await expect(error).not.toContainText('undefined');
+    await expect(error).not.toContainText('can’t play here');
+    // Nothing on screen claims music the database never heard of.
     await expect(page.locator('#ws-music-mark')).toHaveText('');
+    await expect(page.locator('#ws-music-player iframe')).toHaveCount(0);
+    await expect(page.locator('#ws-music-clear')).toBeHidden();
   });
 });
 
@@ -251,9 +211,10 @@ test.describe('the bulk bar', () => {
 /*
   ⚠ THE RULE, DRIVEN ONCE (ADR 0032). `sheet-dismiss.test.ts` proves every sheet
   ASKS the question — it matches text, so it cannot prove the answer works. This
-  proves it works, on the sheet that prompted the pass: Michael, 2026-08-11,
-  *"the song sheet doesn't close if I click on the outside of the sheet, whereas
-  the other two do."*
+  proves it works. The sheet that prompted the pass was the song sheet (Michael,
+  2026-08-11: *"the song sheet doesn't close if I click on the outside of the
+  sheet, whereas the other two do"*); it went with the songs table (ADR 0044),
+  so the rule is driven on the quote sheet, which follows it the same way.
 
   Both halves matter and they are opposite. A CLEAN sheet must go on an outside
   click — a modal that ignores you reads as stuck. A DIRTY one must not, or the
@@ -261,52 +222,30 @@ test.describe('the bulk bar', () => {
   without the second is worse than wiring neither.
 */
 test.describe('a sheet is dismissible, and says what that costs', () => {
-  test('the song sheet closes on an outside press when nothing is at stake', async ({ page }) => {
+  async function openQuoteSheet(page: Page) {
     await page.goto('/admin/fragments');
     await hideDevToolbar(page);
-    const sheet = page.locator('#song-sheet');
-    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
-    // sheet has no door left, because a song now enters from the essay that
-    // wanted it. The URL field and its debounced lookup still exist on an
-    // existing song's Facts tab, which is the surface this behaviour lives on
-    // now. `song:edit` is the documented row → editor seam.
-    await page.evaluate(() =>
-      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
-    );
+    await page.locator('#add-btn').click(); // the quote sheet lives behind Add ▾
+    await page.locator('#add-menu [data-new="quote"]').click();
+    const sheet = page.locator('#sheet');
     await expect(sheet).toBeVisible();
+    return sheet;
+  }
 
+  test('the quote sheet closes on an outside press when nothing is at stake', async ({ page }) => {
+    const sheet = await openQuoteSheet(page);
     // Press the backdrop — the dialog element itself, outside its content box.
     await page.mouse.click(5, 5);
     await expect(sheet, 'a clean sheet must close on an outside press').toBeHidden();
   });
 
   test('…and asks first once there is something to lose', async ({ page }) => {
-    await page.goto('/admin/fragments');
-    await hideDevToolbar(page);
-    const sheet = page.locator('#song-sheet');
-    // ⚠ NOT `#lst-new` — /admin/listening is gone (plan 40) and an EMPTY song
-    // sheet has no door left, because a song now enters from the essay that
-    // wanted it. The URL field and its debounced lookup still exist on an
-    // existing song's Facts tab, which is the surface this behaviour lives on
-    // now. `song:edit` is the documented row → editor seam.
-    await page.evaluate(() =>
-      document.dispatchEvent(new CustomEvent('song:edit', { detail: { id: 'aaaaaaaa-1111-2222-3333-444444444444' } })),
-    );
-    await expect(sheet).toBeVisible();
-
-    // ⚠ TYPED TEXT IS THE UNSAVED WORK NOW. This used to press a feeling chip,
-    // which was held until Save and so was the cheapest possible dirty edit.
-    // The words are gone (plan 40); the title is the field that replaces them
-    // as "something to lose".
-    // ⚠ NO `Facts` TAB CLICK ANY MORE. `a song is not a fragment` deleted
-    // `songs.setNotes` and with it the sheet's Notes pane — which left ONE
-    // panel, so the tab strip went too (a strip over a single pane says there
-    // is somewhere else to go). The field is simply on screen now.
-    await page.locator('#sng-song-title').fill('zzq dirty');
+    const sheet = await openQuoteSheet(page);
+    await sheet.locator('input[name="source_url"]').fill('https://example.com/zzq-dirty');
     await page.mouse.click(5, 5);
 
     // The sheet stays, and the confirm is what stands between the click and the
-    // loss. Dismissing THAT leaves the song exactly where it was.
+    // loss. Dismissing THAT leaves the quote exactly where it was.
     await expect(page.locator('dialog[open] >> text=Discard changes?')).toBeVisible();
     await expect(sheet, 'a dirty sheet must not vanish behind its own confirm').toBeVisible();
   });
