@@ -16,7 +16,7 @@
 // always mount both again — so a document-wide read of `.fb-panel`
 // finds whichever came first in the DOM, which is a bug that looks like a
 // caching problem.
-import { wireFragmentPanel, type PanelHandle, type PanelOpts } from './fragment-panel';
+import { wireFragmentPanel, type PanelHandle, type PanelOpts, type RefreshOpts } from './fragment-panel';
 import './subject-filter'; // the fetched partial's <subject-filter> needs the definition
 import { onFragmentsChanged } from './fragments-changed';
 import { closeWithExit, openDialog } from './dialog-close';
@@ -43,7 +43,7 @@ export interface ShellHandle {
   showError: (m: string) => void;
   clearError: () => void;
   /** Re-fetch the rows. Safe to call when closed; it simply doesn't. */
-  refresh: () => Promise<void>;
+  refresh: (o?: RefreshOpts) => Promise<void>;
   /**
    * Throw the loaded panel away so the next open refetches from scratch.
    *
@@ -113,14 +113,14 @@ export function wireBrowserShell(root: HTMLDialogElement, opts: ShellOpts): Shel
     },
     showError,
     clearError,
-    async refresh() {
+    async refresh(o) {
       if (!root.open) return;
       // ⚠ A REBUILD, NOT A REFRESH, when the target changed. `panel.refresh()`
       // re-fetches with the params captured at wire time; the pair drawer opens
       // on a different song each time, so its caller drops the panel first and
       // this reloads it against the current ones.
       if (!panel) return void loadPanel();
-      await panel.refresh();
+      await panel.refresh(o);
     },
     setName(name) {
       if (nameEl) nameEl.textContent = name;
@@ -149,11 +149,18 @@ export function wireBrowserShell(root: HTMLDialogElement, opts: ShellOpts): Shel
   // A fragment created from this drawer, or edited in a sheet on top of it,
   // should appear in these rows. Only while it is open — refetching a list
   // nobody is looking at is work for nothing, and the next open is fresh.
-  onFragmentsChanged(({ settled }) => {
-    if (!root.open) return false; // not handled — let the host underneath answer
-    void settled.then(() => handle.refresh());
-    return true;
-  });
+  //
+  // Quiet, fetched at once, swapped after the exit, and live behind an open
+  // sheet — the same terms as the Fragment Manager, for the reasons written
+  // beside its listener in admin-list.ts.
+  onFragmentsChanged(
+    ({ settled }) => {
+      if (!root.open) return false; // not handled — let the host underneath answer
+      void handle.refresh({ quiet: true, swapAfter: settled });
+      return true;
+    },
+    { live: true },
+  );
 
   return handle;
 }

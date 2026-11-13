@@ -19,7 +19,7 @@ import { closeWithExit, openDialog } from './dialog-close';
 import { wireSheetDismiss } from './sheet-dismiss';
 import { sheetError as sheetErrorOf } from './sheet-error';
 import { confirmDialog } from './confirm-dialog';
-import { notifyFragmentsChanged } from './fragments-changed';
+import { corpusDebt } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
 import { wireSharedBy } from './shared-by';
 import { readIntent } from './open-editor';
@@ -348,10 +348,16 @@ onPage((page) => {
   sheet.addEventListener('change', markDirty); // toggles, selects, the date field
   quoteEditor.on('update', () => markDirty()); // TipTap passes its own props, not an Event
 
+  // What this sheet owes the list behind it. Every write that changes a row —
+  // a save, a trash, a membership — reports here as it lands, and the list
+  // catches up while the sheet is still open (fragments-changed.ts).
+  const debt = corpusDebt(sheet);
+
   // --- constellation membership: its own tab, one picker for both types ---
   // (It applies immediately, so it never belonged inside either <form>.)
   const picker = wireConstellationPicker(
     document.getElementById('sheet-panel-cn')!.querySelector('.cn-picker') as HTMLElement,
+    { onWritten: debt.changed },
   );
   const tabs = wireSheetTabs(sheet);
   const cnCount = document.getElementById('sheet-cn-count')!;
@@ -362,9 +368,6 @@ onPage((page) => {
     cnCount.textContent = n ? String(n) : '';
   }
   cnPanel.addEventListener('change', refreshCnCount);
-
-  /** A membership edit changes the list underneath — refresh on close. */
-  const membershipTouched = () => picker.changed();
 
   // --- "Shared by": the corpus side of the person link (12 · Piece 3) ---
   // One handle, since ADR 0031 left one form here. The song's own copy of this
@@ -410,12 +413,12 @@ onPage((page) => {
     // full page load ran, and vanished only when the new document painted. There
     // was no close animation because there was no close. It read as jarring
     // because it WAS jarring — an element disappearing is not an element closing.
-    const stale = membershipTouched();
     void closeWithExit(sheet);
-    // Membership applies immediately, so the list/suite behind us is stale. The
-    // host refreshes in place if it can; if nothing claims it, this falls back to
-    // the reload that used to be here unconditionally.
-    if (stale) notifyFragmentsChanged(sheet);
+    // Membership applies immediately, so the list/suite behind us may be stale.
+    // Usually it has already caught up (the picker reports each write as it
+    // lands); `settle` pays whatever has not, and falls back to the reload
+    // that used to be here unconditionally when no host can refresh in place.
+    debt.settle();
   }
 
   // ✕, Escape and the backdrop are three gestures with one meaning, wired in one
@@ -687,8 +690,9 @@ onPage((page) => {
       dirty = false; // saved — don't prompt the unsaved-work guard on the way out
       // The reload used to be what closed this sheet after a save. It isn't any
       // more, so the close is explicit and load-bearing rather than tidying.
+      debt.changed();
       void closeWithExit(sheet);
-      notifyFragmentsChanged(sheet);
+      debt.settle();
     });
   }
 
@@ -719,8 +723,9 @@ onPage((page) => {
       });
       if (!res.ok) return;
       dirty = false; // trashed — nothing left here worth guarding
+      debt.changed();
       void closeWithExit(sheet);
-      notifyFragmentsChanged(sheet);
+      debt.settle();
     });
   });
 

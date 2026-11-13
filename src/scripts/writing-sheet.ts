@@ -87,7 +87,7 @@ import { slugify } from '../lib/slug';
 import { countWords, minutesForWords } from '../lib/reading';
 import { formatActionError, nowTime } from './action-error';
 import { confirmDialog } from './confirm-dialog';
-import { notifyFragmentsChanged } from './fragments-changed';
+import { corpusDebt } from './fragments-changed';
 import { wireConstellationPicker } from './constellation-picker';
 import { readIntent } from './open-editor';
 import { wireSheetTabs } from './sheet-tabs';
@@ -249,7 +249,12 @@ onPage((page) => {
   const versionsTab = sheet.querySelector('[data-tab="versions"]') as HTMLButtonElement;
   let savedStatus = 'draft';
   let dirty = false;
-  let everSaved = false; // any successful server save this open → reload on close
+  // What this sheet owes the list behind it — every write that changes a row
+  // reports here as it lands, so the list catches up while you are still in the
+  // piece rather than when you leave it (fragments-changed.ts). It replaced an
+  // `everSaved` flag that `populate` reset, which quietly forgot a copy or a
+  // promoted version the moment the sheet reloaded the piece to show it.
+  const debt = corpusDebt(sheet);
   let loadFailed = false; // fetch failed → sheet is inert (view-only shell)
   let prevHash = ''; // the hash to restore on close (e.g. the browser's #browse)
   /** The server row exists (vs. an id we minted that the server hasn't seen). */
@@ -519,7 +524,7 @@ onPage((page) => {
     if (!slugTouched && data.slug) slugField.value = data.slug;
     savedStatus = status;
     updateViewLink(data.slug ?? slugField.value); // after savedStatus: it picks View vs Preview from it
-    everSaved = true;
+    debt.changed();
     dirty = false;
     reflectStatus();
     setSaved();
@@ -563,7 +568,7 @@ onPage((page) => {
       if (saved) {
         conflictParked = false;
         dirty = false;
-        everSaved = true; // the list underneath must refresh (a copy now exists)
+        debt.changed(); // the list underneath must refresh (a copy now exists)
         await openEdit(idField.value);
       } else {
         setStatusError('Could not save the copy — your words are still here');
@@ -617,7 +622,9 @@ onPage((page) => {
 
   // ---- constellation membership (its own tab) ----
   const cnPanel = document.getElementById('ws-panel-cn') as HTMLElement;
-  const picker = wireConstellationPicker(cnPanel.querySelector('.cn-picker') as HTMLElement);
+  const picker = wireConstellationPicker(cnPanel.querySelector('.cn-picker') as HTMLElement, {
+    onWritten: debt.changed,
+  });
   const cnCount = document.getElementById('ws-cn-count')!;
   const toolbar = document.getElementById('ws-toolbar') as HTMLElement;
 
@@ -625,6 +632,7 @@ onPage((page) => {
   const musicPanel = wireMusicPanel({
     root: document.getElementById('ws-panel-music') as HTMLElement,
     markEl: document.getElementById('ws-music-mark')!,
+    onWritten: debt.changed,
   });
 
   // The formatting toolbar belongs to the document; hide it on the other tabs.
@@ -642,7 +650,7 @@ onPage((page) => {
     onPromoted() {
       dirty = false;
       versionHeld = false;
-      everSaved = true; // the list underneath shows a new "edited" time
+      debt.changed(); // the list underneath shows a new "edited" time
       void openEdit(idField.value);
     },
     /**
@@ -765,7 +773,6 @@ onPage((page) => {
         : 'Otherwise the posted date is set automatically when you publish.';
     occurredField.value = d?.occurredIso ? toLocalInput(d.occurredIso) : '';
     dirty = false;
-    everSaved = false;
     versionHeld = false;
     jsError.hidden = true;
     deleteZone.hidden = !d;
@@ -844,9 +851,6 @@ onPage((page) => {
   function closeNow() {
     dirty = false;
     releaseEditLock();
-    // A pairing counts too: it applied immediately, so the feed underneath is
-    // now stale in exactly the way a membership change makes it stale.
-    const stale = everSaved || picker.changed() || musicPanel.changed();
     setHash(prevHash); // restore the underlying context (e.g. #browse) first
     void closeWithExit(sheet);
     // This used to be `location.reload()` on the very next line, which meant the
@@ -854,12 +858,12 @@ onPage((page) => {
     // the "instantly disappears, and there's some bit of lag" of the report. The
     // close is real now, and the host refreshes in place around it.
     //
-    // ⚠ THE REFRESH IS DELIBERATELY *NOT* AWAITED ON THE EXIT. `notifyFragmentsChanged`
+    // ⚠ THE REFRESH IS DELIBERATELY *NOT* AWAITED ON THE EXIT. Settling the debt
     // starts a fetch, and a fetch is off the main thread — starting it now means
     // the rows behind this sheet are already in flight while it slides. What must
     // not land mid-slide is the SWAP, and that is `afterDialogClose`'s job inside
     // the listener (see the header of scripts/dialog-close.ts), not this line's.
-    if (stale) notifyFragmentsChanged(sheet);
+    debt.settle();
   }
   async function requestClose() {
     if (!loadFailed && dirty) {
@@ -938,7 +942,7 @@ onPage((page) => {
     if (!saved) return;
     reflectStatus(); // save() has already advanced savedStatus
     setSaved('Now a draft ' + nowTime());
-    everSaved = true; // the list underneath moves it out of Notes
+    debt.changed(); // the list underneath moves it out of Notes
   });
 
   document.getElementById('ws-unpublish')?.addEventListener('click', async () => {
@@ -1043,7 +1047,7 @@ onPage((page) => {
     deleteBtn.disabled = false;
     if (error) return setStatusError(formatActionError(error));
     dirty = false;
-    everSaved = true; // the list underneath must refresh
+    debt.changed(); // the list underneath must refresh
     closeNow();
   });
 

@@ -4,7 +4,7 @@
 // Contract:
 //   setFragment(id | null, memberIds)  — call on every sheet open
 //   flush(newId)                       — call right after a first save
-//   changed()                          — did membership change while open?
+//   opts.onWritten                     — a membership write just LANDED
 import { actions } from 'astro:actions';
 import { callAction, formatActionError, submitAction } from './action-error';
 import { announceSkyChange, onSkyChange, type SkyConstellation } from './sky-changed';
@@ -17,20 +17,28 @@ export interface PickerHandle {
    *  `false` if that write failed, so the host can hold its sheet open rather
    *  than reporting a save that only half landed. */
   flush: (newId: string) => Promise<boolean>;
-  /** True if membership changed since the last setFragment (host may refresh). */
-  changed: () => boolean;
   /** Tick a constellation without user input (e.g. the composing context). */
   preselect: (id: string) => void;
 }
 
-export function wireConstellationPicker(root: HTMLElement): PickerHandle {
+export interface PickerOpts {
+  /**
+   * Called each time a membership write succeeds — after the server has it,
+   * never on the click. The host sheet passes this to `corpusDebt.changed`, so
+   * the list behind it redraws with the new membership while the sheet is still
+   * open (fragments-changed.ts); calling it on the click would have the list
+   * refetch before the write and redraw the OLD membership.
+   */
+  onWritten?: () => void;
+}
+
+export function wireConstellationPicker(root: HTMLElement, opts: PickerOpts = {}): PickerHandle {
   const boxes = () => Array.from(root.querySelectorAll<HTMLInputElement>('.cn-check'));
   const status = root.querySelector('.cn-picker-status') as HTMLElement | null;
   const list = root.querySelector('.cn-list') as HTMLElement;
   const noneHint = root.querySelector<HTMLElement>('.cn-none');
 
   let fragmentId: string | null = null;
-  let dirty = false;
   let inFlight: Promise<unknown> = Promise.resolve();
   /** Did the most recent trip through the chain fail? Read by `flush`. */
   let failed = false;
@@ -81,6 +89,7 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
         }
         failed = false;
         say(ids.length ? 'Saved' : 'Removed from all');
+        opts.onWritten?.();
       })
       .catch((e) => {
         failed = true;
@@ -90,7 +99,6 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
 
   root.addEventListener('change', (e) => {
     if (!(e.target as Element).classList?.contains('cn-check')) return;
-    dirty = true;
     if (fragmentId) persist();
     else say('Will be added when you save');
   });
@@ -235,7 +243,6 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
   return {
     setFragment(id, memberIds) {
       fragmentId = id;
-      dirty = false;
       const want = new Set(memberIds);
       boxes().forEach((b) => (b.checked = want.has(b.value)));
       foldForm(false);
@@ -249,12 +256,10 @@ export function wireConstellationPicker(root: HTMLElement): PickerHandle {
       await inFlight;
       return !failed;
     },
-    changed: () => dirty,
     preselect(id) {
       const box = boxes().find((b) => b.value === id);
       if (box && !box.checked) {
         box.checked = true;
-        dirty = true;
       }
     },
   };

@@ -30,9 +30,23 @@ export interface PanelOpts {
   onSwap?: (doc: Document) => void;
 }
 
+export interface RefreshOpts {
+  /**
+   * A background catch-up: something changed elsewhere (a sheet saved), and the
+   * rows on screen are still very nearly right. They stay at full strength and
+   * keep taking clicks while the new ones are fetched, and are swapped without
+   * ceremony when they arrive. The note above `DIM_AFTER_MS` says why this is
+   * right for everything except a filter YOU just changed.
+   */
+  quiet?: boolean;
+  /** Fetch now, but hold the swap until this resolves — a sheet's exit, so the
+   *  page-sized `innerHTML` does not land mid-slide. */
+  swapAfter?: Promise<void>;
+}
+
 export interface PanelHandle {
   root: HTMLElement;
-  refresh: () => Promise<void>;
+  refresh: (o?: RefreshOpts) => Promise<void>;
   getSelected: () => string[];
   clearSelection: () => void;
   /** Take one fragment out of the cart without touching the rest. The browser
@@ -130,23 +144,113 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
   }
   onSkyChange(addConstellationOption);
 
+  /*
+    ── THE DIM SAYS "WHAT YOU SEE IS NOT WHAT YOU ASKED FOR", AND NOTHING ELSE ──
+    (2026-11-13.) `.list-loading` fades the table and takes it away from the
+    pointer, and it used to go on for EVERY fetch — including the refresh after
+    a sheet closed, when the rows on screen were 99% right and the one that
+    changed was the one you had just been looking at. So closing a sheet greyed
+    out the whole list and made it unclickable for as long as the round trip
+    took. Michael: *"it takes more than a second for that fragment browser to
+    reload, and it's disabled the whole time."*
+
+    Now it is two cases:
+      · A filter, sort or search you just changed: the rows on screen ARE wrong
+        — they answer a question you have stopped asking — so they dim. But only
+        after DIM_AFTER_MS: a response faster than that never flashes the table
+        at all, and a dim that blinks on and off reads as flicker, not progress.
+      · A background catch-up (`quiet`): nothing dims and nothing is blocked.
+        The new rows replace the old ones when they arrive, focus stays on the
+        same row, and in the common case you never see a refresh happen.
+
+    The alternative that lost: a spinner or skeleton for the quiet case. It
+    would announce work the reader has no reason to wait for — the save has
+    already succeeded, and the table only needs to catch up with it.
+  */
+  const DIM_AFTER_MS = 200;
+  let dimTimer = 0;
+  function armDim() {
+    if (dimTimer || listWrap.classList.contains('list-loading')) return;
+    dimTimer = window.setTimeout(() => {
+      dimTimer = 0;
+      listWrap.classList.add('list-loading');
+    }, DIM_AFTER_MS);
+  }
+  function clearDim() {
+    clearTimeout(dimTimer);
+    dimTimer = 0;
+    listWrap.classList.remove('list-loading');
+  }
+
+  /*
+    ── FOCUS IS SAID IN TERMS THAT SURVIVE A SWAP ─────────────────────────
+    `innerHTML` throws every row away, and with them whatever had focus — the
+    row you returned to from a sheet drops focus to <body>, and a keyboard user
+    loses their place in a list of 168 things. So focus is recorded as "the nth
+    control in row <id>" (or "the sort header for <field>"), and put back on the
+    same control in the new markup.
+
+    ⚠ THE SHEET'S OPENER IS THE CASE THAT NEEDS TWO HALVES. A live refresh swaps
+    the table while a sheet is open over it, so the element the browser means to
+    return focus to on close is already gone when the sheet shuts, and the
+    browser lands on <body>. We can't change the dialog's own target, so we
+    remember the opener's spot at open time and, when a dialog closes onto
+    <body> after one of those swaps, finish the job ourselves.
+  */
+  type FocusSpot = { header: string } | { row: string; index: number };
+  const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  function spotOf(el: Element | null): FocusSpot | null {
+    if (!el || !listWrap.contains(el)) return null;
+    const header = el.closest<HTMLElement>('.sort-header');
+    if (header?.dataset.field) return { header: header.dataset.field };
+    const row = el.closest<HTMLElement>('tr.fragment-row');
+    if (!row?.dataset.id) return null;
+    return { row: row.dataset.id, index: Array.from(row.querySelectorAll(FOCUSABLE)).indexOf(el) };
+  }
+  function elementAt(spot: FocusSpot): HTMLElement | null {
+    if ('header' in spot)
+      return listWrap.querySelector<HTMLElement>(`.sort-header[data-field="${CSS.escape(spot.header)}"]`);
+    const row = listWrap.querySelector<HTMLElement>(`tr.fragment-row[data-id="${CSS.escape(spot.row)}"]`);
+    if (!row) return null;
+    return row.querySelectorAll<HTMLElement>(FOCUSABLE)[spot.index] ?? null;
+  }
+
+  let openerSpot: FocusSpot | null = null; // set on every row open
+  let openerSwapped = false; // the opener's element was replaced while a sheet was up
+  const onDialogClose = () => {
+    if (!root.isConnected) return void document.removeEventListener('close', onDialogClose, true);
+    // A confirm closing back into its sheet lands focus INSIDE the sheet, not
+    // on <body> — that is not our close, so stay armed for the sheet's own.
+    if (!openerSwapped || !openerSpot || (document.activeElement && document.activeElement !== document.body)) return;
+    openerSwapped = false;
+    elementAt(openerSpot)?.focus({ preventScroll: true });
+  };
+  // Capture: `close` does not bubble. By the time it fires the browser has
+  // already tried (and, after a swap, failed) to restore focus.
+  document.addEventListener('close', onDialogClose, true);
+
   // --- fetch + swap (keeps focus; no navigation) ----------------------------
   let fetchToken = 0;
-  async function applyFilters() {
+  async function applyFilters(o: RefreshOpts = {}) {
     const params = buildParams();
     const historyUrl = opts.historyBase ? opts.historyBase + (params.toString() ? `?${params}` : '') : null;
     for (const [k, v] of Object.entries(opts.extraParams ?? {})) params.set(k, v);
-    // remember a focused sort header so keyboard focus survives the swap
-    const focusField = (document.activeElement as HTMLElement)?.closest?.('.sort-header')?.getAttribute('data-field');
     const token = ++fetchToken;
-    listWrap.classList.add('list-loading');
+    // A quiet fetch leaves an ARMED dim alone: if it supersedes a filter change
+    // still in flight, what is on screen is still the wrong answer until it lands.
+    if (!o.quiet) armDim();
     try {
       const res = await fetch(`${PARTIAL}?${params}`, { headers: { 'X-Requested-With': 'fetch' } });
       if (!res.ok) throw new Error('bad status');
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
       const next = doc.querySelector('.fpanel-list');
       if (!next) throw new Error('no list');
+      if (o.swapAfter) await o.swapAfter;
       if (token !== fetchToken) return;
+      // Read focus at SWAP time, not at click time: if you moved on while the
+      // fetch was out, the swap has no business pulling you back.
+      const focusSpot = spotOf(document.activeElement);
+      const underSheet = !!document.querySelector('dialog[open]');
       listWrap.innerHTML = next.innerHTML;
       syncToolbar(doc);
       if (historyUrl) history.replaceState({}, '', historyUrl);
@@ -156,19 +260,26 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
       // filter brings it back on screen.
       restoreTicks();
       refreshSelection();
-      if (focusField) listWrap.querySelector<HTMLElement>(`.sort-header[data-field="${focusField}"]`)?.focus();
+      if (focusSpot) elementAt(focusSpot)?.focus({ preventScroll: true });
+      if (underSheet && openerSpot) openerSwapped = true;
       opts.onSwap?.(doc);
     } catch {
       // Manager context: fall back to a full navigation (server renders the
       // same state). Sheet context: stay put — the previous list still stands.
-      if (historyUrl) location.assign(historyUrl);
+      //
+      // ⚠ NEVER WITH A SHEET OPEN. A live refresh runs while you are typing in
+      // one, and navigating away from that to recover a TABLE would be trading
+      // the thing you are writing for the thing behind it. Stale rows are the
+      // honest failure there; the next refresh corrects them.
+      if (o.swapAfter) await o.swapAfter;
+      if (historyUrl && !document.querySelector('dialog[open]')) location.assign(historyUrl);
     } finally {
-      if (token === fetchToken) listWrap.classList.remove('list-loading');
+      if (token === fetchToken) clearDim();
     }
   }
 
   filters.addEventListener('submit', (e) => e.preventDefault());
-  filters.querySelectorAll('select').forEach((s) => s.addEventListener('change', applyFilters));
+  filters.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => applyFilters()));
   filters.addEventListener('filter:change', () => applyFilters()); // subject combobox
 
   let lastSearch = qInput.value.trim().length >= MIN_SEARCH ? qInput.value.trim() : '';
@@ -227,6 +338,8 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
 
     const actBtn = el.closest<HTMLElement>('[data-act]');
     if (actBtn) {
+      openerSpot = spotOf(document.activeElement); // the membership cell opens a sheet too
+      openerSwapped = false;
       const row = actBtn.closest<HTMLElement>('tr.fragment-row');
       if (row) opts.onAction?.(actBtn.dataset.act!, actBtn.dataset.id ?? row.dataset.id!, row);
       return;
@@ -238,7 +351,11 @@ export function wireFragmentPanel(root: HTMLElement, opts: PanelOpts = {}): Pane
     if (el.closest('.select-all') || el.closest('[data-noedit]')) return;
 
     const row = el.closest<HTMLElement>('tr.fragment-row');
-    if (row && root.dataset.view !== 'trash') opts.onOpen?.(row, e as MouseEvent);
+    if (row && root.dataset.view !== 'trash') {
+      openerSpot = spotOf(document.activeElement); // what the browser will try to return to
+      openerSwapped = false;
+      opts.onOpen?.(row, e as MouseEvent);
+    }
   });
 
   // select-all (change fires once). It keeps meaning "everything currently

@@ -140,15 +140,26 @@ onPage(() => {
   // An editor sheet saved, trashed, or changed a membership. `panel.refresh` is
   // `applyFilters` — it refetches the fragments-panel partial and swaps the table
   // in place, which is exactly what the reload used to accomplish and nothing
-  // more. There was genuinely nothing to build here; the capability was already
-  // on the handle, and since Piece 3 the same call also re-syncs the toolbar.
-  // The whole thing waits on the sheet's exit rather than fetching early like the
-  // composer does: this partial is a table, not a page, and the ~0.28s head start
-  // isn't worth the extra branch. The swap is what must not land mid-slide.
-  onFragmentsChanged(({ settled }) => {
-    void settled.then(() => panel.refresh());
-    return true;
-  });
+  // more. Since Piece 3 the same call also re-syncs the toolbar.
+  //
+  // ⚠ QUIET, AND FETCHED THE MOMENT IT IS ANNOUNCED (2026-11-13). This used to
+  // wait for the sheet's exit before even starting the request — "the ~0.28s
+  // head start isn't worth the extra branch" — and then dim the whole table for
+  // the round trip. Together that was the sluggish close: slide, THEN fetch, all
+  // of it with the list greyed out and refusing clicks. Now the request leaves
+  // as the sheet starts to slide, only the swap waits for the exit (it is the
+  // part that must not land mid-animation), and the rows stay live throughout.
+  //
+  // `live: true` — this table can redraw behind an open sheet, so a save that
+  // lands mid-edit reaches it immediately (`corpusDebt` in fragments-changed.ts)
+  // and closing usually has nothing left to do.
+  onFragmentsChanged(
+    ({ settled }) => {
+      void panel.refresh({ quiet: true, swapAfter: settled });
+      return true;
+    },
+    { live: true },
+  );
 
   // --- per-row trash actions --------------------------------------------------
   async function trashAction(op: 'restore' | 'purge', id: string) {

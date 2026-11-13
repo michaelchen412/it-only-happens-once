@@ -43,17 +43,22 @@ export interface MusicPanelHandle {
    * to until the first save, and the sheet calls this again once there is.
    */
   setFragment(id: string | null, music: PieceMusic | null): void;
-  /** True if the music changed — the sheet reloads on close so the feed refreshes. */
-  changed(): boolean;
 }
 
 interface Options {
   root: HTMLElement;
   /** The tab's little mark, shown when the piece has music. */
   markEl: HTMLElement;
+  /**
+   * Called each time `music.set` succeeds — after the server has the link,
+   * never on the paste. The sheet passes `corpusDebt.changed`, so the list
+   * behind it catches up while the sheet is still open (fragments-changed.ts),
+   * the same contract as the constellation picker's `onWritten`.
+   */
+  onWritten?: () => void;
 }
 
-export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
+export function wireMusicPanel({ root, markEl, onWritten }: Options): MusicPanelHandle {
   const el = <T extends HTMLElement>(id: string): T => {
     const node = root.querySelector<T>(`#${id}`);
     // ⚠ Throws rather than casting. A missing player div was once a sheet that
@@ -70,7 +75,6 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
 
   let fragmentId: string | null = null;
   let current: PieceMusic | null = null;
-  let touched = false;
   /** Writes are async; only the newest one may paint. */
   let seq = 0;
 
@@ -149,7 +153,7 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
       return showError(error ? formatActionError(error) : 'That didn’t save — try again.');
     }
     current = data.url ? { url: data.url, embed: data.embed } : null;
-    touched = true;
+    onWritten?.();
     render(); // the field now shows the CANONICAL link — what was actually stored
     statusEl.textContent = data.url ? 'Saved.' : 'Removed.';
   }
@@ -178,7 +182,6 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
     setFragment(id, music) {
       fragmentId = id;
       current = music;
-      touched = false;
       seq++; // anything still in flight belongs to the previous piece
       clearError();
       // A piece that has never been saved has no row to write to. Say so,
@@ -187,9 +190,6 @@ export function wireMusicPanel({ root, markEl }: Options): MusicPanelHandle {
       statusEl.textContent = id ? '' : 'Save this piece first — then it can carry music.';
       playerEl.replaceChildren(); // a different piece's music must not keep playing
       render();
-    },
-    changed() {
-      return touched;
     },
   };
 }

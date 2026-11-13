@@ -346,30 +346,92 @@ test.describe('closing', () => {
     ).toBe(true);
   });
 
-  test('the list refresh happens after the sheet is gone, not during', async ({ page }) => {
-    await stubActions(page, { 'constellations.setMembership': () => ({ ok: true }) });
-    const picker = await openPicker(page);
+  /*
+    ⚠ THESE THREE REPLACED "the list refresh happens after the sheet is gone"
+    (2026-11-13), which pinned two things that were each the slow half of the
+    report they now answer — *"it takes more than a second for that fragment
+    browser to reload, and it's disabled the whole time."*
+
+     · It asserted the REQUEST left after `close`. The request is network and
+       off the main thread; holding it for the 0.28s exit was pure added wait.
+       What must not land mid-slide is the SWAP, so that is what is ordered now.
+     · It ticked a constellation on a NEW quote — a toggle that is only queued
+       ("Will be added when you save") and is thrown away on close. The old
+       picker counted the click as a change, so closing refetched the whole
+       table for nothing. It now counts a WRITE that landed, so that spec saw
+       no refresh at all, which is correct.
+
+    So these open an EXISTING quote, where the toggle really is written (stubbed
+    here — see the header), and watch the list's own DOM rather than its URL.
+  */
+  /** Open the first quote row from the keyboard, on its Constellations tab. */
+  async function openExistingQuote(page: Page) {
+    await page.goto('/admin/fragments');
+    await hideDevToolbar(page);
+    const row = page.locator('tr.fragment-row[data-fragment]').first();
+    test.skip((await row.count()) === 0, 'needs a quote row');
+    const id = (await row.getAttribute('data-id'))!;
+    // The keyboard, so the browser has a real element to return focus to.
+    await row.locator('.row-open').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#sheet')).toBeVisible();
+    await page.locator('#sheet [data-tab="constellations"]').click();
+    const picker = page.locator('#sheet-panel-cn .cn-picker');
+    await expect(picker).toBeVisible();
     test.skip((await picker.locator('.cn-row').count()) === 0, 'no constellation to tick');
-
-    // Record the ORDER of the two events. Asserting the sequence is the honest
-    // version of "it closes gracefully" — smoothness is not something a spec
-    // can see, but "the heavy DOM work landed mid-animation" is.
+    // Record, in order: the sheet's `close`, every swap of the table's rows, and
+    // the table ever dimming. Observed on the DOM, because the swap — not the
+    // request — is the main-thread work the exit must not share a frame with.
     await page.evaluate(() => {
-      const w = window as unknown as { __order?: string[] };
+      const w = window as unknown as { __order: string[] };
       w.__order = [];
-      document.getElementById('sheet')!.addEventListener('close', () => w.__order!.push('close'));
+      document.getElementById('sheet')!.addEventListener('close', () => w.__order.push('close'));
+      const list = document.querySelector('.fpanel-list')!;
+      new MutationObserver((records) => {
+        if (records.some((r) => r.type === 'childList')) w.__order.push('swap');
+        if (list.classList.contains('list-loading')) w.__order.push('dim');
+      }).observe(list, { childList: true, attributes: true, attributeFilter: ['class'] });
     });
-    await page.route('**/admin/fragments-panel*', async (route) => {
-      await page.evaluate(() => (window as unknown as { __order: string[] }).__order.push('refresh'));
-      await route.continue();
-    });
+    return { picker, id };
+  }
+  const order = (page: Page) => page.evaluate(() => (window as unknown as { __order: string[] }).__order);
 
-    await picker.locator('.cn-row').first().locator('.cn-check').check();
+  test('a membership change reaches the list behind the sheet while it is still open', async ({ page }) => {
+    await stubActions(page, { 'constellations.setMembership': () => ({ ok: true }) });
+    const { picker } = await openExistingQuote(page);
+
+    await picker.locator('.cn-row').first().locator('.cn-check').click();
+    await expect.poll(() => order(page), { timeout: 8000 }).toContain('swap');
+    await expect(page.locator('#sheet')).toBeVisible(); // nobody had to close anything
+    expect(await order(page), 'a background catch-up must never dim the table').not.toContain('dim');
+  });
+
+  test('closing straight after a change swaps the rows only once the sheet is gone', async ({ page }) => {
+    await stubActions(page, { 'constellations.setMembership': () => ({ ok: true }) });
+    const { picker } = await openExistingQuote(page);
+
+    await picker.locator('.cn-row').first().locator('.cn-check').click();
+    // The write has landed (the picker says so), and the live catch-up is still
+    // waiting out its quiet period — so it is the CLOSE that has to pay.
+    await expect(picker.locator('.cn-picker-status')).not.toHaveText('');
     await page.locator('#sheet [data-close]').first().click();
 
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __order: string[] }).__order))
-      .toEqual(['close', 'refresh']);
+    await expect.poll(() => order(page)).toEqual(['close', 'swap']);
+  });
+
+  test('focus comes back to the row it left, even after the row was redrawn under the sheet', async ({ page }) => {
+    // The browser returns focus to the element that opened the dialog — which a
+    // live swap has thrown away, so without help it lands on <body> and a
+    // keyboard user loses their place in the list.
+    await stubActions(page, { 'constellations.setMembership': () => ({ ok: true }) });
+    const { picker, id } = await openExistingQuote(page);
+
+    await picker.locator('.cn-row').first().locator('.cn-check').click();
+    await expect.poll(() => order(page), { timeout: 8000 }).toContain('swap');
+    await page.keyboard.press('Escape');
+
+    await expect(page.locator('#sheet')).toBeHidden();
+    await expect(page.locator(`tr.fragment-row[data-id="${id}"] .row-open`)).toBeFocused();
   });
 });
 
