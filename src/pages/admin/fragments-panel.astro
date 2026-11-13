@@ -40,7 +40,20 @@ if (mode === 'pick') {
 } else {
   params.constellation = null; // placed-marking is a pick-mode concern
 }
+/*
+  ⚠ `Server-Timing`, so the cost of a refresh is a number you can read rather
+  than a feeling (2026-11-13). DevTools → Network → the request → Timing shows
+  `list` beside the browser's own waiting time, and the gap between the two is
+  everything that is not the database — middleware, rendering, the network.
+  Admin-only, like every response from this route, and it carries a duration
+  and nothing else.
+*/
+const listStart = performance.now();
 const data = await queryFragmentList(Astro.locals.supabase, params);
+Astro.response.headers.set(
+  'Server-Timing',
+  `list;dur=${(performance.now() - listStart).toFixed(1)};desc="fragment list"`,
+);
 ---
 
 <FragmentListPanel data={data} params={params} mode={mode} />

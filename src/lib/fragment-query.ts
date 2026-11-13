@@ -158,82 +158,37 @@ export interface FragmentListData {
   placedIds: Set<string>;
 }
 
+/*
+  ⚠ THREE ROUND TRIPS DEEP, NOT TEN — FOUR WITH A FILTER (2026-11-13). This function used to `await`
+  every read in turn — constellations, then authors, then works, then the rows,
+  then the type counts, then subjects, then the trash count — and almost none of
+  them needed the one before. Each is a round trip to Supabase, so the cost of
+  the whole list was their SUM: ~10 × 25–50ms measured from a dev box, before a
+  byte of HTML was rendered. Every filter change, every refresh after a sheet
+  closed, paid it. Michael: *"it takes more than a second for that fragment
+  browser to reload, and it's disabled the whole time."*
+
+  The reads now go in the stages their dependencies actually force:
+    1. everything that can be known from the params alone — the filter lookups,
+       the vocabularies, and the "sidecar" reads (type counts, every subject,
+       the trash count, pick-mode placements) that nothing downstream waits on;
+    2. the row query, which needs the filters resolved;
+    3. what hangs off the rows — the subjects and memberships of each one.
+  Two filters are still two-step chains inside stage 1 — subjects (slugs → ids
+  → links) and a constellation (slug → id → links) — which is the fourth trip
+  when either is set. They run alongside the rest of the stage rather than
+  ahead of it.
+
+  ⚠ A SUPABASE QUERY IS LAZY. The builder sends nothing until something calls
+  `.then` on it, so "start it now, await it later" needs an explicit
+  `Promise.resolve(…)` — holding the builder in a variable would quietly put the
+  read back at the end of the queue. And the sidecar gets a no-op `.catch` the
+  moment it starts: if stage 2 throws while it is still in flight, its own
+  rejection would otherwise be UNHANDLED, which Node answers by killing the
+  function, not by logging a warning. The real `await` further down still sees
+  the rejection; the no-op only marks it as one somebody will collect.
+*/
 export async function queryFragmentList(supabase: DB, p: FragmentListParams): Promise<FragmentListData> {
-  // subject filter → fragment ids matching ALL selected subjects (AND semantics)
-  let subjectFilterIds: string[] | null = null;
-  if (p.subjectSlugs.length) {
-    const { data: subs } = await supabase.from('subjects').select('id, slug').in('slug', p.subjectSlugs);
-    const subIds = (subs ?? []).map((s) => s.id);
-    if (!subIds.length) {
-      subjectFilterIds = [];
-    } else {
-      const { data: links } = await supabase
-        .from('fragment_subjects')
-        .select('fragment_id, subject_id')
-        .in('subject_id', subIds);
-      const bySet: Record<string, Set<string>> = {};
-      for (const l of links ?? []) (bySet[l.fragment_id] ??= new Set()).add(l.subject_id);
-      subjectFilterIds = Object.entries(bySet)
-        .filter(([, s]) => s.size === subIds.length)
-        .map(([fid]) => fid);
-    }
-  }
-
-  // membership filter (`?in=`): a constellation slug, or 'none' for the orphans.
-  // Resolved to an id list here, exactly like the subject filter above.
-  const { data: allConstellationRows } = await supabase
-    .from('constellations')
-    .select('id, name, slug, description, color')
-    .order('sort');
-  // Markdown → words, once, for every consumer of `ConstellationRefLite`.
-  const allConstellations = (allConstellationRows ?? []).map((c) => ({
-    ...c,
-    description: toPlainText(c.description) || null,
-  }));
-  let membershipFilterIds: string[] | null = null; // whitelist: fragments in the chosen constellation
-  let membershipExcludeIds: string[] | null = null; // blacklist: everything placed anywhere ('none')
-  if (p.membership === 'none') {
-    const { data: links } = await supabase.from('fragment_constellations').select('fragment_id');
-    membershipExcludeIds = [...new Set((links ?? []).map((l) => l.fragment_id))];
-  } else if (p.membership) {
-    const target = allConstellations.find((c) => c.slug === p.membership);
-    if (!target) {
-      membershipFilterIds = []; // unknown slug → match nothing, don't silently ignore
-    } else {
-      const { data: links } = await supabase
-        .from('fragment_constellations')
-        .select('fragment_id')
-        .eq('constellation_id', target.id);
-      membershipFilterIds = (links ?? []).map((l) => l.fragment_id);
-    }
-  }
-
-  // provenance facets: authors & works (for the datalists, filters, and editor prefill)
-  //
-  // ⚠ THE CEILING HERE IS CHOSEN, NOT DEFAULTED (docs/plans/16 · Piece 2).
-  // These look unbounded and are not: PostgREST stops at 1000 rows unless you
-  // say otherwise, so the read that "gets every author" would have started
-  // lying at 1001 with nothing on screen to say so — the same silent-truncation
-  // fault the combo's 50-row cap had, one layer down. Stating it makes the
-  // number somebody's decision. Harmless at 70 authors / 49 works; the thing
-  // that actually retires the question is the plan's step 2, where the combo
-  // asks the server per keystroke instead of being handed the whole vocabulary.
-  const VOCAB_CEILING = 1000;
-  const { data: allAuthors } = await supabase
-    .from('authors')
-    .select('id, name, slug')
-    .order('name')
-    .limit(VOCAB_CEILING);
-  const { data: allWorks } = await supabase
-    .from('works')
-    .select('id, title, slug, author_id')
-    .order('title')
-    .limit(VOCAB_CEILING);
-  const authorNameById = Object.fromEntries((allAuthors ?? []).map((a) => [a.id, a.name]));
-  const workTitleById = Object.fromEntries((allWorks ?? []).map((w) => [w.id, w.title]));
-  const authorFilterId = p.authorSlug ? ((allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—') : null;
-  const workFilterId = p.workSlug ? ((allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—') : null;
-
   // The view's scope, shared by the list query AND the per-type counts — so the
   // badge numbers can never disagree with the rows underneath them.
   //
@@ -271,6 +226,97 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     return working as T;
   };
 
+  // ── stage 1a: the sidecar — started now, collected at the end ──────────────
+  const sidecar = Promise.all([
+    // per-type counts (the badge numbers) for the current view, independent of filters
+    Promise.resolve(scoped(supabase.from('fragments').select('type'))),
+    Promise.resolve(supabase.from('subjects').select('name, slug').order('name')),
+    // Notes excluded here too, so the pill agrees with the room it opens.
+    Promise.resolve(
+      supabase
+        .from('fragments')
+        .select('id', { count: 'exact', head: true })
+        .not('deleted_at', 'is', null)
+        .neq('status', 'note'),
+    ),
+    // pick mode: which fragments already live in the target constellation
+    p.constellation
+      ? Promise.resolve(
+          supabase.from('fragment_constellations').select('fragment_id').eq('constellation_id', p.constellation),
+        )
+      : null,
+  ]);
+  void sidecar.catch(() => {}); // see the header: marks it handled, never swallows it
+
+  // ── stage 1b: what the row query is filtered by ───────────────────────────
+  const constellationsRead = Promise.resolve(
+    supabase.from('constellations').select('id, name, slug, description, color').order('sort'),
+  ).then(({ data }) =>
+    // Markdown → words, once, for every consumer of `ConstellationRefLite`.
+    (data ?? []).map((c) => ({ ...c, description: toPlainText(c.description) || null })),
+  );
+
+  // provenance facets: authors & works (for the datalists, filters, and editor prefill)
+  //
+  // ⚠ THE CEILING HERE IS CHOSEN, NOT DEFAULTED (docs/plans/16 · Piece 2).
+  // These look unbounded and are not: PostgREST stops at 1000 rows unless you
+  // say otherwise, so the read that "gets every author" would have started
+  // lying at 1001 with nothing on screen to say so — the same silent-truncation
+  // fault the combo's 50-row cap had, one layer down. Stating it makes the
+  // number somebody's decision. Harmless at 70 authors / 49 works; the thing
+  // that actually retires the question is the plan's step 2, where the combo
+  // asks the server per keystroke instead of being handed the whole vocabulary.
+  const VOCAB_CEILING = 1000;
+
+  const [subjectFilterIds, allConstellations, membership, { data: allAuthors }, { data: allWorks }] = await Promise.all(
+    [
+      // subject filter → fragment ids matching ALL selected subjects (AND semantics)
+      (async (): Promise<string[] | null> => {
+        if (!p.subjectSlugs.length) return null;
+        const { data: subs } = await supabase.from('subjects').select('id, slug').in('slug', p.subjectSlugs);
+        const subIds = (subs ?? []).map((s) => s.id);
+        if (!subIds.length) return [];
+        const { data: links } = await supabase
+          .from('fragment_subjects')
+          .select('fragment_id, subject_id')
+          .in('subject_id', subIds);
+        const bySet: Record<string, Set<string>> = {};
+        for (const l of links ?? []) (bySet[l.fragment_id] ??= new Set()).add(l.subject_id);
+        return Object.entries(bySet)
+          .filter(([, s]) => s.size === subIds.length)
+          .map(([fid]) => fid);
+      })(),
+      constellationsRead,
+      // membership filter (`?in=`): a constellation slug, or 'none' for the orphans.
+      // Resolved to an id list here, exactly like the subject filter above.
+      (async (): Promise<{ only: string[] | null; except: string[] | null }> => {
+        if (p.membership === 'none') {
+          // blacklist: everything placed anywhere
+          const { data: links } = await supabase.from('fragment_constellations').select('fragment_id');
+          return { only: null, except: [...new Set((links ?? []).map((l) => l.fragment_id))] };
+        }
+        if (!p.membership) return { only: null, except: null };
+        // whitelist: fragments in the chosen constellation. The one read in this
+        // stage that waits on another — a slug has to become an id first.
+        const target = (await constellationsRead).find((c) => c.slug === p.membership);
+        if (!target) return { only: [], except: null }; // unknown slug → match nothing, don't silently ignore
+        const { data: links } = await supabase
+          .from('fragment_constellations')
+          .select('fragment_id')
+          .eq('constellation_id', target.id);
+        return { only: (links ?? []).map((l) => l.fragment_id), except: null };
+      })(),
+      Promise.resolve(supabase.from('authors').select('id, name, slug').order('name').limit(VOCAB_CEILING)),
+      Promise.resolve(supabase.from('works').select('id, title, slug, author_id').order('title').limit(VOCAB_CEILING)),
+    ],
+  );
+  const membershipFilterIds = membership.only;
+  const membershipExcludeIds = membership.except;
+  const authorNameById = Object.fromEntries((allAuthors ?? []).map((a) => [a.id, a.name]));
+  const workTitleById = Object.fromEntries((allWorks ?? []).map((w) => [w.id, w.title]));
+  const authorFilterId = p.authorSlug ? ((allAuthors ?? []).find((a) => a.slug === p.authorSlug)?.id ?? '—') : null;
+  const workFilterId = p.workSlug ? ((allWorks ?? []).find((w) => w.slug === p.workSlug)?.id ?? '—') : null;
+
   // main query — drafts first (status asc: draft < published), then the chosen sort
   //
   // ⚠ THE CEILING IS STATED HERE FOR THE SAME REASON IT IS STATED FOR THE
@@ -302,63 +348,53 @@ export async function queryFragmentList(supabase: DB, p: FragmentListParams): Pr
     .order('status', { ascending: true }) // drafts pinned to top
     .order(SORT_COL[p.sortField], { ascending: p.sortDir === 'asc', nullsFirst: false });
 
+  // ── stage 2: the rows ──────────────────────────────────────────────────────
   const { data: fragments } = await query;
   const rows = fragments ?? [];
 
-  // per-type counts (the badge numbers) for the current view, independent of filters
-  const { data: typeRows } = await scoped(supabase.from('fragments').select('type'));
+  // ── stage 3: what hangs off the rows, collected with the sidecar ──────────
+  const ids = rows.map((r) => r.id);
+  const [
+    [{ data: typeRows }, { data: allSubjects }, { count: trashCount }, placedRead],
+    subjectLinks,
+    constellationLinks,
+  ] = await Promise.all([
+    sidecar,
+    // subjects per fragment (editor prefill)
+    ids.length
+      ? Promise.resolve(supabase.from('fragment_subjects').select('fragment_id, subjects(name)').in('fragment_id', ids))
+      : null,
+    // where each listed fragment lives (the membership column)
+    ids.length
+      ? Promise.resolve(
+          supabase.from('fragment_constellations').select('fragment_id, constellation_id').in('fragment_id', ids),
+        )
+      : null,
+  ]);
+
   const typeCounts = { writing: 0, quote: 0 } as Record<string, number>;
   for (const r of typeRows ?? []) typeCounts[r.type]++;
 
-  // subjects per fragment (editor prefill) + all subjects + trash count
-  const ids = rows.map((r) => r.id);
   const subjectsByFragment: Record<string, string[]> = {};
-  if (ids.length) {
-    const { data: fs } = await supabase
-      .from('fragment_subjects')
-      .select('fragment_id, subjects(name)')
-      .in('fragment_id', ids);
-    for (const link of fs ?? []) {
-      const name = (link.subjects as { name: string } | null)?.name;
-      if (name) (subjectsByFragment[link.fragment_id] ??= []).push(name);
-    }
+  for (const link of subjectLinks?.data ?? []) {
+    const name = (link.subjects as { name: string } | null)?.name;
+    if (name) (subjectsByFragment[link.fragment_id] ??= []).push(name);
   }
-  // where each listed fragment lives (the membership column). Ordered by the
-  // sky's authored order so a row's chips always read in the same sequence.
+
+  // Ordered by the sky's authored order so a row's chips always read in the
+  // same sequence.
   const constellationsByFragment: Record<string, ConstellationRefLite[]> = {};
-  if (ids.length) {
-    const byId = new Map(allConstellations.map((c) => [c.id, c]));
-    const order = new Map(allConstellations.map((c, i) => [c.id, i]));
-    const { data: links } = await supabase
-      .from('fragment_constellations')
-      .select('fragment_id, constellation_id')
-      .in('fragment_id', ids);
-    for (const l of links ?? []) {
-      const ref = byId.get(l.constellation_id);
-      if (ref) (constellationsByFragment[l.fragment_id] ??= []).push(ref);
-    }
-    for (const refs of Object.values(constellationsByFragment)) {
-      refs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-    }
+  const byId = new Map(allConstellations.map((c) => [c.id, c]));
+  const order = new Map(allConstellations.map((c, i) => [c.id, i]));
+  for (const l of constellationLinks?.data ?? []) {
+    const ref = byId.get(l.constellation_id);
+    if (ref) (constellationsByFragment[l.fragment_id] ??= []).push(ref);
+  }
+  for (const refs of Object.values(constellationsByFragment)) {
+    refs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
 
-  const { data: allSubjects } = await supabase.from('subjects').select('name, slug').order('name');
-  // Notes excluded here too, so the pill agrees with the room it opens.
-  const { count: trashCount } = await supabase
-    .from('fragments')
-    .select('id', { count: 'exact', head: true })
-    .not('deleted_at', 'is', null)
-    .neq('status', 'note');
-
-  // pick mode: which of these fragments already live in the target constellation
-  const placedIds = new Set<string>();
-  if (p.constellation) {
-    const { data: links } = await supabase
-      .from('fragment_constellations')
-      .select('fragment_id')
-      .eq('constellation_id', p.constellation);
-    for (const l of links ?? []) placedIds.add(l.fragment_id);
-  }
+  const placedIds = new Set((placedRead?.data ?? []).map((l) => l.fragment_id));
 
   return {
     rows,

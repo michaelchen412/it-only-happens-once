@@ -36,7 +36,13 @@ if (Astro.url.searchParams.get('view') === 'notes') return Astro.redirect('/admi
 
 const params = parseListParams(Astro.url.searchParams);
 params.constellation = null; // pick-mode concern; never used here
+const listStart = performance.now();
 const data = await queryFragmentList(supabase, params);
+// The same measurement the fragments-panel partial reports — see the note there.
+Astro.response.headers.set(
+  'Server-Timing',
+  `list;dur=${(performance.now() - listStart).toFixed(1)};desc="fragment list"`,
+);
 const view = params.view;
 const subjectNames = data.allSubjects.map((s) => s.name);
 
