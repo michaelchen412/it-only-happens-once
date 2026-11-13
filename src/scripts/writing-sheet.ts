@@ -740,10 +740,29 @@ onPage((page) => {
     excerptField.value = d?.excerpt ?? '';
     setSubjects(d?.subjects ?? '');
     savedStatus = d?.status ?? 'draft';
-    // existing pieces keep their stored date by default (custom date checked)
-    dateToggle.checked = !!d;
-    occurredField.disabled = !d;
-    dateAutoNote.hidden = !!d;
+    /*
+      ⚠ THE CUSTOM DATE IS NEVER ON BY DEFAULT (2026-11-13). It opened ticked
+      on every existing piece — "existing pieces keep their stored date" — and
+      the tick is what SENT that date. On a published piece that was harmless,
+      but on a draft it meant the first publish posted the piece under the day
+      the draft was CREATED, not the day it went live, which is the automatic
+      date the dialog promises (admin.md §5). Michael noticed the box ticked.
+
+      Unticked sends no date, and `persist` does the right thing for each
+      case on its own: today on a first publish, and an already-published
+      piece left exactly where it is. So "keep the stored date" never needed
+      the tick. The field still holds that date, so ticking it starts from the
+      current value rather than from now.
+    */
+    dateToggle.checked = false;
+    occurredField.disabled = true;
+    dateAutoNote.hidden = false;
+    // The note has to be true for both cases: a published piece keeps its date
+    // (it is not re-dated on re-publish), anything else gets today's.
+    dateAutoNote.textContent =
+      d?.status === 'published'
+        ? 'Otherwise it keeps the date it was first posted.'
+        : 'Otherwise the posted date is set automatically when you publish.';
     occurredField.value = d?.occurredIso ? toLocalInput(d.occurredIso) : '';
     dirty = false;
     everSaved = false;
