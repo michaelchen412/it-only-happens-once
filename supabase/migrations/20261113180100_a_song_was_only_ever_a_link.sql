@@ -1,4 +1,10 @@
--- DRY-RUN RESULTS: filled in below once rehearsed against live data.
+-- ⚠ NOT APPLIED — DEFERRED (2026-11-13, Michael: "not important right now").
+-- Its precondition is met: the code reading `music_url` has served production
+-- since 2026-11-13 and nothing reads the columns below. Apply it from the
+-- Supabase SQL editor whenever — the MCP `apply_migration` declines any
+-- destructive statement here — and then rename this file to the version
+-- `list_migrations` reports, since its timestamp currently sorts before the
+-- two migrations that were applied ahead of it. Tracked in docs/plans/README.md.
 --
 -- ══════════════════════════════════════════════════════════════════════════
 -- Phase 2 of 2: contract. The old shape comes out.
