@@ -68,6 +68,7 @@ const showWindows = searching && windows.length > 0;
       <Timestamp
         date={item.occurredAt}
         updated={item.updatedAt ?? undefined}
+        published={item.publishedAt ?? undefined}
         kind="posted"
         precision={item.precision}
       />

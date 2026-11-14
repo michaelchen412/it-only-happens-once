@@ -126,6 +126,7 @@ const { returnLabel, room } = Astro.props;
   import { closeWithExit, openDialog } from '../scripts/dialog-close';
   import { initReveal } from '../scripts/reveal';
   import { initShareMark } from '../scripts/share-mark';
+  import { renderTimestamps } from '../scripts/timestamp';
 
   /**
    * ⚠ THE SHEET CARRIES THE BEHAVIOUR FOR THE CONTENT IT MATERIALISES, and it
@@ -149,6 +150,12 @@ const { returnLabel, room } = Astro.props;
    * do manage to run cost nothing. ⚠ A third primitive inside a fragment needs
    * a third line — there is no mechanism that would notice its absence, only a
    * control that quietly stops working.
+   *
+   * ⚠ THE THIRD IS THE DATE (2026-11-13), and it differs in kind: not a
+   * listener but a rewrite of text, so it runs on each FILL below rather than
+   * once here. `Timestamp` ships its calendar date and an empty "Last updated"
+   * line, and `renderTimestamps` makes them the reader's — without it an opened
+   * essay would say "November 13" where the feed behind it says "Today".
    */
   initReveal();
   initShareMark();
@@ -262,6 +269,7 @@ const { returnLabel, room } = Astro.props;
     const tpl = templateFor(slug);
     if (tpl) {
       inner.replaceChildren(tpl.content.cloneNode(true));
+      renderTimestamps(inner);
       show(d, slug);
       return true;
     }
@@ -277,6 +285,7 @@ const { returnLabel, room } = Astro.props;
     if (seq !== fillSeq) return true; // a newer open already claimed the sheet
     if (!article) return false; // caller sends them to the permalink
     inner.replaceChildren(article);
+    renderTimestamps(inner);
     const scroll = d.querySelector('.reader-scroll');
     if (scroll) scroll.scrollTop = 0;
     return true;

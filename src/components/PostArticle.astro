@@ -96,7 +96,13 @@ const pairedTitle = `Music for ${item.title}`;
   */
   }
   <div class="text-whisper mt-5 flex flex-wrap items-center gap-3 text-sm">
-    <Timestamp date={item.occurredAt} updated={item.updatedAt ?? undefined} kind="posted" precision={item.precision} />
+    <Timestamp
+      date={item.occurredAt}
+      updated={item.updatedAt ?? undefined}
+      published={item.publishedAt ?? undefined}
+      kind="posted"
+      precision={item.precision}
+    />
     <span class="font-sans">·</span>
     <span class="font-sans">{item.readMinutes} min read</span>
   </div>

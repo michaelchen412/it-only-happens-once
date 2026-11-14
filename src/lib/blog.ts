@@ -36,6 +36,14 @@ export interface WritingItem {
   hasMore: boolean;
   occurredAt: string;
   updatedAt: string | null;
+  /**
+   * When it first went live — an INSTANT, unlike `occurredAt`. The "Last
+   * updated" line compares against this, so an edit only counts when it lands
+   * on a later day than the publish did, in every reader's zone alike. Absent
+   * on surfaces that do not select it; `Timestamp` then falls back to the
+   * calendar date.
+   */
+  publishedAt?: string | null;
   precision: 'day' | 'year';
   readMinutes: number;
   subjects: SubjectRef[];
@@ -205,7 +213,7 @@ export async function listWriting(
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, occurred_at, updated_at, date_precision, fragment_subjects(subjects(name, slug)), music_url`,
+      `id, slug, title, body, excerpt, occurred_at, updated_at, published_at, date_precision, fragment_subjects(subjects(name, slug)), music_url`,
       { count: 'exact' },
     )
     .eq('type', 'writing')
@@ -231,6 +239,7 @@ export async function listWriting(
       hasMore: full.length > lede.length,
       occurredAt: r.occurred_at,
       updatedAt: r.updated_at ?? null,
+      publishedAt: r.published_at ?? null,
       precision: r.date_precision,
       readMinutes: readingMinutes(r.body),
       subjects: subjectsOf(r, opts.subjectRank),
@@ -408,7 +417,7 @@ export async function getWritingBySlug(
   let query = supabase
     .from('fragments')
     .select(
-      `id, slug, title, body, excerpt, status, occurred_at, updated_at, date_precision, fragment_subjects(subject_id, subjects(name, slug)), music_url`,
+      `id, slug, title, body, excerpt, status, occurred_at, updated_at, published_at, date_precision, fragment_subjects(subject_id, subjects(name, slug)), music_url`,
     )
     .eq('type', 'writing')
     .is('deleted_at', null)
@@ -447,6 +456,7 @@ export async function getWritingBySlug(
     hasMore: (r.body ?? '').trim().length > lede.length,
     occurredAt: r.occurred_at,
     updatedAt: r.updated_at ?? null,
+    publishedAt: r.published_at ?? null,
     precision: r.date_precision,
     readMinutes: readingMinutes(r.body),
     subjects: subjectsOf(r),

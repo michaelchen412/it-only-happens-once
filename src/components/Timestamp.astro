@@ -5,6 +5,13 @@
   Surface: a bare, quiet token. No verb. Just the moment.
     today → Today · yesterday → Yesterday · within a week → Tuesday
     this year → March 12 · older → March 12, 2023 · year-precision → 2019
+
+  ⚠ THE RELATIVE WORDS ARE THE READER'S, applied in the browser by
+  `scripts/timestamp.ts`. The server renders only the calendar date ("March 12"),
+  because "today" depends on where and when someone is reading, and this HTML is
+  edge-cached — a "Today" rendered on the server is a lie by tomorrow, and on a
+  UTC server it was a lie by 7pm in New York. Without JavaScript, the date stays,
+  which is always true.
   Click: a popover with the full truth — weekday, date, time, and any later edit.
   The verb ("Posted" / "Added") lives ONLY in the popover, chosen by `kind`,
   honoring the two date meanings: writing is posted, a song/quote is added.
@@ -14,6 +21,9 @@
 interface Props {
   date: string | Date;
   updated?: string | Date;
+  /** When it first went live (an instant). "Last updated" is measured from
+      this when given, and from the calendar date when not. */
+  published?: string | Date;
   kind?: 'posted' | 'added';
   precision?: 'day' | 'year';
   class?: string;
@@ -23,11 +33,11 @@ interface Props {
   prefix?: string;
 }
 import { Icon } from 'astro-icon/components';
-const { date, updated, kind = 'posted', precision = 'day', class: className = '', prefix } = Astro.props;
+const { date, updated, published, kind = 'posted', precision = 'day', class: className = '', prefix } = Astro.props;
 
 const d = new Date(date);
 const u = updated ? new Date(updated) : null;
-const now = new Date();
+const p = published ? new Date(published) : null;
 
 // ⚠⚠ `timeZone: 'UTC'`, AND IT IS THE "never UTC on screen" RULE BEING KEPT
 // RATHER THAN BROKEN (ADR 0039). `date` here is `occurred_at` — a CALENDAR DATE,
@@ -43,20 +53,22 @@ const now = new Date();
 // Three readers, one column.
 const CAL = { timeZone: 'UTC' } as const;
 
-const startOfDay = (x: Date) => Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
-const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+/** The calendar date as `YYYY-MM-DD` — what the browser relabels and compares. */
+const ymd = d.toISOString().slice(0, 10);
 
 const weekdayLong = d.toLocaleDateString('en-US', { ...CAL, weekday: 'long' });
 const monthDay = d.toLocaleDateString('en-US', { ...CAL, month: 'long', day: 'numeric' });
 const monthDayYear = d.toLocaleDateString('en-US', { ...CAL, month: 'long', day: 'numeric', year: 'numeric' });
 
-let label: string;
-if (precision === 'year') label = String(d.getUTCFullYear());
-else if (diffDays === 0) label = 'Today';
-else if (diffDays === 1) label = 'Yesterday';
-else if (diffDays > 1 && diffDays < 7) label = weekdayLong;
-else if (d.getUTCFullYear() === now.getUTCFullYear()) label = monthDay;
-else label = monthDayYear;
+// The server's label is the absolute date, never a relative word — see the
+// header. "This year" is the build's year, so a cached page may show a year the
+// reader would drop; the browser corrects that along with the relative words.
+const label =
+  precision === 'year'
+    ? String(d.getUTCFullYear())
+    : d.getUTCFullYear() === new Date().getUTCFullYear()
+      ? monthDay
+      : monthDayYear;
 
 const verb = kind === 'added' ? 'Added' : 'Posted';
 // ⚠ NO TIME OF DAY, AND ITS ABSENCE IS THE POINT (ADR 0039). This read
@@ -66,24 +78,18 @@ const verb = kind === 'added' ? 'Added' : 'Posted';
 // it was a backdated piece it was a literal midnight, printed as though it meant
 // something. A calendar date has a day and nothing smaller.
 const detail = precision === 'year' ? `${verb} in ${d.getUTCFullYear()}` : `${verb} on ${weekdayLong}, ${monthDayYear}`;
-// ⚠ `updated` IS THE OTHER KIND AND IS DELIBERATELY LEFT ALONE — the one place
-// this component is still not fully compliant, recorded rather than smuggled.
-// `updated_at` is an INSTANT, so ADR 0039 says it belongs in the viewer's zone;
-// rendered on the server it can only be the server's. Fixing it properly means a
-// client pass, and `local-time.ts`'s two modes both drop the YEAR — which this
-// line carries and needs, against posts from 2022. `fragments-display.ts` met
-// exactly this and declined it in the same words ("full compliance wants a third
-// mode"). Same call, same reason; the discrepancy is hours, not a day, and the
-// year is the fact a reader is actually using.
-const updatedDetail = u
-  ? `Last updated on ${u.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })} at ${u.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-  : null;
-
+// ⚠ `updated` IS AN INSTANT, so it belongs in the READER's zone (ADR 0039) —
+// and a server can only offer its own, which on Vercel is UTC. This used to
+// format it here and said so in a comment, as the one place the component
+// broke the no-UTC rule; it showed "12:02 AM" for an essay published at 7:02pm
+// in New York. The line now ships HIDDEN and empty, and `scripts/timestamp.ts`
+// fills it in the reader's zone and shows it only when the update falls on a
+// later day than the PUBLISH did (an edit minutes after posting is not news —
+// and `updated_at` moves on the publish write itself). Against the publish
+// INSTANT rather than the posted date, because the posted date is New York's
+// calendar day: a Tokyo reader is already on the next one when an essay goes
+// live at 7pm, and would be told about an edit that never happened. No JavaScript, no line:
+// it is an optional detail, and no line is better than a wrong time.
 // unique per instance (build-time)
 const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
 ---
@@ -109,7 +115,7 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
       /* No underline: the clock icon + hover already read as interactive, and the
         date is a quiet detail — an underline over-advertises a non-critical tap. */
     }
-    <time datetime={d.toISOString()}>{label}</time>
+    <time datetime={d.toISOString()} data-ts-day={precision === 'day' ? ymd : undefined}>{label}</time>
   </button>
   <div
     id={pid}
@@ -118,6 +124,16 @@ const pid = 'ts-' + Math.random().toString(36).slice(2, 9);
     class="ts-popover rounded-box border-base-300 bg-base-200 border p-4 text-sm shadow-lg"
   >
     <p class="text-base-content/80">{detail}</p>
-    {updatedDetail && <p class="text-whisper mt-1">{updatedDetail}</p>}
+    {
+      u && (
+        <p class="text-whisper mt-1" data-ts-updated={p ? p.toISOString() : ymd} hidden>
+          Last updated on <time datetime={u.toISOString()} />
+        </p>
+      )
+    }
   </div>
 </span>
+
+<script>
+  import '../scripts/timestamp';
+</script>
