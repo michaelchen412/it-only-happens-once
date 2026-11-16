@@ -117,6 +117,23 @@ const hasContent = Astro.slots.has('content');
     outline-offset: 3px;
     border-radius: 2px;
   }
+  /* ⚠ ON A TOUCH SCREEN THE UNDERLINE IS THERE AT REST (2026-11-16). The
+     register above trades discoverability for quiet and pays it back on hover —
+     and a finger never hovers, so on a phone "2 constellations" was plain grey
+     text with nothing to say it opens. Michael, testing the Reader on his phone:
+     "I don't feel like the constellations popover was clickable." It was; it
+     just never said so. `hover: none` is the device that cannot reveal it, so it
+     shows the hover state permanently — the same dotted line, never louder.
+
+     Only on the LIST triggers (`--wide`: "2 constellations", "7 related"). The
+     attribution's silence is the register's whole point (see the header), and
+     it is not what went unnoticed; a count names a destination, so marking it
+     costs nothing the line was protecting. */
+  @media (hover: none) {
+    .rv[data-rv-live]:has(> .rv__pop--wide) > .rv__trigger {
+      text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
+    }
+  }
   .rv[data-rv-live] .rv__trigger[aria-expanded='true'] {
     text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
     color: var(--color-primary);

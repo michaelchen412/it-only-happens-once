@@ -363,8 +363,48 @@ const allSubjectsHref =
     flex-direction: column;
     gap: 0.8rem;
   }
+  /* ⚠ EVERY ROW IS A DOOR, AND NOW IT SAYS SO WITHOUT A POINTER (2026-11-16).
+     A row was a block of words: no underline, no mark, and the star's bloom —
+     the one sign of life — runs on `.group:hover`, which a finger never fires.
+     On a phone that read as a list of facts rather than a list of places, and
+     Michael felt it: "I don't feel like it was clickable." The overview had the
+     same hover-only problem and ADR-0022 fixed it; this is the popover-sized
+     version of that fix.
+
+     Two cues, both quiet. A trailing → (the `.qp-door` arrow's ink and weight,
+     so it reads as the same family) that warms on hover and focus. And a
+     pressed tint on `:active` — on touch the only state there is between "I
+     tapped" and "it navigated", which on a slow connection is long enough to
+     wonder whether the tap took. The negative margin keeps the tint's padding
+     from moving the words: a row sits exactly where it did. */
   .qp-row {
     display: block;
+    position: relative;
+    margin: -0.3rem -0.45rem;
+    padding: 0.3rem 1.6rem 0.3rem 0.45rem;
+    border-radius: calc(var(--radius-box) * 0.6);
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease;
+  }
+  .qp-row::after {
+    content: '→';
+    position: absolute;
+    top: 0.3rem;
+    right: 0.45rem;
+    color: var(--text-whisper);
+    opacity: 0.6;
+    transition:
+      opacity 160ms ease,
+      color 160ms ease;
+  }
+  .qp-row:hover::after,
+  .qp-row:focus-visible::after,
+  .qp-row:active::after {
+    opacity: 1;
+    color: var(--color-primary);
+  }
+  .qp-row:active {
+    background: color-mix(in oklab, var(--color-primary) 10%, transparent);
   }
   .qp-row__head {
     display: flex;

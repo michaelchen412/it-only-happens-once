@@ -138,8 +138,65 @@ export function initReveal() {
       if (opening) place();
       trigger.setAttribute('aria-expanded', String(opening));
     });
+    /*
+      ⚠ INSIDE THE READER, A BOX THAT WILL NOT FIT BELOW MAKES ROOM INSTEAD OF
+      SHRINKING (2026-11-16). `place()` caps rather than flips, so the list never
+      lands across the line being read — right, and kept. But the strip ends an
+      essay, and the Reader cannot scroll past its own last line, so the trigger
+      sat at y≈567 of 720 with nowhere to go: "2 constellations" opened a 117px
+      box with its second constellation entirely off-screen, and "10 related"
+      showed one row of eight. The cap had nothing to cap TO.
+
+      So the sheet scrolls up first, by exactly the shortfall, and the box opens
+      below at its natural height. Nothing is covered — the words move, they are
+      not hidden — which is the alternative that kept the rule, chosen with
+      Michael over flipping the box upward at an essay's end.
+
+      · The Reader only. On a standalone page the strip sits under a quote, and
+        lifting the page would scroll the quote out of view: the rule's reason,
+        by another route. There the cap stays the answer.
+      · Room is ADDED when the sheet has none: trailing padding on the
+        scroller, for exactly the gap, removed when the box closes. Removing it
+        lets the scroll settle back to where the essay ended, which is where the
+        reader was.
+      · The trigger never rises above a fifth of the screen, so what it belongs
+        to stays in view; and a list taller than 60% of the screen still
+        scrolls inside its box rather than asking the page to move further.
+    */
+    let addedRoom: { el: HTMLElement; before: string } | null = null;
+    const makeRoom = () => {
+      if (isSheet()) return;
+      const scroller = trigger.closest<HTMLElement>('.reader-scroll');
+      if (!scroller) return;
+      pop.style.maxHeight = 'none';
+      const natural = pop.getBoundingClientRect().height;
+      const r = trigger.getBoundingClientRect();
+      const GAP = 8;
+      const want = Math.min(natural, window.innerHeight * 0.6);
+      const short = want + GAP * 2 - (window.innerHeight - r.bottom);
+      const lift = Math.min(short, r.top - window.innerHeight * 0.2);
+      place();
+      if (lift <= 0) return;
+      const spare = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+      if (spare < lift) {
+        addedRoom = { el: scroller, before: scroller.style.paddingBottom };
+        const current = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
+        scroller.style.paddingBottom = `${current + (lift - spare)}px`;
+      }
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // The capture-phase scroll listener below re-places the box on every
+      // frame of this, so it rides up with its trigger rather than jumping.
+      scroller.scrollBy({ top: lift, behavior: still ? 'auto' : 'smooth' });
+    };
+
     pop.addEventListener('toggle', (e) => {
-      if ((e as ToggleEvent).newState === 'open') place();
+      if ((e as ToggleEvent).newState === 'open') {
+        place();
+        makeRoom();
+      } else if (addedRoom) {
+        addedRoom.el.style.paddingBottom = addedRoom.before;
+        addedRoom = null;
+      }
     });
 
     // Scroll and resize move the anchor out from under a fixed-position box.
